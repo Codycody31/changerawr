@@ -1,0 +1,193 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id              String             @id @default(cuid())
+  email           String             @unique
+  password        String
+  name            String?
+  role            Role               @default(STAFF)
+  refreshTokens   RefreshToken[]
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  lastLoginAt     DateTime?
+  settings        Settings?
+  staffRequests   ChangelogRequest[] @relation("StaffRequests")
+  adminResponses  ChangelogRequest[] @relation("AdminResponses")
+  ApiKey          ApiKey[]
+  auditLogs       AuditLog[]         @relation("AuditLogUser")
+  targetAuditLogs AuditLog[]         @relation("AuditLogTarget")
+}
+
+model RefreshToken {
+  id          String   @id @default(cuid())
+  token       String   @unique
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+  invalidated Boolean  @default(false)
+
+  @@index([userId])
+}
+
+model Settings {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  theme     String   @default("light")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model InvitationLink {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  role      Role
+  email     String
+  createdBy String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([token])
+  @@index([email])
+}
+
+model Project {
+  id                String             @id @default(cuid())
+  name              String
+  isPublic          Boolean            @default(false)
+  allowAutoPublish  Boolean            @default(false)
+  requireApproval   Boolean            @default(true)
+  defaultTags       String[]           @default([])
+  changelog         Changelog?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  changelogRequests ChangelogRequest[]
+}
+
+model Changelog {
+  id        String           @id @default(cuid())
+  project   Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String           @unique
+  entries   ChangelogEntry[]
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+}
+
+model ChangelogEntry {
+  id          String             @id @default(cuid())
+  title       String
+  content     String             @db.Text
+  version     String?
+  publishedAt DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  tags        ChangelogTag[]
+  changelog   Changelog          @relation(fields: [changelogId], references: [id], onDelete: Cascade)
+  changelogId String
+  requests    ChangelogRequest[]
+
+  @@index([changelogId])
+}
+
+model ChangelogTag {
+  id        String             @id @default(cuid())
+  name      String             @unique
+  entries   ChangelogEntry[]
+  requests  ChangelogRequest[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+}
+
+model ChangelogRequest {
+  id               String          @id @default(cuid())
+  type             String // DELETE_PROJECT, DELETE_TAG
+  status           String          @default("PENDING") // PENDING, APPROVED, REJECTED
+  staffId          String
+  staff            User            @relation("StaffRequests", fields: [staffId], references: [id])
+  adminId          String?
+  admin            User?           @relation("AdminResponses", fields: [adminId], references: [id])
+  projectId        String
+  project          Project         @relation(fields: [projectId], references: [id])
+  targetId         String? // For specific items being deleted (e.g., tag id)
+  createdAt        DateTime        @default(now())
+  reviewedAt       DateTime?
+  ChangelogEntry   ChangelogEntry? @relation(fields: [changelogEntryId], references: [id])
+  changelogEntryId String?
+  ChangelogTag     ChangelogTag?   @relation(fields: [changelogTagId], references: [id])
+  changelogTagId   String?
+
+  @@index([staffId])
+  @@index([adminId])
+  @@index([projectId])
+  @@index([status])
+}
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  name        String
+  key         String    @unique
+  lastUsed    DateTime?
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime?
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  permissions String[] // Array of permitted actions
+  isRevoked   Boolean   @default(false)
+
+  @@index([userId])
+  @@index([key])
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  action       String
+  userId       String
+  targetUserId String?
+  details      Json?
+  createdAt    DateTime @default(now())
+  user         User     @relation("AuditLogUser", fields: [userId], references: [id])
+  targetUser   User?    @relation("AuditLogTarget", fields: [targetUserId], references: [id])
+
+  @@index([userId])
+  @@index([targetUserId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model SystemConfig {
+  id                            Int      @id @default(1)
+  defaultInvitationExpiry       Int      @default(7)
+  requireApprovalForChangelogs  Boolean  @default(true)
+  maxChangelogEntriesPerProject Int      @default(100)
+  enableAnalytics               Boolean  @default(true)
+  enableNotifications           Boolean  @default(true)
+  updatedAt                     DateTime @updatedAt
+}
+
+enum Role {
+  ADMIN
+  STAFF
+  VIEWER
+}
+
+enum RequestType {
+  DELETE_ENTRY
+  DELETE_TAG
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
