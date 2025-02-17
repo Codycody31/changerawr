@@ -9,13 +9,25 @@ const PUBLIC_PATHS = [
     '/api/auth/login',
     '/api/auth/refresh',
     '/api/auth/preview',
+    '/api/setup/status', // Allow setup status check
     '/_next',
     '/favicon.ico',
     '/public'
 ]
 
 // Routes that should redirect to /dashboard if authenticated
-const AUTH_ROUTES = ['/login', '/register']
+const AUTH_ROUTES = ['/login', '/register', '/setup']
+
+async function checkSetupStatus(): Promise<boolean> {
+    try {
+        const response = await fetch('http://localhost:3000/api/setup/status')
+        const data = await response.json()
+        return data.isComplete
+    } catch (error) {
+        console.error('Setup status check failed:', error)
+        return false
+    }
+}
 
 export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl
@@ -30,15 +42,22 @@ export async function middleware(request: NextRequest) {
         return NextResponse.next()
     }
 
+    // Special handling for setup route
+    if (pathname === '/setup') {
+        const isSetupComplete = await checkSetupStatus()
+
+        if (isSetupComplete) {
+            // If setup is complete, redirect to login
+            return NextResponse.redirect(new URL('/login', request.url))
+        }
+
+        // Allow access to setup if not complete
+        return NextResponse.next()
+    }
+
     // Check for authentication token in cookies
     const accessToken = request.cookies.get('accessToken')?.value
     const refreshToken = request.cookies.get('refreshToken')?.value
-
-    // Logging for debugging
-    console.log('Middleware Debug:')
-    console.log('Path:', pathname)
-    console.log('Access Token Present:', !!accessToken)
-    console.log('Refresh Token Present:', !!refreshToken)
 
     // Handle authentication routes
     if (AUTH_ROUTES.includes(pathname)) {
@@ -46,29 +65,32 @@ export async function middleware(request: NextRequest) {
             try {
                 const userId = await verifyAccessToken(accessToken)
                 if (userId) {
-                    console.log('Already authenticated, would redirect to dashboard')
                     return NextResponse.redirect(new URL('/dashboard', request.url))
                 }
             } catch (error) {
-                console.log('Access Token verification failed:', error)
-                // Continue to login if token is invalid
+                console.error('Access Token verification failed:', error)
             }
         }
         return NextResponse.next()
     }
 
+    // For non-setup routes, check if setup is complete
+    if (pathname !== '/setup') {
+        const isSetupComplete = await checkSetupStatus()
+        if (!isSetupComplete) {
+            // Redirect to setup if system is not initialized
+            return NextResponse.redirect(new URL('/setup', request.url))
+        }
+    }
+
     // Protect other routes
     if (!accessToken) {
-        console.log('No access token found')
-
         // If refresh token exists, allow continuation to potentially refresh
         if (refreshToken) {
-            console.log('Refresh token present, allowing request to potentially refresh')
             return NextResponse.next()
         }
 
         // Redirect to login with original path
-        console.log('Redirecting to login')
         const url = new URL('/login', request.url)
         url.searchParams.set('from', pathname)
         return NextResponse.redirect(url)
@@ -78,11 +100,8 @@ export async function middleware(request: NextRequest) {
     try {
         const userId = await verifyAccessToken(accessToken)
         if (!userId) {
-            console.log('Invalid access token')
-
             // If refresh token exists, allow request to potentially refresh
             if (refreshToken) {
-                console.log('Refresh token present, allowing request to potentially refresh')
                 return NextResponse.next()
             }
 
@@ -96,12 +115,10 @@ export async function middleware(request: NextRequest) {
         const response = NextResponse.next()
         response.headers.set('x-user-id', userId)
         return response
-    } catch (error) {
-        console.log('Token verification error:', error)
-
+    } catch (error: unknown) {
+        console.error((error as Error).stack);
         // If refresh token exists, allow request to potentially refresh
         if (refreshToken) {
-            console.log('Refresh token present, allowing request to potentially refresh')
             return NextResponse.next()
         }
 

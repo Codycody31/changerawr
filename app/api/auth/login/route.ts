@@ -2,19 +2,20 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { verifyPassword } from '@/lib/auth/password'
 import { generateTokens } from '@/lib/auth/tokens'
-import { LoginCredentials, LoginResponse, Role } from '@/lib/types/auth'
+
 import { z } from 'zod'
 
 const loginSchema = z.object({
     email: z.string().email('Invalid email address'),
     password: z.string().min(8, 'Password must be at least 8 characters'),
-}) satisfies z.Schema<LoginCredentials>
+})
 
 export async function POST(request: Request) {
     try {
         const body = await request.json()
         const { email, password } = loginSchema.parse(body)
 
+        // Find user and include necessary fields
         const user = await db.user.findUnique({
             where: { email },
             select: {
@@ -30,7 +31,6 @@ export async function POST(request: Request) {
         if (!user) {
             // Simulate password check to prevent timing attacks
             await verifyPassword(password, '$2b$10$invalidHashToPreventTimingAttack')
-
             return NextResponse.json(
                 { error: 'Invalid credentials' },
                 { status: 401 }
@@ -45,49 +45,50 @@ export async function POST(request: Request) {
             )
         }
 
-        // Update last login timestamp
-        await db.user.update({
-            where: { id: user.id },
-            data: { lastLoginAt: new Date() }
-        })
-
-        // Clean up old refresh tokens
-        await db.refreshToken.deleteMany({
-            where: {
-                userId: user.id,
-                OR: [
-                    { expiresAt: { lt: new Date() } },
-                    { invalidated: true },
-                ],
-            },
-        })
+        // Update last login timestamp and clean up old refresh tokens
+        await db.$transaction([
+            db.user.update({
+                where: { id: user.id },
+                data: { lastLoginAt: new Date() }
+            }),
+            db.refreshToken.deleteMany({
+                where: {
+                    userId: user.id,
+                    OR: [
+                        { expiresAt: { lt: new Date() } },
+                        { invalidated: true },
+                    ],
+                },
+            })
+        ])
 
         // Generate new tokens
         const tokens = await generateTokens(user.id)
 
-        const response: LoginResponse = {
+        // Create response with user data
+        const response = {
             user: {
                 id: user.id,
                 email: user.email,
                 name: user.name,
-                role: user.role as Role,
+                role: user.role,
                 lastLoginAt: user.lastLoginAt,
             },
             ...tokens,
         }
 
-        // Create a response with the user data and set cookies
+        // Create response and set cookies
         const nextResponse = NextResponse.json(response)
 
-        // Set access token as an HTTP-only cookie
+        // Set access token as HTTP-only cookie
         nextResponse.cookies.set('accessToken', tokens.accessToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'strict',
-            maxAge: 60 * 60, // 1 hour
+            maxAge: 15 * 60, // 15 minutes
         })
 
-        // Set refresh token as an HTTP-only cookie
+        // Set refresh token as HTTP-only cookie
         nextResponse.cookies.set('refreshToken', tokens.refreshToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
@@ -118,7 +119,7 @@ export async function POST(request: Request) {
     }
 }
 
-// Optional: Add rate limiting middleware or additional security checks
+// Return method not allowed for other methods
 export async function GET() {
     return NextResponse.json(
         { error: 'Method not allowed' },

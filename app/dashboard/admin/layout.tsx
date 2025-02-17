@@ -12,7 +12,6 @@ import {Users, Key, Shield, Settings, FileText, ClipboardCheck} from 'lucide-rea
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import {Toaster} from "@/components/ui/toaster";
 
 const tabs = [
     {
@@ -114,7 +113,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                             animate={{ opacity: 1, y: 0 }}
                         >
                             {children}
-                            <Toaster/>
                         </motion.div>
                     </div>
                 </div>
