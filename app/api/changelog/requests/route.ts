@@ -2,28 +2,37 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { validateAuthAndGetUser } from '@/lib/utils/changelog'
 import { z } from 'zod'
+import {Prisma} from "@prisma/client";
 
 const requestSchema = z.object({
-    type: z.enum(['DELETE_PROJECT', 'DELETE_TAG']),
+    type: z.enum(['DELETE_PROJECT', 'DELETE_TAG', 'DELETE_ENTRY']),
     projectId: z.string(),
     targetId: z.string().optional()
 })
 
-export async function GET() {
+export async function GET(request: Request) {
     try {
         const user = await validateAuthAndGetUser()
+        const { searchParams } = new URL(request.url)
+        const projectId = searchParams.get('projectId')
 
+        // Build the base query
+        const whereClause: Prisma.ChangelogRequestWhereInput = {
+            status: 'PENDING',
+        }
+
+        // If projectId is provided, filter by it
+        if (projectId) {
+            whereClause.projectId = projectId
+        }
+
+        // If not admin, only show user's own requests
         if (user.role !== 'ADMIN') {
-            return NextResponse.json(
-                { error: 'Unauthorized' },
-                { status: 403 }
-            )
+            whereClause.staffId = user.id
         }
 
         const requests = await db.changelogRequest.findMany({
-            where: {
-                status: 'PENDING'
-            },
+            where: whereClause,
             include: {
                 staff: {
                     select: {
@@ -59,7 +68,7 @@ export async function GET() {
 export async function POST(request: Request) {
     try {
         const user = await validateAuthAndGetUser()
-        console.log('User attempting to create request:', { id: user.id, role: user.role }) // Debugging
+        console.log('User attempting to create request:', { id: user.id, role: user.role })
 
         // Ensure only staff members can create requests (Admins should perform actions directly)
         if (user.role !== 'STAFF') {
@@ -70,7 +79,7 @@ export async function POST(request: Request) {
         }
 
         const body = await request.json()
-        console.log('Received request body:', body) // Debug log
+        console.log('Received request body:', body)
 
         const validatedData = requestSchema.parse(body)
 
@@ -108,25 +117,24 @@ export async function POST(request: Request) {
             }
         }
 
-        // Check if a similar pending request already exists
+        // Check if a similar pending request already exists from any staff member
         const existingRequest = await db.changelogRequest.findFirst({
             where: {
                 projectId: validatedData.projectId,
                 type: validatedData.type,
                 targetId: validatedData.targetId,
-                status: 'PENDING',
-                staffId: user.id
+                status: 'PENDING'
             }
         })
 
         if (existingRequest) {
             return NextResponse.json(
                 { error: 'A similar request is already pending' },
-                { status: 400 }
+                { status: 409 } // Using 409 Conflict for better semantic meaning
             )
         }
 
-        // Create the request without performing the deletion
+        // Create the request
         const changelogRequest = await db.changelogRequest.create({
             data: {
                 type: validatedData.type,
@@ -152,9 +160,6 @@ export async function POST(request: Request) {
                 }
             }
         })
-
-        // Log the creation of the request for debugging
-        console.log('Request created successfully:', changelogRequest)
 
         // Create an audit log entry
         await db.auditLog.create({

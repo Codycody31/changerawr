@@ -1,10 +1,9 @@
 import { db } from '@/lib/db'
 import {
-    validateAuthAndGetUser,
     changelogEntrySchema,
     sendError,
     sendSuccess,
-    type ChangelogEntryInput
+    type ChangelogEntryInput, validateAuthAndGetUser
 } from '@/lib/utils/changelog'
 import {z} from "zod";
 
@@ -13,7 +12,7 @@ export async function GET(
     { params }: { params: { projectId: string } }
 ) {
     try {
-        await validateAuthAndGetUser(request.headers.get('authorization'))
+        await validateAuthAndGetUser()
 
         const changelog = await db.changelog.findUnique({
             where: { projectId: params.projectId },
@@ -45,7 +44,7 @@ export async function POST(
     { params }: { params: { projectId: string } }
 ) {
     try {
-        const user = await validateAuthAndGetUser(request.headers.get('authorization'))
+        const user = await validateAuthAndGetUser()
 
         if (user.role === 'VIEWER') {
             return sendError('Unauthorized', 403)

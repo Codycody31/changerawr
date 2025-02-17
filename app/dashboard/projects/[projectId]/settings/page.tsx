@@ -322,7 +322,7 @@ export default function ProjectSettingsPage({params}: ProjectSettingsPageProps) 
                                         <DestructiveActionRequest
                                             projectId={projectId}
                                             action="DELETE_PROJECT"
-                                            onSuccess={user?.role === 'ADMIN' ? () => router.push('/dashboard/projects') : () => {}}
+                                            onSuccess={() => router.push('/dashboard/projects')}
 
                                         />
                                     )}

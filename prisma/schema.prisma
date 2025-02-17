@@ -111,7 +111,7 @@ model ChangelogTag {
 
 model ChangelogRequest {
   id               String          @id @default(cuid())
-  type             String // DELETE_PROJECT, DELETE_TAG
+  type             String // DELETE_PROJECT, DELETE_TAG, DELETE_ENTRY
   status           String          @default("PENDING") // PENDING, APPROVED, REJECTED
   staffId          String
   staff            User            @relation("StaffRequests", fields: [staffId], references: [id])

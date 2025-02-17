@@ -55,3 +55,52 @@ export interface ChangelogRequest {
         name: string
     } | null
 }
+
+export interface Project {
+    changelog: {
+        id: string;
+        projectId: string;
+        createdAt: Date;
+        updatedAt: Date;
+    } | null;
+    name: string;
+    id: string;
+    createdAt: Date;
+    updatedAt: Date;
+    isPublic: boolean;
+    allowAutoPublish: boolean;
+    requireApproval: boolean;
+    defaultTags: string[];
+}
+
+export interface RequestDataType {
+    type: string;
+    status: string;
+    projectId: string;
+    targetId: string | null;
+    id: string;
+    createdAt: Date;
+    staffId: string;
+    adminId: string | null;
+    reviewedAt: Date | null;
+    changelogEntryId: string | null;
+    changelogTagId: string | null;
+    project: {
+        changelog: {
+            id: string;
+            projectId: string;
+            createdAt: Date;
+            updatedAt: Date;
+        } | null;
+        name: string;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        isPublic: boolean;
+        allowAutoPublish: boolean;
+        requireApproval: boolean;
+        defaultTags: string[];
+    };
+    ChangelogEntry: unknown | null;
+    ChangelogTag: unknown;
+}

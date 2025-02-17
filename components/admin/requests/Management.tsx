@@ -1,6 +1,7 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import {
     Card,
     CardContent,
@@ -25,7 +26,6 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-    AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -34,9 +34,16 @@ import { formatDistanceToNow } from 'date-fns'
 import { Check, X, Loader2, AlertTriangle } from 'lucide-react'
 import type { ChangelogRequest, RequestStatus } from '@/lib/types/changelog'
 
+type ProcessingRequest = {
+    id: string;
+    status: RequestStatus;
+} | null;
+
 export function RequestManagement() {
     const { toast } = useToast()
     const queryClient = useQueryClient()
+    const [processingRequest, setProcessingRequest] = useState<ProcessingRequest>(null)
+    const [isDialogOpen, setIsDialogOpen] = useState(false)
 
     const { data: requests, isLoading, error } = useQuery<ChangelogRequest[]>({
         queryKey: ['changelog-requests'],
@@ -71,12 +78,14 @@ export function RequestManagement() {
 
             return response.json()
         },
-        onSuccess: (data) => {
+        onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['changelog-requests'] })
             toast({
                 title: 'Success',
-                description: `Request ${data.status.toLowerCase()} successfully`
+                description: `Request ${processingRequest?.status?.toLowerCase() || ''} successfully`
             })
+            setIsDialogOpen(false)
+            setProcessingRequest(null)
         },
         onError: (error: Error) => {
             toast({
@@ -84,8 +93,24 @@ export function RequestManagement() {
                 description: error.message,
                 variant: 'destructive'
             })
+            setIsDialogOpen(false)
+            setProcessingRequest(null)
         }
     })
+
+    const handleProcessRequest = (requestId: string, status: RequestStatus) => {
+        setProcessingRequest({ id: requestId, status })
+        setIsDialogOpen(true)
+    }
+
+    const confirmProcessRequest = () => {
+        if (!processingRequest) return
+
+        processRequest.mutate({
+            requestId: processingRequest.id,
+            status: processingRequest.status
+        })
+    }
 
     if (isLoading) {
         return (
@@ -104,42 +129,114 @@ export function RequestManagement() {
         )
     }
 
-    const handleProcessRequest = (requestId: string, status: RequestStatus) => {
-        return (
-            <AlertDialog>
-                <AlertDialogTrigger asChild>
-                    <Button
-                        size="sm"
-                        variant={status === 'APPROVED' ? 'default' : 'destructive'}
-                        disabled={processRequest.isPending}
-                    >
-                        {status === 'APPROVED' ? (
-                            <Check className="h-4 w-4" />
-                        ) : (
-                            <X className="h-4 w-4" />
-                        )}
-                    </Button>
-                </AlertDialogTrigger>
+    return (
+        <>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Pending Requests</CardTitle>
+                    <CardDescription>
+                        Manage destructive action requests from staff members
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {!requests?.length ? (
+                        <div className="text-center py-6">
+                            <p className="text-sm text-muted-foreground">No pending requests</p>
+                        </div>
+                    ) : (
+                        <div className="relative overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Type</TableHead>
+                                        <TableHead>Project</TableHead>
+                                        <TableHead>Requested By</TableHead>
+                                        <TableHead>Target</TableHead>
+                                        <TableHead>Requested</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {requests.map((request) => (
+                                        <TableRow key={request.id}>
+                                            <TableCell>
+                                                <Badge variant="outline">
+                                                    {request.type === 'DELETE_PROJECT' ? 'Delete Project' : 'Delete Tag'}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                                {request.project.name}
+                                            </TableCell>
+                                            <TableCell>
+                                                {request.staff.name || request.staff.email}
+                                            </TableCell>
+                                            <TableCell>
+                                                {request.type === 'DELETE_TAG'
+                                                    ? request.ChangelogTag?.name
+                                                    : 'Entire Project'}
+                                            </TableCell>
+                                            <TableCell>
+                                                {formatDistanceToNow(new Date(request.createdAt), {
+                                                    addSuffix: true
+                                                })}
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <Button
+                                                        size="sm"
+                                                        variant="default"
+                                                        onClick={() => handleProcessRequest(request.id, 'APPROVED')}
+                                                        disabled={processRequest.isPending}
+                                                    >
+                                                        <Check className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="destructive"
+                                                        onClick={() => handleProcessRequest(request.id, 'REJECTED')}
+                                                        disabled={processRequest.isPending}
+                                                    >
+                                                        <X className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>
-                            {status === 'APPROVED' ? 'Approve Request?' : 'Reject Request?'}
+                            {processingRequest?.status === 'APPROVED' ? 'Approve Request?' : 'Reject Request?'}
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                            {status === 'APPROVED'
+                            {processingRequest?.status === 'APPROVED'
                                 ? 'This will approve the request and execute the requested action.'
                                 : 'This will reject the request. The requested action will not be performed.'}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel onClick={() => {
+                            setProcessingRequest(null)
+                            setIsDialogOpen(false)
+                        }}>
+                            Cancel
+                        </AlertDialogCancel>
                         <AlertDialogAction
-                            onClick={() => processRequest.mutate({ requestId, status })}
-                            className={status === 'APPROVED' ? '' : 'bg-destructive hover:bg-destructive/90'}
+                            onClick={confirmProcessRequest}
+                            className={processingRequest?.status === 'APPROVED'
+                                ? ''
+                                : 'bg-destructive hover:bg-destructive/90'}
                         >
                             {processRequest.isPending ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : status === 'APPROVED' ? (
+                            ) : processingRequest?.status === 'APPROVED' ? (
                                 'Approve'
                             ) : (
                                 'Reject'
@@ -148,72 +245,6 @@ export function RequestManagement() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-        )
-    }
-
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Pending Requests</CardTitle>
-                <CardDescription>
-                    Manage destructive action requests from staff members
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                {!requests?.length ? (
-                    <div className="text-center py-6">
-                        <p className="text-sm text-muted-foreground">No pending requests</p>
-                    </div>
-                ) : (
-                    <div className="relative overflow-x-auto">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Type</TableHead>
-                                    <TableHead>Project</TableHead>
-                                    <TableHead>Requested By</TableHead>
-                                    <TableHead>Target</TableHead>
-                                    <TableHead>Requested</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {requests.map((request) => (
-                                    <TableRow key={request.id}>
-                                        <TableCell>
-                                            <Badge variant="outline">
-                                                {request.type === 'DELETE_PROJECT' ? 'Delete Project' : 'Delete Tag'}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell>
-                                            {request.project.name}
-                                        </TableCell>
-                                        <TableCell>
-                                            {request.staff.name || request.staff.email}
-                                        </TableCell>
-                                        <TableCell>
-                                            {request.type === 'DELETE_TAG'
-                                                ? request.ChangelogTag?.name
-                                                : 'Entire Project'}
-                                        </TableCell>
-                                        <TableCell>
-                                            {formatDistanceToNow(new Date(request.createdAt), {
-                                                addSuffix: true
-                                            })}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <div className="flex items-center justify-end gap-2">
-                                                {handleProcessRequest(request.id, 'APPROVED')}
-                                                {handleProcessRequest(request.id, 'REJECTED')}
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
-                )}
-            </CardContent>
-        </Card>
+        </>
     )
 }

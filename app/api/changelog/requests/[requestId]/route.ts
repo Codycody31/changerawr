@@ -1,45 +1,96 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import type { RequestStatus } from '@/lib/types/changelog';
+import { z } from 'zod';
+import { validateAuthAndGetUser } from '@/lib/utils/changelog';
+import { changelogRequestService } from '@/lib/services/request/changelog-request';
 
-export async function PATCH(request: Request, context: { params?: { requestId?: string } }) {
+// Schema validation
+const updateRequestSchema = z.object({
+    status: z.enum(['APPROVED', 'REJECTED']),
+    timestamp: z.string().optional()
+});
+
+export async function PATCH(
+    req: Request,
+    context: { params: { requestId: string } }
+) {
+    console.log('=== Processing PATCH Request ===');
+
     try {
-        console.log('Received PATCH request:', { context });
+        // Get and validate requestId
+        const { requestId } = await (async () => context.params)();
+        console.log('RequestId:', requestId);
 
-        // Validate requestId from params
-        if (!context.params || !context.params.requestId) {
-            console.error('Missing requestId in params:', context.params);
+        if (!requestId) {
+            console.log('Missing requestId in params');
             return NextResponse.json({ error: 'Missing requestId' }, { status: 400 });
         }
 
-        const { requestId } = context.params;
-        console.log('Processing requestId:', requestId);
+        // Validate auth
+        const user = await validateAuthAndGetUser();
+        console.log('User:', { id: user.id, role: user.role });
 
-        // Parse request body
-        const body = await request.json().catch((err) => {
-            console.error('Failed to parse request body:', err);
-            return null;
-        });
-
-        if (!body || !body.status) {
-            console.error('Invalid or missing status in request body:', body);
-            return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+        if (user.role !== 'ADMIN') {
+            console.log('Non-admin user attempted to process request');
+            return NextResponse.json(
+                { error: 'Only admins can process requests' },
+                { status: 403 }
+            );
         }
 
-        const { status } = body as { status: RequestStatus };
-        console.log('Updating request status:', { requestId, status });
+        // Parse request body
+        let body;
+        try {
+            const text = await req.text();
+            console.log('Raw request body:', text);
 
-        // Update the request in the database
-        const updatedRequest = await db.changelogRequest.update({
-            where: { id: requestId },
-            data: { status },
-        });
+            if (!text) {
+                console.log('Empty request body');
+                return NextResponse.json({ error: 'Empty request body' }, { status: 400 });
+            }
 
-        console.log('Request updated successfully:', updatedRequest);
+            body = JSON.parse(text);
+            console.log('Parsed body:', body);
+        } catch (error) {
+            console.log('Failed to parse request body:', error);
+            return NextResponse.json(
+                { error: 'Invalid JSON in request body' },
+                { status: 400 }
+            );
+        }
 
-        return NextResponse.json(updatedRequest);
-    } catch (error) {
-        console.error('Unexpected error processing request:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        // Validate parsed body
+        try {
+            const validatedData = updateRequestSchema.parse(body);
+            console.log('Validated data:', validatedData);
+
+            // Process the request
+            const result = await changelogRequestService.processRequest({
+                requestId,
+                status: validatedData.status,
+                adminId: user.id
+            });
+
+            console.log('Request processed successfully:', result);
+            return NextResponse.json(result);
+
+        } catch (error) {
+            if (error instanceof z.ZodError) {
+                console.log('Validation error:', error.errors);
+                return NextResponse.json(
+                    { error: 'Invalid request data', details: error.errors },
+                    { status: 400 }
+                );
+            }
+            throw error;
+        }
+
+    } catch (error: unknown) {
+        // @ts-expect-error error might be null
+        console.error('Error stack:', error.stack);
+
+        return NextResponse.json(
+            { error: 'Failed to process request' },
+            { status: 500 }
+        );
     }
 }

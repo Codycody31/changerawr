@@ -6,14 +6,29 @@ import {
     sendSuccess,
     type ChangelogEntryInput
 } from '@/lib/utils/changelog'
-import {z} from "zod";
+import { z } from "zod";
+
+// Helper to get project ID from changelog entry
+async function getProjectIdFromEntry(entryId: string) {
+    const entry = await db.changelogEntry.findUnique({
+        where: { id: entryId },
+        select: {
+            changelog: {
+                select: {
+                    projectId: true
+                }
+            }
+        }
+    });
+    return entry?.changelog?.projectId;
+}
 
 export async function PUT(
     request: Request,
     { params }: { params: { entryId: string } }
 ) {
     try {
-        const user = await validateAuthAndGetUser(request.headers.get('authorization'))
+        const user = await validateAuthAndGetUser()
 
         if (user.role === 'VIEWER') {
             return sendError('Unauthorized', 403)
@@ -56,22 +71,30 @@ export async function DELETE(
     { params }: { params: { entryId: string } }
 ) {
     try {
-        const user = await validateAuthAndGetUser(request.headers.get('authorization'))
+        const user = await validateAuthAndGetUser()
 
         if (user.role === 'VIEWER') {
             return sendError('Unauthorized', 403)
         }
 
+        // Get the project ID from the changelog entry
+        const projectId = await getProjectIdFromEntry(params.entryId)
+
+        if (!projectId) {
+            return sendError('Changelog entry not found', 404)
+        }
+
         // If user is staff, create a deletion request
         if (user.role === 'STAFF') {
-            const [request] = await Promise.all([db.changelogRequest.create({
+            const request = await db.changelogRequest.create({
                 data: {
                     type: 'DELETE_ENTRY',
                     status: 'PENDING',
                     staffId: user.id,
-                    changelogEntryId: params.entryId
+                    changelogEntryId: params.entryId,
+                    projectId: projectId
                 }
-            })])
+            })
 
             return sendSuccess({
                 message: 'Deletion request created',

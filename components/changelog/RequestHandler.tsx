@@ -1,3 +1,4 @@
+// components/changelog/DestructiveActionRequest.tsx
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -15,10 +16,22 @@ import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
 import { Loader2, Trash2, AlertCircle } from 'lucide-react'
 import { useAuth } from '@/context/auth'
+import { Role, hasAdminAccess } from '@/lib/types/auth'
+
+type ActionType = 'DELETE_PROJECT' | 'DELETE_TAG' | 'DELETE_ENTRY'
+
+interface ChangelogRequest {
+    id: string
+    type: ActionType
+    status: 'PENDING' | 'APPROVED' | 'REJECTED'
+    projectId: string
+    targetId?: string
+    createdAt: string
+}
 
 interface DestructiveActionRequestProps {
     projectId: string
-    action: 'DELETE_PROJECT' | 'DELETE_TAG'
+    action: ActionType
     targetId?: string
     targetName?: string
     onSuccess?: () => void
@@ -35,56 +48,68 @@ export function DestructiveActionRequest({
     const { toast } = useToast()
     const queryClient = useQueryClient()
     const [isOpen, setIsOpen] = useState(false)
+    const [isSubmitting, setIsSubmitting] = useState(false)
 
-    // Query to check for existing pending requests
-    const { data: existingRequests } = useQuery({
-        queryKey: ['changelog-requests'],
+    const userRole = user?.role as (Role | null | undefined)
+
+    // Query existing requests
+    const { data: existingRequests, isFetched } = useQuery<ChangelogRequest[]>({
+        queryKey: ['changelog-requests', projectId],
         queryFn: async () => {
-            const response = await fetch('/api/changelog/requests')
+            const response = await fetch(`/api/changelog/requests?projectId=${projectId}`)
             if (!response.ok) {
-                throw new Error('Failed to fetch requests')
+                const error = await response.json()
+                throw new Error(error.message || 'Failed to fetch requests')
             }
             return response.json()
         },
-        enabled: user?.role !== 'ADMIN', // Only fetch for non-admin users
-        staleTime: 30000, // Cache for 30 seconds
+        enabled: !hasAdminAccess(userRole),
+        staleTime: 30000,
     })
 
-    // Check if there's already a pending request
+    // Check for existing pending request
     const existingRequest = existingRequests?.find(
-        (req: any) =>
+        (req) =>
             req.status === 'PENDING' &&
             req.projectId === projectId &&
             req.type === action &&
             (action === 'DELETE_PROJECT' || req.targetId === targetId)
     )
 
+    // Create request mutation
     const createRequest = useMutation({
         mutationFn: async () => {
-            if (existingRequest) {
-                throw new Error('A request for this action is already pending approval')
-            }
-
-            const response = await fetch('/api/changelog/requests', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+            setIsSubmitting(true)
+            try {
+                const requestData = {
                     type: action,
                     projectId,
-                    targetId: action === 'DELETE_TAG' ? targetId : undefined
-                }),
-            })
+                    targetId: action !== 'DELETE_PROJECT' ? targetId : undefined
+                }
 
-            const data = await response.json()
+                const response = await fetch('/api/changelog/requests', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestData),
+                })
 
-            if (!response.ok) {
-                throw new Error(data.error || 'Failed to create request')
+                if (!response.ok) {
+                    const errorData = await response.json()
+                    throw new Error(errorData.error || 'Failed to create request')
+                }
+
+                return response.json()
+            } catch (error) {
+                console.error('Request creation error:', error)
+                throw error
+            } finally {
+                setIsSubmitting(false)
             }
-
-            return data
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['changelog-requests'] })
+            queryClient.invalidateQueries({ queryKey: ['changelog-requests', projectId] })
             toast({
                 title: 'Request Submitted',
                 description: 'An admin will review your request shortly.',
@@ -96,29 +121,27 @@ export function DestructiveActionRequest({
             console.error('Request error:', error)
             toast({
                 title: 'Error',
-                description: error.message,
+                description: error.message || 'Failed to submit request',
                 variant: 'destructive',
             })
-            if (error.message.includes('already pending')) {
-                setIsOpen(false)
-            }
+            setIsOpen(false)
         }
     })
 
-    // If user is admin, they can perform the action directly
-    if (user?.role === 'ADMIN') {
+    // If user is admin or data hasn't been fetched yet, don't render
+    if (hasAdminAccess(userRole) || (!isFetched && !hasAdminAccess(userRole))) {
         return null
     }
 
     const actionLabel = action === 'DELETE_PROJECT'
         ? 'Delete Project'
-        : `Delete Tag "${targetName}"`
+        : `Delete ${action === 'DELETE_TAG' ? 'Tag' : 'Entry'} "${targetName}"`
 
-    // If there's already a pending request, show a disabled state
+    // Show disabled state for existing request
     if (existingRequest) {
         return (
             <div className="inline-flex items-center">
-                {action === 'DELETE_TAG' ? (
+                {action === 'DELETE_TAG' || action === 'DELETE_ENTRY' ? (
                     <button
                         className="ml-1 text-muted-foreground cursor-not-allowed"
                         disabled
@@ -140,10 +163,15 @@ export function DestructiveActionRequest({
         )
     }
 
+    const handleCreateRequest = () => {
+        if (!projectId || isSubmitting) return
+        createRequest.mutate()
+    }
+
     return (
         <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
             <AlertDialogTrigger asChild>
-                {action === 'DELETE_TAG' ? (
+                {action === 'DELETE_TAG' || action === 'DELETE_ENTRY' ? (
                     <button
                         onClick={() => setIsOpen(true)}
                         className="ml-1 hover:text-destructive"
@@ -160,7 +188,7 @@ export function DestructiveActionRequest({
                     <AlertDialogDescription>
                         {action === 'DELETE_PROJECT'
                             ? 'This will request deletion of the entire project and all its data.'
-                            : `This will request deletion of the tag "${targetName}" from this project.`}
+                            : `This will request deletion of the ${action === 'DELETE_TAG' ? 'tag' : 'entry'} "${targetName}" from this project.`}
                         <br /><br />
                         This action requires admin approval. Would you like to submit a request?
                     </AlertDialogDescription>
@@ -169,12 +197,10 @@ export function DestructiveActionRequest({
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                     <AlertDialogAction
                         className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        onClick={() => {
-                            createRequest.mutate()
-                        }}
-                        disabled={createRequest.isPending || !!existingRequest}
+                        onClick={handleCreateRequest}
+                        disabled={isSubmitting}
                     >
-                        {createRequest.isPending ? (
+                        {isSubmitting ? (
                             <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 Submitting...

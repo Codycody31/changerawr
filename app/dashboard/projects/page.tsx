@@ -1,6 +1,6 @@
 'use client'
 
-import { use, useEffect } from 'react'
+import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/auth'
 import ProjectsPage from "@/components/project/ProjectSettingsPage";
@@ -9,7 +9,7 @@ interface PageProps {
     params: Promise<{ projectId: string }>
 }
 
-export default function SettingsPageWrapper({ params }: PageProps) {
+export default function SettingsPageWrapper({ }: PageProps) {
     const router = useRouter()
     const { user } = useAuth()
 

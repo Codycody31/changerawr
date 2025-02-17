@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { verifyPassword } from '@/lib/auth/password'
 import { generateTokens } from '@/lib/auth/tokens'
-import { LoginCredentials, LoginResponse } from '@/lib/types/auth'
+import { LoginCredentials, LoginResponse, Role } from '@/lib/types/auth'
 import { z } from 'zod'
 
 const loginSchema = z.object({
@@ -70,7 +70,7 @@ export async function POST(request: Request) {
                 id: user.id,
                 email: user.email,
                 name: user.name,
-                role: user.role,
+                role: user.role as Role,
                 lastLoginAt: user.lastLoginAt,
             },
             ...tokens,

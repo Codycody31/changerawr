@@ -370,7 +370,7 @@ export default function ApiKeysPage() {
                                 <div className="flex flex-col space-y-2">
                                     <h4 className="font-medium text-yellow-100">New API Key Created</h4>
                                     <p className="text-sm text-yellow-200">
-                                        Make sure to copy your API key now. You won't be able to see it again!
+                                        Make sure to copy your API key now. You won&apos;t be able to see it again!
                                     </p>
                                     <div className="flex items-center gap-2 p-2 bg-yellow-800 border border-yellow-700 rounded">
                                         <code className="flex-1 font-mono text-sm text-yellow-100">
@@ -455,7 +455,7 @@ export default function ApiKeysPage() {
                                                             <AlertDialogHeader>
                                                                 <AlertDialogTitle>Revoke API Key</AlertDialogTitle>
                                                                 <AlertDialogDescription>
-                                                                    Are you sure you want to revoke "{key.name}"?
+                                                                    Are you sure you want to revoke &ldquo;{key.name}&rdquo;?
                                                                     This will immediately prevent any further use of this key.
                                                                 </AlertDialogDescription>
                                                             </AlertDialogHeader>
@@ -487,7 +487,7 @@ export default function ApiKeysPage() {
                                                         <AlertDialogHeader>
                                                             <AlertDialogTitle>Delete API Key</AlertDialogTitle>
                                                             <AlertDialogDescription>
-                                                                Are you sure you want to permanently delete "{key.name}"?
+                                                                Are you sure you want to permanently delete &ldquo;{key.name}&rdquo;?
                                                                 This action cannot be undone.
                                                             </AlertDialogDescription>
                                                         </AlertDialogHeader>

@@ -8,7 +8,7 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import { Users, Key, Shield, Settings, FileText } from 'lucide-react';
+import {Users, Key, Shield, Settings, FileText, ClipboardCheck} from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
@@ -42,6 +42,13 @@ const tabs = [
         icon: FileText,
         path: '/dashboard/admin/audit-logs',
         pattern: /^\/dashboard\/admin\/audit-logs/
+    },
+    {
+        id: 'requests',
+        label: 'Requests',
+        icon: ClipboardCheck,
+        path: '/dashboard/admin/requests',
+        pattern: /^\/dashboard\/admin\/requests/
     },
     {
         id: 'settings',
