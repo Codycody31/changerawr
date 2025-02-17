@@ -112,8 +112,8 @@ export async function POST(request: Request) {
                     permissions: apiKey.permissions || []
                 }
             );
-        } catch (auditLogError) {
-            console.error('Failed to create audit log:', auditLogError);
+        } catch (auditLogError: unknown) {
+            console.error('Failed to create audit log:', (auditLogError as Error).stack);
             // Continue execution even if audit log creation fails
         }
 
