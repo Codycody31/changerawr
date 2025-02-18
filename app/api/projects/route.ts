@@ -13,20 +13,21 @@ export async function GET() {
         const projects = await db.project.findMany({
             include: {
                 changelog: {
-                    select: {
-                        id: true,
-                        _count: {
-                            select: {
-                                entries: true
-                            }
-                        },
+                    include: {
                         entries: {
                             orderBy: {
                                 createdAt: 'desc'
                             },
                             take: 1,
                             select: {
-                                version: true
+                                id: true,
+                                version: true,
+                                createdAt: true
+                            }
+                        },
+                        _count: {
+                            select: {
+                                entries: true
                             }
                         }
                     }
@@ -37,7 +38,14 @@ export async function GET() {
             }
         })
 
-        return Response.json(projects)
+        // Transform the response to include entry count and latest entry
+        const transformedProjects = projects.map(project => ({
+            ...project,
+            entryCount: project.changelog?._count?.entries || 0,
+            latestEntry: project.changelog?.entries?.[0] || null
+        }))
+
+        return Response.json(transformedProjects)
     } catch (error) {
         console.error('Failed to fetch projects:', error)
         return Response.json({ error: 'Failed to fetch projects' }, { status: 500 })

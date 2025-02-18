@@ -17,7 +17,10 @@ import { format } from 'date-fns'
 import { Project as PrismaProject, Changelog, ChangelogEntry } from '@prisma/client'
 import { useAuth } from '@/context/auth'
 
+// Updated interface to match the new API response
 interface Project extends PrismaProject {
+    entryCount: number
+    latestEntry: (ChangelogEntry & { version: string }) | null
     changelog?: Changelog & {
         entries: ChangelogEntry[]
     }
@@ -80,11 +83,11 @@ export default function ProjectsPage() {
                                     </Link>
                                 </TableCell>
                                 <TableCell>
-                                    {project.changelog?.entries[0]?.version || 'No versions'}
+                                    {project.latestEntry?.version || 'No versions'}
                                 </TableCell>
                                 <TableCell>
                                     <Badge>
-                                        {project.changelog?.entries.length || 0} entries
+                                        {project.entryCount || 0} entries
                                     </Badge>
                                 </TableCell>
                                 <TableCell>

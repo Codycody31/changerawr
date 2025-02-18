@@ -104,18 +104,15 @@ export async function GET(
 
 export async function POST(
     request: Request,
-    { params }: { params: Promise<{ projectId: string }> }
+    { params }: { params: { projectId: string } }
 ) {
     try {
-        const { projectId } = await params
-        await validateAuthAndGetUser()
-        const json = await request.json()
+        const user = await validateAuthAndGetUser()
+        const { title, content, version, tags } = await request.json()
 
-        const { title, content, version, tags } = json
-
-        // First ensure the changelog exists
+        // Get the changelog for this project
         const changelog = await db.changelog.findUnique({
-            where: { projectId }
+            where: { projectId: params.projectId }
         })
 
         if (!changelog) {
@@ -125,15 +122,12 @@ export async function POST(
             )
         }
 
-        // Create the entry
         const entry = await db.changelogEntry.create({
             data: {
                 title,
                 content,
                 version,
-                changelog: {
-                    connect: { id: changelog.id }
-                },
+                changelogId: changelog.id,
                 tags: {
                     connect: tags.map((tagId: string) => ({ id: tagId }))
                 }

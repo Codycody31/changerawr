@@ -169,7 +169,7 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                             <CardContent>
                                 <div className="space-y-2">
                                     <Button className="w-full" asChild>
-                                        <Link href={`/dashboard/projects/${project.id}/entries/new`}>
+                                        <Link href={`/dashboard/projects/${project.id}/changelog/new`}>
                                             <Plus className="h-4 w-4 mr-2" />
                                             New Entry
                                         </Link>
@@ -203,7 +203,7 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                                                 )}
                                             </div>
                                             <Button variant="ghost" size="sm" asChild>
-                                                <Link href={`/dashboard/projects/${project.id}/entries/${entry.id}`}>
+                                                <Link href={`/dashboard/projects/${project.id}/changelog/${entry.id}`}>
                                                     View
                                                 </Link>
                                             </Button>
@@ -218,7 +218,7 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                                         Get started by creating your first changelog entry
                                     </p>
                                     <Button asChild>
-                                        <Link href={`/dashboard/projects/${project.id}/entries/new`}>
+                                        <Link href={`/dashboard/projects/${project.id}/changelog/new`}>
                                             <Plus className="h-4 w-4 mr-2" />
                                             Create Entry
                                         </Link>

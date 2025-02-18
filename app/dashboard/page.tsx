@@ -218,7 +218,7 @@ export default function DashboardPage() {
                                                 <div>
                                                     <p className="text-sm">{activity.message}</p>
                                                     <Link
-                                                        href={`/projects/${activity.projectId}`}
+                                                        href={`/dashboard/projects/${activity.projectId}/`}
                                                         className="text-xs text-muted-foreground hover:text-primary inline-flex items-center gap-1 mt-1"
                                                     >
                                                         {activity.projectName}
