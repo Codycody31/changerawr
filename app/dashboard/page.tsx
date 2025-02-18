@@ -24,14 +24,14 @@ import {
     BookOpen,
     ChevronRight,
     Star,
-    Zap
 } from 'lucide-react'
-import {formatDistanceToNow} from "date-fns";
+import { formatDistanceToNow } from "date-fns"
+import type { DashboardStats, ProjectPreview, Activity as DashboardActivity } from '@/lib/types/dashboard'
 
 export default function DashboardPage() {
     const { user } = useAuth()
 
-    const { data: stats, isLoading } = useQuery({
+    const { data: stats, isLoading } = useQuery<DashboardStats>({
         queryKey: ['dashboard-stats'],
         queryFn: async () => {
             const response = await fetch('/api/dashboard/stats')
@@ -63,12 +63,12 @@ export default function DashboardPage() {
                                         Ready to document your next big update?
                                     </p>
                                 </div>
-                                <Button size="lg" className="bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg hover:shadow-xl transition-all duration-200" asChild>
-                                    <Link href="/changelog/new">
-                                        <Zap className="mr-2 h-5 w-5" />
-                                        New Update
-                                    </Link>
-                                </Button>
+                                {/*<Button size="lg" className="bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg hover:shadow-xl transition-all duration-200" asChild>*/}
+                                {/*    <Link href="/projects/changelog/new">*/}
+                                {/*        <Zap className="mr-2 h-5 w-5" />*/}
+                                {/*        New Update*/}
+                                {/*    </Link>*/}
+                                {/*</Button>*/}
                             </div>
                         </CardContent>
                     </Card>
@@ -82,7 +82,7 @@ export default function DashboardPage() {
                             </CardHeader>
                             <CardContent>
                                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                                    {stats?.projectPreviews.map((project) => (
+                                    {stats?.projectPreviews.map((project: ProjectPreview) => (
                                         <Link
                                             key={project.id}
                                             href={project.id.startsWith('placeholder') ? '/dashboard/projects/new' : `/dashboard/projects/${project.id}`}
@@ -128,7 +128,7 @@ export default function DashboardPage() {
                             <CardContent>
                                 <div className="mt-2">
                                     <Button variant="ghost" className="w-full justify-between" asChild>
-                                        <Link href="/projects">
+                                        <Link href="/dashboard/projects">
                                             View All Projects
                                             <ArrowRight className="h-4 w-4" />
                                         </Link>
@@ -149,16 +149,16 @@ export default function DashboardPage() {
                                     </div>
                                 </div>
                             </CardHeader>
-                            <CardContent>
-                                <div className="mt-2">
-                                    <Button variant="ghost" className="w-full justify-between" asChild>
-                                        <Link href="/changelog">
-                                            View History
-                                            <ArrowRight className="h-4 w-4" />
-                                        </Link>
-                                    </Button>
-                                </div>
-                            </CardContent>
+                            {/*<CardContent>*/}
+                            {/*    <div className="mt-2">*/}
+                            {/*        <Button variant="ghost" className="w-full justify-between" asChild>*/}
+                            {/*            <Link href="/changelog">*/}
+                            {/*                View History*/}
+                            {/*                <ArrowRight className="h-4 w-4" />*/}
+                            {/*            </Link>*/}
+                            {/*        </Button>*/}
+                            {/*    </div>*/}
+                            {/*</CardContent>*/}
                         </Card>
 
                         <Card>
@@ -199,13 +199,12 @@ export default function DashboardPage() {
                                         <Activity className="h-5 w-5 text-primary" />
                                         <CardTitle>Recent Activity</CardTitle>
                                     </div>
-                                    {/*<Button variant="ghost" size="sm">View All</Button>*/}
                                 </div>
                             </CardHeader>
                             <CardContent>
                                 <ScrollArea className="h-[300px]">
                                     <div className="space-y-4">
-                                        {stats?.recentActivity?.map((activity, i) => (
+                                        {stats?.recentActivity?.map((activity: DashboardActivity, i: number) => (
                                             <motion.div
                                                 key={activity.id}
                                                 initial={{ opacity: 0, x: -20 }}

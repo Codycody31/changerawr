@@ -1,90 +1,154 @@
+import { NextResponse } from 'next/server'
+import { validateAuthAndGetUser } from '@/lib/utils/changelog'
 import { db } from '@/lib/db'
-import {
-    changelogEntrySchema,
-    sendError,
-    sendSuccess,
-    type ChangelogEntryInput, validateAuthAndGetUser
-} from '@/lib/utils/changelog'
-import {z} from "zod";
 
 export async function GET(
     request: Request,
-    { params }: { params: { projectId: string } }
+    { params }: { params: Promise<{ projectId: string }> }
 ) {
     try {
+        const { projectId } = await params
         await validateAuthAndGetUser()
+        const { searchParams } = new URL(request.url)
 
+        // Get query parameters
+        const search = searchParams.get('search')
+        const tag = searchParams.get('tag')
+        const startDate = searchParams.get('startDate')
+        const endDate = searchParams.get('endDate')
+        const page = parseInt(searchParams.get('page') || '1')
+        const limit = parseInt(searchParams.get('limit') || '10')
+        const skip = (page - 1) * limit
+
+        // First get the changelog for this project
         const changelog = await db.changelog.findUnique({
-            where: { projectId: params.projectId },
-            include: {
+            where: { projectId }
+        })
+
+        if (!changelog) {
+            return NextResponse.json(
+                { error: 'Changelog not found' },
+                { status: 404 }
+            )
+        }
+
+        // Build where clause for filtering
+        const where = {
+            changelogId: changelog.id,
+            ...(search && {
+                OR: [
+                    { title: { contains: search, mode: 'insensitive' as const } },
+                    { content: { contains: search, mode: 'insensitive' as const } },
+                ],
+            }),
+            ...(tag && {
+                tags: {
+                    some: {
+                        name: tag
+                    }
+                }
+            }),
+            ...(startDate && endDate && {
+                createdAt: {
+                    gte: new Date(startDate),
+                    lte: new Date(endDate)
+                }
+            })
+        }
+
+        // Get entries with pagination
+        const [entries, total] = await Promise.all([
+            db.changelogEntry.findMany({
+                where,
+                include: {
+                    tags: true
+                },
+                orderBy: {
+                    createdAt: 'desc'
+                },
+                skip,
+                take: limit
+            }),
+            db.changelogEntry.count({ where })
+        ])
+
+        // Get all tags used in this project's changelog
+        const tags = await db.changelogTag.findMany({
+            where: {
                 entries: {
-                    include: {
-                        tags: true
-                    },
-                    orderBy: {
-                        createdAt: 'desc'
+                    some: {
+                        changelogId: changelog.id
                     }
                 }
             }
         })
 
-        if (!changelog) {
-            return sendError('Changelog not found', 404)
-        }
-
-        return sendSuccess(changelog)
+        return NextResponse.json({
+            entries,
+            tags,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit)
+            }
+        })
     } catch (error) {
         console.error('Error fetching changelog:', error)
-        return sendError('Failed to fetch changelog', 500)
+        return NextResponse.json(
+            { error: 'Failed to fetch changelog' },
+            { status: 500 }
+        )
     }
 }
 
 export async function POST(
     request: Request,
-    { params }: { params: { projectId: string } }
+    { params }: { params: Promise<{ projectId: string }> }
 ) {
     try {
-        const user = await validateAuthAndGetUser()
-
-        if (user.role === 'VIEWER') {
-            return sendError('Unauthorized', 403)
-        }
-
+        const { projectId } = await params
+        await validateAuthAndGetUser()
         const json = await request.json()
-        const body: ChangelogEntryInput = changelogEntrySchema.parse(json)
 
-        // Find or create changelog for the project
-        const changelog = await db.changelog.upsert({
-            where: { projectId: params.projectId },
-            create: { projectId: params.projectId },
-            update: {}
+        const { title, content, version, tags } = json
+
+        // First ensure the changelog exists
+        const changelog = await db.changelog.findUnique({
+            where: { projectId }
         })
 
-        // Create changelog entry
+        if (!changelog) {
+            return NextResponse.json(
+                { error: 'Changelog not found' },
+                { status: 404 }
+            )
+        }
+
+        // Create the entry
         const entry = await db.changelogEntry.create({
             data: {
-                title: body.title,
-                content: body.content,
-                version: body.version,
-                changelogId: changelog.id,
-                tags: body.tags ? {
-                    connectOrCreate: body.tags.map(tag => ({
-                        where: { name: tag },
-                        create: { name: tag }
-                    }))
-                } : undefined
+                title,
+                content,
+                version,
+                changelog: {
+                    connect: { id: changelog.id }
+                },
+                tags: {
+                    connect: tags.map((tagId: string) => ({ id: tagId }))
+                }
             },
             include: {
                 tags: true
             }
         })
 
-        return sendSuccess(entry, 201)
+        return NextResponse.json(entry)
     } catch (error) {
-        if (error instanceof z.ZodError) {
-            return sendError('Invalid request data: ' + error.message, 400)
-        }
         console.error('Error creating changelog entry:', error)
-        return sendError('Failed to create changelog entry', 500)
+        return NextResponse.json(
+            { error: 'Failed to create changelog entry' },
+            { status: 500 }
+        )
     }
 }
