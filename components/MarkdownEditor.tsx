@@ -374,6 +374,7 @@ export const RenderMarkdown: React.FC<RenderMarkdownProps> = ({
         <div
             className={`prose max-w-none ${className}`}
             dangerouslySetInnerHTML={{__html: renderMarkdown(children)}}
+            suppressHydrationWarning
         />
     );
 };

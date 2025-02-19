@@ -5,6 +5,7 @@ import './globals.css'
 import React from "react";
 import {ThemeProvider} from "@/components/theme-provider";
 import {Toaster} from "@/components/ui/toaster";
+import {Providers} from "@/app/dashboard/providers";
 
 const inter = Inter({subsets: ['latin']})
 
@@ -19,19 +20,21 @@ export default function RootLayout({
     children: React.ReactNode
 }) {
     return (
-        <html lang="en" suppressHydrationWarning>
-        <body className={inter.className}>
-        <AuthProvider>
-            <ThemeProvider
-                attribute="class"
-                defaultTheme="light"
-                disableTransitionOnChange
-            >
-                {children}
-                <Toaster/>
-            </ThemeProvider>
-        </AuthProvider>
-        </body>
-        </html>
+        <Providers>
+            <html lang="en" suppressHydrationWarning>
+            <body className={inter.className}>
+            <AuthProvider>
+                <ThemeProvider
+                    attribute="class"
+                    defaultTheme="light"
+                    disableTransitionOnChange
+                >
+                    {children}
+                    <Toaster/>
+                </ThemeProvider>
+            </AuthProvider>
+            </body>
+            </html>
+        </Providers>
     )
 }

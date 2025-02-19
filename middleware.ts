@@ -37,6 +37,11 @@ export async function middleware(request: NextRequest) {
         return NextResponse.next()
     }
 
+    // Always allow public changelog routes
+    if (pathname.startsWith('/changelog/')) {
+        return NextResponse.next()
+    }
+
     // Check if the path is public
     if (PUBLIC_PATHS.some(path => pathname.startsWith(path))) {
         return NextResponse.next()

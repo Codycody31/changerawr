@@ -1,47 +1,32 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, {useEffect, useState} from 'react'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
-import { useAuth } from '@/context/auth'
+import {usePathname, useRouter} from 'next/navigation'
+import {useAuth} from '@/context/auth'
 import {
-    LayoutGrid,
+    ChevronLeft,
+    ChevronRight,
+    ClipboardCheck,
+    FileText,
     Folder,
-    Settings,
+    Key,
+    LayoutGrid,
+    Loader2,
     LogOut,
     Menu,
-    Users,
     ServerCog,
-    Key,
-    ChevronRight,
-    ChevronLeft,
-    Loader2, Shield, FileText, ClipboardCheck,
+    Settings,
+    Shield,
+    Users,
 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog'
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-} from '@/components/ui/tooltip'
-import {
-    Sheet,
-    SheetContent,
-    SheetHeader,
-    SheetTitle,
-    SheetTrigger,
-} from "@/components/ui/sheet"
-import { getGravatarUrl } from '@/lib/utils/gravatar'
-import { cn } from '@/lib/utils'
-import { Providers } from "@/app/dashboard/providers"
+import {Button} from '@/components/ui/button'
+import {Avatar, AvatarFallback, AvatarImage} from '@/components/ui/avatar'
+import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,} from '@/components/ui/dialog'
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,} from '@/components/ui/tooltip'
+import {Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,} from "@/components/ui/sheet"
+import {getGravatarUrl} from '@/lib/utils/gravatar'
+import {cn} from '@/lib/utils'
 import {User} from "@prisma/client";
 
 // Navigation Configuration
@@ -118,7 +103,7 @@ const NAV_SECTIONS = [
 ]
 
 // User Menu Component
-function UserMenu({ user, logout }: { user: User; logout: () => Promise<void> }) {
+function UserMenu({user, logout}: { user: User; logout: () => Promise<void> }) {
     const getUserInitial = () => {
         if (user.name) return user.name[0].toUpperCase()
         if (user.email) return user.email[0].toUpperCase()
@@ -172,7 +157,7 @@ function UserMenu({ user, logout }: { user: User; logout: () => Promise<void> })
                             asChild
                         >
                             <Link href="/dashboard/settings">
-                                <Settings className="h-4 w-4 mr-2" />
+                                <Settings className="h-4 w-4 mr-2"/>
                                 Settings
                             </Link>
                         </Button>
@@ -181,7 +166,7 @@ function UserMenu({ user, logout }: { user: User; logout: () => Promise<void> })
                             className="w-full"
                             onClick={logout}
                         >
-                            <LogOut className="h-4 w-4 mr-2" />
+                            <LogOut className="h-4 w-4 mr-2"/>
                             Logout
                         </Button>
                     </div>
@@ -239,9 +224,9 @@ function Sidebar({
                         onClick={() => setIsExpanded(!isExpanded)}
                     >
                         {isExpanded ? (
-                            <ChevronLeft className="h-5 w-5" />
+                            <ChevronLeft className="h-5 w-5"/>
                         ) : (
-                            <ChevronRight className="h-5 w-5" />
+                            <ChevronRight className="h-5 w-5"/>
                         )}
                     </Button>
                 </div>
@@ -269,7 +254,7 @@ function Sidebar({
                                                         : "hover:bg-accent/50 text-muted-foreground hover:text-foreground"
                                                 )}
                                             >
-                                                <item.icon className="h-5 w-5 shrink-0" />
+                                                <item.icon className="h-5 w-5 shrink-0"/>
                                                 {isExpanded && (
                                                     <span className="ml-3 text-sm truncate">
                                                         {item.label}
@@ -292,7 +277,7 @@ function Sidebar({
                 {/* User Section */}
                 <div className="border-t p-2">
                     {isExpanded ? (
-                        <UserMenu user={user} logout={logout} />
+                        <UserMenu user={user} logout={logout}/>
                     ) : (
                         <TooltipProvider>
                             <Tooltip>
@@ -327,7 +312,7 @@ function Sidebar({
 }
 
 // Mobile Navigation Component
-function MobileNav({ user, logout }: { user: User; logout: () => Promise<void> }) {
+function MobileNav({user, logout}: { user: User; logout: () => Promise<void> }) {
     const pathname = usePathname()
 
     // Filter navigation items based on user role
@@ -349,7 +334,7 @@ function MobileNav({ user, logout }: { user: User; logout: () => Promise<void> }
                     <Sheet>
                         <SheetTrigger asChild>
                             <Button variant="ghost" size="icon">
-                                <Menu className="h-5 w-5" />
+                                <Menu className="h-5 w-5"/>
                             </Button>
                         </SheetTrigger>
                         <SheetContent>
@@ -373,7 +358,7 @@ function MobileNav({ user, logout }: { user: User; logout: () => Promise<void> }
                                                         : "hover:bg-accent/50 text-muted-foreground hover:text-foreground"
                                                 )}
                                             >
-                                                <item.icon className="h-5 w-5 mr-3" />
+                                                <item.icon className="h-5 w-5 mr-3"/>
                                                 <span className="text-sm">
                                                     {item.label}
                                                 </span>
@@ -385,7 +370,7 @@ function MobileNav({ user, logout }: { user: User; logout: () => Promise<void> }
                         </SheetContent>
                     </Sheet>
 
-                    <UserMenu user={user} logout={logout} />
+                    <UserMenu user={user} logout={logout}/>
                 </div>
             </div>
         </header>
@@ -397,7 +382,7 @@ function LoadingScreen() {
     return (
         <div className="flex items-center justify-center min-h-screen">
             <div className="text-center">
-                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4"/>
             </div>
         </div>
     )
@@ -410,7 +395,7 @@ export default function DashboardLayout({
     children: React.ReactNode
 }) {
     const router = useRouter()
-    const { user, isLoading, logout } = useAuth()
+    const {user, isLoading, logout} = useAuth()
     const [isExpanded, setIsExpanded] = useState(true)
 
     useEffect(() => {
@@ -421,7 +406,7 @@ export default function DashboardLayout({
 
     // Show loading screen while checking auth
     if (isLoading) {
-        return <LoadingScreen />
+        return <LoadingScreen/>
     }
 
     // Redirect to login if no user
@@ -430,28 +415,26 @@ export default function DashboardLayout({
     }
 
     return (
-        <Providers>
-            <div className="min-h-screen bg-background">
-                <Sidebar
-                    user={user}
-                    logout={logout}
-                    isExpanded={isExpanded}
-                    setIsExpanded={setIsExpanded}
-                />
-                <MobileNav user={user} logout={logout} />
+        <div className="min-h-screen bg-background">
+            <Sidebar
+                user={user}
+                logout={logout}
+                isExpanded={isExpanded}
+                setIsExpanded={setIsExpanded}
+            />
+            <MobileNav user={user} logout={logout}/>
 
-                <main
-                    className={cn(
-                        "pt-16 md:pt-0 transition-all duration-300",
-                        "md:ml-16",
-                        isExpanded ? "md:ml-64" : "md:ml-16"
-                    )}
-                >
-                    <div className="p-4 md:p-8 mx-auto max-w-7xl">
-                        {children}
-                    </div>
-                </main>
-            </div>
-        </Providers>
+            <main
+                className={cn(
+                    "pt-16 md:pt-0 transition-all duration-300",
+                    "md:ml-16",
+                    isExpanded ? "md:ml-64" : "md:ml-16"
+                )}
+            >
+                <div className="p-4 md:p-8 mx-auto max-w-7xl">
+                    {children}
+                </div>
+            </main>
+        </div>
     )
 }

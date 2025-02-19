@@ -1,0 +1,164 @@
+import { Suspense } from 'react'
+import { notFound } from 'next/navigation'
+import ChangelogEntries from '@/components/changelog/ChangelogEntries'
+import { Skeleton } from '@/components/ui/skeleton'
+import {GitBranch, Clock, Rss} from 'lucide-react'
+import { cn } from '@/lib/utils'
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
+import Link from 'next/link'
+
+interface PageProps {
+    params: {
+        projectId: string
+    }
+}
+
+interface ChangelogResponse {
+    project: {
+        id: string
+        name: string
+    }
+    items: Array<{
+        id: string
+        publishedAt: string
+    }>
+    nextCursor?: string
+}
+
+async function getInitialData(projectId: string) {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/changelog/${projectId}/entries`)
+
+    if (!res.ok) {
+        if (res.status === 404) return null
+        throw new Error('Failed to fetch changelog')
+    }
+
+    return res.json() as Promise<ChangelogResponse>
+}
+
+export default async function ChangelogPage({ params }: PageProps) {
+    const data = await getInitialData(await     params.projectId)
+
+    if (!data) {
+        notFound()
+    }
+
+    const stats = {
+        totalEntries: data.items.length + (data.nextCursor ? '+' : ''),
+        lastUpdate: data.items[0]?.publishedAt,
+    }
+
+    return (
+        <div className="min-h-screen bg-background">
+            {/* Subtle gradient background */}
+            <div className="absolute top-0 inset-x-0 h-96">
+                <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-primary/3 to-transparent" />
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(var(--primary-rgb),0.07),transparent)]" />
+            </div>
+
+            <div className="relative pb-24">
+                <header className="relative py-24 px-4 md:py-32 max-w-6xl mx-auto">
+                    <div className="text-center space-y-8">
+                        {/* Project name */}
+                        <h1 className={cn(
+                            "text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight",
+                            "bg-gradient-to-b from-foreground via-foreground/95 to-foreground/80",
+                            "bg-clip-text text-transparent"
+                        )}>
+                            {data.project.name}
+                        </h1>
+
+                        {/* Subtitle */}
+                        <p className="text-xl md:text-2xl text-muted-foreground font-medium">
+                            Changelog &amp; Release Notes
+                        </p>
+
+                        {/* Stats display with RSS link */}
+                        <div className="flex flex-col items-center gap-6">
+                            <div className="inline-flex items-center gap-8 px-8 py-4
+                                          bg-background/60 backdrop-blur-sm
+                                          border border-border/40
+                                          rounded-full
+                                          hover:bg-background/80 hover:border-border/60
+                                          transition-all duration-300">
+                                <div className="flex items-center gap-3">
+                                    <GitBranch className="w-5 h-5 text-muted-foreground" />
+                                    <span className="font-medium text-lg">
+                                        {stats.totalEntries} Updates
+                                    </span>
+                                </div>
+
+                                {stats.lastUpdate && (
+                                    <>
+                                        <div className="w-1.5 h-1.5 rounded-full bg-border" />
+                                        <div className="flex items-center gap-3">
+                                            <Clock className="w-5 h-5 text-muted-foreground" />
+                                            <time
+                                                dateTime={stats.lastUpdate}
+                                                className="font-medium text-lg tabular-nums"
+                                            >
+                                                {new Intl.DateTimeFormat('en-US', {
+                                                    month: 'long',
+                                                    day: 'numeric',
+                                                    year: 'numeric',
+                                                }).format(new Date(stats.lastUpdate))}
+                                            </time>
+                                        </div>
+                                    </>
+                                )}
+
+                                <div className="w-1.5 h-1.5 rounded-full bg-border" />
+
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Link
+                                                href={`/changelog/${await params.projectId}/rss.xml`}
+                                                className="flex items-center gap-2 text-muted-foreground hover:text-orange-500 transition-colors duration-200"
+                                                aria-label="Subscribe to RSS feed"
+                                            >
+                                                <Rss className="w-5 h-5" />
+                                                <span className="font-medium text-lg">RSS</span>
+                                            </Link>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            Subscribe to updates via RSS
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+
+                <div className="relative max-w-7xl mx-auto px-4 md:px-6">
+                    <Suspense
+                        fallback={
+                            <div className="space-y-12">
+                                {[...Array(3)].map((_, i) => (
+                                    <div key={i} className="space-y-4 animate-pulse">
+                                        <div className="space-y-3">
+                                            <Skeleton className="h-8 w-[300px]" />
+                                            <Skeleton className="h-5 w-[200px]" />
+                                        </div>
+                                        <Skeleton className="h-48 w-full" />
+                                        <div className="flex gap-2 pt-4">
+                                            <Skeleton className="h-6 w-16" />
+                                            <Skeleton className="h-6 w-16" />
+                                            <Skeleton className="h-6 w-16" />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        }
+                    >
+                        <ChangelogEntries projectId={await params.projectId} />
+                    </Suspense>
+                </div>
+
+                {/* Footer spacer */}
+                <div className="h-12" />
+            </div>
+        </div>
+    )
+}

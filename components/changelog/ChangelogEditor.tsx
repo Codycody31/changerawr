@@ -1,20 +1,23 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { ChevronLeft, Tag as TagIcon, X, Search } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Badge } from "@/components/ui/badge";
-import { MarkdownEditor } from '@/components/MarkdownEditor';
-import { useDebounce } from 'use-debounce';
-import { compareVersions } from 'compare-versions';
-import { cn } from '@/lib/utils';
+import React, {useEffect, useMemo, useState} from 'react';
+import {useRouter} from 'next/navigation';
+import {useMutation, useQuery} from '@tanstack/react-query';
+import {ChevronLeft, Loader2, Search, Tag as TagIcon, X, BookCheck} from 'lucide-react';
+import {Button} from '@/components/ui/button';
+import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
+import {Input} from '@/components/ui/input';
+import {Badge} from "@/components/ui/badge";
+import {MarkdownEditor} from '@/components/MarkdownEditor';
+import {useDebounce} from 'use-debounce';
+import {compareVersions} from 'compare-versions';
+import {toast} from "@/hooks/use-toast";
+import {DestructiveActionRequest} from "@/components/changelog/RequestHandler";
+import {ChangelogActionRequest} from "@/components/changelog/ChangelogActionRequest";
 
 interface ChangelogEditorProps {
     projectId: string;
     entryId?: string;
     isNewChangelog?: boolean; // New prop to control default tag behavior
+    initialPublishedStatus?: boolean; // New prop
 }
 
 interface Tag {
@@ -33,7 +36,8 @@ interface Project {
 export function ChangelogEditor({
                                     projectId,
                                     entryId,
-                                    isNewChangelog = false
+                                    isNewChangelog = false,
+                                    initialPublishedStatus = false,
                                 }: ChangelogEditorProps) {
     const router = useRouter();
     const [title, setTitle] = useState('');
@@ -47,23 +51,25 @@ export function ChangelogEditor({
     const [debouncedTags] = useDebounce(selectedTags, 1000);
     const [isSaving, setIsSaving] = useState(false);
     const [savedEntryId, setSavedEntryId] = useState<string | null>(null);
+    const [isPublished, setIsPublished] = useState(initialPublishedStatus);
+    const [isPublishing, setIsPublishing] = useState(false);
 
     // Fetch project details to get default tags
-    const { data: projectData } = useQuery<Project>({
+    const {data: projectData} = useQuery<Project>({
         queryKey: ['project-details', projectId],
         queryFn: async () => {
             const response = await fetch(`/api/projects/${projectId}`);
             if (!response.ok) {
                 console.error('Failed to fetch project details');
-                return { defaultTags: [] };
+                return {defaultTags: []};
             }
             return response.json();
         },
-        placeholderData: { defaultTags: [] }
+        placeholderData: {defaultTags: []}
     });
 
     // Fetch tags
-    const { data: tagsData = [] } = useQuery<Tag[]>({
+    const {data: tagsData = []} = useQuery<Tag[]>({
         queryKey: ['project-tags', projectId],
         queryFn: async () => {
             const response = await fetch(`/api/projects/${projectId}/changelog/tags`);
@@ -83,7 +89,7 @@ export function ChangelogEditor({
         // Create tags for default tags that don't exist
         const newDefaultTags = defaultTagNames
             .filter(name => !tagsData.some(tag => tag.name === name))
-            .map(name => ({ id: `default-${name}`, name }));
+            .map(name => ({id: `default-${name}`, name}));
 
         return [...tagsData, ...newDefaultTags];
     }, [tagsData, projectData]);
@@ -94,17 +100,17 @@ export function ChangelogEditor({
     );
 
     // Fetch all changelog entries for version history
-    const { data: entriesData = { entries: [] } } = useQuery<{ entries: ChangelogEntry[] }>({
+    const {data: entriesData = {entries: []}} = useQuery<{ entries: ChangelogEntry[] }>({
         queryKey: ['changelog-entries', projectId],
         queryFn: async () => {
             const response = await fetch(`/api/projects/${projectId}/changelog`);
             if (!response.ok) {
                 console.error('Failed to fetch entries');
-                return { entries: [] };
+                return {entries: []};
             }
             return response.json();
         },
-        placeholderData: { entries: [] }
+        placeholderData: {entries: []}
     });
 
     // Calculate version suggestions
@@ -130,7 +136,7 @@ export function ChangelogEditor({
     }, [entriesData]);
 
     // Fetch existing entry if editing
-    const { data: existingEntry } = useQuery({
+    const {data: existingEntry} = useQuery({
         queryKey: ['changelog-entry', entryId],
         queryFn: async () => {
             if (!entryId) return null;
@@ -146,6 +152,7 @@ export function ChangelogEditor({
         if (existingEntry) {
             setTitle(existingEntry.title || '');
             setVersion(existingEntry.version || '');
+            setIsPublished(!!existingEntry.publishedAt);
 
             const entryTags = Array.isArray(existingEntry.tags)
                 ? existingEntry.tags.map((t: any) => t.id)
@@ -182,12 +189,45 @@ export function ChangelogEditor({
 
             const response = await fetch(url, {
                 method: entryId ? 'PUT' : 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(data)
             });
 
             if (!response.ok) throw new Error('Failed to save entry');
             return response.json();
+        }
+    });
+
+    const publishEntry = useMutation({
+        mutationFn: async () => {
+            if (!entryId) return;
+
+            const response = await fetch(`/api/projects/${projectId}/changelog/${entryId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'publish' })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to publish entry');
+            }
+
+            return response.json();
+        },
+        onSuccess: () => {
+            setIsPublished(true);
+            toast({
+                title: 'Entry Published',
+                description: 'The changelog entry has been published successfully.'
+            });
+        },
+        onError: (error: Error) => {
+            toast({
+                title: 'Failed to Publish',
+                description: error.message || 'There was an error publishing the entry.',
+                variant: 'destructive'
+            });
         }
     });
 
@@ -229,7 +269,7 @@ export function ChangelogEditor({
                             onClick={() => router.back()}
                             className="hover:bg-accent hover:text-accent-foreground"
                         >
-                            <ChevronLeft className="h-4 w-4 mr-2" />
+                            <ChevronLeft className="h-4 w-4 mr-2"/>
                             Back
                         </Button>
                         <div>
@@ -241,6 +281,26 @@ export function ChangelogEditor({
                             </p>
                         </div>
                     </div>
+
+                    {entryId && (
+                        <div className="flex items-center gap-2">
+                            <ChangelogActionRequest
+                                projectId={projectId}
+                                entryId={entryId}
+                                action="PUBLISH"
+                                title={title}
+                                isPublished={isPublished}
+                                onSuccess={() => setIsPublished(true)}
+                            />
+                            <ChangelogActionRequest
+                                projectId={projectId}
+                                entryId={entryId}
+                                action="DELETE"
+                                title={title}
+                                onSuccess={() => router.push(`/dashboard/projects/${projectId}/changelog`)}
+                            />
+                        </div>
+                    )}
                 </div>
 
                 {/* Title and Metadata */}
@@ -281,10 +341,12 @@ export function ChangelogEditor({
                                         onChange={(e) => setTagSearchInput(e.target.value)}
                                         className="pr-10"
                                     />
-                                    <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                                    <Search
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4"/>
                                 </div>
                                 {tagSearchInput && (
-                                    <div className="absolute z-10 mt-1 w-full border rounded bg-background shadow-lg max-h-60 overflow-y-auto">
+                                    <div
+                                        className="absolute z-10 mt-1 w-full border rounded bg-background shadow-lg max-h-60 overflow-y-auto">
                                         {filteredTags.map((tag) => (
                                             <div
                                                 key={tag.id}
@@ -320,9 +382,9 @@ export function ChangelogEditor({
                                             className="cursor-pointer hover:bg-destructive hover:text-destructive-foreground"
                                             onClick={() => setSelectedTags(selectedTags.filter(id => id !== tagId))}
                                         >
-                                            <TagIcon className="h-3 w-3 mr-1" />
+                                            <TagIcon className="h-3 w-3 mr-1"/>
                                             {tag.name}
-                                            <X className="h-3 w-3 ml-1" />
+                                            <X className="h-3 w-3 ml-1"/>
                                         </Badge>
                                     ) : null;
                                 })}
