@@ -1,5 +1,5 @@
-import {useState} from 'react'
-import {useMutation, useQueryClient} from '@tanstack/react-query'
+import { useState } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
     AlertDialog,
     AlertDialogAction,
@@ -11,13 +11,15 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import {Button} from '@/components/ui/button'
-import {useToast} from '@/hooks/use-toast'
-import {Globe, Loader2, PackageOpen, Trash2} from 'lucide-react'
-import {useAuth} from '@/context/auth'
-import {Role} from '@prisma/client'
+import { Button } from '@/components/ui/button'
+import { useToast } from '@/hooks/use-toast'
+import { Globe, Loader2, PackageOpen, Trash2 } from 'lucide-react'
+import { useAuth } from '@/context/auth'
+import { Role } from '@prisma/client'
+import { cn } from '@/lib/utils'
 
 type ActionType = 'PUBLISH' | 'UNPUBLISH' | 'DELETE';
+type ButtonVariant = 'default' | 'destructive' | 'outline' | 'ghost';
 
 interface ChangelogActionRequestProps {
     projectId: string;
@@ -27,6 +29,8 @@ interface ChangelogActionRequestProps {
     isPublished?: boolean;
     onSuccess?: () => void;
     className?: string;
+    variant?: ButtonVariant;
+    disabled?: boolean;
 }
 
 export function ChangelogActionRequest({
@@ -35,22 +39,25 @@ export function ChangelogActionRequest({
                                            action,
                                            title,
                                            isPublished = false,
-                                           onSuccess
+                                           onSuccess,
+                                           className,
+                                           variant = 'default',
+                                           disabled = false
                                        }: ChangelogActionRequestProps) {
-    const {user} = useAuth();
-    const {toast} = useToast();
+    const { user } = useAuth();
+    const { toast } = useToast();
     const queryClient = useQueryClient();
     const [isOpen, setIsOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Handle publish action
+    // Handle publish/unpublish action
     const publishEntry = useMutation({
         mutationFn: async () => {
             setIsSubmitting(true);
             try {
                 const response = await fetch(`/api/projects/${projectId}/changelog/${entryId}`, {
                     method: 'PATCH',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         action: action.toLowerCase()
                     })
@@ -66,8 +73,11 @@ export function ChangelogActionRequest({
                 setIsSubmitting(false);
             }
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({queryKey: ['changelog-entry', entryId]});
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ['changelog-entry', entryId] });
+            queryClient.invalidateQueries({ queryKey: ['changelog-entries', projectId] });
+            queryClient.setQueryData(['changelog-entry', entryId], data);
+
             toast({
                 title: `Entry ${action === 'PUBLISH' ? 'Published' : 'Unpublished'}`,
                 description: `The changelog entry has been ${action === 'PUBLISH' ? 'published' : 'unpublished'} successfully.`
@@ -105,7 +115,9 @@ export function ChangelogActionRequest({
             }
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({queryKey: ['changelog-entries', projectId]});
+            queryClient.invalidateQueries({ queryKey: ['changelog-entries', projectId] });
+            queryClient.removeQueries({ queryKey: ['changelog-entry', entryId] });
+
             toast({
                 title: 'Entry Deleted',
                 description: 'The changelog entry has been deleted successfully.'
@@ -130,9 +142,6 @@ export function ChangelogActionRequest({
 
     if (!canPerformAction) return null;
 
-    // Skip UI if action is publish and entry is already published
-    if (action === 'PUBLISH' && isPublished) return null;
-
     const handleAction = () => {
         if (action === 'PUBLISH' || action === 'UNPUBLISH') {
             publishEntry.mutate();
@@ -141,14 +150,21 @@ export function ChangelogActionRequest({
         }
     };
 
+    const getButtonVariant = (): ButtonVariant => {
+        if (variant) return variant;
+        if (action === 'DELETE') return 'destructive';
+        if (action === 'UNPUBLISH') return 'outline';
+        return 'default';
+    };
+
     const getActionButton = () => {
         if (action === 'PUBLISH' || action === 'UNPUBLISH') {
             return (
                 <Button
                     onClick={() => setIsOpen(true)}
-                    disabled={isSubmitting}
-                    variant={action === 'UNPUBLISH' ? "outline" : "default"}
-                    className="gap-2"
+                    disabled={disabled || isSubmitting}
+                    variant={getButtonVariant()}
+                    className={cn("gap-2", className)}
                 >
                     {isSubmitting ? (
                         <>
@@ -173,17 +189,27 @@ export function ChangelogActionRequest({
                 </Button>
             );
         }
+
+        // Updated delete button
         return (
             <Button
-                variant="ghost"
-                size="sm"
-                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                variant="destructive"
+                size="icon"
+                className={cn(className)}
                 onClick={() => setIsOpen(true)}
+                disabled={disabled || isSubmitting}
             >
-                <Trash2 className="h-4 w-4"/>
+                {isSubmitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                    <Trash2 className="h-4 w-4" />
+                )}
             </Button>
         );
     };
+
+    // Don't render if action is publish and entry is already published
+    if (action === 'PUBLISH' && isPublished) return null;
 
     return (
         <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
@@ -209,9 +235,11 @@ export function ChangelogActionRequest({
                 <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                     <AlertDialogAction
-                        className={action === 'DELETE' ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : ''}
+                        className={cn(
+                            action === 'DELETE' && 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+                        )}
                         onClick={handleAction}
-                        disabled={isSubmitting}
+                        disabled={disabled || isSubmitting}
                     >
                         {isSubmitting ? (
                             <>

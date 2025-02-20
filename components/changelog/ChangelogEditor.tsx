@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { MarkdownEditor } from '@/components/MarkdownEditor';
@@ -29,9 +29,10 @@ interface EditorState {
     hasUnsavedChanges: boolean;
 }
 
-const formatTagName = (name: string) => {
-    return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
-};
+// Constants for pagination and caching
+const ITEMS_PER_PAGE = 20;
+const CACHE_TIME = 1000 * 60 * 5; // 5 minutes
+const DEBOUNCE_TIME = 1000; // 1 second
 
 export function ChangelogEditor({
                                     projectId,
@@ -41,81 +42,99 @@ export function ChangelogEditor({
                                 }: ChangelogEditorProps) {
     const router = useRouter();
 
-    // Combined state to reduce individual updates
-    const [editorState, setEditorState] = useState<EditorState>({
+    // Optimized state management
+    const [editorState, setEditorState] = useState<EditorState>(() => ({
         title: '',
         content: '',
         version: '',
         tags: [],
         isPublished: initialPublishedStatus,
         hasUnsavedChanges: false
-    });
+    }));
 
-    // UI state
-    const [isSaving, setIsSaving] = useState(false);
+    // UI state with useRef for values that don't need re-renders
+    const isSaving = useRef(false);
     const [lastSaveError, setLastSaveError] = useState<string | null>(null);
+    const lastSavedStateRef = useRef<EditorState | null>(null);
+    const saveFailedRef = useRef(false);
+    const isAutoSavingRef = useRef(false);
 
     // Debounced state for autosave
-    const [debouncedState] = useDebounce(editorState, 1000);
+    const [debouncedState] = useDebounce(editorState, DEBOUNCE_TIME);
 
-    // Fetch all necessary data in parallel
-    const { data: initialData } = useQuery({
+    // Optimized data fetching with react-query
+    const { data: initialData, isLoading: isInitialDataLoading } = useQuery({
         queryKey: ['changelog-init', projectId, entryId],
         queryFn: async () => {
-            const [projectResponse, tagsResponse, entryResponse] = await Promise.all([
+            const [projectResponse, entryResponse] = await Promise.all([
                 fetch(`/api/projects/${projectId}`),
-                fetch(`/api/projects/${projectId}/changelog/tags`),
                 entryId ? fetch(`/api/projects/${projectId}/changelog/${entryId}`) : Promise.resolve(null)
             ]);
 
             const project = await projectResponse.json();
-            const tags = await tagsResponse.json();
             const entry = entryResponse ? await entryResponse.json() : null;
 
-            return { project, tags, entry };
-        }
+            return { project, entry };
+        },
+        staleTime: CACHE_TIME,
     });
 
-    // Process tags and available options
-    const { availableTags, mappedDefaultTags } = useMemo(() => {
-        if (!initialData) return { availableTags: [], mappedDefaultTags: [] };
+    // Separate query for tags with pagination
+    const {
+        data: tagsData,
+        fetchNextPage,
+        hasNextPage,
+        isLoading: isTagsLoading
+    } = useInfiniteQuery({
+        queryKey: ['changelog-tags', projectId],
+        queryFn: async ({ pageParam = 0 }) => {
+            const response = await fetch(
+                `/api/projects/${projectId}/changelog/tags?page=${pageParam}&limit=${ITEMS_PER_PAGE}`
+            );
+            return response.json();
+        },
+        getNextPageParam: (lastPage) => {
+            return lastPage.pagination.hasMore ? lastPage.pagination.page + 1 : undefined;
+        },
+        staleTime: CACHE_TIME,
+    });
 
-        const { project, tags } = initialData;
+    // Memoized tags processing
+    const { availableTags, mappedDefaultTags } = useMemo(() => {
+        if (!initialData || !tagsData?.pages) {
+            return { availableTags: [], mappedDefaultTags: [] };
+        }
+
+        const allTags = tagsData.pages.flatMap(page => page.tags);
+        const { project } = initialData;
         const defaultTags = project.defaultTags || [];
+
         const tagMap = new Map<string, Tag>();
         const defaultTagObjects: Tag[] = [];
 
-        // Process existing tags
-        tags.forEach(tag => {
-            const formattedName = formatTagName(tag.name);
-            tagMap.set(formattedName.toLowerCase(), {
-                ...tag,
-                name: formattedName
+        const processTags = (tags: Tag[], isDefault = false) => {
+            tags.forEach(tag => {
+                const lowercaseName = tag.name.toLowerCase();
+                if (!tagMap.has(lowercaseName)) {
+                    tagMap.set(lowercaseName, tag);
+                    if (isDefault) {
+                        defaultTagObjects.push(tag);
+                    }
+                }
             });
-        });
+        };
 
-        // Process default tags
-        defaultTags.forEach(defaultTag => {
-            const formattedName = formatTagName(defaultTag);
-            const lowercaseName = formattedName.toLowerCase();
-
-            if (tagMap.has(lowercaseName)) {
-                defaultTagObjects.push(tagMap.get(lowercaseName)!);
-            } else {
-                const newTag: Tag = {
-                    id: `default-${lowercaseName}`,
-                    name: formattedName
-                };
-                tagMap.set(lowercaseName, newTag);
-                defaultTagObjects.push(newTag);
-            }
-        });
+        processTags(allTags);
+        processTags(defaultTags.map(name => ({
+            id: `default-${name.toLowerCase()}`,
+            name
+        })), true);
 
         return {
             availableTags: Array.from(tagMap.values()),
             mappedDefaultTags: defaultTagObjects
         };
-    }, [initialData]);
+    }, [initialData, tagsData?.pages]);
 
     // Initialize editor state from fetched data
     useEffect(() => {
@@ -136,7 +155,7 @@ export function ChangelogEditor({
         const entryTags = entry.tags || [];
         const formattedTags = entryTags.map(tag => ({
             ...tag,
-            name: formatTagName(tag.name)
+            name: tag.name.charAt(0).toUpperCase() + tag.name.slice(1).toLowerCase()
         }));
 
         setEditorState({
@@ -156,27 +175,33 @@ export function ChangelogEditor({
                 ? `/api/projects/${projectId}/changelog/${entryId}`
                 : `/api/projects/${projectId}/changelog`;
 
+            // Properly format tag data for the API
             const tagData = data.tags.map(tag =>
                 tag.id.startsWith('default-')
-                    ? { name: formatTagName(tag.name) }
-                    : { id: tag.id }
+                    ? { name: tag.name }
+                    : { id: tag.id }  // Direct id property
             );
 
             const response = await fetch(url, {
                 method: entryId ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    ...data,
+                    title: data.title,
+                    content: data.content,
+                    version: data.version,
                     tags: tagData
                 })
             });
 
-            if (!response.ok) throw new Error('Failed to save entry');
+            if (!response.ok) {
+                throw new Error('Failed to save entry');
+            }
+
             return response.json();
         }
     });
 
-    // Handlers
+    // Optimized change handlers
     const handleContentChange = useCallback((newContent: string) => {
         setEditorState(prev => ({
             ...prev,
@@ -204,31 +229,40 @@ export function ChangelogEditor({
     const handleTagsChange = useCallback((newTags: Tag[]) => {
         setEditorState(prev => ({
             ...prev,
-            tags: newTags.map(tag => ({
-                ...tag,
-                name: formatTagName(tag.name)
-            })),
+            tags: newTags,
             hasUnsavedChanges: true
         }));
     }, []);
 
+    // Optimized save handler
     const handleSave = useCallback(async () => {
-        if (!editorState.title || !editorState.content) return;
+        if (isAutoSavingRef.current || saveFailedRef.current) return;
 
-        setIsSaving(true);
+        const currentState = {
+            title: editorState.title,
+            content: editorState.content,
+            version: editorState.version,
+            tags: editorState.tags
+        };
+
+        const stateChanged = !lastSavedStateRef.current ||
+            JSON.stringify(currentState) !== JSON.stringify(lastSavedStateRef.current);
+
+        if (!stateChanged || !editorState.title || !editorState.content) return;
+
+        isSaving.current = true;
         setLastSaveError(null);
+        isAutoSavingRef.current = true;
 
         try {
-            const result = await saveEntry.mutateAsync({
-                title: editorState.title,
-                content: editorState.content,
-                version: editorState.version,
-                tags: editorState.tags
-            });
+            const result = await saveEntry.mutateAsync(currentState);
 
             if (!entryId) {
                 router.replace(`/dashboard/projects/${projectId}/changelog/${result.id}`);
             }
+
+            saveFailedRef.current = false;
+            lastSavedStateRef.current = currentState;
 
             setEditorState(prev => ({
                 ...prev,
@@ -239,30 +273,53 @@ export function ChangelogEditor({
                 title: "Changes saved",
                 description: "Your changes have been saved successfully."
             });
-        } catch (error: unknown) {
-            console.error((error as Error).stack);
+        } catch (error) {
+            console.error('Save error:', error);
+            saveFailedRef.current = true;
             setLastSaveError('Failed to save changes. Please try again.');
+
             toast({
                 title: "Save failed",
                 description: "There was an error saving your changes.",
                 variant: "destructive"
             });
         } finally {
-            setIsSaving(false);
+            isSaving.current = false;
+            isAutoSavingRef.current = false;
         }
     }, [editorState, entryId, projectId, router, saveEntry]);
 
     // Autosave effect
     useEffect(() => {
-        if (!debouncedState.hasUnsavedChanges || !debouncedState.title || !debouncedState.content) return;
-        handleSave();
+        if (saveFailedRef.current || !debouncedState.hasUnsavedChanges) return;
+
+        const currentState = {
+            title: debouncedState.title,
+            content: debouncedState.content,
+            version: debouncedState.version,
+            tags: debouncedState.tags
+        };
+
+        const stateChanged = !lastSavedStateRef.current ||
+            JSON.stringify(currentState) !== JSON.stringify(lastSavedStateRef.current);
+
+        if (!stateChanged || !debouncedState.title || !debouncedState.content) return;
+
+        const timeoutId = setTimeout(handleSave, 0);
+        return () => clearTimeout(timeoutId);
     }, [debouncedState, handleSave]);
+
+    if (isInitialDataLoading || isTagsLoading) {
+        return <div className="flex items-center justify-center min-h-screen">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>;
+    }
 
     return (
         <div className="min-h-screen bg-background text-foreground">
             <EditorHeader
                 title={editorState.title}
-                isSaving={isSaving}
+                isSaving={isSaving.current}
                 hasUnsavedChanges={editorState.hasUnsavedChanges}
                 lastSaveError={lastSaveError}
                 onManualSave={handleSave}
@@ -275,6 +332,7 @@ export function ChangelogEditor({
                 selectedTags={editorState.tags}
                 availableTags={availableTags}
                 onTagsChange={handleTagsChange}
+                onLoadMoreTags={hasNextPage ? () => fetchNextPage() : undefined}
             />
 
             <div className="container py-6">

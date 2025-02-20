@@ -1,39 +1,25 @@
-// components/changelog/editor/EditorHeader.tsx
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
+    Popover, PopoverContent, PopoverTrigger,
 } from '@/components/ui/popover';
 import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
+    Command, CommandEmpty, CommandGroup, CommandInput,
+    CommandItem, CommandList,
 } from "@/components/ui/command"
 import {
-    ChevronLeft,
-    Save,
-    AlertCircle,
-    ChevronDown,
-    Tags,
-    Check
+    ChevronLeft, Save, AlertCircle, ChevronDown,
+    Tags, Check
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import {
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger,
-    TooltipProvider
+    Tooltip, TooltipContent, TooltipTrigger, TooltipProvider
 } from '@/components/ui/tooltip';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ChangelogActionRequest } from "@/components/changelog/ChangelogActionRequest";
 import { Badge } from "@/components/ui/badge";
 import { cn } from '@/lib/utils';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 interface Tag {
     id: string;
@@ -334,6 +320,40 @@ const EditorHeader = ({
                           availableTags,
                           onTagsChange
                       }: EditorHeaderProps) => {
+    // Add query client for cache updates
+    const queryClient = useQueryClient();
+
+    // Query for real-time entry status
+    const { data: entryData } = useQuery({
+        queryKey: ['changelog-entry', projectId, entryId],
+        queryFn: async () => {
+            if (!entryId) return null;
+            const response = await fetch(`/api/projects/${projectId}/changelog/${entryId}`);
+            if (!response.ok) throw new Error('Failed to fetch entry');
+            return response.json();
+        },
+        // Only fetch if we have an entryId
+        enabled: !!entryId,
+    });
+
+    // Use the latest published status from the query
+    const currentPublishStatus = entryData?.publishedAt ? true : isPublished;
+
+    // Handle successful publish/unpublish
+    const handleActionSuccess = () => {
+        // Invalidate the entry query to trigger a refetch
+        queryClient.invalidateQueries({ queryKey: ['changelog-entry', projectId, entryId] });
+    };
+
+    // Validate if publishing is allowed
+    const canPublish = !!version && version.trim() !== '';
+
+    const publishTooltip = !canPublish
+        ? "Please set a version before publishing"
+        : currentPublishStatus
+            ? "Unpublish this entry"
+            : "Publish this entry";
+
     return (
         <TooltipProvider>
             <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
@@ -380,14 +400,25 @@ const EditorHeader = ({
                                 {entryId && (
                                     <>
                                         <Separator orientation="vertical" className="h-6" />
-                                        <ChangelogActionRequest
-                                            projectId={projectId}
-                                            entryId={entryId}
-                                            action={isPublished ? "UNPUBLISH" : "PUBLISH"}
-                                            title={title}
-                                            isPublished={isPublished}
-                                            variant="default"
-                                        />
+                                        <Tooltip>
+                                            <TooltipTrigger>
+                                                <div>
+                                                    <ChangelogActionRequest
+                                                        projectId={projectId}
+                                                        entryId={entryId}
+                                                        action={currentPublishStatus ? "UNPUBLISH" : "PUBLISH"}
+                                                        title={title}
+                                                        isPublished={currentPublishStatus}
+                                                        variant="default"
+                                                        disabled={!canPublish && !currentPublishStatus}
+                                                        onSuccess={handleActionSuccess}
+                                                    />
+                                                </div>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                {publishTooltip}
+                                            </TooltipContent>
+                                        </Tooltip>
                                         <ChangelogActionRequest
                                             projectId={projectId}
                                             entryId={entryId}

@@ -48,14 +48,19 @@ export async function PUT(
         // Unwrap the params using IIFE
         const { entryId } = await (async () => context.params)();
 
+        // Fix the tags connection structure
         const entry = await db.changelogEntry.update({
-            where: { id: entryId },
+            where: {
+                id: entryId
+            },
             data: {
                 title,
                 content,
                 version,
                 tags: {
-                    set: tags.map((tagId: string) => ({ id: tagId }))
+                    set: tags.map((tag: { id: string }) => ({
+                        id: tag.id
+                    }))
                 }
             },
             include: {

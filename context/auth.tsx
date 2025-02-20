@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { User } from '@prisma/client';
 
@@ -9,26 +9,79 @@ interface AuthContextType {
     login: (email: string, password: string) => Promise<void>
     logout: () => Promise<void>
     isLoading: boolean
+    testRefresh?: boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+const REFRESH_INTERVAL = 15 * 60 * 1000 // 15 minutes
+const TEST_REFRESH_INTERVAL = 15 * 1000 // 15 seconds
+const REFRESH_THRESHOLD = 0.8 // Refresh at 80% of token lifetime
+
+export function AuthProvider({
+                                 children,
+                                 testRefresh = false
+                             }: {
+    children: React.ReactNode
+    testRefresh?: boolean
+}) {
     const [user, setUser] = useState<User | null>(null)
     const [isLoading, setIsLoading] = useState(true)
     const router = useRouter()
+    const refreshTimerRef = useRef<NodeJS.Timeout>()
 
-    // Check auth state on mount and whenever the component is re-rendered
-    useEffect(() => {
-        checkAuthState()
-    }, [])
+    const refreshInterval = testRefresh ? TEST_REFRESH_INTERVAL : REFRESH_INTERVAL
+    const timeUntilRefresh = refreshInterval * REFRESH_THRESHOLD
 
-    async function checkAuthState() {
+    const refreshToken = async () => {
+        try {
+            const refreshResponse = await fetch('/api/auth/refresh', {
+                method: 'POST',
+                credentials: 'include', // Important for cookies
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+
+            if (refreshResponse.ok) {
+                const { user: refreshedUser } = await refreshResponse.json()
+                setUser(refreshedUser)
+                return true
+            }
+
+            // If refresh fails, clear user state
+            setUser(null)
+            return false
+        } catch (error) {
+            console.error('Token refresh failed:', error)
+            setUser(null)
+            return false
+        }
+    }
+
+    const scheduleTokenRefresh = useCallback(() => {
+        if (refreshTimerRef.current) {
+            clearTimeout(refreshTimerRef.current)
+        }
+
+        refreshTimerRef.current = setTimeout(async () => {
+            if (user) {
+                const success = await refreshToken()
+                if (success) {
+                    scheduleTokenRefresh()
+                } else {
+                    await logout()
+                }
+            }
+        }, timeUntilRefresh)
+    }, [user, timeUntilRefresh])
+
+    const checkAuthState = useCallback(async () => {
         setIsLoading(true)
         try {
             const response = await fetch('/api/auth/me', {
-                credentials: 'include', // Important for sending cookies
-                cache: 'no-store' // Ensure fresh data
+                credentials: 'include',
+                cache: 'no-store'
             })
 
             if (response.ok) {
@@ -36,17 +89,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setUser(userData)
             } else {
                 // If me endpoint fails, try to refresh token
-                const refreshResponse = await fetch('/api/auth/refresh', {
-                    method: 'POST',
-                    credentials: 'include',
-                    cache: 'no-store'
-                })
-
-                if (refreshResponse.ok) {
-                    const { user: refreshedUser } = await refreshResponse.json()
-                    setUser(refreshedUser)
-                } else {
-                    // Clear user if refresh fails
+                const success = await refreshToken()
+                if (!success) {
                     setUser(null)
                 }
             }
@@ -56,9 +100,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } finally {
             setIsLoading(false)
         }
-    }
+    }, [])
 
-    async function login(email: string, password: string) {
+    const logout = useCallback(async () => {
+        try {
+            setIsLoading(true)
+            if (refreshTimerRef.current) {
+                clearTimeout(refreshTimerRef.current)
+            }
+
+            await fetch('/api/auth/logout', {
+                method: 'POST',
+                credentials: 'include'
+            })
+        } catch (error) {
+            console.error('Logout error:', error)
+        } finally {
+            setUser(null)
+            setIsLoading(false)
+            router.push('/login')
+        }
+    }, [router])
+
+    // Initial auth check
+    useEffect(() => {
+        checkAuthState()
+    }, [checkAuthState])
+
+    // Schedule refresh when user changes
+    useEffect(() => {
+        if (user) {
+            scheduleTokenRefresh()
+        }
+
+        return () => {
+            if (refreshTimerRef.current) {
+                clearTimeout(refreshTimerRef.current)
+            }
+        }
+    }, [user, scheduleTokenRefresh])
+
+    const login = async (email: string, password: string) => {
         try {
             setIsLoading(true)
             const response = await fetch('/api/auth/login', {
@@ -67,7 +149,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ email, password }),
-                credentials: 'include' // Important for handling cookies
+                credentials: 'include'
             })
 
             if (!response.ok) {
@@ -76,11 +158,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
 
             const { user: userData } = await response.json()
-
-            // Update user state
             setUser(userData)
-
-            // Redirect to dashboard
             router.push('/dashboard')
         } catch (error) {
             console.error('Login error:', error)
@@ -91,33 +169,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     }
 
-    async function logout() {
-        try {
-            setIsLoading(true)
-            // Attempt to invalidate server-side session
-            await fetch('/api/auth/logout', {
-                method: 'POST',
-                credentials: 'include'
-            })
-        } catch (error) {
-            console.error('Logout error:', error)
-        } finally {
-            // Reset user state
-            setUser(null)
-            setIsLoading(false)
-
-            // Redirect to login
-            router.push('/login')
-        }
-    }
-
     return (
         <AuthContext.Provider
             value={{
                 user,
                 login,
                 logout,
-                isLoading
+                isLoading,
+                testRefresh
             }}
         >
             {children}

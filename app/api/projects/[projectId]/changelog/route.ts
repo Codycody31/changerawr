@@ -112,7 +112,7 @@ export async function POST(
 
         // Get the changelog for this project
         const changelog = await db.changelog.findUnique({
-            where: { projectId: params.projectId }
+            where: { projectId: await params.projectId }
         })
 
         if (!changelog) {
@@ -122,6 +122,7 @@ export async function POST(
             )
         }
 
+        // Create the entry with its tags
         const entry = await db.changelogEntry.create({
             data: {
                 title,
@@ -129,7 +130,16 @@ export async function POST(
                 version,
                 changelogId: changelog.id,
                 tags: {
-                    connect: tags.map((tagId: string) => ({ id: tagId }))
+                    connectOrCreate: tags.map((tag: { id?: string; name: string }) => ({
+                        where: {
+                            // If we have an ID, use it; otherwise use the name
+                            id: tag.id || undefined,
+                            name: !tag.id ? tag.name : undefined
+                        },
+                        create: {
+                            name: tag.name
+                        }
+                    }))
                 }
             },
             include: {

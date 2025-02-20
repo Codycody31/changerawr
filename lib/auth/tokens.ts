@@ -1,6 +1,7 @@
 import { SignJWT, jwtVerify } from 'jose'
 import { db } from '../db'
 import { nanoid } from 'nanoid'
+import {User} from "@prisma/client";
 
 const ACCESS_SECRET = new TextEncoder().encode(
     process.env.JWT_ACCESS_SECRET || 'your-access-secret-key'
@@ -43,37 +44,70 @@ export async function verifyAccessToken(token: string) {
     }
 }
 
-export async function refreshAccessToken(refreshToken: string) {
-    const storedToken = await db.refreshToken.findUnique({
-        where: { token: refreshToken },
-        include: { user: true }
-    })
+interface TokenResponse {
+    accessToken: string
+    refreshToken: string
+    user: User
+}
 
-    if (!storedToken || storedToken.invalidated || storedToken.expiresAt < new Date()) {
-        // Invalidate all refresh tokens for this user if token is compromised
-        if (storedToken) {
-            await db.refreshToken.updateMany({
-                where: { userId: storedToken.userId },
-                data: { invalidated: true }
-            })
+export async function refreshAccessToken(currentRefreshToken: string): Promise<TokenResponse | null> {
+    try {
+        // Find and validate the refresh token
+        const existingToken = await db.refreshToken.findUnique({
+            where: {
+                token: currentRefreshToken
+            },
+            include: {
+                user: true
+            }
+        })
+
+        // Check if token exists and is valid
+        if (!existingToken || existingToken.invalidated || existingToken.expiresAt < new Date()) {
+            // Invalidate the token if it exists but is expired
+            if (existingToken) {
+                await db.refreshToken.update({
+                    where: { id: existingToken.id },
+                    data: { invalidated: true }
+                })
+            }
+            return null
         }
+
+        // Generate new access token
+        const accessToken = await new SignJWT({ userId: existingToken.user.id })
+            .setProtectedHeader({ alg: 'HS256' })
+            .setExpirationTime('15m')
+            .setIssuedAt()
+            .sign(ACCESS_SECRET)
+
+        // Generate new refresh token
+        const refreshToken = nanoid(64)
+        const expiresAt = new Date()
+        expiresAt.setDate(expiresAt.getDate() + 7)
+
+        // Store new refresh token
+        await db.refreshToken.create({
+            data: {
+                userId: existingToken.user.id,
+                token: refreshToken,
+                expiresAt,
+            },
+        })
+
+        // Invalidate the old refresh token
+        await db.refreshToken.update({
+            where: { id: existingToken.id },
+            data: { invalidated: true }
+        })
+
+        return {
+            accessToken,
+            refreshToken,
+            user: existingToken.user
+        }
+    } catch (error) {
+        console.error('Error refreshing token:', error)
         return null
-    }
-
-    // Generate new access token
-    const accessToken = await new SignJWT({ userId: storedToken.userId })
-        .setProtectedHeader({ alg: 'HS256' })
-        .setExpirationTime('15m')
-        .setIssuedAt()
-        .sign(ACCESS_SECRET)
-
-    return {
-        accessToken,
-        user: {
-            id: storedToken.user.id,
-            email: storedToken.user.email,
-            name: storedToken.user.name,
-            role: storedToken.user.role,
-        }
     }
 }
