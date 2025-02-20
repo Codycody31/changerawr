@@ -1,6 +1,5 @@
-// components/changelog/ChangelogActionRequest.tsx
-import { useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import {useState} from 'react'
+import {useMutation, useQueryClient} from '@tanstack/react-query'
 import {
     AlertDialog,
     AlertDialogAction,
@@ -12,13 +11,13 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { Button } from '@/components/ui/button'
-import { useToast } from '@/hooks/use-toast'
-import { Loader2, Trash2, BookCheck } from 'lucide-react'
-import { useAuth } from '@/context/auth'
-import { Role } from '@prisma/client'
+import {Button} from '@/components/ui/button'
+import {useToast} from '@/hooks/use-toast'
+import {Globe, Loader2, PackageOpen, Trash2} from 'lucide-react'
+import {useAuth} from '@/context/auth'
+import {Role} from '@prisma/client'
 
-type ActionType = 'PUBLISH' | 'DELETE';
+type ActionType = 'PUBLISH' | 'UNPUBLISH' | 'DELETE';
 
 interface ChangelogActionRequestProps {
     projectId: string;
@@ -36,11 +35,10 @@ export function ChangelogActionRequest({
                                            action,
                                            title,
                                            isPublished = false,
-                                           onSuccess,
-                                           className
+                                           onSuccess
                                        }: ChangelogActionRequestProps) {
-    const { user } = useAuth();
-    const { toast } = useToast();
+    const {user} = useAuth();
+    const {toast} = useToast();
     const queryClient = useQueryClient();
     const [isOpen, setIsOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -52,13 +50,15 @@ export function ChangelogActionRequest({
             try {
                 const response = await fetch(`/api/projects/${projectId}/changelog/${entryId}`, {
                     method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'publish' })
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        action: action.toLowerCase()
+                    })
                 });
 
                 if (!response.ok) {
                     const error = await response.json();
-                    throw new Error(error.error || 'Failed to publish entry');
+                    throw new Error(error.error || `Failed to ${action.toLowerCase()} entry`);
                 }
 
                 return response.json();
@@ -67,18 +67,18 @@ export function ChangelogActionRequest({
             }
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['changelog-entry', entryId]);
+            queryClient.invalidateQueries({queryKey: ['changelog-entry', entryId]});
             toast({
-                title: 'Entry Published',
-                description: 'The changelog entry has been published successfully.'
+                title: `Entry ${action === 'PUBLISH' ? 'Published' : 'Unpublished'}`,
+                description: `The changelog entry has been ${action === 'PUBLISH' ? 'published' : 'unpublished'} successfully.`
             });
             setIsOpen(false);
             onSuccess?.();
         },
         onError: (error: Error) => {
             toast({
-                title: 'Failed to Publish',
-                description: error.message || 'There was an error publishing the entry.',
+                title: `Failed to ${action.toLowerCase()}`,
+                description: error.message || `There was an error ${action.toLowerCase()}ing the entry.`,
                 variant: 'destructive'
             });
             setIsOpen(false);
@@ -105,7 +105,7 @@ export function ChangelogActionRequest({
             }
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['changelog-entries', projectId]);
+            queryClient.invalidateQueries({queryKey: ['changelog-entries', projectId]});
             toast({
                 title: 'Entry Deleted',
                 description: 'The changelog entry has been deleted successfully.'
@@ -134,7 +134,7 @@ export function ChangelogActionRequest({
     if (action === 'PUBLISH' && isPublished) return null;
 
     const handleAction = () => {
-        if (action === 'PUBLISH') {
+        if (action === 'PUBLISH' || action === 'UNPUBLISH') {
             publishEntry.mutate();
         } else {
             deleteEntry.mutate();
@@ -142,28 +142,37 @@ export function ChangelogActionRequest({
     };
 
     const getActionButton = () => {
-        if (action === 'PUBLISH') {
+        if (action === 'PUBLISH' || action === 'UNPUBLISH') {
             return (
                 <Button
                     onClick={() => setIsOpen(true)}
                     disabled={isSubmitting}
+                    variant={action === 'UNPUBLISH' ? "outline" : "default"}
                     className="gap-2"
                 >
                     {isSubmitting ? (
                         <>
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            Publishing...
+                            <Loader2 className="h-4 w-4 animate-spin"/>
+                            {action === 'PUBLISH' ? 'Publishing...' : 'Unpublishing...'}
                         </>
                     ) : (
                         <>
-                            <BookCheck className="h-4 w-4" />
-                            Publish
+                            {action === 'PUBLISH' ? (
+                                <>
+                                    <Globe className="h-4 w-4"/>
+                                    Publish
+                                </>
+                            ) : (
+                                <>
+                                    <PackageOpen className="h-4 w-4"/>
+                                    Unpublish
+                                </>
+                            )}
                         </>
                     )}
                 </Button>
             );
         }
-
         return (
             <Button
                 variant="ghost"
@@ -171,7 +180,7 @@ export function ChangelogActionRequest({
                 className="text-destructive hover:text-destructive hover:bg-destructive/10"
                 onClick={() => setIsOpen(true)}
             >
-                <Trash2 className="h-4 w-4" />
+                <Trash2 className="h-4 w-4"/>
             </Button>
         );
     };
@@ -184,12 +193,16 @@ export function ChangelogActionRequest({
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>
-                        {action === 'PUBLISH' ? 'Publish Entry' : 'Delete Entry'}
+                        {action === 'PUBLISH' ? 'Publish Entry' :
+                            action === 'UNPUBLISH' ? 'Unpublish Entry' :
+                                'Delete Entry'}
                     </AlertDialogTitle>
                     <AlertDialogDescription>
                         {action === 'PUBLISH'
                             ? `Are you sure you want to publish "${title}"? Published entries will be visible to all users.`
-                            : `Are you sure you want to delete "${title}"? This action cannot be undone.`
+                            : action === 'UNPUBLISH'
+                                ? `Are you sure you want to unpublish "${title}"? The entry will no longer be visible to users.`
+                                : `Are you sure you want to delete "${title}"? This action cannot be undone.`
                         }
                     </AlertDialogDescription>
                 </AlertDialogHeader>
@@ -202,11 +215,15 @@ export function ChangelogActionRequest({
                     >
                         {isSubmitting ? (
                             <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                {action === 'PUBLISH' ? 'Publishing...' : 'Deleting...'}
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin"/>
+                                {action === 'PUBLISH' ? 'Publishing...' :
+                                    action === 'UNPUBLISH' ? 'Unpublishing...' :
+                                        'Deleting...'}
                             </>
                         ) : (
-                            action === 'PUBLISH' ? 'Publish' : 'Delete'
+                            action === 'PUBLISH' ? 'Publish' :
+                                action === 'UNPUBLISH' ? 'Unpublish' :
+                                    'Delete'
                         )}
                     </AlertDialogAction>
                 </AlertDialogFooter>

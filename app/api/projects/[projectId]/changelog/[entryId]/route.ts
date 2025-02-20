@@ -8,10 +8,10 @@ export async function GET(
     context: { params: { projectId: string; entryId: string } }
 ) {
     try {
-        const user = await validateAuthAndGetUser();
+        await validateAuthAndGetUser();
 
         // Unwrap the params using IIFE
-        const { projectId, entryId } = await (async () => context.params)();
+        const { entryId } = await (async () => context.params)();
 
         const entry = await db.changelogEntry.findUnique({
             where: { id: entryId },
@@ -42,11 +42,11 @@ export async function PUT(
     context: { params: { projectId: string; entryId: string } }
 ) {
     try {
-        const user = await validateAuthAndGetUser();
+        await validateAuthAndGetUser();
         const { title, content, version, tags } = await request.json();
 
         // Unwrap the params using IIFE
-        const { projectId, entryId } = await (async () => context.params)();
+        const { entryId } = await (async () => context.params)();
 
         const entry = await db.changelogEntry.update({
             where: { id: entryId },
@@ -82,7 +82,7 @@ export async function PATCH(
         const { action } = await request.json();
         const { projectId, entryId } = await (async () => context.params)();
 
-        // Verify user has permission to publish
+        // Verify user has permission
         if (user.role === Role.VIEWER) {
             return NextResponse.json(
                 { error: 'Insufficient permissions' },
@@ -90,8 +90,25 @@ export async function PATCH(
             );
         }
 
-        // Handle publish action
-        if (action === 'publish') {
+        // First, verify the entry exists and belongs to the project
+        const existingEntry = await db.changelogEntry.findFirst({
+            where: {
+                id: entryId,
+                changelog: {
+                    projectId: projectId
+                }
+            }
+        });
+
+        if (!existingEntry) {
+            return NextResponse.json(
+                { error: 'Entry not found or does not belong to this project' },
+                { status: 404 }
+            );
+        }
+
+        // Handle publish/unpublish actions
+        if (action === 'publish' || action === 'unpublish') {
             const project = await db.project.findUnique({
                 where: { id: projectId },
                 select: { requireApproval: true, allowAutoPublish: true }
@@ -104,8 +121,9 @@ export async function PATCH(
                 );
             }
 
-            // Check if entry can be published based on project settings
-            if (project.requireApproval && user.role !== Role.ADMIN && !project.allowAutoPublish) {
+            // For publishing, check project settings
+            if (action === 'publish' && project.requireApproval &&
+                user.role !== Role.ADMIN && !project.allowAutoPublish) {
                 return NextResponse.json(
                     { error: 'Entry requires admin approval before publishing' },
                     { status: 403 }
@@ -114,7 +132,9 @@ export async function PATCH(
 
             const entry = await db.changelogEntry.update({
                 where: { id: entryId },
-                data: { publishedAt: new Date() },
+                data: {
+                    publishedAt: action === 'publish' ? new Date() : null
+                },
                 include: { tags: true }
             });
 
