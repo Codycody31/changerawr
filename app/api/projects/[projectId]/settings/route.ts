@@ -12,6 +12,29 @@ const projectSettingsSchema = z.object({
     defaultTags: z.array(z.string()).optional(),
 })
 
+/**
+ * @method GET
+ * @description Retrieves the project settings for a given project
+ * @query {
+ *   projectId: String, required
+ * }
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "id": { "type": "string" },
+ *     "name": { "type": "string" },
+ *     "isPublic": { "type": "boolean" },
+ *     "allowAutoPublish": { "type": "boolean" },
+ *     "requireApproval": { "type": "boolean" },
+ *     "defaultTags": { "type": "array", "items": { "type": "string" } },
+ *     "updatedAt": { "type": "string", "format": "date-time" }
+ *   }
+ * }
+ * @error 400 Invalid request data
+ * @error 403 Unauthorized - User does not have 'ADMIN' role
+ * @error 404 Project not found
+ * @error 500 An unexpected error occurred while fetching the project settings
+ */
 export async function GET(
     request: Request,
     context: { params: { projectId: string } }
@@ -59,6 +82,45 @@ export async function GET(
     }
 }
 
+/**
+ * @method PATCH
+ * @description Updates the project settings for a given project
+ * @query {
+ *   projectId: String, required
+ * }
+ * @body {
+ *   "type": "object",
+ *   "properties": {
+ *     "name": { "type": "string" },
+ *     "isPublic": { "type": "boolean" },
+ *     "allowAutoPublish": { "type": "boolean" },
+ *     "requireApproval": { "type": "boolean" },
+ *     "defaultTags": {
+ *       "type": "array",
+ *       "items": { "type": "string" }
+ *     }
+ *   },
+ *   "required": [
+ *     "name"
+ *   ]
+ * }
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "id": { "type": "string" },
+ *     "name": { "type": "string" },
+ *     "isPublic": { "type": "boolean" },
+ *     "allowAutoPublish": { "type": "boolean" },
+ *     "requireApproval": { "type": "boolean" },
+ *     "defaultTags": { "type": "array", "items": { "type": "string" } },
+ *     "updatedAt": { "type": "string", "format": "date-time" }
+ *   }
+ * }
+ * @error 400 Invalid request data
+ * @error 403 Unauthorized - User does not have 'ADMIN' role
+ * @error 404 Project not found
+ * @error 500 An unexpected error occurred while updating the project settings
+ */
 export async function PATCH(
     request: Request,
     context: { params: { projectId: string } }

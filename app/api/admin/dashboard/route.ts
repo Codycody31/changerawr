@@ -2,6 +2,47 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { validateAuthAndGetUser } from '@/lib/utils/changelog'
 
+/**
+ * @method GET
+ * @description Fetches dashboard metrics for the authenticated user
+ * @description Validates that the authenticated user has 'ADMIN' role
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "userCount": {
+ *       "type": "object",
+ *       "properties": {
+ *         "total": { "type": "number" },
+ *         "admins": { "type": "number" },
+ *         "staff": { "type": "number" }
+ *       }
+ *     },
+ *     "invitations": {
+ *       "type": "object",
+ *       "properties": {
+ *         "total": { "type": "number" },
+ *         "pending": { "type": "number" }
+ *       }
+ *     },
+ *     "changelog": {
+ *       "type": "object",
+ *       "properties": {
+ *         "totalEntries": { "type": "number" },
+ *         "entriesThisMonth": { "type": "number" }
+ *       }
+ *     },
+ *     "systemHealth": {
+ *       "type": "object",
+ *       "properties": {
+ *         "databaseConnected": { "type": "boolean" },
+ *         "lastDataSync": { "type": "string", "format": "date-time" }
+ *       }
+ *     }
+ *   }
+ * }
+ * @error 403 Unauthorized - User does not have 'ADMIN' role
+ * @error 500 An unexpected error occurred while fetching dashboard data
+ */
 export async function GET() {
     try {
         // Validate that the user is an admin

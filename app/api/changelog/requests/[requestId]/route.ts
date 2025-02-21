@@ -9,6 +9,42 @@ const updateRequestSchema = z.object({
     timestamp: z.string().optional()
 });
 
+/**
+ * @method PATCH
+ * @description Updates the status of a changelog request
+ * @query {
+ *   requestId: String, required
+ * }
+ * @body {
+ *   "type": "object",
+ *   "properties": {
+ *     "status": { "type": "string", "enum": ["APPROVED", "REJECTED"] },
+ *     "timestamp": { "type": "string", "format": "date-time" },
+ *     "adminId": { "type": "string" }
+ *   },
+ *   "required": [
+ *     "status"
+ *   ],
+ *   "additionalProperties": false
+ * }
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "id": { "type": "string" },
+ *     "title": { "type": "string" },
+ *     "content": { "type": "string" },
+ *     "version": { "type": "number" },
+ *     "status": { "type": "string", "enum": ["PENDING", "APPROVED", "REJECTED"] },
+ *     "createdAt": { "type": "string", "format": "date-time" },
+ *     "changelogId": { "type": "string" },
+ *     "adminId": { "type": "string" }
+ *   }
+ * }
+ * @error 400 Invalid request data
+ * @error 403 Unauthorized - User does not have 'ADMIN' role
+ * @error 404 Request not found
+ * @error 500 An unexpected error occurred while processing the request
+ */
 export async function PATCH(
     req: Request,
     context: { params: { requestId: string } }

@@ -10,6 +10,47 @@ const requestSchema = z.object({
     targetId: z.string().optional()
 })
 
+/**
+ * @method GET
+ * @description Retrieves pending changelog requests for authenticated user
+ * @path /api/requests
+ * @query {projectId: string} (optional)
+ * @response 200 {
+ *   "type": "array",
+ *   "items": {
+ *     "type": "object",
+ *     "properties": {
+ *       "id": { "type": "string" },
+ *       "type": { "type": "string", "enum": ["DELETE_PROJECT", "DELETE_TAG", "DELETE_ENTRY"] },
+ *       "status": { "type": "string", "enum": ["PENDING"] },
+ *       "staffId": { "type": "string" },
+ *       "staff": {
+ *         "type": "object",
+ *         "properties": {
+ *           "id": { "type": "string" },
+ *           "email": { "type": "string" },
+ *           "name": { "type": "string" }
+ *         }
+ *       },
+ *       "project": {
+ *         "type": "object",
+ *         "properties": {
+ *           "id": { "type": "string" },
+ *           "name": { "type": "string" },
+ *           "defaultTags": {
+ *             "type": "array",
+ *             "items": {
+ *               "type": "string"
+ *             }
+ *           }
+ *         }
+ *       }
+ *     }
+ *   }
+ * }
+ * @error 401 Unauthorized - User not authenticated
+ * @error 500 An unexpected error occurred while fetching requests
+ */
 export async function GET(request: Request) {
     try {
         const user = await validateAuthAndGetUser()
@@ -65,6 +106,46 @@ export async function GET(request: Request) {
     }
 }
 
+/**
+ * @method POST
+ * @description Creates a new pending changelog request
+ * @path /api/requests
+ * @request {json}
+ * @response 201 {
+ *   "type": "object",
+ *   "properties": {
+ *     "id": { "type": "string" },
+ *     "type": { "type": "string", "enum": ["DELETE_PROJECT", "DELETE_TAG", "DELETE_ENTRY"] },
+ *     "status": { "type": "string", "enum": ["PENDING"] },
+ *     "staffId": { "type": "string" },
+ *     "staff": {
+ *       "type": "object",
+ *       "properties": {
+ *         "id": { "type": "string" },
+ *         "email": { "type": "string" },
+ *         "name": { "type": "string" }
+ *       }
+ *     },
+ *     "project": {
+ *       "type": "object",
+ *       "properties": {
+ *         "id": { "type": "string" },
+ *         "name": { "type": "string" },
+ *         "defaultTags": {
+ *             "type": "array",
+ *             "items": {
+ *               "type": "string"
+ *             }
+ *         }
+ *       }
+ *     }
+ *   }
+ * }
+ * @error 401 Unauthorized - User not authenticated
+ * @error 403 Forbidden - Only staff members can create requests
+ * @error 400 Invalid request data
+ * @error 500 Internal Server Error
+ */
 export async function POST(request: Request) {
     try {
         const user = await validateAuthAndGetUser()

@@ -2,10 +2,38 @@ import { db } from '@/lib/db'
 import { validateAuthAndGetUser } from '@/lib/utils/changelog'
 import { z } from 'zod'
 
+/**
+ * Schema for validating project request body.
+ */
 const projectSchema = z.object({
     name: z.string().min(1, 'Project name is required')
 })
 
+/**
+ * @method GET
+ * @description Fetches a list of projects, including their latest changelog entry and entry count
+ * @response 200 {
+ *   "type": "array",
+ *   "items": {
+ *     "type": "object",
+ *     "properties": {
+ *       "id": { "type": "string" },
+ *       "name": { "type": "string" },
+ *       "createdAt": { "type": "string", "format": "date-time" },
+ *       "entryCount": { "type": "number" },
+ *       "latestEntry": {
+ *         "type": "object",
+ *         "properties": {
+ *           "id": { "type": "string" },
+ *           "version": { "type": "string" },
+ *           "createdAt": { "type": "string", "format": "date-time" }
+ *         }
+ *       }
+ *     }
+ *   }
+ * }
+ * @error 500 An unexpected error occurred while fetching projects
+ */
 export async function GET() {
     try {
         await validateAuthAndGetUser()
@@ -52,6 +80,36 @@ export async function GET() {
     }
 }
 
+/**
+ * @method POST
+ * @description Creates a new project and its associated changelog
+ * @body {
+ *   "type": "object",
+ *   "properties": {
+ *     "name": {
+ *       "type": "string",
+ *       "minLength": 1,
+ *       "description": "Project name"
+ *     }
+ *   }
+ * }
+ * @response 201 {
+ *   "type": "object",
+ *   "properties": {
+ *     "id": { "type": "string" },
+ *     "name": { "type": "string" },
+ *     "createdAt": { "type": "string", "format": "date-time" },
+ *     "changelog": {
+ *       "type": "object",
+ *       "properties": {
+ *         "id": { "type": "string" }
+ *       }
+ *     }
+ *   }
+ * }
+ * @error 400 Invalid input - Project name is required
+ * @error 500 An unexpected error occurred while creating the project
+ */
 export async function POST(request: Request) {
     try {
         await validateAuthAndGetUser()

@@ -7,6 +7,24 @@ const previewSchema = z.object({
     email: z.string().email()
 })
 
+/**
+ * @method POST
+ * @description Creates a preview of a user's information
+ * @path /api/preview
+ * @request {json}
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "id": { "type": "string" },
+ *     "name": { "type": "string" },
+ *     "email": { "type": "string" },
+ *     "avatarUrl": { "type": "string" }
+ *   }
+ * }
+ * @error 400 Invalid input - Email must be a valid email address
+ * @error 404 User not found
+ * @error 500 An unexpected error occurred while creating the preview
+ */
 export async function POST(request: Request) {
     try {
         const body = await request.json()

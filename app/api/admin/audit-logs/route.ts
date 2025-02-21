@@ -2,6 +2,58 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { validateAuthAndGetUser } from '@/lib/utils/changelog'
 
+/**
+ * @method GET
+ * @description Fetches audit logs based on filters and pagination
+ * @query {
+ *   page: Number, default: 1
+ *   pageSize: Number, default: 20
+ *   search: String, optional
+ *   action: String, optional
+ *   from: Date, optional
+ *   to: Date, optional
+ *   userId: String, optional
+ *   targetId: String, optional
+ *   export: boolean, optional
+ * }
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "logs": {
+ *       "type": "array",
+ *       "items": {
+ *         "type": "object",
+ *         "properties": {
+ *           "id": { "type": "string" },
+ *           "action": { "type": "string" },
+ *           "performer": {
+ *             "type": "object",
+ *             "properties": {
+ *               "name": { "type": "string" },
+ *               "email": { "type": "string" }
+ *             }
+ *           },
+ *           "performer_email": { "type": "string" },
+ *           "target": {
+ *             "type": "object",
+ *             "properties": {
+ *               "name": { "type": "string" },
+ *               "email": { "type": "string" }
+ *             }
+ *           },
+ *           "target_email": { "type": "string" },
+ *           "details": { "type": "string" },
+ *           "createdAt": { "type": "string", "format": "date-time" }
+ *         }
+ *       }
+ *     },
+ *     "total": { "type": "number" },
+ *     "pages": { "type": "number" }
+ *   }
+ * }
+ * @error 403 Unauthorized - User does not have 'ADMIN' role
+ * @error 500 An unexpected error occurred while fetching audit logs
+ */
 export async function GET(request: Request) {
     try {
         // Validate admin access

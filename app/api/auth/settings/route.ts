@@ -2,6 +2,22 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { validateAuthAndGetUser } from '@/lib/utils/changelog';
 
+/**
+ * @method GET
+ * @description Retrieves or creates the user's settings
+ * @path /api/settings
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "id": { "type": "string" },
+ *     "userId": { "type": "string" },
+ *     "theme": { "type": "string", "enum": ["light", "dark"] },
+ *     "name": { "type": "string" }
+ *   }
+ * }
+ * @error 401 Unauthorized - User not authenticated
+ * @error 500 An unexpected error occurred while fetching settings
+ */
 export async function GET() {
     try {
         const user = await validateAuthAndGetUser();
@@ -31,6 +47,24 @@ export async function GET() {
     }
 }
 
+/**
+ * @method PATCH
+ * @description Updates the user's settings
+ * @path /api/settings
+ * @request {json}
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "id": { "type": "string" },
+ *     "userId": { "type": "string" },
+ *     "theme": { "type": "string", "enum": ["light", "dark"] },
+ *     "name": { "type": "string" }
+ *   }
+ * }
+ * @error 400 Invalid request data
+ * @error 401 Unauthorized - User not authenticated
+ * @error 500 An unexpected error occurred while updating settings
+ */
 export async function PATCH(request: Request) {
     try {
         const user = await validateAuthAndGetUser();

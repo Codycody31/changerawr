@@ -3,6 +3,54 @@ import { db } from '@/lib/db'
 
 const ITEMS_PER_PAGE = 10
 
+/**
+ * @method GET
+ * @description Fetches the changelog entries for a given public project, optionally paginated by cursor
+ * @query {
+ *   projectId: String, required
+ *   cursor?: String, optional
+ * }
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "project": {
+ *       "type": "object",
+ *       "properties": {
+ *         "id": { "type": "string" },
+ *         "name": { "type": "string" }
+ *       }
+ *     },
+ *     "items": {
+ *       "type": "array",
+ *       "items": {
+ *         "type": "object",
+ *         "properties": {
+ *           "id": { "type": "string" },
+ *           "title": { "type": "string" },
+ *           "content": { "type": "string" },
+ *           "version": { "type": "number" },
+ *           "publishedAt": { "type": "string", "format": "date-time" },
+ *           "tags": {
+ *             "type": "array",
+ *             "items": {
+ *               "type": "object",
+ *               "properties": {
+ *                 "id": { "type": "string" },
+ *                 "name": { "type": "string" }
+ *               }
+ *             }
+ *           }
+ *         }
+ *       }
+ *     },
+ *     "nextCursor": { "type": "string", "nullabel": true }
+ *   }
+ * }
+ * @error 400 Invalid request data
+ * @error 403 Unauthorized - User does not have 'ADMIN' role or the project is not public
+ * @error 404 Project not found
+ * @error 500 An unexpected error occurred while fetching the changelog entries
+ */
 export async function GET(
     request: Request,
     context: { params: { projectId: string } }

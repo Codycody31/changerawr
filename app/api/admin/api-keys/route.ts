@@ -12,6 +12,40 @@ const createApiKeySchema = z.object({
     permissions: z.array(z.string()).optional(),
 });
 
+/**
+ * @method GET
+ * @description Fetches a list of API keys for the authenticated user
+ * @query {
+ *   page: Number, default: 1
+ *   pageSize: Number, default: 20
+ * }
+ * @response 200 {
+ *   "type": "array",
+ *   "items": {
+ *     "type": "object",
+ *     "properties": {
+ *       "id": { "type": "string" },
+ *       "name": { "type": "string" },
+ *       "key": { "type": "string" },
+ *       "lastUsed": { "type": "string", "format": "date-time" },
+ *       "createdAt": { "type": "string", "format": "date-time" },
+ *       "expiresAt": { "type": "string", "format": "date-time" },
+ *       "isRevoked": { "type": "boolean" },
+ *       "permissions": { "type": "array", "items": { "type": "string" } },
+ *       "user": {
+ *         "type": "object",
+ *         "properties": {
+ *           "id": { "type": "string" },
+ *           "email": { "type": "string" },
+ *           "name": { "type": "string" }
+ *         }
+ *       }
+ *     }
+ *   }
+ * }
+ * @error 403 Unauthorized - User does not have 'ADMIN' role
+ * @error 500 An unexpected error occurred while fetching API keys
+ */
 export async function GET() {
     try {
         const user = await validateAuthAndGetUser();
@@ -72,6 +106,45 @@ export async function GET() {
     }
 }
 
+/**
+ * @method POST
+ * @description Creates a new API key for the authenticated user
+ * @body {
+ *   "type": "object",
+ *   "properties": {
+ *     "name": { "type": "string" },
+ *     "expiresAt": { "type": "string", "format": "date" },
+ *     "permissions": { "type": "array", "items": { "type": "string" } }
+ *   },
+ *   "required": [
+ *     "name"
+ *   ]
+ * }
+ * @response 201 {
+ *   "type": "object",
+ *   "properties": {
+ *     "id": { "type": "string" },
+ *     "name": { "type": "string" },
+ *     "key": { "type": "string" },
+ *     "lastUsed": { "type": "null" },
+ *     "createdAt": { "type": "string", "format": "date-time" },
+ *     "expiresAt": { "type": "string", "format": "date-time" },
+ *     "isRevoked": { "type": "boolean", "default": false },
+ *     "permissions": { "type": "array", "items": { "type": "string" } },
+ *     "user": {
+ *       "type": "object",
+ *       "properties": {
+ *         "id": { "type": "string" },
+ *         "email": { "type": "string" },
+ *         "name": { "type": "string" }
+ *       }
+ *     }
+ *   }
+ * }
+ * @error 403 Unauthorized - User does not have 'ADMIN' role
+ * @error 400 Invalid request data
+ * @error 500 An unexpected error occurred while creating an API key
+ */
 export async function POST(request: Request) {
     try {
         const user = await validateAuthAndGetUser();

@@ -3,6 +3,23 @@ import { cookies } from 'next/headers'
 import { verifyAccessToken } from '@/lib/auth/tokens'
 import { db } from '@/lib/db'
 
+/**
+ * @method GET
+ * @description Verifies the access token and retrieves the user's data
+ * @path /api/user
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "id": { "type": "string" },
+ *     "email": { "type": "string" },
+ *     "name": { "type": "string" },
+ *     "role": { "type": "string" }
+ *   }
+ * }
+ * @error 401 Unauthorized - Invalid or expired access token
+ * @error 404 User not found
+ * @error 500 An unexpected error occurred during authentication
+ */
 export async function GET() {
     try {
         // Get access token from cookies

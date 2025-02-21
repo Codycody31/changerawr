@@ -1,4 +1,3 @@
-// src/app/api/auth/register/route.ts
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { hashPassword } from '@/lib/auth/password'
@@ -10,6 +9,22 @@ const registerSchema = z.object({
     password: z.string().min(8),
 })
 
+/**
+ * @method POST
+ * @description Registers a new user using an invitation token
+ * @path /api/auth/register
+ * @request {json}
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "success": { "type": "boolean", "example": true }
+ *   }
+ * }
+ * @error 400 Invalid input - Token, name, or password is missing or invalid
+ * @error 400 Invalid or expired invitation
+ * @error 409 User already exists
+ * @error 500 An unexpected error occurred during registration
+ */
 export async function POST(request: Request) {
     try {
         const body = await request.json()
@@ -37,6 +52,18 @@ export async function POST(request: Request) {
 
             // Hash password
             const hashedPassword = await hashPassword(password)
+
+            // Check if user already exists
+            const existingUser = await tx.user.findFirst({
+                where: { email: invitation.email },
+            })
+
+            if (existingUser) {
+                return NextResponse.json(
+                    { error: 'User already exists' },
+                    { status: 409 }
+                )
+            }
 
             // Create user
             const user = await tx.user.create({

@@ -1,23 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
-/**
- * @openapi
- * @auth bearer
- * @desc Handles GET requests to validate an invitation token.
- * @params {object} params - The request parameters.
- * @params {string} params.token - The invitation token.
- * @response {object} 200 - Successful response.
- * @response {string} 200.email - The email associated with the invitation.
- * @response {string} 200.role - The role associated with the invitation.
- * @response {string} 200.expiresAt - The expiration date of the invitation.
- * @response {object} 400 - Bad request response.
- * @response {string} 400.message - The error message.
- * @response {object} 404 - Not found response.
- * @response {string} 404.message - The error message.
- * @response {object} 500 - Internal server error response.
- * @response {string} 500.message - The error message.
- */
 export async function GET(
     request: Request,
     { params }: { params: { token: string } }
