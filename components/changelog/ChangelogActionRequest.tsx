@@ -50,6 +50,12 @@ export function ChangelogActionRequest({
     const [isOpen, setIsOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    const isAdmin = user?.role === Role.ADMIN;
+    const isStaff = user?.role === Role.STAFF;
+
+    // Update permission check to allow staff to perform all actions
+    const canPerformAction = isAdmin || isStaff;
+
     // Handle publish/unpublish action
     const publishEntry = useMutation({
         mutationFn: async () => {
@@ -106,22 +112,35 @@ export function ChangelogActionRequest({
 
                 if (!response.ok) {
                     const error = await response.json();
-                    throw new Error(error.error || 'Failed to delete entry');
+                    throw new Error(error.error || 'Failed to process deletion');
                 }
 
-                return response.json();
+                const data = await response.json();
+                return { data, status: response.status };
             } finally {
                 setIsSubmitting(false);
             }
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['changelog-entries', projectId] });
-            queryClient.removeQueries({ queryKey: ['changelog-entry', entryId] });
+        onSuccess: (result) => {
+            // For staff, it will be a request (202). For admin, it's a direct deletion
+            if (isStaff && result.status === 202) {
+                toast({
+                    title: 'Deletion Request Submitted',
+                    description: 'Your request has been sent to an administrator for approval.'
+                });
 
-            toast({
-                title: 'Entry Deleted',
-                description: 'The changelog entry has been deleted successfully.'
-            });
+                // Optionally invalidate requests list if you're tracking them
+                queryClient.invalidateQueries({ queryKey: ['changelog-requests'] });
+            } else {
+                queryClient.invalidateQueries({ queryKey: ['changelog-entries', projectId] });
+                queryClient.removeQueries({ queryKey: ['changelog-entry', entryId] });
+
+                toast({
+                    title: 'Entry Deleted',
+                    description: 'The changelog entry has been deleted successfully.'
+                });
+            }
+
             setIsOpen(false);
             onSuccess?.();
         },
@@ -129,16 +148,12 @@ export function ChangelogActionRequest({
             console.error('Delete error:', error);
             toast({
                 title: 'Error',
-                description: error.message || 'Failed to delete entry',
+                description: error.message || 'Failed to process deletion request',
                 variant: 'destructive'
             });
             setIsOpen(false);
         }
     });
-
-    // Determine if user can perform the action
-    const canPerformAction = user?.role === Role.ADMIN ||
-        (user?.role === Role.STAFF && action === 'PUBLISH');
 
     if (!canPerformAction) return null;
 
@@ -155,6 +170,21 @@ export function ChangelogActionRequest({
         if (action === 'DELETE') return 'destructive';
         if (action === 'UNPUBLISH') return 'outline';
         return 'default';
+    };
+
+    const getActionDescription = () => {
+        switch (action) {
+            case 'PUBLISH':
+                return "Published entries will be visible to all users.";
+            case 'UNPUBLISH':
+                return "The entry will no longer be visible to users.";
+            case 'DELETE':
+                return isStaff
+                    ? "Your deletion request will be sent to an administrator for approval."
+                    : "This action cannot be undone.";
+            default:
+                return "";
+        }
     };
 
     const getActionButton = () => {
@@ -190,7 +220,7 @@ export function ChangelogActionRequest({
             );
         }
 
-        // Updated delete button
+        // Delete button
         return (
             <Button
                 variant="destructive"
@@ -219,17 +249,12 @@ export function ChangelogActionRequest({
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>
-                        {action === 'PUBLISH' ? 'Publish Entry' :
-                            action === 'UNPUBLISH' ? 'Unpublish Entry' :
-                                'Delete Entry'}
+                        {action === 'DELETE'
+                            ? (isStaff ? 'Request Entry Deletion' : 'Delete Entry')
+                            : `${action === 'PUBLISH' ? 'Publish' : 'Unpublish'} Entry`}
                     </AlertDialogTitle>
                     <AlertDialogDescription>
-                        {action === 'PUBLISH'
-                            ? `Are you sure you want to publish "${title}"? Published entries will be visible to all users.`
-                            : action === 'UNPUBLISH'
-                                ? `Are you sure you want to unpublish "${title}"? The entry will no longer be visible to users.`
-                                : `Are you sure you want to delete "${title}"? This action cannot be undone.`
-                        }
+                        Are you sure you want to {action.toLowerCase()} &ldquo;{title}&rdquo;? {getActionDescription()}
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -244,14 +269,14 @@ export function ChangelogActionRequest({
                         {isSubmitting ? (
                             <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin"/>
-                                {action === 'PUBLISH' ? 'Publishing...' :
-                                    action === 'UNPUBLISH' ? 'Unpublishing...' :
-                                        'Deleting...'}
+                                {action === 'DELETE'
+                                    ? (isStaff ? 'Submitting Request...' : 'Deleting...')
+                                    : `${action === 'PUBLISH' ? 'Publishing' : 'Unpublishing'}...`}
                             </>
                         ) : (
-                            action === 'PUBLISH' ? 'Publish' :
-                                action === 'UNPUBLISH' ? 'Unpublish' :
-                                    'Delete'
+                            action === 'DELETE'
+                                ? (isStaff ? 'Request Deletion' : 'Delete')
+                                : action === 'PUBLISH' ? 'Publish' : 'Unpublish'
                         )}
                     </AlertDialogAction>
                 </AlertDialogFooter>

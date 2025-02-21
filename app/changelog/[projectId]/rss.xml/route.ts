@@ -29,7 +29,7 @@ export async function GET(
                                 { publishedAt: 'desc' },
                                 { id: 'desc' }
                             ],
-                            take: 50 // Limit to most recent 50 entries
+                            take: 10 // Changed from 50 to 10 entries
                         }
                     }
                 }

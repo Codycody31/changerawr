@@ -107,7 +107,7 @@ export async function POST(
     { params }: { params: { projectId: string } }
 ) {
     try {
-        const user = await validateAuthAndGetUser()
+        await validateAuthAndGetUser()
         const { title, content, version, tags } = await request.json()
 
         // Get the changelog for this project

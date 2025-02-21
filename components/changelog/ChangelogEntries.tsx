@@ -1,7 +1,7 @@
 'use client'
 
 import {useEffect, useRef, useState} from 'react'
-import {motion, useInView, useScroll, useSpring} from 'framer-motion'
+import {motion, useInView} from 'framer-motion'
 import {format} from 'date-fns'
 import {Badge} from '@/components/ui/badge'
 import {Card, CardContent} from '@/components/ui/card'
@@ -104,16 +104,16 @@ export default function ChangelogEntries({projectId}: ChangelogEntriesProps) {
         }
     }, [isLoadMoreVisible, hasNextPage, isFetchingNextPage, fetchNextPage])
 
-    const {scrollYProgress} = useScroll({
-        target: containerRef,
-        offset: ["start end", "end end"]
-    })
+    // const {scrollYProgress} = useScroll({
+    //     target: containerRef,
+    //     offset: ["start end", "end end"]
+    // })
 
-    const scaleX = useSpring(scrollYProgress, {
-        stiffness: 100,
-        damping: 30,
-        restDelta: 0.001
-    })
+    // const scaleX = useSpring(scrollYProgress, {
+    //     stiffness: 100,
+    //     damping: 30,
+    //     restDelta: 0.001
+    // })
 
     useEffect(() => {
         const handleScroll = () => {
@@ -158,18 +158,18 @@ export default function ChangelogEntries({projectId}: ChangelogEntriesProps) {
 
     return (
         <div ref={containerRef} className="relative min-h-[50vh]">
-            {/* Progress bar */}
-            <motion.div
-                className="fixed top-0 left-0 right-0 h-1 bg-primary/10 z-50"
-                initial={{opacity: 0}}
-                animate={{opacity: 1}}
-                transition={{delay: 0.5}}
-            >
-                <motion.div
-                    className="h-full bg-gradient-to-r from-primary/40 to-primary origin-left"
-                    style={{scaleX}}
-                />
-            </motion.div>
+            {/* Progress bar - kinda inaccurate so disabled for now */}
+            {/*<motion.div*/}
+            {/*    className="fixed top-0 left-0 right-0 h-1 bg-primary/10 z-50"*/}
+            {/*    initial={{opacity: 0}}*/}
+            {/*    animate={{opacity: 1}}*/}
+            {/*    transition={{delay: 0.5}}*/}
+            {/*>*/}
+            {/*    <motion.div*/}
+            {/*        className="h-full bg-gradient-to-r from-primary/40 to-primary origin-left"*/}
+            {/*        style={{scaleX}}*/}
+            {/*    />*/}
+            {/*</motion.div>*/}
 
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-8">
                 <motion.div

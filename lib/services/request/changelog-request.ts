@@ -1,4 +1,3 @@
-// lib/services/changelog-request.ts
 import { db } from '@/lib/db';
 import { RequestDataType } from '@/lib/types/changelog';
 import type { Prisma, RequestStatus } from '@prisma/client';
@@ -150,12 +149,29 @@ class DeleteEntryProcessor implements RequestProcessor {
     }
 }
 
+class AllowPublishProcessor implements RequestProcessor {
+    async processRequest({ tx, request }: RequestContext): Promise<void> {
+        if (!request.ChangelogEntry?.id) {
+            throw new Error('Changelog entry ID is required for publishing');
+        }
+
+        // Update the entry's publish status
+        await tx.changelogEntry.update({
+            where: { id: request.ChangelogEntry.id },
+            data: {
+                publishedAt: new Date()
+            }
+        });
+    }
+}
+
 // Processor registry and factory
 class RequestProcessorRegistry {
     private static processors: Record<string, RequestProcessor> = {
         'DELETE_PROJECT': new DeleteProjectProcessor(),
         'DELETE_TAG': new DeleteTagProcessor(),
-        'DELETE_ENTRY': new DeleteEntryProcessor()
+        'DELETE_ENTRY': new DeleteEntryProcessor(),
+        'ALLOW_PUBLISH': new AllowPublishProcessor()
     };
 
     static getProcessor(type: string): RequestProcessor {
@@ -257,6 +273,7 @@ class ChangelogRequestService {
     private async processApprovedRequest(tx: PrismaTransaction, request: RequestDataType) {
         try {
             const processor = RequestProcessorRegistry.getProcessor(request.type);
+            // @ts-expect-error request is not assignable to type
             await processor.processRequest({ tx, request });
         } catch (error) {
             console.error('Error processing request:', error);

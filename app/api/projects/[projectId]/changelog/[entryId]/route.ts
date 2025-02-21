@@ -102,6 +102,18 @@ export async function PATCH(
                 changelog: {
                     projectId: projectId
                 }
+            },
+            include: {
+                changelog: {
+                    select: {
+                        project: {
+                            select: {
+                                requireApproval: true,
+                                allowAutoPublish: true
+                            }
+                        }
+                    }
+                }
             }
         });
 
@@ -112,38 +124,71 @@ export async function PATCH(
             );
         }
 
+        const project = existingEntry.changelog.project;
+
         // Handle publish/unpublish actions
         if (action === 'publish' || action === 'unpublish') {
-            const project = await db.project.findUnique({
-                where: { id: projectId },
-                select: { requireApproval: true, allowAutoPublish: true }
-            });
-
-            if (!project) {
-                return NextResponse.json(
-                    { error: 'Project not found' },
-                    { status: 404 }
-                );
+            // Allow unpublishing for both ADMIN and STAFF
+            if (action === 'unpublish') {
+                const entry = await db.changelogEntry.update({
+                    where: { id: entryId },
+                    data: {
+                        publishedAt: null
+                    },
+                    include: { tags: true }
+                });
+                return NextResponse.json(entry);
             }
 
-            // For publishing, check project settings
-            if (action === 'publish' && project.requireApproval &&
-                user.role !== Role.ADMIN && !project.allowAutoPublish) {
-                return NextResponse.json(
-                    { error: 'Entry requires admin approval before publishing' },
-                    { status: 403 }
-                );
+            // Handle publishing
+            if (action === 'publish') {
+                // Admins can publish directly
+                if (user.role === Role.ADMIN || project.allowAutoPublish) {
+                    const entry = await db.changelogEntry.update({
+                        where: { id: entryId },
+                        data: {
+                            publishedAt: new Date()
+                        },
+                        include: { tags: true }
+                    });
+                    return NextResponse.json(entry);
+                }
+
+                // Staff needs approval if required
+                if (project.requireApproval && user.role === Role.STAFF) {
+                    // Check for existing pending request
+                    const existingRequest = await db.changelogRequest.findFirst({
+                        where: {
+                            type: 'ALLOW_PUBLISH',
+                            changelogEntryId: entryId,
+                            status: 'PENDING'
+                        }
+                    });
+
+                    if (existingRequest) {
+                        return NextResponse.json(
+                            { error: 'A publish request for this entry is already pending' },
+                            { status: 400 }
+                        );
+                    }
+
+                    // Create publish request
+                    const publishRequest = await db.changelogRequest.create({
+                        data: {
+                            type: 'ALLOW_PUBLISH',
+                            staffId: user.id,
+                            projectId,
+                            changelogEntryId: entryId,
+                            status: 'PENDING'
+                        }
+                    });
+
+                    return NextResponse.json({
+                        message: 'Publish request created, awaiting admin approval',
+                        request: publishRequest
+                    }, { status: 202 });
+                }
             }
-
-            const entry = await db.changelogEntry.update({
-                where: { id: entryId },
-                data: {
-                    publishedAt: action === 'publish' ? new Date() : null
-                },
-                include: { tags: true }
-            });
-
-            return NextResponse.json(entry);
         }
 
         return NextResponse.json(

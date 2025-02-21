@@ -510,7 +510,7 @@ export const MarkdownEditor: React.FC<EditorProps> = ({
             setHistory([initialValue]);
             setHistoryIndex(0);
         }
-    }, [initialValue]);
+    }, [content, initialValue]);
 
     const updateContent = useCallback((newContent: string) => {
         if (newContent === content) return;

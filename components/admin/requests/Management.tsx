@@ -32,7 +32,58 @@ import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
 import { formatDistanceToNow } from 'date-fns'
 import { Check, X, Loader2, AlertTriangle } from 'lucide-react'
-import type { ChangelogRequest, RequestStatus } from '@/lib/types/changelog'
+
+// New type definitions
+export type RequestType = 'DELETE_PROJECT' | 'DELETE_TAG' | 'DELETE_ENTRY' | 'ALLOW_PUBLISH';
+
+export const REQUEST_TYPES: Record<RequestType, {
+    label: string;
+    description: string;
+    targetDisplay: (request: ChangelogRequest) => string;
+}> = {
+    DELETE_PROJECT: {
+        label: 'Delete Project',
+        description: 'Delete an entire project and all associated data',
+        targetDisplay: () => 'Entire Project'
+    },
+    DELETE_TAG: {
+        label: 'Delete Tag',
+        description: 'Delete a specific changelog tag',
+        targetDisplay: (request) => request.ChangelogTag?.name || 'Unknown Tag'
+    },
+    DELETE_ENTRY: {
+        label: 'Delete Entry',
+        description: 'Delete a specific changelog entry',
+        targetDisplay: (request) => request.ChangelogEntry?.title || 'Unknown Entry'
+    },
+    ALLOW_PUBLISH: {
+        label: 'Publish Entry',
+        description: 'Request approval to publish a changelog entry',
+        targetDisplay: (request) => request.ChangelogEntry?.title || 'Unknown Entry'
+    }
+};
+
+// Updated types
+export interface ChangelogRequest {
+    id: string;
+    type: RequestType;
+    project: {
+        name: string;
+    };
+    staff: {
+        name: string | null;
+        email: string;
+    };
+    ChangelogTag?: {
+        name: string;
+    };
+    ChangelogEntry?: {
+        title: string;
+    };
+    createdAt: string;
+}
+
+export type RequestStatus = 'APPROVED' | 'REJECTED';
 
 type ProcessingRequest = {
     id: string;
@@ -161,7 +212,7 @@ export function RequestManagement() {
                                         <TableRow key={request.id}>
                                             <TableCell>
                                                 <Badge variant="outline">
-                                                    {request.type === 'DELETE_PROJECT' ? 'Delete Project' : 'Delete Tag'}
+                                                    {REQUEST_TYPES[request.type].label}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell>
@@ -171,9 +222,7 @@ export function RequestManagement() {
                                                 {request.staff.name || request.staff.email}
                                             </TableCell>
                                             <TableCell>
-                                                {request.type === 'DELETE_TAG'
-                                                    ? request.ChangelogTag?.name
-                                                    : 'Entire Project'}
+                                                {REQUEST_TYPES[request.type].targetDisplay(request)}
                                             </TableCell>
                                             <TableCell>
                                                 {formatDistanceToNow(new Date(request.createdAt), {

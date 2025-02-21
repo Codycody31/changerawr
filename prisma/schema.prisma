@@ -184,6 +184,8 @@ enum Role {
 enum RequestType {
   DELETE_ENTRY
   DELETE_TAG
+  DELETE_PROJECT
+  ALLOW_PUBLISH
 }
 
 enum RequestStatus {
