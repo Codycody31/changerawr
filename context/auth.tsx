@@ -28,6 +28,7 @@ export function AuthProvider({
     const [user, setUser] = useState<User | null>(null)
     const [isLoading, setIsLoading] = useState(true)
     const router = useRouter()
+    // @ts-expect-error 1 arg but zero nw
     const refreshTimerRef = useRef<NodeJS.Timeout>()
 
     const refreshInterval = testRefresh ? TEST_REFRESH_INTERVAL : REFRESH_INTERVAL

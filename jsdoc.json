@@ -1,0 +1,16 @@
+{
+  "tags": {
+    "allowUnknownTags": true,
+    "dictionaries": ["jsdoc", "closure"]
+  },
+  "source": {
+    "include": ["app/api"],
+    "includePattern": ".+\\.ts$",
+    "excludePattern": "(^|\\/|\\\\)_"
+  },
+  "opts": {
+    "destination": "./tempDoc.json",
+    "recurse": true,
+    "template": "node_modules/jsdoc/templates/json"
+  }
+}
