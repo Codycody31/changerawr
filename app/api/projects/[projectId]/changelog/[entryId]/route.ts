@@ -3,6 +3,54 @@ import { validateAuthAndGetUser } from '@/lib/utils/changelog'
 import { db } from '@/lib/db'
 import {Role} from "@/lib/types/auth";
 
+/**
+ * Get a changelog entry by ID
+ * @method GET
+ * @description Returns the details of a changelog entry by its ID, including its title, content, version, tags, and creation/update timestamps. Requires user authentication and permission to view the project.
+ * @param {string} projectId - The ID of the project the entry belongs to.
+ * @param {string} entryId - The ID of the changelog entry to retrieve.
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "id": { "type": "string" },
+ *     "title": { "type": "string" },
+ *     "content": { "type": "string" },
+ *     "version": { "type": "number" },
+ *     "tags": {
+ *       "type": "array",
+ *       "items": {
+ *         "type": "object",
+ *         "properties": {
+ *           "id": { "type": "string" },
+ *           "name": { "type": "string" },
+ *           "color": { "type": "string" }
+ *         }
+ *       }
+ *     },
+ *     "createdAt": { "type": "string", "format": "date-time" },
+ *     "updatedAt": { "type": "string", "format": "date-time" },
+ *     "projectId": { "type": "string" }
+ *   }
+ * }
+ * @error 401 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": { "type": "string" }
+ *   }
+ * }
+ * @error 403 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": { "type": "string" }
+ *   }
+ * }
+ * @error 404 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": { "type": "string" }
+ *   }
+ * }
+ */
 export async function GET(
     request: Request,
     context: { params: { projectId: string; entryId: string } }
@@ -37,6 +85,89 @@ export async function GET(
     }
 }
 
+/**
+ * Update a changelog entry by ID
+ * @method PUT
+ * @description Updates the title, content, version, and tags of a changelog entry by its ID. Requires user authentication and permission to edit the project.
+ * @param {string} projectId - The ID of the project the entry belongs to.
+ * @param {string} entryId - The ID of the changelog entry to update.
+ * @requestBody {
+ *   "type": "object",
+ *   "properties": {
+ *     "title": { "type": "string" },
+ *     "content": { "type": "string" },
+ *     "version": { "type": "number" },
+ *     "tags": {
+ *       "type": "array",
+ *       "items": {
+ *         "type": "object",
+ *         "properties": {
+ *           "id": { "type": "string" },
+ *           "name": { "type": "string" },
+ *           "color": { "type": "string" }
+ *         }
+ *       }
+ *     }
+ *   }
+ * }
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "id": { "type": "string" },
+ *     "title": { "type": "string" },
+ *     "content": { "type": "string" },
+ *     "version": { "type": "number" },
+ *     "tags": {
+ *       "type": "array",
+ *       "items": {
+ *         "type": "object",
+ *         "properties": {
+ *           "id": { "type": "string" },
+ *           "name": { "type": "string" },
+ *           "color": { "type": "string" }
+ *         }
+ *       }
+ *     },
+ *     "createdAt": { "type": "string", "format": "date-time" },
+ *     "updatedAt": { "type": "string", "format": "date-time" },
+ *     "projectId": { "type": "string" }
+ *   }
+ * }
+ * @error 401 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": { "type": "string" }
+ *   }
+ * }
+ * @error 403 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": { "type": "string" }
+ *   }
+ * }
+ * @error 404 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": { "type": "string" }
+ *   }
+ * }
+ * @error 400 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": { "type": "string" },
+ *     "details": {
+ *       "type": "array",
+ *       "items": {
+ *         "type": "object",
+ *         "properties": {
+ *           "message": { "type": "string" },
+ *           "path": { "type": "string" }
+ *         }
+ *       }
+ *     }
+ *   }
+ * }
+ */
 export async function PUT(
     request: Request,
     context: { params: { projectId: string; entryId: string } }
@@ -78,6 +209,77 @@ export async function PUT(
     }
 }
 
+/**
+ * Update the status of a changelog entry by ID
+ * @method PATCH
+ * @description Updates the status (published/unpublished) of a changelog entry by its ID. Requires user authentication and permission to edit the project.
+ * @param {string} projectId - The ID of the project the entry belongs to.
+ * @param {string} entryId - The ID of the changelog entry to update.
+ * @requestBody {
+ *   "type": "object",
+ *   "properties": {
+ *     "action": { "type": "string", "enum": ["publish", "unpublish"] }
+ *   }
+ * }
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "id": { "type": "string" },
+ *     "title": { "type": "string" },
+ *     "content": { "type": "string" },
+ *     "version": { "type": "number" },
+ *     "tags": {
+ *       "type": "array",
+ *       "items": {
+ *         "type": "object",
+ *         "properties": {
+ *           "id": { "type": "string" },
+ *           "name": { "type": "string" },
+ *           "color": { "type": "string" }
+ *         }
+ *       }
+ *     },
+ *     "createdAt": { "type": "string", "format": "date-time" },
+ *     "updatedAt": { "type": "string", "format": "date-time" },
+ *     "projectId": { "type": "string" },
+ *     "publishedAt": { "type": "string", "format": "date-time" }
+ *   }
+ * }
+ * @error 401 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": { "type": "string" }
+ *   }
+ * }
+ * @error 403 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": { "type": "string" }
+ *   }
+ * }
+ * @error 404 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": { "type": "string" }
+ *   }
+ * }
+ * @error 400 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": { "type": "string" },
+ *     "details": {
+ *       "type": "array",
+ *       "items": {
+ *         "type": "object",
+ *         "properties": {
+ *           "message": { "type": "string" },
+ *           "path": { "type": "string" }
+ *         }
+ *       }
+ *     }
+ *   }
+ * }
+ */
 export async function PATCH(
     request: Request,
     context: { params: { projectId: string; entryId: string } }
@@ -204,7 +406,67 @@ export async function PATCH(
     }
 }
 
-// New method for deletion requests
+/**
+ * Delete a changelog entry or create a deletion request
+ * @method DELETE
+ * @description Deletes a changelog entry if the user is an admin, or creates a deletion request if the user is staff. Requires user authentication and appropriate permissions.
+ * @param {string} projectId - The ID of the project the entry belongs to.
+ * @param {string} entryId - The ID of the changelog entry to delete.
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "id": { "type": "string" },
+ *     "title": { "type": "string" },
+ *     "content": { "type": "string" },
+ *     "version": { "type": "number" },
+ *     "projectId": { "type": "string" },
+ *     "createdAt": { "type": "string", "format": "date-time" },
+ *     "updatedAt": { "type": "string", "format": "date-time" }
+ *   }
+ * }
+ * @response 202 {
+ *   "type": "object",
+ *   "properties": {
+ *     "message": { "type": "string" },
+ *     "request": {
+ *       "type": "object",
+ *       "properties": {
+ *         "id": { "type": "string" },
+ *         "type": { "type": "string", "enum": ["DELETE_ENTRY"] },
+ *         "status": { "type": "string", "enum": ["PENDING"] },
+ *         "staffId": { "type": "string" },
+ *         "projectId": { "type": "string" },
+ *         "changelogEntryId": { "type": "string" },
+ *         "createdAt": { "type": "string", "format": "date-time" }
+ *       }
+ *     }
+ *   }
+ * }
+ * @error 400 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": { "type": "string" }
+ *   }
+ * }
+ * @error 401 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": { "type": "string" }
+ *   }
+ * }
+ * @error 403 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": { "type": "string" }
+ *   }
+ * }
+ * @error 500 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": { "type": "string" }
+ *   }
+ * }
+ */
 export async function DELETE(
     request: Request,
     context: { params: { projectId: string; entryId: string } }

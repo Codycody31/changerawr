@@ -14,6 +14,9 @@
   "paths": {
     "/api/setup": {
       "get": {
+        "tags": [
+          "Setup"
+        ],
         "summary": "",
         "responses": {
           "405": {
@@ -36,6 +39,9 @@
         "security": []
       },
       "post": {
+        "tags": [
+          "Setup"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -175,6 +181,9 @@
     },
     "/api/projects": {
       "get": {
+        "tags": [
+          "Projects"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -253,6 +262,9 @@
         "security": []
       },
       "post": {
+        "tags": [
+          "Projects"
+        ],
         "summary": "",
         "responses": {
           "201": {
@@ -360,6 +372,9 @@
     },
     "/api/setup/status": {
       "get": {
+        "tags": [
+          "Setup"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -413,6 +428,9 @@
     },
     "/api/setup/settings": {
       "get": {
+        "tags": [
+          "Setup"
+        ],
         "responses": {
           "405": {
             "description": "Successful response",
@@ -434,6 +452,9 @@
         "security": []
       },
       "post": {
+        "tags": [
+          "Setup"
+        ],
         "responses": {
           "201": {
             "description": "Successful response",
@@ -559,6 +580,9 @@
     },
     "/api/setup/admin": {
       "get": {
+        "tags": [
+          "Setup"
+        ],
         "summary": "",
         "responses": {
           "405": {
@@ -581,6 +605,9 @@
         "security": []
       },
       "post": {
+        "tags": [
+          "Setup"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -720,6 +747,9 @@
     },
     "/api/projects/{projectId}": {
       "get": {
+        "tags": [
+          "Projects"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -830,6 +860,9 @@
         "security": []
       },
       "delete": {
+        "tags": [
+          "Projects"
+        ],
         "summary": "",
         "responses": {
           "204": {
@@ -905,6 +938,9 @@
         "security": []
       },
       "patch": {
+        "tags": [
+          "Projects"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -1017,6 +1053,9 @@
     },
     "/api/dashboard/stats": {
       "get": {
+        "tags": [
+          "Dashboard"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -1164,6 +1203,9 @@
     },
     "/api/changelog/requests": {
       "get": {
+        "tags": [
+          "Changelog"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -1294,6 +1336,9 @@
         "security": []
       },
       "post": {
+        "tags": [
+          "Changelog"
+        ],
         "summary": "",
         "responses": {
           "201": {
@@ -1481,6 +1526,9 @@
     },
     "/api/auth/settings": {
       "get": {
+        "tags": [
+          "Auth"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -1573,6 +1621,9 @@
         "security": []
       },
       "patch": {
+        "tags": [
+          "Auth"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -1696,6 +1747,9 @@
     },
     "/api/auth/register": {
       "post": {
+        "tags": [
+          "Auth"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -1805,127 +1859,11 @@
         "security": []
       }
     },
-    "/api/auth/preview": {
-      "post": {
-        "summary": "",
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "name": {
-                      "type": "string"
-                    },
-                    "email": {
-                      "type": "string"
-                    },
-                    "avatarUrl": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid input - Email must be a valid email address",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "User not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "An unexpected error occurred while creating the preview",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": []
-      }
-    },
     "/api/auth/refresh": {
       "post": {
+        "tags": [
+          "Auth"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -2060,6 +1998,9 @@
     },
     "/api/auth/me": {
       "get": {
+        "tags": [
+          "Auth"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -2177,8 +2118,11 @@
         "security": []
       }
     },
-    "/api/auth/logout": {
+    "/api/auth/preview": {
       "post": {
+        "tags": [
+          "Auth"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -2188,9 +2132,75 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "email": {
+                      "type": "string"
+                    },
+                    "avatarUrl": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input - Email must be a valid email address",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
                     }
                   }
                 }
@@ -2198,7 +2208,7 @@
             }
           },
           "500": {
-            "description": "An unexpected error occurred while logging out",
+            "description": "An unexpected error occurred while creating the preview",
             "content": {
               "application/json": {
                 "schema": {
@@ -2232,6 +2242,9 @@
     },
     "/api/auth/login": {
       "get": {
+        "tags": [
+          "Auth"
+        ],
         "summary": "",
         "responses": {
           "405": {
@@ -2254,6 +2267,9 @@
         "security": []
       },
       "post": {
+        "tags": [
+          "Auth"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -2397,8 +2413,67 @@
         }
       }
     },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "An unexpected error occurred while logging out",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
     "/api/admin/users": {
       "get": {
+        "tags": [
+          "Admin"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -2498,6 +2573,9 @@
         "security": []
       },
       "post": {
+        "tags": [
+          "Admin"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -2598,8 +2676,140 @@
         "security": []
       }
     },
+    "/api/admin/dashboard": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "userCount": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "number"
+                        },
+                        "admins": {
+                          "type": "number"
+                        },
+                        "staff": {
+                          "type": "number"
+                        }
+                      }
+                    },
+                    "invitations": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "number"
+                        },
+                        "pending": {
+                          "type": "number"
+                        }
+                      }
+                    },
+                    "changelog": {
+                      "type": "object",
+                      "properties": {
+                        "totalEntries": {
+                          "type": "number"
+                        },
+                        "entriesThisMonth": {
+                          "type": "number"
+                        }
+                      }
+                    },
+                    "systemHealth": {
+                      "type": "object",
+                      "properties": {
+                        "databaseConnected": {
+                          "type": "boolean"
+                        },
+                        "lastDataSync": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized - User does not have 'ADMIN' role",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "An unexpected error occurred while fetching dashboard data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
     "/api/admin/config": {
       "get": {
+        "tags": [
+          "Admin"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -2691,6 +2901,9 @@
         "security": []
       },
       "patch": {
+        "tags": [
+          "Admin"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -2822,134 +3035,11 @@
         }
       }
     },
-    "/api/admin/dashboard": {
-      "get": {
-        "summary": "",
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "userCount": {
-                      "type": "object",
-                      "properties": {
-                        "total": {
-                          "type": "number"
-                        },
-                        "admins": {
-                          "type": "number"
-                        },
-                        "staff": {
-                          "type": "number"
-                        }
-                      }
-                    },
-                    "invitations": {
-                      "type": "object",
-                      "properties": {
-                        "total": {
-                          "type": "number"
-                        },
-                        "pending": {
-                          "type": "number"
-                        }
-                      }
-                    },
-                    "changelog": {
-                      "type": "object",
-                      "properties": {
-                        "totalEntries": {
-                          "type": "number"
-                        },
-                        "entriesThisMonth": {
-                          "type": "number"
-                        }
-                      }
-                    },
-                    "systemHealth": {
-                      "type": "object",
-                      "properties": {
-                        "databaseConnected": {
-                          "type": "boolean"
-                        },
-                        "lastDataSync": {
-                          "type": "string",
-                          "format": "date-time"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Unauthorized - User does not have 'ADMIN' role",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "An unexpected error occurred while fetching dashboard data",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": []
-      }
-    },
     "/api/admin/audit-logs": {
       "get": {
+        "tags": [
+          "Admin"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -3083,6 +3173,9 @@
     },
     "/api/admin/api-keys": {
       "get": {
+        "tags": [
+          "Admin"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -3206,6 +3299,9 @@
         "security": []
       },
       "post": {
+        "tags": [
+          "Admin"
+        ],
         "summary": "",
         "responses": {
           "201": {
@@ -3367,6 +3463,9 @@
     },
     "/api/projects/{projectId}/versions": {
       "get": {
+        "tags": [
+          "Projects"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -3475,6 +3574,9 @@
     },
     "/api/projects/{projectId}/settings": {
       "get": {
+        "tags": [
+          "Projects"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -3634,6 +3736,9 @@
         "security": []
       },
       "patch": {
+        "tags": [
+          "Projects"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -3806,6 +3911,9 @@
     },
     "/api/projects/{projectId}/changelog": {
       "get": {
+        "tags": [
+          "Projects"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -3952,6 +4060,9 @@
         "security": []
       },
       "post": {
+        "tags": [
+          "Projects"
+        ],
         "summary": "",
         "responses": {
           "201": {
@@ -4100,6 +4211,9 @@
     },
     "/api/changelog/{projectId}/entries": {
       "get": {
+        "tags": [
+          "Changelog"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -4288,6 +4402,9 @@
     },
     "/api/changelog/requests/{requestId}": {
       "patch": {
+        "tags": [
+          "Changelog"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -4465,6 +4582,9 @@
     },
     "/api/changelog/entries/{entryId}": {
       "put": {
+        "tags": [
+          "Changelog"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -4605,6 +4725,9 @@
         }
       },
       "delete": {
+        "tags": [
+          "Changelog"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -4722,8 +4845,100 @@
         }
       }
     },
+    "/api/auth/invitation/{token}": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "email": {
+                      "type": "string"
+                    },
+                    "role": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"message\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"message\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"message\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": ""
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/users/{userId}": {
       "get": {
+        "tags": [
+          "Admin"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -4805,6 +5020,9 @@
         "security": []
       },
       "delete": {
+        "tags": [
+          "Admin"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -4891,6 +5109,9 @@
         "security": []
       },
       "patch": {
+        "tags": [
+          "Admin"
+        ],
         "summary": "",
         "responses": {
           "200": {
@@ -4971,6 +5192,1227 @@
         },
         "security": []
       }
+    },
+    "/api/admin/users/invitations": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "token": {
+                        "type": "string"
+                      },
+                      "email": {
+                        "type": "string"
+                      },
+                      "role": {
+                        "type": "string"
+                      },
+                      "expiresAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "usedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": ""
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/api-keys/{keyId}": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "lastUsed": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "isRevoked": {
+                      "type": "boolean"
+                    },
+                    "permissions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": ""
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": \"Unauthorized\" } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": \"API key not found\" } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": ""
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "lastUsed": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "isRevoked": {
+                      "type": "boolean"
+                    },
+                    "permissions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" }, \"details\": { \"type\": \"array\", \"items\": { \"type\": \"object\", \"properties\": { \"message\": { \"type\": \"string\" }, \"path\": { \"type\": \"string\" } } } } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "message": {
+                            "type": "string"
+                          },
+                          "path": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": ""
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/changelog/{entryId}": {
+      "get": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "number"
+                    },
+                    "tags": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "color": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "projectId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "description": "- The ID of the project the entry belongs to.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entryId",
+            "in": "query",
+            "description": "- The ID of the changelog entry to retrieve.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "number"
+                    },
+                    "tags": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "color": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "projectId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" }, \"details\": { \"type\": \"array\", \"items\": { \"type\": \"object\", \"properties\": { \"message\": { \"type\": \"string\" }, \"path\": { \"type\": \"string\" } } } } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "message": {
+                            "type": "string"
+                          },
+                          "path": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "description": "- The ID of the project the entry belongs to.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entryId",
+            "in": "query",
+            "description": "- The ID of the changelog entry to update.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "number"
+                    },
+                    "projectId": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "request": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "DELETE_ENTRY"
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "PENDING"
+                          ]
+                        },
+                        "staffId": {
+                          "type": "string"
+                        },
+                        "projectId": {
+                          "type": "string"
+                        },
+                        "changelogEntryId": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "description": "- The ID of the project the entry belongs to.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entryId",
+            "in": "query",
+            "description": "- The ID of the changelog entry to delete.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "number"
+                    },
+                    "tags": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "color": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "projectId": {
+                      "type": "string"
+                    },
+                    "publishedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" }, \"details\": { \"type\": \"array\", \"items\": { \"type\": \"object\", \"properties\": { \"message\": { \"type\": \"string\" }, \"path\": { \"type\": \"string\" } } } } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "message": {
+                            "type": "string"
+                          },
+                          "path": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "description": "- The ID of the project the entry belongs to.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entryId",
+            "in": "query",
+            "description": "- The ID of the changelog entry to update.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/projects/{projectId}/changelog/tags": {
+      "get": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "{ \"type\": \"object\", \"properties\": { \"tags\": { \"type\": \"array\", \"items\": { \"type\": \"object\", \"properties\": { \"id\": { \"type\": \"string\" }, \"name\": { \"type\": \"string\" }, } } }, \"pagination\": { \"type\": \"object\", \"properties\": { \"page\": { \"type\": \"number\" }, \"limit\": { \"type\": \"number\" }, \"totalCount\": { \"type\": \"number\" }, \"totalPages\": { \"type\": \"number\" }, \"hasMore\": { \"type\": \"boolean\" } } } } }"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/admin/users/{userId}/role": {
+      "patch": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "role": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "lastLoginAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" }, \"details\": { \"type\": \"array\", \"items\": { \"type\": \"object\", \"properties\": { \"message\": { \"type\": \"string\" }, \"path\": { \"type\": \"string\" } } } } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "message": {
+                            "type": "string"
+                          },
+                          "path": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/admin/users/invitations/{id}": {
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "invitation": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "role": {
+                          "type": "string"
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "usedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
     }
   },
   "components": {
@@ -4987,5 +6429,69 @@
         "name": "accessToken"
       }
     }
-  }
+  },
+  "tags": [
+    {
+      "name": "Setup",
+      "description": "Operations related to Setup"
+    },
+    {
+      "name": "Projects",
+      "description": "Operations related to Projects"
+    },
+    {
+      "name": "Dashboard",
+      "description": "Operations related to Dashboard"
+    },
+    {
+      "name": "Changelog",
+      "description": "Operations related to Changelog"
+    },
+    {
+      "name": "Auth",
+      "description": "Operations related to Auth"
+    },
+    {
+      "name": "Admin",
+      "description": "Operations related to Admin"
+    }
+  ],
+  "x-tagGroups": [
+    {
+      "name": "Setup",
+      "tags": [
+        "Setup"
+      ]
+    },
+    {
+      "name": "Projects",
+      "tags": [
+        "Projects"
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "tags": [
+        "Dashboard"
+      ]
+    },
+    {
+      "name": "Changelog",
+      "tags": [
+        "Changelog"
+      ]
+    },
+    {
+      "name": "Auth",
+      "tags": [
+        "Auth"
+      ]
+    },
+    {
+      "name": "Admin",
+      "tags": [
+        "Admin"
+      ]
+    }
+  ]
 }

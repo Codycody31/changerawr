@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
+import {cookies, headers} from 'next/headers'
 import { verifyAccessToken } from '@/lib/auth/tokens'
 import { db } from '@/lib/db'
 
@@ -22,18 +22,71 @@ import { db } from '@/lib/db'
  */
 export async function GET() {
     try {
-        // Get access token from cookies
-        const cookieStore = await cookies()
-        const accessToken = cookieStore.get('accessToken')?.value
+        // Check for Bearer token (API key) first
+        const headersList = await headers();
+        const authHeader = headersList.get('authorization');
+
+        if (authHeader?.startsWith('Bearer ')) {
+            const apiKey = authHeader.substring(7);
+
+            // Log the received API key for debugging
+            console.log('Received API key:', apiKey);
+
+            // First, let's check if the key exists at all ( used for debugging )
+            // const checkKey = await db.apiKey.findFirst({
+            //     where: {
+            //         key: apiKey
+            //     }
+            // });
+
+            // console.log('Basic key check result:', checkKey);
+
+            // Now, let's try the full validation :)
+            const validApiKey = await db.apiKey.findFirst({
+                where: {
+                    key: apiKey,
+                    OR: [
+                        { expiresAt: null },
+                        { expiresAt: { gt: new Date() } }
+                    ],
+                    isRevoked: false
+                }
+            });
+
+            if (!validApiKey) {
+                return NextResponse.json({
+                    error: 'Invalid API key',
+                    details: 'Key not found or invalid'
+                }, { status: 401 });
+            }
+
+            // Update last used timestamp
+            await db.apiKey.update({
+                where: { id: validApiKey.id },
+                data: { lastUsed: new Date() }
+            });
+
+            // Return admin user data for API keys
+            return NextResponse.json({
+                id: validApiKey.userId,
+                email: 'api.key@changerawr.sys',
+                role: 'ADMIN',
+                name: 'API Key'
+            });
+        }
+
+        // Fall back to cookie authentication
+        const cookieStore = await cookies();
+        const accessToken = cookieStore.get('accessToken')?.value;
 
         if (!accessToken) {
-            return NextResponse.json({ error: 'No token' }, { status: 401 })
+            return NextResponse.json({ error: 'No token' }, { status: 401 });
         }
 
         // Verify token
-        const userId = await verifyAccessToken(accessToken)
+        const userId = await verifyAccessToken(accessToken);
         if (!userId) {
-            return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+            return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
         }
 
         // Fetch user data
@@ -45,15 +98,15 @@ export async function GET() {
                 name: true,
                 role: true
             }
-        })
+        });
 
         if (!user) {
-            return NextResponse.json({ error: 'User not found' }, { status: 404 })
+            return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        return NextResponse.json(user)
+        return NextResponse.json(user);
     } catch (error) {
-        console.error('Authentication error:', error)
-        return NextResponse.json({ error: 'Authentication failed' }, { status: 500 })
+        console.error('Authentication error:', error);
+        return NextResponse.json({ error: 'Authentication failed' }, { status: 500 });
     }
 }

@@ -9,6 +9,44 @@ const updateApiKeySchema = z.object({
     expiresAt: z.string().datetime().optional().nullable(),
 });
 
+/**
+ * Retrieves the details of an API key
+ * @method GET
+ * @description Returns the details of an API key, including its name, last used date, created date, expiration date, revocation status, and permissions. Requires admin permissions.
+ * @body None
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "id": { "type": "string" },
+ *     "name": { "type": "string" },
+ *     "lastUsed": { "type": "string", "format": "date-time" },
+ *     "createdAt": { "type": "string", "format": "date-time" },
+ *     "expiresAt": { "type": "string", "format": "date-time" },
+ *     "isRevoked": { "type": "boolean" },
+ *     "permissions": { "type": "array", "items": { "type": "string" } },
+ *     "user": {
+ *       "type": "object",
+ *       "properties": {
+ *         "id": { "type": "string" },
+ *         "email": { "type": "string" },
+ *         "name": { "type": "string" }
+ *       }
+ *     }
+ *   }
+ * }
+ * @error 401 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": { "type": "string" }
+ *   }
+ * }
+ * @error 404 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": { "type": "string" }
+ *   }
+ * }
+ */
 export async function GET(
     request: Request,
     { params }: { params: { keyId: string } }
@@ -60,6 +98,69 @@ export async function GET(
     }
 }
 
+/**
+ * Updates an API key's details
+ * @method PATCH
+ * @description Updates an API key's name, revocation status, or expiration date. Requires admin permissions.
+ * @body {
+ *   "type": "object",
+ *   "required": ["id"],
+ *   "properties": {
+ *     "id": { "type": "string" },
+ *     "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+ *     "isRevoked": { "type": "boolean" },
+ *     "expiresAt": { "type": "string", "format": "date-time" }
+ *   }
+ * }
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "id": { "type": "string" },
+ *     "name": { "type": "string" },
+ *     "lastUsed": { "type": "string", "format": "date-time" },
+ *     "createdAt": { "type": "string", "format": "date-time" },
+ *     "expiresAt": { "type": "string", "format": "date-time" },
+ *     "isRevoked": { "type": "boolean" },
+ *     "permissions": { "type": "array", "items": { "type": "string" } },
+ *     "user": {
+ *       "type": "object",
+ *       "properties": {
+ *         "id": { "type": "string" },
+ *         "email": { "type": "string" },
+ *         "name": { "type": "string" }
+ *       }
+ *     }
+ *   }
+ * }
+ * @error 401 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": { "type": "string" }
+ *   }
+ * }
+ * @error 404 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": { "type": "string" }
+ *   }
+ * }
+ * @error 400 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": { "type": "string" },
+ *     "details": {
+ *       "type": "array",
+ *       "items": {
+ *         "type": "object",
+ *         "properties": {
+ *           "message": { "type": "string" },
+ *           "path": { "type": "string" }
+ *         }
+ *       }
+ *     }
+ *   }
+ * }
+ */
 export async function PATCH(
     request: Request,
     { params }: { params: { keyId: string } }
@@ -133,6 +234,15 @@ export async function PATCH(
     }
 }
 
+/**
+ * Revokes an API key
+ * @method DELETE
+ * @description Revokes an API key, making it unable to be used for authentication. Requires admin permissions.
+ * @body None
+ * @response 200 { "type": "object", "properties": { "success": true } }
+ * @error 401 { "type": "object", "properties": { "error": "Unauthorized" } }
+ * @error 404 { "type": "object", "properties": { "error": "API key not found" } }
+ */
 export async function DELETE(
     request: Request,
     { params }: { params: { keyId: string } }

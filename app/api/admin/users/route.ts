@@ -126,6 +126,14 @@ export async function POST(request: Request) {
         const body = await request.json();
         const validatedData = createInvitationSchema.parse(body);
 
+        // Prevent inviting system emails
+        if (validatedData.email === 'api.key@changerawr.sys') {
+            return new NextResponse(
+                JSON.stringify({ error: 'Cannot invite system email addresses' }),
+                { status: 400 }
+            );
+        }
+
         // Check if user already exists
         const existingUser = await db.user.findUnique({
             where: { email: validatedData.email }

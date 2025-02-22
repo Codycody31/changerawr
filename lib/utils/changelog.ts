@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { db } from '@/lib/db'
 import { RequestStatus } from '@prisma/client'
 import { verifyAccessToken } from '@/lib/auth/tokens'
-import {cookies} from "next/headers";
+import {cookies, headers} from "next/headers";
 
 // Zod Schemas
 export const requestStatusSchema = z.object({
@@ -20,28 +20,68 @@ export type ChangelogEntryInput = z.infer<typeof changelogEntrySchema>
 
 // Auth Helper
 export async function validateAuthAndGetUser() {
-    const cookieStore = await cookies()
-    const accessToken = cookieStore.get('accessToken')
+    // Check for Bearer token (API key) first
+    const headersList = await headers();
+    const authHeader = headersList.get('authorization');
 
-    if (!accessToken?.value) {
-        throw new Error('No access token found')
+    if (authHeader?.startsWith('Bearer ')) {
+        const apiKey = authHeader.substring(7); // Remove 'Bearer ' prefix
+
+        // Find and validate API key
+        const validApiKey = await db.apiKey.findFirst({
+            where: {
+                key: apiKey,
+                OR: [
+                    { expiresAt: null },
+                    { expiresAt: { gt: new Date() } }
+                ],
+                isRevoked: false
+            }
+        });
+
+        if (!validApiKey) {
+            throw new Error('Invalid API key');
+        }
+
+        // Update last used timestamp
+        await db.apiKey.update({
+            where: { id: validApiKey.id },
+            data: { lastUsed: new Date() }
+        });
+
+        // API keys always get admin access since they can only be created by admins
+        return {
+            id: validApiKey.userId,
+            email: 'api.key@changerawr.sys',
+            role: 'ADMIN',
+            createdAt: validApiKey.createdAt,
+            updatedAt: new Date()
+        };
     }
 
-    const userId = await verifyAccessToken(accessToken.value)
+    // Fall back to cookie authentication
+    const cookieStore = await cookies();
+    const accessToken = cookieStore.get('accessToken');
+
+    if (!accessToken?.value) {
+        throw new Error('No access token found');
+    }
+
+    const userId = await verifyAccessToken(accessToken.value);
 
     if (!userId) {
-        throw new Error('Invalid token')
+        throw new Error('Invalid token');
     }
 
     const user = await db.user.findUnique({
         where: { id: userId }
-    })
+    });
 
     if (!user) {
-        throw new Error('User not found')
+        throw new Error('User not found');
     }
 
-    return user
+    return user;
 }
 
 // Response Helpers
