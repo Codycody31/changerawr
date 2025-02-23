@@ -4,20 +4,20 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build",
+    "build": "npm run build:widget && next build",
     "start": "next start",
     "lint": "next lint",
+    "build:widget": "tsx scripts/widget/build.ts",
     "generate-swagger": "tsx scripts/api/generateSwagger.ts"
   },
   "prisma": {
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
   },
   "dependencies": {
-    "@auth/core": "^0.37.4",
-    "@auth/prisma-adapter": "^2.7.4",
     "@faker-js/faker": "^9.5.0",
     "@headlessui/react": "^2.2.0",
     "@hookform/resolvers": "^4.0.0",
+    "@mistralai/mistralai": "^1.5.0",
     "@prisma/client": "^6.3.1",
     "@radix-ui/react-accordion": "^1.2.3",
     "@radix-ui/react-alert-dialog": "^1.1.6",
@@ -53,11 +53,11 @@
     "dotenv": "^16.4.7",
     "framer-motion": "^12.4.3",
     "fs": "^0.0.1-security",
+    "fs-extra": "^11.3.0",
     "glob": "^11.0.1",
     "jose": "^5.9.6",
     "jsdoc": "^4.0.4",
     "jsdoc-api": "^9.3.4",
-    "lodash": "^4.17.21",
     "lucide-react": "^0.475.0",
     "md5": "^2.3.0",
     "mobx": "^6.13.6",
@@ -88,6 +88,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/forms": "^0.5.10",
+    "@types/fs-extra": "^11.0.4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

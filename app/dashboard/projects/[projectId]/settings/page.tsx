@@ -21,9 +21,10 @@ import {
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import {useToast} from '@/hooks/use-toast'
-import {AlertTriangle, Loader2, Plus, Settings, Shield, Tag, X} from 'lucide-react'
+import {AlertTriangle, Loader2, Plus, Puzzle, Settings, Shield, Tag, X, Lock, ExternalLink, Rss, Code, AlertCircle, Boxes} from 'lucide-react'
 import {DestructiveActionRequest} from '@/components/changelog/RequestHandler'
 import {useAuth} from '@/context/auth'
+import {Alert, AlertDescription} from '@/components/ui/alert'
 
 interface ProjectSettingsPageProps {
     params: Promise<{ projectId: string }>
@@ -122,6 +123,7 @@ export default function ProjectSettingsPage({params}: ProjectSettingsPageProps) 
     const tabs = [
         {id: 'general', label: 'General', icon: Settings},
         {id: 'access', label: 'Access', icon: Shield},
+        {id: 'integrations', label: 'Integrations', icon: Puzzle}, // Add new
         {id: 'tags', label: 'Tags', icon: Tag},
         {id: 'danger', label: 'Danger', icon: AlertTriangle, className: 'text-destructive'}
     ]
@@ -205,6 +207,109 @@ export default function ProjectSettingsPage({params}: ProjectSettingsPageProps) 
                     </Card>
                 )
 
+            case 'integrations':
+                return (
+                    <Card>
+                        <CardHeader>
+                            <div className="flex items-center gap-2">
+                                <Boxes className="h-5 w-5 text-primary" />
+                                <CardTitle>Integrations</CardTitle>
+                            </div>
+                            <CardDescription>
+                                Add changelog widgets and integrations to your project
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            {!project.isPublic && (
+                                <Alert variant="warning">
+                                    <AlertCircle className="h-4 w-4" />
+                                    <AlertDescription>
+                                        Some integrations require your project to be public. Make your project public in settings to enable all features.
+                                    </AlertDescription>
+                                </Alert>
+                            )}
+
+                            <div className="grid gap-4">
+                                {/* Widget Integration */}
+                                <div className="group relative rounded-lg border p-4 hover:border-primary/50 transition-colors">
+                                    <div className="flex items-start gap-4">
+                                        <div className="p-2 rounded-md bg-primary/10 text-primary">
+                                            <Code className="h-5 w-5" />
+                                        </div>
+                                        <div className="flex-1 space-y-1">
+                                            <h3 className="font-medium">Changelog Widget</h3>
+                                            <p className="text-sm text-muted-foreground">
+                                                Embed a customizable changelog widget directly into your website
+                                            </p>
+                                        </div>
+                                        {project.isPublic ? (
+                                            <Button
+                                                onClick={() => router.push(`/dashboard/projects/${projectId}/integrations/widget`)}
+                                                variant="outline"
+                                                className="group-hover:border-primary/50 group-hover:bg-primary/5 transition-colors"
+                                            >
+                                                <Settings className="h-4 w-4 mr-2"/>
+                                                Configure Widget
+                                            </Button>
+                                        ) : (
+                                            <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground bg-muted rounded-md">
+                                                <Lock className="h-4 w-4"/>
+                                                Requires public project
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* RSS Feed */}
+                                <div className="group relative rounded-lg border p-4 hover:border-primary/50 transition-colors">
+                                    <div className="flex items-start gap-4">
+                                        <div className="p-2 rounded-md bg-primary/10 text-primary">
+                                            <Rss className="h-5 w-5" />
+                                        </div>
+                                        <div className="flex-1 space-y-1">
+                                            <h3 className="font-medium">RSS Feed</h3>
+                                            <p className="text-sm text-muted-foreground">
+                                                Subscribe to your changelog updates via RSS
+                                            </p>
+                                        </div>
+                                        {project.isPublic ? (
+                                            <Button
+                                                variant="outline"
+                                                className="group-hover:border-primary/50 group-hover:bg-primary/5 transition-colors"
+                                                asChild
+                                            >
+                                                <a href={`/changelog/${projectId}/rss.xml`} target="_blank">
+                                                    <ExternalLink className="h-4 w-4 mr-2"/>
+                                                    View RSS Feed
+                                                </a>
+                                            </Button>
+                                        ) : (
+                                            <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground bg-muted rounded-md">
+                                                <Lock className="h-4 w-4"/>
+                                                Requires public project
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="mt-6 pt-6 border-t">
+                                <h3 className="text-sm font-medium text-muted-foreground mb-2">More integrations coming soon</h3>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                                    {['Slack', 'Discord', 'Email Digest'].map((integration) => (
+                                        <div
+                                            key={integration}
+                                            className="flex items-center justify-center h-20 rounded-lg border bg-muted/30 text-sm text-muted-foreground"
+                                        >
+                                            {integration}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )
+
             case 'tags':
                 return (
                     <Card>
@@ -265,6 +370,7 @@ export default function ProjectSettingsPage({params}: ProjectSettingsPageProps) 
                         </CardContent>
                     </Card>
                 )
+
 
             case 'danger':
                 return (

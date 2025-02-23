@@ -23,7 +23,7 @@ declare global {
                     tryItOutEnabled?: boolean;
                     tryItOutBaseUrl?: string;
                     tryItOutHeaders?: Record<string, string>;
-                    theme?: any;
+                    theme?: unknown;
                     nativeScrollbars?: boolean;
                     expandResponses?: string;
                     requiredPropsFirst?: boolean;

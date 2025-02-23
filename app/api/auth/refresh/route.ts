@@ -27,6 +27,7 @@ import { cookies } from 'next/headers'
  * @error 401 Unauthorized - No refresh token provided
  * @error 500 An unexpected error occurred while refreshing the token
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function POST(request: Request) {
     try {
         const cookieStore = await cookies()
