@@ -272,10 +272,10 @@ export default function WidgetConfigContent({ projectId }: { projectId: string }
                                 <TabsTrigger value="dark">Dark</TabsTrigger>
                             </TabsList>
                             <TabsContent value="light" className="mt-0">
-                                <WidgetPreview config={config} projectId={projectId} />
+                                <WidgetPreview config={config} />
                             </TabsContent>
                             <TabsContent value="dark" className="mt-0">
-                                <WidgetPreview config={config} projectId={projectId} />
+                                <WidgetPreview config={config} />
                             </TabsContent>
                         </Tabs>
                     </CardContent>

@@ -8,7 +8,6 @@ export interface WidgetPreviewProps {
     config: WidgetConfig; // Define the type for 'config' prop
     isOpen: boolean; // Define 'isOpen' prop
     onClose: () => void; // Define 'onClose' prop
-    projectId: string; // Define as a string
 }
 
 const FAKE_ENTRIES = [
@@ -208,7 +207,7 @@ const ChangelogWidget: FC<WidgetPreviewProps> = ({ config, isOpen, onClose }) =>
     );
 };
 
-export default function WidgetPreview({ config }: { config: WidgetConfig, projectId: WidgetPreviewProps }) {
+export default function WidgetPreview({ config }: { config: WidgetConfig }) {
     const [isOpen, setIsOpen] = useState(!config.isPopup);
     const isDark = config.theme === 'dark';
 

@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
-import {db} from "@/lib/db";
+import { db } from "@/lib/db";
 
 /**
  * @method GET
- * @description Gets the widget script for a public project
+ * @description Gets the widget loader script for a public project
  * @query {
  *   projectId: String, required
  * }
- * @response 200 Widget script content
+ * @response 200 Widget loader script content
  * @error 403 Project is not public
  * @error 404 Project not found
  * @error 500 An unexpected error occurred
@@ -44,118 +44,92 @@ export async function GET(
             );
         }
 
-        // Generate the widget script
-        const widgetScript = `
+        // Generate the loader script
+        const script = `
         (function() {
-            const scriptEl = document.currentScript;
-            const projectId = "${projectId}";
+            // Get current script
+            const currentScript = document.currentScript;
             
-            // Get configuration from data attributes
-            const config = {
-                theme: scriptEl.getAttribute('data-theme') || 'light',
-                isPopup: scriptEl.getAttribute('data-popup') === 'true',
-                position: scriptEl.getAttribute('data-position') || 'bottom-right',
-                maxEntries: parseInt(scriptEl.getAttribute('data-max-entries') || '3', 10),
-                maxHeight: scriptEl.getAttribute('data-max-height') || '400px',
-                trigger: scriptEl.getAttribute('data-trigger'),
-                hidden: scriptEl.getAttribute('data-hidden') === 'true'
+            // Extract configuration from data attributes
+            const options = {
+                projectId: '${projectId}',
+                theme: currentScript.getAttribute('data-theme') || 'light',
+                position: currentScript.getAttribute('data-position') || 'bottom-right',
+                maxHeight: currentScript.getAttribute('data-max-height') || '400px',
+                isPopup: currentScript.getAttribute('data-popup') === 'true',
+                trigger: currentScript.getAttribute('data-trigger'),
+                maxEntries: currentScript.getAttribute('data-max-entries') 
+                    ? parseInt(currentScript.getAttribute('data-max-entries'), 10) 
+                    : 3,
+                hidden: currentScript.getAttribute('data-popup') === 'true'
             };
 
-            // Create and inject styles
-            const style = document.createElement('style');
-            style.textContent = \`
-                .changerawr-widget {
-                    font-family: system-ui, -apple-system, sans-serif;
-                    background: var(--theme) === 'dark' ? '#1a1a1a' : '#ffffff';
-                    color: var(--theme) === 'dark' ? '#ffffff' : '#000000';
-                    border-radius: 8px;
-                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-                    max-height: \${config.maxHeight};
-                    overflow-y: auto;
-                    width: 100%;
-                    max-width: 400px;
-                }
+            // Create initialization function
+            const initWidget = () => {
+                // Create container for widget
+                const container = document.createElement('div');
+                container.id = \`changerawr-widget-\${Math.random().toString(36).substr(2, 9)}\`;
                 
-                .changerawr-widget.popup {
-                    position: fixed;
-                    \${config.position.includes('bottom') ? 'bottom: 20px;' : 'top: 20px;'}
-                    \${config.position.includes('right') ? 'right: 20px;' : 'left: 20px;'}
-                    display: none;
-                    z-index: 9999;
-                }
-                
-                .changerawr-overlay {
-                    position: fixed;
-                    inset: 0;
-                    background: rgba(0, 0, 0, 0.5);
-                    display: none;
-                    z-index: 9998;
-                }
-            \`;
-            document.head.appendChild(style);
+                // Determine where to insert the container
+                if (options.trigger && options.trigger !== 'immediate') {
+                    // Find trigger button
+                    const triggerButton = document.getElementById(options.trigger);
+                    if (!triggerButton) {
+                        console.error(\`Changerawr: Trigger button '\${options.trigger}' not found\`);
+                        return;
+                    }
 
-            // Create widget container
-            const widget = document.createElement('div');
-            widget.className = 'changerawr-widget' + (config.isPopup ? ' popup' : '');
-            
-            if (config.isPopup) {
-                // Create overlay
-                const overlay = document.createElement('div');
-                overlay.className = 'changerawr-overlay';
-                document.body.appendChild(overlay);
-                
-                // Setup trigger button listener
-                if (config.trigger) {
-                    const triggerBtn = document.getElementById(config.trigger);
-                    if (triggerBtn) {
-                        triggerBtn.addEventListener('click', () => {
-                            widget.style.display = 'block';
-                            overlay.style.display = 'block';
-                        });
-                        
-                        overlay.addEventListener('click', () => {
-                            widget.style.display = 'none';
-                            overlay.style.display = 'none';
+                    // Append to body for popup-style widgets
+                    document.body.appendChild(container);
+
+                    // Setup trigger button
+                    triggerButton.setAttribute('aria-expanded', 'false');
+                    triggerButton.setAttribute('aria-haspopup', 'dialog');
+                    triggerButton.setAttribute('aria-controls', container.id);
+                } else {
+                    // Insert next to script for immediate or inline widgets
+                    currentScript.parentNode.insertBefore(container, currentScript);
+                }
+
+                // Load and initialize widget
+                const script = document.createElement('script');
+                script.src = '${process.env.NEXT_PUBLIC_APP_URL}/widget-bundle.js';
+                script.onload = () => {
+                    const widget = window.ChangerawrWidget.init({
+                        container,
+                        ...options
+                    });
+
+                    // Setup trigger button interaction if applicable
+                    if (options.trigger && options.trigger !== 'immediate') {
+                        const triggerButton = document.getElementById(options.trigger);
+                        triggerButton.addEventListener('click', () => widget.toggle());
+                        triggerButton.addEventListener('keydown', (e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                widget.toggle();
+                            }
                         });
                     }
-                }
-            }
+                };
+                document.head.appendChild(script);
+            };
 
-            // Initially hide if specified
-            if (config.hidden) {
-                widget.style.display = 'none';
-            }
-
-            // Insert widget into DOM
-            if (config.isPopup) {
-                document.body.appendChild(widget);
+            // Initialize based on document readiness
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initWidget);
             } else {
-                scriptEl.parentNode.insertBefore(widget, scriptEl);
+                initWidget();
             }
-
-            // Fetch and display changelog entries
-            fetch(\`${process.env.NEXT_PUBLIC_APP_URL}/api/projects/\${projectId}/changelog\`)
-                .then(response => response.json())
-                .then(entries => {
-                    const limitedEntries = entries.slice(0, config.maxEntries);
-                    widget.innerHTML = limitedEntries.map(entry => \`
-                        <div class="entry" style="padding: 16px; border-bottom: 1px solid #eee;">
-                            <h3 style="margin: 0 0 8px 0;">\${entry.title}</h3>
-                            <div style="color: #666;">\${entry.content}</div>
-                        </div>
-                    \`).join('');
-                })
-                .catch(error => {
-                    console.error('Failed to load changelog entries:', error);
-                    widget.innerHTML = '<div style="padding: 16px;">Failed to load updates</div>';
-                });
         })();`;
 
-        return new NextResponse(widgetScript, {
+        return new NextResponse(script, {
             status: 200,
             headers: {
                 'Content-Type': 'application/javascript',
-                'Cache-Control': 'no-cache, no-store, must-revalidate'
+                'Cache-Control': 'public, max-age=3600',
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET'
             }
         });
 
@@ -169,4 +143,15 @@ export async function GET(
             }
         );
     }
+}
+
+// Handle preflight CORS requests
+export async function OPTIONS() {
+    return new NextResponse(null, {
+        headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET',
+            'Access-Control-Allow-Headers': 'Content-Type',
+        },
+    });
 }
