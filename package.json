@@ -14,9 +14,6 @@
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
   },
   "dependencies": {
-    "@ai-sdk/mistral": "^1.1.12",
-    "@auth/core": "^0.37.4",
-    "@auth/prisma-adapter": "^2.7.4",
     "@faker-js/faker": "^9.5.0",
     "@headlessui/react": "^2.2.0",
     "@hookform/resolvers": "^4.0.0",
@@ -43,7 +40,6 @@
     "@tiptap/starter-kit": "^2.11.5",
     "@types/bcryptjs": "^2.4.6",
     "@types/md5": "^2.3.5",
-    "ai": "^4.1.45",
     "bcryptjs": "^3.0.0",
     "chalk": "^5.4.1",
     "class-variance-authority": "^0.7.1",
@@ -62,7 +58,6 @@
     "jose": "^5.9.6",
     "jsdoc": "^4.0.4",
     "jsdoc-api": "^9.3.4",
-    "lodash": "^4.17.21",
     "lucide-react": "^0.475.0",
     "md5": "^2.3.0",
     "mobx": "^6.13.6",
