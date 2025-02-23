@@ -47,8 +47,12 @@ export async function GET(
         // Generate the loader script
         const script = `
         (function() {
-            // Get current script
+            // Get current script and validate
             const currentScript = document.currentScript;
+            if (!currentScript) {
+                console.error('Changerawr: Could not initialize widget - script context not found');
+                return;
+            }
             
             // Extract configuration from data attributes
             const options = {
@@ -64,54 +68,81 @@ export async function GET(
                 hidden: currentScript.getAttribute('data-popup') === 'true'
             };
 
-            // Create initialization function
+            // Validate position value
+            if (!['bottom-right', 'bottom-left', 'top-right', 'top-left'].includes(options.position)) {
+                console.warn(\`Changerawr: Invalid position '\${options.position}', defaulting to bottom-right\`);
+                options.position = 'bottom-right';
+            }
+
+            // Create initialization function with proper container handling
             const initWidget = () => {
-                // Create container for widget
+                // Create container with unique ID
                 const container = document.createElement('div');
                 container.id = \`changerawr-widget-\${Math.random().toString(36).substr(2, 9)}\`;
                 
-                // Determine where to insert the container
-                if (options.trigger && options.trigger !== 'immediate') {
-                    // Find trigger button
+                // Handle container placement based on widget type
+                const isPopupWithTrigger = options.isPopup && options.trigger && options.trigger !== 'immediate';
+                
+                if (isPopupWithTrigger) {
+                    // Find trigger button for popup widgets
                     const triggerButton = document.getElementById(options.trigger);
                     if (!triggerButton) {
                         console.error(\`Changerawr: Trigger button '\${options.trigger}' not found\`);
                         return;
                     }
 
-                    // Append to body for popup-style widgets
+                    // Set initial container state for popup
+                    container.style.setProperty('display', 'none', 'important');
                     document.body.appendChild(container);
 
-                    // Setup trigger button
+                    // Setup trigger button accessibility
                     triggerButton.setAttribute('aria-expanded', 'false');
                     triggerButton.setAttribute('aria-haspopup', 'dialog');
                     triggerButton.setAttribute('aria-controls', container.id);
                 } else {
-                    // Insert next to script for immediate or inline widgets
+                    // For inline widgets or immediate popups
                     currentScript.parentNode.insertBefore(container, currentScript);
                 }
 
-                // Load and initialize widget
+                // Load and initialize widget bundle
                 const script = document.createElement('script');
                 script.src = '${process.env.NEXT_PUBLIC_APP_URL}/widget-bundle.js';
                 script.onload = () => {
+                    // Initialize the widget with proper positioning
                     const widget = window.ChangerawrWidget.init({
                         container,
-                        ...options
+                        ...options,
+                        // Ensure popup state is properly set
+                        isPopup: isPopupWithTrigger
                     });
 
-                    // Setup trigger button interaction if applicable
-                    if (options.trigger && options.trigger !== 'immediate') {
+                    // Setup trigger button interactions if needed
+                    if (isPopupWithTrigger) {
                         const triggerButton = document.getElementById(options.trigger);
-                        triggerButton.addEventListener('click', () => widget.toggle());
+                        
+                        // Handle click
+                        triggerButton.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            widget.toggle();
+                            triggerButton.setAttribute('aria-expanded', widget.isOpen.toString());
+                        });
+
+                        // Handle keyboard
                         triggerButton.addEventListener('keydown', (e) => {
                             if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault();
                                 widget.toggle();
+                                triggerButton.setAttribute('aria-expanded', widget.isOpen.toString());
                             }
                         });
                     }
                 };
+
+                script.onerror = () => {
+                    console.error('Changerawr: Failed to load widget bundle');
+                    container.innerHTML = 'Failed to load widget';
+                };
+
                 document.head.appendChild(script);
             };
 

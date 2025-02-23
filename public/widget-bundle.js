@@ -1,4 +1,4 @@
-"use strict";var ChangerawrWidgetLoader=(()=>{var s=class{constructor(e,t){let a=this.getScriptOptions();this.container=e,this.options={theme:"light",maxHeight:"400px",position:"bottom-right",isPopup:!1,maxEntries:3,hidden:!1,...a,...t},this.isOpen=!1,this.isLoading=!1,this.init()}getScriptOptions(){let e=document.currentScript;return e?{theme:e.getAttribute("data-theme"),position:e.getAttribute("data-position"),maxHeight:e.getAttribute("data-max-height"),isPopup:e.getAttribute("data-popup")==="true",trigger:e.getAttribute("data-trigger"),maxEntries:e.getAttribute("data-max-entries")?parseInt(e.getAttribute("data-max-entries"),10):void 0,hidden:e.getAttribute("data-popup")==="true"}:{}}addStyles(){let e=`
+"use strict";var ChangerawrWidgetLoader=(()=>{var c=class{constructor(t,e){let o=this.getScriptOptions();this.container=t,this.options={theme:"light",maxHeight:"400px",position:"bottom-right",isPopup:!1,maxEntries:3,hidden:!1,...o,...e},this.isOpen=!1,this.isLoading=!1,this.init()}getScriptOptions(){let t=document.currentScript;return t?{theme:t.getAttribute("data-theme"),position:t.getAttribute("data-position"),maxHeight:t.getAttribute("data-max-height"),isPopup:t.getAttribute("data-popup")==="true",trigger:t.getAttribute("data-trigger"),maxEntries:t.getAttribute("data-max-entries")?parseInt(t.getAttribute("data-max-entries"),10):void 0,hidden:t.getAttribute("data-popup")==="true"}:{}}updatePosition(){if(this.options.isPopup)switch(this.container.style.removeProperty("top"),this.container.style.removeProperty("bottom"),this.container.style.removeProperty("left"),this.container.style.removeProperty("right"),this.options.position){case"top-right":this.container.style.setProperty("top","20px","important"),this.container.style.setProperty("right","20px","important");break;case"top-left":this.container.style.setProperty("top","20px","important"),this.container.style.setProperty("left","20px","important");break;case"bottom-left":this.container.style.setProperty("bottom","20px","important"),this.container.style.setProperty("left","20px","important");break;case"bottom-right":default:this.container.style.setProperty("bottom","20px","important"),this.container.style.setProperty("right","20px","important");break}}addStyles(){let t=`
             .changerawr-widget {
                 font-family: system-ui, -apple-system, sans-serif;
                 font-size: 14px;
@@ -15,22 +15,33 @@
             }
             
             .changerawr-widget.popup {
-                position: fixed;
-                z-index: 9999;
+                position: fixed !important;
+                z-index: 9999 !important;
                 opacity: 0;
                 transform: translateY(20px);
                 pointer-events: none;
                 transition: opacity 0.2s ease, transform 0.2s ease;
             }
+            
+            /* Position-specific transforms */
+            .changerawr-widget.popup[data-position="top-right"],
+            .changerawr-widget.popup[data-position="top-left"] {
+                transform: translateY(-20px);
+            }
+
+            .changerawr-widget.popup[data-position="bottom-right"],
+            .changerawr-widget.popup[data-position="bottom-left"] {
+                transform: translateY(20px);
+            }
 
             .changerawr-widget.popup.open {
-                opacity: 1;
-                transform: translateY(0);
-                pointer-events: all;
+                opacity: 1 !important;
+                transform: translateY(0) !important;
+                pointer-events: all !important;
             }
 
             .changerawr-widget.hidden {
-                display: none;
+                display: none !important;
             }
 
             .changerawr-widget.dark {
@@ -198,24 +209,6 @@
                 border-top-color: #60a5fa;
             }
 
-            .changerawr-overlay {
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: rgba(0, 0, 0, 0.3);
-                opacity: 0;
-                transition: opacity 0.2s ease;
-                pointer-events: none;
-                z-index: 9998;
-            }
-
-            .changerawr-overlay.open {
-                opacity: 1;
-                pointer-events: all;
-            }
-
             .changerawr-footer {
                 padding: 8px 16px;
                 border-top: 1px solid #eaeaea;
@@ -239,28 +232,7 @@
             .changerawr-footer a:hover {
                 text-decoration: underline;
             }
-
-            /* Position classes */
-            .changerawr-widget.popup.bottom-right {
-                bottom: 20px;
-                right: 20px;
-            }
-
-            .changerawr-widget.popup.bottom-left {
-                bottom: 20px;
-                left: 20px;
-            }
-
-            .changerawr-widget.popup.top-right {
-                top: 20px;
-                right: 20px;
-            }
-
-            .changerawr-widget.popup.top-left {
-                top: 20px;
-                left: 20px;
-            }
-        `,t=document.createElement("style");t.textContent=e,document.head.appendChild(t)}async init(){this.addStyles(),this.options.isPopup&&(this.container.classList.add("popup",this.options.position),this.setupOverlay()),this.container.className=`changerawr-widget ${this.options.theme}`,this.options.hidden&&this.container.classList.add("hidden"),this.container.style.setProperty("--max-height",this.options.maxHeight),this.container.setAttribute("role","dialog"),this.container.setAttribute("aria-label","Changelog updates"),this.render(),await this.loadEntries(),this.setupKeyboardNavigation(),this.options.trigger&&this.setupTriggerButton()}setupOverlay(){this.overlay=document.createElement("div"),this.overlay.className="changerawr-overlay",document.body.appendChild(this.overlay),this.overlay.addEventListener("click",()=>this.close())}setupKeyboardNavigation(){this.container.addEventListener("keydown",e=>{if(e.key==="Escape"&&this.isOpen&&this.close(),e.key==="Tab"){let t=this.container.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'),a=t[0],r=t[t.length-1];e.shiftKey&&document.activeElement===a?(e.preventDefault(),r.focus()):!e.shiftKey&&document.activeElement===r&&(e.preventDefault(),a.focus())}})}setupTriggerButton(){let e=document.getElementById(this.options.trigger);if(!e){console.warn(`Changerawr: Trigger button with ID '${this.options.trigger}' not found`);return}e.setAttribute("aria-expanded","false"),e.setAttribute("aria-haspopup","dialog"),e.setAttribute("aria-controls",this.container.id),e.addEventListener("click",()=>{this.toggle(),e.setAttribute("aria-expanded",this.isOpen.toString())}),e.addEventListener("keydown",t=>{(t.key==="Enter"||t.key===" ")&&(t.preventDefault(),this.toggle(),e.setAttribute("aria-expanded",this.isOpen.toString()))})}render(){let e=document.createElement("div");e.className="changerawr-header",e.innerHTML=`
+        `,e=document.createElement("style");e.textContent=t,document.head.appendChild(e)}async init(){this.addStyles();let t=`changerawr-widget ${this.options.theme}`;this.options.isPopup&&(t+=" popup"),this.options.hidden&&(t+=" hidden"),this.container.className=t,this.container.style.setProperty("--max-height",this.options.maxHeight),this.container.setAttribute("role","dialog"),this.container.setAttribute("aria-label","Changelog updates"),this.options.isPopup&&this.updatePosition(),this.render(),await this.loadEntries(),this.setupKeyboardNavigation(),this.options.trigger&&this.setupTriggerButton()}setupKeyboardNavigation(){this.container.addEventListener("keydown",t=>{if(t.key==="Escape"&&this.isOpen&&this.close(),t.key==="Tab"){let e=this.container.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'),o=e[0],i=e[e.length-1];t.shiftKey&&document.activeElement===o?(t.preventDefault(),i.focus()):!t.shiftKey&&document.activeElement===i&&(t.preventDefault(),o.focus())}})}setupTriggerButton(){let t=document.getElementById(this.options.trigger);if(!t){console.warn(`Changerawr: Trigger button with ID '${this.options.trigger}' not found`);return}t.setAttribute("aria-expanded","false"),t.setAttribute("aria-haspopup","dialog"),t.setAttribute("aria-controls",this.container.id),t.addEventListener("click",()=>{this.toggle(),t.setAttribute("aria-expanded",this.isOpen.toString())}),t.addEventListener("keydown",e=>{(e.key==="Enter"||e.key===" ")&&(e.preventDefault(),this.toggle(),t.setAttribute("aria-expanded",this.isOpen.toString()))})}render(){let t=document.createElement("div");t.className="changerawr-header",t.innerHTML=`
             <span>Latest Updates</span>
             ${this.options.isPopup?`
                 <button 
@@ -275,14 +247,14 @@
                     </svg>
                 </button>
             `:""}
-        `,this.container.appendChild(e);let t=document.createElement("div");t.className="changerawr-entries",t.setAttribute("role","list"),this.container.appendChild(t);let a=document.createElement("div");a.className="changerawr-footer",a.innerHTML=`
+        `,this.container.appendChild(t);let e=document.createElement("div");e.className="changerawr-entries",e.setAttribute("role","list"),this.container.appendChild(e);let o=document.createElement("div");o.className="changerawr-footer",o.innerHTML=`
             <span>Powered by Changerawr</span>
             <a href="http://localhost:3000/changelog/${this.options.projectId}/rss.xml" target="_blank" rel="noopener noreferrer">RSS</a>
-        `,this.container.appendChild(a),this.renderLoading();let r=this.container.querySelector(".changerawr-close");r&&r.addEventListener("click",()=>this.close())}renderLoading(){let e=this.container.querySelector(".changerawr-entries");e.innerHTML=`
+        `,this.container.appendChild(o),this.renderLoading();let i=this.container.querySelector(".changerawr-close");i&&i.addEventListener("click",()=>this.close())}renderLoading(){let t=this.container.querySelector(".changerawr-entries");t.innerHTML=`
             <div class="changerawr-loading">
                 <div class="changerawr-spinner" role="status"></div>
             </div>
-        `}async loadEntries(){this.isLoading=!0;try{let e=await fetch(`http://localhost:3000/api/changelog/${this.options.projectId}/entries`);if(!e.ok)throw new Error("Failed to fetch entries");let t=await e.json();this.renderEntries(t.items)}catch(e){console.error("Failed to load changelog:",e),this.renderError()}finally{this.isLoading=!1}}renderEntries(e){let t=this.container.querySelector(".changerawr-entries");t.innerHTML="",e.slice(0,this.options.maxEntries).forEach(r=>{var h;let i=document.createElement("div");if(i.className="changerawr-entry",i.setAttribute("role","listitem"),i.setAttribute("tabindex","0"),(h=r.tags)!=null&&h.length){let p=document.createElement("div");p.className="changerawr-tag",p.textContent=r.tags[0].name,i.appendChild(p)}let d=document.createElement("div");d.className="changerawr-entry-title",d.textContent=r.title,i.appendChild(d);let c=document.createElement("div");c.className="changerawr-entry-content",c.textContent=r.content,i.appendChild(c);let o=document.createElement("a");o.href=`http://localhost:3000/changelog/${this.options.projectId}#${r.id}`,o.className="changerawr-read-more",o.textContent="Read more",o.target="_blank",o.setAttribute("aria-label",`Read more about ${r.title}`),i.appendChild(o),t.appendChild(i)})}renderError(){let e=this.container.querySelector(".changerawr-entries");e.innerHTML=`
+        `}async loadEntries(){this.isLoading=!0;try{let t=await fetch(`http://localhost:3000/api/changelog/${this.options.projectId}/entries`);if(!t.ok)throw new Error("Failed to fetch entries");let e=await t.json();this.renderEntries(e.items)}catch(t){console.error("Failed to load changelog:",t),this.renderError()}finally{this.isLoading=!1}}renderEntries(t){let e=this.container.querySelector(".changerawr-entries");e.innerHTML="",t.slice(0,this.options.maxEntries).forEach(i=>{var h;let n=document.createElement("div");if(n.className="changerawr-entry",n.setAttribute("role","listitem"),n.setAttribute("tabindex","0"),(h=i.tags)!=null&&h.length){let p=document.createElement("div");p.className="changerawr-tag",p.textContent=i.tags[0].name,n.appendChild(p)}let a=document.createElement("div");a.className="changerawr-entry-title",a.textContent=i.title,n.appendChild(a);let d=document.createElement("div");d.className="changerawr-entry-content",d.textContent=i.content,n.appendChild(d);let s=document.createElement("a");s.href=`http://localhost:3000/changelog/${this.options.projectId}#${i.id}`,s.className="changerawr-read-more",s.textContent="Read more",s.target="_blank",s.setAttribute("aria-label",`Read more about ${i.title}`),n.appendChild(s),e.appendChild(n)})}renderError(){let t=this.container.querySelector(".changerawr-entries");t.innerHTML=`
             <div class="changerawr-error">
                 Failed to load changelog entries
                 <br>
@@ -290,5 +262,5 @@
                     Try Again
                 </button>
             </div>
-        `,e.querySelector(".changerawr-retry").addEventListener("click",()=>this.loadEntries())}open(){if(!this.options.isPopup)return;this.isOpen=!0,this.container.classList.remove("hidden"),this.container.style.display="block",requestAnimationFrame(()=>{this.container.classList.add("open")}),this.previouslyFocused=document.activeElement;let e=this.container.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');e&&e.focus()}close(){if(!this.options.isPopup)return;this.isOpen=!1,this.container.classList.remove("open");let e=()=>{this.isOpen||(this.options.hidden&&this.container.classList.add("hidden"),this.container.style.display="none"),this.container.removeEventListener("transitionend",e)};this.container.addEventListener("transitionend",e),this.previouslyFocused&&this.previouslyFocused.focus()}toggle(){this.isOpen?this.close():this.open()}};document.addEventListener("DOMContentLoaded",()=>{document.querySelectorAll('script[src*="/api/integrations/widget/"]').forEach(e=>{let t=e.getAttribute("src").match(/\/api\/widget\/([^?]+)/);if(!t)return;let a=t[1],r=document.createElement("div");r.id=`changerawr-widget-${Math.random().toString(36).substr(2,9)}`,document.body.appendChild(r);let i=new s(r,{projectId:a,theme:e.getAttribute("data-theme")||"light",position:e.getAttribute("data-position")||"bottom-right",isPopup:e.getAttribute("data-popup")==="true",trigger:e.getAttribute("data-trigger"),maxEntries:e.getAttribute("data-max-entries")?parseInt(e.getAttribute("data-max-entries"),10):3,hidden:e.getAttribute("data-popup")==="true"})})});window.ChangerawrWidget={init:n=>{if(!n.container)throw new Error("Container element is required");if(!n.projectId)throw new Error("Project ID is required");return n.container.id=n.container.id||`changerawr-widget-${Math.random().toString(36).substr(2,9)}`,new s(n.container,{projectId:n.projectId,theme:n.theme||"light",maxHeight:n.maxHeight||"400px",position:n.position||"bottom-right",isPopup:n.isPopup||!1,maxEntries:n.maxEntries||3,hidden:n.hidden||!1,trigger:n.trigger})}};})();
+        `,t.querySelector(".changerawr-retry").addEventListener("click",()=>this.loadEntries())}open(){if(!this.options.isPopup)return;this.isOpen=!0,this.container.classList.remove("hidden"),this.container.style.display="block",requestAnimationFrame(()=>{this.container.classList.add("open")}),this.previouslyFocused=document.activeElement;let t=this.container.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');t&&t.focus()}close(){if(!this.options.isPopup)return;this.isOpen=!1,this.container.classList.remove("open");let t=()=>{this.isOpen||(this.options.hidden&&this.container.classList.add("hidden"),this.container.style.display="none"),this.container.removeEventListener("transitionend",t)};this.container.addEventListener("transitionend",t),this.previouslyFocused&&this.previouslyFocused.focus()}toggle(){this.isOpen?this.close():this.open()}};document.addEventListener("DOMContentLoaded",()=>{document.querySelectorAll('script[src*="/api/integrations/widget/"]').forEach(t=>{let e=t.getAttribute("src").match(/\/api\/widget\/([^?]+)/);if(!e)return;let o=e[1],i=t.getAttribute("data-position")||"bottom-right";["top-right","top-left","bottom-right","bottom-left"].includes(i)||console.warn(`Invalid position '${i}', defaulting to bottom-right`);let n=document.createElement("div");n.id=`changerawr-widget-${Math.random().toString(36).substr(2,9)}`;let a=t.getAttribute("data-popup")==="true";a?document.body.appendChild(n):t.parentNode.insertBefore(n,t);let d=new c(n,{projectId:o,theme:t.getAttribute("data-theme")||"light",position:t.getAttribute("data-position")||"bottom-right",isPopup:a,trigger:t.getAttribute("data-trigger"),maxEntries:t.getAttribute("data-max-entries")?parseInt(t.getAttribute("data-max-entries"),10):3,hidden:a})})});window.ChangerawrWidget={init:r=>{if(!r.container)throw new Error("Container element is required");if(!r.projectId)throw new Error("Project ID is required");let t=r.position||"bottom-right";return["top-right","top-left","bottom-right","bottom-left"].includes(t)||console.warn(`Invalid position '${t}', defaulting to bottom-right`),r.container.id=r.container.id||`changerawr-widget-${Math.random().toString(36).substr(2,9)}`,r.isPopup&&document.body.appendChild(r.container),new c(r.container,{projectId:r.projectId,theme:r.theme||"light",maxHeight:r.maxHeight||"400px",position:r.position||"bottom-right",isPopup:r.isPopup||!1,maxEntries:r.maxEntries||3,hidden:r.isPopup||!1,trigger:r.trigger})}};})();
 //# sourceMappingURL=widget-bundle.js.map

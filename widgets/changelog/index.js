@@ -1,6 +1,5 @@
 class ChangelogWidget {
     constructor(container, options) {
-        // Merge options from script tag data attributes with passed options
         const scriptOptions = this.getScriptOptions();
 
         this.container = container;
@@ -14,13 +13,13 @@ class ChangelogWidget {
             ...scriptOptions,
             ...options
         };
+
         this.isOpen = false;
         this.isLoading = false;
         this.init();
     }
 
     getScriptOptions() {
-        // Try to get options from the script tag that loaded this widget
         const currentScript = document.currentScript;
         if (!currentScript) return {};
 
@@ -35,6 +34,37 @@ class ChangelogWidget {
                 : undefined,
             hidden: currentScript.getAttribute('data-popup') === 'true'
         };
+    }
+
+    updatePosition() {
+        if (!this.options.isPopup) return;
+
+        // Reset all position styles first
+        this.container.style.removeProperty('top');
+        this.container.style.removeProperty('bottom');
+        this.container.style.removeProperty('left');
+        this.container.style.removeProperty('right');
+
+        // Apply new position based on option
+        switch (this.options.position) {
+            case 'top-right':
+                this.container.style.setProperty('top', '20px', 'important');
+                this.container.style.setProperty('right', '20px', 'important');
+                break;
+            case 'top-left':
+                this.container.style.setProperty('top', '20px', 'important');
+                this.container.style.setProperty('left', '20px', 'important');
+                break;
+            case 'bottom-left':
+                this.container.style.setProperty('bottom', '20px', 'important');
+                this.container.style.setProperty('left', '20px', 'important');
+                break;
+            case 'bottom-right':
+            default:
+                this.container.style.setProperty('bottom', '20px', 'important');
+                this.container.style.setProperty('right', '20px', 'important');
+                break;
+        }
     }
 
     addStyles() {
@@ -55,22 +85,33 @@ class ChangelogWidget {
             }
             
             .changerawr-widget.popup {
-                position: fixed;
-                z-index: 9999;
+                position: fixed !important;
+                z-index: 9999 !important;
                 opacity: 0;
                 transform: translateY(20px);
                 pointer-events: none;
                 transition: opacity 0.2s ease, transform 0.2s ease;
             }
+            
+            /* Position-specific transforms */
+            .changerawr-widget.popup[data-position="top-right"],
+            .changerawr-widget.popup[data-position="top-left"] {
+                transform: translateY(-20px);
+            }
+
+            .changerawr-widget.popup[data-position="bottom-right"],
+            .changerawr-widget.popup[data-position="bottom-left"] {
+                transform: translateY(20px);
+            }
 
             .changerawr-widget.popup.open {
-                opacity: 1;
-                transform: translateY(0);
-                pointer-events: all;
+                opacity: 1 !important;
+                transform: translateY(0) !important;
+                pointer-events: all !important;
             }
 
             .changerawr-widget.hidden {
-                display: none;
+                display: none !important;
             }
 
             .changerawr-widget.dark {
@@ -238,24 +279,6 @@ class ChangelogWidget {
                 border-top-color: #60a5fa;
             }
 
-            .changerawr-overlay {
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: rgba(0, 0, 0, 0.3);
-                opacity: 0;
-                transition: opacity 0.2s ease;
-                pointer-events: none;
-                z-index: 9998;
-            }
-
-            .changerawr-overlay.open {
-                opacity: 1;
-                pointer-events: all;
-            }
-
             .changerawr-footer {
                 padding: 8px 16px;
                 border-top: 1px solid #eaeaea;
@@ -279,27 +302,6 @@ class ChangelogWidget {
             .changerawr-footer a:hover {
                 text-decoration: underline;
             }
-
-            /* Position classes */
-            .changerawr-widget.popup.bottom-right {
-                bottom: 20px;
-                right: 20px;
-            }
-
-            .changerawr-widget.popup.bottom-left {
-                bottom: 20px;
-                left: 20px;
-            }
-
-            .changerawr-widget.popup.top-right {
-                top: 20px;
-                right: 20px;
-            }
-
-            .changerawr-widget.popup.top-left {
-                top: 20px;
-                left: 20px;
-            }
         `;
 
         const styleSheet = document.createElement('style');
@@ -310,34 +312,31 @@ class ChangelogWidget {
     async init() {
         this.addStyles();
 
+        // Combine classes into a single assignment
+        let classes = `changerawr-widget ${this.options.theme}`;
         if (this.options.isPopup) {
-            this.container.classList.add('popup', this.options.position);
-            this.setupOverlay();
+            classes += ' popup';
         }
-
-        this.container.className = `changerawr-widget ${this.options.theme}`;
         if (this.options.hidden) {
-            this.container.classList.add('hidden');
+            classes += ' hidden';
         }
+        this.container.className = classes;
+
         this.container.style.setProperty('--max-height', this.options.maxHeight);
         this.container.setAttribute('role', 'dialog');
         this.container.setAttribute('aria-label', 'Changelog updates');
+
+        if (this.options.isPopup) {
+            this.updatePosition();
+        }
 
         this.render();
         await this.loadEntries();
         this.setupKeyboardNavigation();
 
-        // Handle trigger button if specified
         if (this.options.trigger) {
             this.setupTriggerButton();
         }
-    }
-
-    setupOverlay() {
-        this.overlay = document.createElement('div');
-        this.overlay.className = 'changerawr-overlay';
-        document.body.appendChild(this.overlay);
-        this.overlay.addEventListener('click', () => this.close());
     }
 
     setupKeyboardNavigation() {
@@ -371,12 +370,10 @@ class ChangelogWidget {
             return;
         }
 
-        // Setup button accessibility and interactions
         triggerButton.setAttribute('aria-expanded', 'false');
         triggerButton.setAttribute('aria-haspopup', 'dialog');
         triggerButton.setAttribute('aria-controls', this.container.id);
 
-        // Handle click and keyboard interactions
         triggerButton.addEventListener('click', () => {
             this.toggle();
             triggerButton.setAttribute('aria-expanded', this.isOpen.toString());
@@ -427,7 +424,6 @@ class ChangelogWidget {
 
         this.renderLoading();
 
-        // Add click handler for close button if it exists
         const closeButton = this.container.querySelector('.changerawr-close');
         if (closeButton) {
             closeButton.addEventListener('click', () => this.close());
@@ -468,7 +464,6 @@ class ChangelogWidget {
         const container = this.container.querySelector('.changerawr-entries');
         container.innerHTML = '';
 
-        // Use the provided maxEntries or default to 3
         const entriesToShow = entries.slice(0, this.options.maxEntries);
 
         entriesToShow.forEach((entry) => {
@@ -493,6 +488,7 @@ class ChangelogWidget {
             content.className = 'changerawr-entry-content';
             content.textContent = entry.content;
             entryEl.appendChild(content);
+
             const readMore = document.createElement('a');
             readMore.href = `${process.env.NEXT_PUBLIC_APP_URL}/changelog/${this.options.projectId}#${entry.id}`;
             readMore.className = 'changerawr-read-more';
@@ -525,14 +521,11 @@ class ChangelogWidget {
         if (!this.options.isPopup) return;
 
         this.isOpen = true;
-        // Remove hidden class first
         this.container.classList.remove('hidden');
-        // Ensure the container is displayed
         this.container.style.display = 'block';
-        // Add open class after a small delay to ensure transitions work
+
         requestAnimationFrame(() => {
             this.container.classList.add('open');
-            // this.overlay?.classList.add('open');
         });
 
         this.previouslyFocused = document.activeElement;
@@ -547,9 +540,7 @@ class ChangelogWidget {
 
         this.isOpen = false;
         this.container.classList.remove('open');
-        // this.overlay?.classList.remove('open');
 
-        // Add transition end listener to hide the element after animation
         const handleTransitionEnd = () => {
             if (!this.isOpen) {
                 if (this.options.hidden) {
@@ -580,30 +571,40 @@ class ChangelogWidget {
 document.addEventListener('DOMContentLoaded', () => {
     const scripts = document.querySelectorAll('script[src*="/api/integrations/widget/"]');
     scripts.forEach(currentScript => {
-        // Extract project ID from script src
         const projectIdMatch = currentScript.getAttribute('src').match(/\/api\/widget\/([^?]+)/);
         if (!projectIdMatch) return;
 
         const projectId = projectIdMatch[1];
+        const position = currentScript.getAttribute('data-position') || 'bottom-right';
 
-        // Create container for widget
+        // Validate position
+        if (!['top-right', 'top-left', 'bottom-right', 'bottom-left'].includes(position)) {
+            console.warn(`Invalid position '${position}', defaulting to bottom-right`);
+        }
+
         const container = document.createElement('div');
         container.id = `changerawr-widget-${Math.random().toString(36).substr(2, 9)}`;
-        document.body.appendChild(container);
 
-        // Initialize widget
+        // Insert container based on popup state
+        const isPopup = currentScript.getAttribute('data-popup') === 'true';
+        if (isPopup) {
+            document.body.appendChild(container);
+        } else {
+            currentScript.parentNode.insertBefore(container, currentScript);
+        }
+
+        // Initialize widget with correct positioning
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const widget = new ChangelogWidget(container, {
             projectId,
-            // Explicitly pass through data attributes
             theme: currentScript.getAttribute('data-theme') || 'light',
             position: currentScript.getAttribute('data-position') || 'bottom-right',
-            isPopup: currentScript.getAttribute('data-popup') === 'true',
+            isPopup,
             trigger: currentScript.getAttribute('data-trigger'),
             maxEntries: currentScript.getAttribute('data-max-entries')
                 ? parseInt(currentScript.getAttribute('data-max-entries'), 10)
                 : 3,
-            hidden: currentScript.getAttribute('data-popup') === 'true'
+            hidden: isPopup // Only hide initially if it's a popup
         });
     });
 });
@@ -619,9 +620,19 @@ window.ChangerawrWidget = {
             throw new Error('Project ID is required');
         }
 
-        // Generate unique ID for ARIA relationships
+        // Validate position
+        const position = config.position || 'bottom-right';
+        if (!['top-right', 'top-left', 'bottom-right', 'bottom-left'].includes(position)) {
+            console.warn(`Invalid position '${position}', defaulting to bottom-right`);
+        }
+
         config.container.id = config.container.id ||
             `changerawr-widget-${Math.random().toString(36).substr(2, 9)}`;
+
+        // Always ensure the container is properly positioned if it's a popup
+        if (config.isPopup) {
+            document.body.appendChild(config.container);
+        }
 
         return new ChangelogWidget(config.container, {
             projectId: config.projectId,
@@ -630,7 +641,7 @@ window.ChangerawrWidget = {
             position: config.position || 'bottom-right',
             isPopup: config.isPopup || false,
             maxEntries: config.maxEntries || 3,
-            hidden: config.hidden || false,
+            hidden: config.isPopup || false, // Only hide initially if it's a popup
             trigger: config.trigger
         });
     }

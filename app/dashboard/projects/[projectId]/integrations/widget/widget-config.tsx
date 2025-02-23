@@ -1,18 +1,99 @@
 'use client'
 
-import {ChangeEvent, useEffect, useMemo, useState} from 'react'
-import {useRouter} from 'next/navigation'
-import {useQuery} from '@tanstack/react-query'
-import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card'
-import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs'
-import {Switch} from '@/components/ui/switch'
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
-import {Label} from '@/components/ui/label'
-import {Input} from '@/components/ui/input'
-import {Button} from '@/components/ui/button'
-import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
-import {ArrowLeft, Check, Code, Copy, Eye, Settings2} from 'lucide-react'
+import { ChangeEvent, useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useQuery } from '@tanstack/react-query'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Switch } from '@/components/ui/switch'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { ArrowLeft, Check, Code2, Copy, Eye, Globe, Palette, Settings, Settings2 } from 'lucide-react'
 import WidgetPreview from '@/components/changelog/WidgetPreview'
+import { Separator } from '@/components/ui/separator'
+import { ScrollArea } from "@/components/ui/scroll-area"
+import {Light as SyntaxHighlighter} from 'react-syntax-highlighter'
+import {atomOneDark, atomOneLight} from 'react-syntax-highlighter/dist/esm/styles/hljs'
+import { useTheme } from 'next-themes'
+import javascript from 'react-syntax-highlighter/dist/esm/languages/hljs/javascript'
+import xml from 'react-syntax-highlighter/dist/esm/languages/hljs/xml'
+import typescript from 'react-syntax-highlighter/dist/esm/languages/hljs/typescript'
+import go from 'react-syntax-highlighter/dist/esm/languages/hljs/go'
+
+// Register languages
+SyntaxHighlighter.registerLanguage('javascript', javascript)
+SyntaxHighlighter.registerLanguage('xml', xml)
+SyntaxHighlighter.registerLanguage('typescript', typescript)
+SyntaxHighlighter.registerLanguage('go', go)
+
+// Custom language definitions
+SyntaxHighlighter.registerLanguage('vue', () => ({
+    contains: [
+        {
+            className: 'tag',
+            begin: '<template',
+            end: '>',
+            starts: {
+                end: '</template>',
+                returnEnd: true,
+                subLanguage: 'xml'
+            }
+        },
+        {
+            className: 'tag',
+            begin: '<script',
+            end: '>',
+            starts: {
+                end: '</script>',
+                returnEnd: true,
+                subLanguage: 'javascript'
+            }
+        }
+    ]
+}))
+
+SyntaxHighlighter.registerLanguage('svelte', () => ({
+    contains: [
+        {
+            className: 'tag',
+            begin: '<script',
+            end: '>',
+            starts: {
+                end: '</script>',
+                returnEnd: true,
+                subLanguage: 'javascript'
+            }
+        },
+        {
+            className: 'template',
+            begin: '{',
+            end: '}',
+            subLanguage: 'javascript'
+        },
+        {
+            className: 'tag',
+            begin: '<[A-Za-z]',
+            end: '>',
+            contains: [
+                {
+                    className: 'attr',
+                    begin: ' [A-Za-z]+=',
+                    end: /(?=\s|$)/,
+                    contains: [
+                        {
+                            className: 'string',
+                            begin: '"',
+                            end: '"'
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}))
 
 // Configuration constants
 const MIN_ENTRIES = 1;
@@ -73,7 +154,7 @@ const CODE_EXAMPLES: CodeExample[] = [
 export default function ChangelogWidget() {
     useEffect(() => {
         const script = document.createElement('script');
-        script.src = '/api/integrations/widget/${config.projectId}';
+        script.src = '${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/widget/${config.projectId}';
         script.async = true;
         ${attributes.map(attr => {
                 const [key, value] = attr.split('=');
@@ -113,7 +194,7 @@ import { onMounted, onUnmounted } from 'vue'
 
 const createChangelog = () => {
     const script = document.createElement('script')
-    script.src = '/api/integrations/widget/${config.projectId}'
+    script.src = '${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/widget/${config.projectId}'
     script.async = true
     ${attributes.map(attr => {
                 const [key, value] = attr.split('=');
@@ -168,7 +249,7 @@ func renderChangelog(w http.ResponseWriter, r *http.Request) {
         MaxHeight   string
         Trigger     string
     }{
-        WidgetSrc:   "/api/integrations/widget/${config.projectId}",
+        WidgetSrc:   "${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/widget/${config.projectId}",
         Popup:       ${config.isPopup},
         Theme:       "${config.theme}",
         Position:    "${config.position}",
@@ -202,7 +283,7 @@ func renderChangelog(w http.ResponseWriter, r *http.Request) {
 
     onMount(() => {
         script = document.createElement('script');
-        script.src = '/api/integrations/widget/${config.projectId}';
+        script.src = '${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/widget/${config.projectId}';
         script.async = true;
         ${attributes.map(attr => {
                 const [key, value] = attr.split('=');
@@ -246,7 +327,7 @@ export class ChangelogWidgetComponent implements OnInit, OnDestroy {
 
     ngOnInit() {
         this.script = document.createElement('script');
-        this.script.src = '/api/integrations/widget/${config.projectId}';
+        this.script.src = '${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/widget/${config.projectId}';
         this.script.async = true;
         ${attributes.map(attr => {
                 const [key, value] = attr.split('=');
@@ -265,10 +346,114 @@ export class ChangelogWidgetComponent implements OnInit, OnDestroy {
     }
 ]
 
+function CodeInstallation({ config, projectId, codeExamples }) {
+    const [currentLanguage, setCurrentLanguage] = useState('HTML')
+    const [copied, setCopied] = useState(false)
+    const { theme } = useTheme()
+
+    const generateEmbedCode = useMemo(() => {
+        const currentExample = codeExamples.find(ex => ex.language === currentLanguage)
+        return currentExample ? currentExample.template({...config, projectId}) : ''
+    }, [config, currentLanguage, projectId, codeExamples])
+
+    const handleCopy = async () => {
+        await navigator.clipboard.writeText(generateEmbedCode)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+    }
+
+    type LanguageMap = {
+        [key: string]: string;
+        HTML: string;
+        React: string;
+        Vue: string;
+        Go: string;
+        Svelte: string;
+        Angular: string;
+    };
+
+    const languageMap: LanguageMap = {
+        'HTML': 'xml',
+        'React': 'javascript',
+        'Vue': 'vue',
+        'Go': 'go',
+        'Svelte': 'svelte',
+        'Angular': 'typescript'
+    }
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <Globe className="h-5 w-5" />
+                    Installation Code
+                </CardTitle>
+                <CardDescription>
+                    Copy and paste this code into your website
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+                <div className="relative">
+                    <div className="flex items-center justify-between p-4 border-b">
+                        <div className="flex gap-2">
+                            {codeExamples.map((example) => (
+                                <Button
+                                    key={example.language}
+                                    variant={currentLanguage === example.language ? 'default' : 'ghost'}
+                                    size="sm"
+                                    onClick={() => setCurrentLanguage(example.language)}
+                                >
+                                    {example.language}
+                                </Button>
+                            ))}
+                        </div>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleCopy}
+                            className="flex items-center gap-2"
+                        >
+                            {copied ? (
+                                <>
+                                    <Check className="h-4 w-4" />
+                                    Copied!
+                                </>
+                            ) : (
+                                <>
+                                    <Copy className="h-4 w-4" />
+                                    Copy
+                                </>
+                            )}
+                        </Button>
+                    </div>
+                    <ScrollArea className="h-96">
+                        <div className="p-4">
+                            <SyntaxHighlighter
+                                language={languageMap[currentLanguage]}
+                                style={theme === 'dark' ? atomOneDark : atomOneLight}
+                                customStyle={{
+                                    margin: 0,
+                                    padding: 0,
+                                    background: 'transparent',
+                                }}
+                                codeTagProps={{
+                                    className: 'text-sm font-mono'
+                                }}
+                            >
+                                {generateEmbedCode}
+                            </SyntaxHighlighter>
+                        </div>
+                    </ScrollArea>
+                </div>
+            </CardContent>
+        </Card>
+    )
+}
+
 export default function WidgetConfigContent({projectId}: { projectId: string }) {
     const router = useRouter()
     const [mounted, setMounted] = useState(false)
-    const [currentLanguage, setCurrentLanguage] = useState('HTML')
+    const [activeTab, setActiveTab] = useState('design')
     const [config, setConfig] = useState<WidgetConfig>({
         theme: 'light',
         isPopup: false,
@@ -277,9 +462,7 @@ export default function WidgetConfigContent({projectId}: { projectId: string }) 
         maxHeight: '400px',
         trigger: ''
     })
-    const [copied, setCopied] = useState(false)
 
-    // Fetch project to check if it's public - always called
     const {data: project, isLoading, isError} = useQuery({
         queryKey: ['project-settings', projectId],
         queryFn: async () => {
@@ -289,9 +472,7 @@ export default function WidgetConfigContent({projectId}: { projectId: string }) 
         }
     })
 
-    // Handle initial theme setup
     useEffect(() => {
-        // Detect initial theme from HTML element
         const detectInitialTheme = () => {
             const htmlElement = document.documentElement;
             const isDarkMode =
@@ -304,10 +485,9 @@ export default function WidgetConfigContent({projectId}: { projectId: string }) 
             }));
         };
 
-        // Detect initial theme
         detectInitialTheme();
+        setMounted(true);
 
-        // Create a MutationObserver to watch for class or style changes
         const observer = new MutationObserver((mutations) => {
             for (const mutation of mutations) {
                 if (mutation.type === 'attributes' &&
@@ -318,71 +498,31 @@ export default function WidgetConfigContent({projectId}: { projectId: string }) 
             }
         });
 
-        // Start observing the html element
         observer.observe(document.documentElement, {
             attributes: true,
             attributeFilter: ['class', 'style']
         });
 
-        // Mark as mounted
-        setMounted(true);
-
-        // Cleanup observer
-        return () => {
-            observer.disconnect();
-        };
+        return () => observer.disconnect();
     }, [])
 
-    // Generate code based on current configuration
-    const generateEmbedCode = useMemo(() => {
-        const currentExample = CODE_EXAMPLES.find(ex => ex.language === currentLanguage)
-        return currentExample
-            ? currentExample.template({...config, projectId})
-            : ''
-    }, [config, currentLanguage, projectId])
-
-    // Copy to clipboard handler
-    const handleCopy = async () => {
-        await navigator.clipboard.writeText(generateEmbedCode)
-        setCopied(true)
-        setTimeout(() => setCopied(false), 2000)
-    }
-
-    // Render loading state
     if (!mounted || isLoading) {
         return (
-            <div className="flex items-center justify-center h-96">
-                <div className="space-y-2 text-center">
-                    <Settings2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground"/>
-                    <p className="text-sm text-muted-foreground">Loading configuration...</p>
-                </div>
+            <div className="flex items-center justify-center h-screen">
+                <Settings2 className="h-8 w-8 animate-spin text-primary" />
             </div>
         )
     }
 
-    // Render error state
-    if (isError) {
+    if (isError || !project?.isPublic) {
         return (
-            <div className="container max-w-5xl py-8">
-                <Alert variant="destructive" className="animate-in fade-in-50">
-                    <AlertTitle>Error Loading Project</AlertTitle>
+            <div className="container max-w-6xl py-8">
+                <Alert variant="destructive">
+                    <AlertTitle>{isError ? 'Error Loading Project' : 'Project is not public'}</AlertTitle>
                     <AlertDescription>
-                        Unable to load project settings. Please try again later.
-                    </AlertDescription>
-                </Alert>
-            </div>
-        )
-    }
-
-    // Render project not public state
-    if (!project?.isPublic) {
-        return (
-            <div className="container max-w-5xl py-8">
-                <Alert variant="destructive" className="animate-in fade-in-50">
-                    <AlertTitle>Project is not public</AlertTitle>
-                    <AlertDescription>
-                        The widget is only available for public projects. Please make your project public in settings to
-                        use the widget.
+                        {isError
+                            ? 'Unable to load project settings. Please try again later.'
+                            : 'The widget is only available for public projects. Please make your project public in settings to use the widget.'}
                     </AlertDescription>
                 </Alert>
             </div>
@@ -390,218 +530,170 @@ export default function WidgetConfigContent({projectId}: { projectId: string }) 
     }
 
     return (
-        <div className="container max-w-5xl py-8 space-y-8 animate-in fade-in-50">
-            <div className="flex items-center gap-4">
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => router.back()}
-                    className="hover:bg-muted"
-                >
-                    <ArrowLeft className="h-4 w-4"/>
-                </Button>
-                <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Widget Configuration</h1>
-                    <p className="text-muted-foreground">Customize and install the changelog widget</p>
-                </div>
-            </div>
-
-            <div className="grid gap-8 lg:grid-cols-2">
-                <div className="space-y-8">
-                    <Card>
-                        <CardHeader className="space-y-1">
-                            <div className="flex items-center gap-2">
-                                <Settings2 className="h-4 w-4"/>
-                                <CardTitle>Configuration</CardTitle>
-                            </div>
-                            <CardDescription>Customize how your widget looks and behaves</CardDescription>
-                        </CardHeader>
-                        <CardContent className="grid gap-6">
-                            <div className="flex items-center justify-between">
-                                <Label htmlFor="popup-mode" className="font-medium">Popup Mode</Label>
-                                <Switch
-                                    id="popup-mode"
-                                    checked={config.isPopup}
-                                    onCheckedChange={(checked) => setConfig(prev => ({
-                                        ...prev,
-                                        isPopup: checked,
-                                        trigger: checked ? (prev.trigger || 'changelog-trigger') : ''
-                                    }))}
-                                />
-                            </div>
-
-                            {config.isPopup && (
-                                <div className="grid gap-4 animate-in fade-in-50 slide-in-from-top-2">
-                                    <div>
-                                        <Label htmlFor="position" className="font-medium mb-1.5">Position</Label>
-                                        <Select
-                                            value={config.position}
-                                            onValueChange={(value: WidgetConfig['position']) =>
-                                                setConfig(prev => ({...prev, position: value}))
-                                            }
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select position"/>
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="bottom-right">Bottom Right</SelectItem>
-                                                <SelectItem value="bottom-left">Bottom Left</SelectItem>
-                                                <SelectItem value="top-right">Top Right</SelectItem>
-                                                <SelectItem value="top-left">Top Left</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    <div>
-                                        <Label htmlFor="trigger" className="font-medium mb-1.5">Trigger Button
-                                            ID</Label>
-                                        <Input
-                                            id="trigger"
-                                            value={config.trigger}
-                                            onChange={(e) => setConfig(prev => ({...prev, trigger: e.target.value}))}
-                                            placeholder="changelog-trigger"
-                                        />
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="grid gap-4">
-                                <div>
-                                    <Label htmlFor="max-entries" className="font-medium mb-1.5">
-                                        Max Entries ({MIN_ENTRIES}-{MAX_ENTRIES})
-                                    </Label>
-                                    <Input
-                                        id="max-entries"
-                                        type="number"
-                                        value={config.maxEntries.toString()}
-                                        onChange={handleMaxEntriesChange}
-                                        min={MIN_ENTRIES}
-                                        max={MAX_ENTRIES}
-                                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                    />
-                                </div>
-
-                                <div>
-                                    <Label htmlFor="max-height" className="font-medium mb-1.5">Max Height</Label>
-                                    <Input
-                                        id="max-height"
-                                        value={config.maxHeight}
-                                        onChange={(e) => setConfig(prev => ({...prev, maxHeight: e.target.value}))}
-                                        placeholder="400px"
-                                    />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader className="space-y-1">
-                            <div className="flex items-center gap-2">
-                                <Code className="h-4 w-4"/>
-                                <CardTitle>Installation</CardTitle>
-                            </div>
-                            <CardDescription>Copy and paste this code into your website</CardDescription>
-                        </CardHeader>
-                        <CardContent className="p-0">
-                            <div className="relative">
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="absolute top-2 right-2 z-10 bg-background hover:bg-muted"
-                                    onClick={handleCopy}
-                                >
-                                    {copied ? (
-                                        <div className="flex items-center gap-2">
-                                            <Check className="h-4 w-4 text-green-600"/>
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center gap-2">
-                                            <Copy className="h-4 w-4"/>
-                                        </div>
-                                    )}
-                                </Button>
-                                <Tabs
-                                    defaultValue="HTML"
-                                    onValueChange={(value) => {
-                                        setCurrentLanguage(value);
-                                        setCopied(false);
-                                    }}
-                                >
-                                    <TabsList className="absolute top-2 left-2 z-10">
-                                        {CODE_EXAMPLES.map((example) => (
-                                            <TabsTrigger
-                                                key={example.language}
-                                                value={example.language}
-                                            >
-                                                {example.language}
-                                            </TabsTrigger>
-                                        ))}
-                                    </TabsList>
-                                    <TabsContent value={currentLanguage} className="pt-16">
-                                        <pre
-                                            className="p-4 pt-10 rounded-lg bg-muted overflow-x-auto text-sm font-mono">
-                                            <code>{generateEmbedCode}</code>
-                                        </pre>
-                                    </TabsContent>
-                                </Tabs>
-                            </div>
-                        </CardContent>
-                    </Card>
+        <div className="min-h-screen bg-background">
+            <div className="container max-w-6xl py-8">
+                <div className="flex items-center gap-4 mb-8">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => router.back()}
+                        className="hover:bg-muted"
+                    >
+                        <ArrowLeft className="h-4 w-4" />
+                    </Button>
+                    <div>
+                        <h1 className="text-3xl font-bold">Widget Configuration</h1>
+                        <p className="text-muted-foreground mt-1">Customize your changelog widget</p>
+                    </div>
                 </div>
 
-                <Card>
-                    <CardHeader className="space-y-1">
-                        <div className="flex items-center gap-2">
-                            <Eye className="h-4 w-4"/>
-                            <CardTitle>Preview</CardTitle>
-                        </div>
-                        <CardDescription>See how your widget looks with the current configuration</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <Tabs
-                            defaultValue={config.theme}
-                            className="w-full"
-                            onValueChange={(value) => setConfig(prev => ({
-                                ...prev,
-                                theme: value as 'light' | 'dark'
-                            }))}
-                        >
-                            <TabsList className="mb-4">
-                                <TabsTrigger value="light">Light</TabsTrigger>
-                                <TabsTrigger value="dark">Dark</TabsTrigger>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="lg:col-span-2 space-y-6">
+                        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                            <TabsList className="grid w-full grid-cols-2 mb-6">
+                                <TabsTrigger value="design" className="flex items-center gap-2">
+                                    <Palette className="h-4 w-4" />
+                                    Design
+                                </TabsTrigger>
+                                <TabsTrigger value="code" className="flex items-center gap-2">
+                                    <Code2 className="h-4 w-4" />
+                                    Installation
+                                </TabsTrigger>
                             </TabsList>
-                            <TabsContent value="light" className="mt-0">
-                                <WidgetPreview config={config}/>
+
+                            <TabsContent value="design" className="space-y-6">
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center gap-2">
+                                            <Settings className="h-5 w-5" />
+                                            Widget Settings
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-6">
+                                        <div className="flex items-center justify-between">
+                                            <div className="space-y-1">
+                                                <Label htmlFor="popup-mode" className="text-base">Popup Mode</Label>
+                                                <p className="text-sm text-muted-foreground">Show widget in a popup overlay</p>
+                                            </div>
+                                            <Switch
+                                                id="popup-mode"
+                                                checked={config.isPopup}
+                                                onCheckedChange={(checked) => setConfig(prev => ({
+                                                    ...prev,
+                                                    isPopup: checked,
+                                                    trigger: checked ? (prev.trigger || 'changelog-trigger') : ''
+                                                }))}
+                                            />
+                                        </div>
+
+                                        <Separator />
+
+                                        {config.isPopup && (
+                                            <>
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="position">Position</Label>
+                                                    <Select
+                                                        value={config.position}
+                                                        onValueChange={(value) => setConfig(prev => ({...prev, position: value}))}
+                                                    >
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Select position" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="bottom-right">Bottom Right</SelectItem>
+                                                            <SelectItem value="bottom-left">Bottom Left</SelectItem>
+                                                            <SelectItem value="top-right">Top Right</SelectItem>
+                                                            <SelectItem value="top-left">Top Left</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="trigger">Trigger Button ID</Label>
+                                                    <Input
+                                                        id="trigger"
+                                                        value={config.trigger}
+                                                        onChange={(e) => setConfig(prev => ({...prev, trigger: e.target.value}))}
+                                                        placeholder="changelog-trigger"
+                                                    />
+                                                </div>
+
+                                                <Separator />
+                                            </>
+                                        )}
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="max-entries">Maximum Entries</Label>
+                                            <Input
+                                                id="max-entries"
+                                                type="number"
+                                                value={config.maxEntries}
+                                                onChange={(e) => {
+                                                    const value = parseInt(e.target.value);
+                                                    if (value >= MIN_ENTRIES && value <= MAX_ENTRIES) {
+                                                        setConfig(prev => ({...prev, maxEntries: value}));
+                                                    }
+                                                }}
+                                                min={MIN_ENTRIES}
+                                                max={MAX_ENTRIES}
+                                            />
+                                            <p className="text-sm text-muted-foreground">Choose between {MIN_ENTRIES} and {MAX_ENTRIES} entries</p>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="max-height">Maximum Height</Label>
+                                            <Input
+                                                id="max-height"
+                                                value={config.maxHeight}
+                                                onChange={(e) => setConfig(prev => ({...prev, maxHeight: e.target.value}))}
+                                                placeholder="400px"
+                                            />
+                                        </div>
+                                    </CardContent>
+                                </Card>
                             </TabsContent>
-                            <TabsContent value="dark" className="mt-0">
-                                <WidgetPreview config={config}/>
+
+                            <TabsContent value="code">
+                                <CodeInstallation config={config} projectId={projectId} codeExamples={CODE_EXAMPLES} />
                             </TabsContent>
                         </Tabs>
-                    </CardContent>
-                </Card>
+                    </div>
+
+                    <div className="lg:col-span-1">
+                        <Card className="sticky top-8">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Eye className="h-5 w-5" />
+                                    Live Preview
+                                </CardTitle>
+                                <CardDescription>
+                                    See how your widget looks
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <Tabs
+                                    value={config.theme}
+                                    onValueChange={(value) => setConfig(prev => ({
+                                        ...prev,
+                                        theme: value as 'light' | 'dark'
+                                    }))}
+                                >
+                                    <TabsList className="w-full mb-4">
+                                        <TabsTrigger value="light" className="flex-1">Light</TabsTrigger>
+                                        <TabsTrigger value="dark" className="flex-1">Dark</TabsTrigger>
+                                    </TabsList>
+                                    <TabsContent value="light" className="mt-0">
+                                        <WidgetPreview config={config} />
+                                    </TabsContent>
+                                    <TabsContent value="dark" className="mt-0">
+                                        <WidgetPreview config={config} />
+                                    </TabsContent>
+                                </Tabs>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </div>
             </div>
         </div>
     )
-}
-
-// Helper function to handle max entries input
-function handleMaxEntriesChange(e: ChangeEvent<HTMLInputElement>) {
-    const value = e.target.value.trim();
-
-    // Handle empty input
-    if (value === '') {
-        return DEFAULT_ENTRIES;
-    }
-
-    // Parse the input value
-    const numValue = parseInt(value, 10);
-
-    // Handle invalid numbers, negative values, and bounds
-    if (isNaN(numValue) || numValue < MIN_ENTRIES) {
-        return MIN_ENTRIES;
-    } else if (numValue > MAX_ENTRIES) {
-        return MAX_ENTRIES;
-    }
-
-    return numValue;
 }
