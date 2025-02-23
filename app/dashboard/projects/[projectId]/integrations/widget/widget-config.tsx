@@ -1,19 +1,25 @@
 'use client'
 
-import {ChangeEvent, useState} from 'react'
-import { useRouter } from 'next/navigation'
-import { useQuery } from '@tanstack/react-query'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Switch } from '@/components/ui/switch'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Label } from '@/components/ui/label'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { ArrowLeft, Copy, Check, Settings2, Eye, Code } from 'lucide-react'
+import {ChangeEvent, useEffect, useMemo, useState} from 'react'
+import {useRouter} from 'next/navigation'
+import {useQuery} from '@tanstack/react-query'
+import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card'
+import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs'
+import {Switch} from '@/components/ui/switch'
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
+import {Label} from '@/components/ui/label'
+import {Input} from '@/components/ui/input'
+import {Button} from '@/components/ui/button'
+import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
+import {ArrowLeft, Check, Code, Copy, Eye, Settings2} from 'lucide-react'
 import WidgetPreview from '@/components/changelog/WidgetPreview'
 
+// Configuration constants
+const MIN_ENTRIES = 1;
+const MAX_ENTRIES = 10;
+const DEFAULT_ENTRIES = 3;
+
+// Type definitions
 export interface WidgetConfig {
     theme: 'light' | 'dark'
     isPopup: boolean
@@ -23,12 +29,246 @@ export interface WidgetConfig {
     trigger: string
 }
 
-const MIN_ENTRIES = 1;
-const MAX_ENTRIES = 10;
-const DEFAULT_ENTRIES = 3;
+// Code example interface
+interface CodeExample {
+    language: string
+    template: (config: WidgetConfig & { projectId: string }) => string
+}
 
-export default function WidgetConfigContent({ projectId }: { projectId: string }) {
+// Code examples collection
+const CODE_EXAMPLES: CodeExample[] = [
+    {
+        language: 'HTML',
+        template: (config) => {
+            const attributes = [
+                config.isPopup ? 'data-popup="true"' : '',
+                `data-theme="${config.theme}"`,
+                config.isPopup ? `data-position="${config.position}"` : '',
+                config.maxEntries !== DEFAULT_ENTRIES ? `data-max-entries="${config.maxEntries}"` : '',
+                config.maxHeight !== '400px' ? `data-max-height="${config.maxHeight}"` : '',
+                config.trigger ? `data-trigger="${config.trigger}"` : '',
+            ].filter(Boolean).join('\n    ')
+
+            return `${config.isPopup && config.theme === 'dark' ? '<div style="--theme: dark;">\n' : ''}${config.trigger ? `<button id="${config.trigger}">View Updates</button>\n` : ''}<script 
+    src="${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/widget/${config.projectId}"
+    ${attributes}
+    async
+></script>${config.isPopup && config.theme === 'dark' ? '\n</div>' : ''}`
+        }
+    },
+    {
+        language: 'React',
+        template: (config) => {
+            const attributes = [
+                config.isPopup ? 'data-popup="true"' : '',
+                `data-theme="${config.theme}"`,
+                config.isPopup ? `data-position="${config.position}"` : '',
+                config.maxEntries !== DEFAULT_ENTRIES ? `data-max-entries="${config.maxEntries}"` : '',
+                config.maxHeight !== '400px' ? `data-max-height="${config.maxHeight}"` : '',
+                config.trigger ? `data-trigger="${config.trigger}"` : '',
+            ].filter(Boolean)
+
+            return `import React, { useEffect } from 'react';
+
+export default function ChangelogWidget() {
+    useEffect(() => {
+        const script = document.createElement('script');
+        script.src = '/api/integrations/widget/${config.projectId}';
+        script.async = true;
+        ${attributes.map(attr => {
+                const [key, value] = attr.split('=');
+                return `        script.setAttribute('${key}', ${value});`
+            }).join('\n')}
+        document.body.appendChild(script);
+
+        return () => {
+            document.body.removeChild(script);
+        };
+    }, []);
+
+    ${config.trigger ? `return <button id="${config.trigger}">View Updates</button>;` : 'return null;'}
+}`
+        }
+    },
+    {
+        language: 'Vue',
+        template: (config) => {
+            const attributes = [
+                config.isPopup ? 'data-popup="true"' : '',
+                `data-theme="${config.theme}"`,
+                config.isPopup ? `data-position="${config.position}"` : '',
+                config.maxEntries !== DEFAULT_ENTRIES ? `data-max-entries="${config.maxEntries}"` : '',
+                config.maxHeight !== '400px' ? `data-max-height="${config.maxHeight}"` : '',
+                config.trigger ? `data-trigger="${config.trigger}"` : '',
+            ].filter(Boolean)
+
+            return `<template>
+    <div>
+        ${config.trigger ? `<button id="${config.trigger}">View Updates</button>` : ''}
+    </div>
+</template>
+
+<script setup>
+import { onMounted, onUnmounted } from 'vue'
+
+const createChangelog = () => {
+    const script = document.createElement('script')
+    script.src = '/api/integrations/widget/${config.projectId}'
+    script.async = true
+    ${attributes.map(attr => {
+                const [key, value] = attr.split('=');
+                return `    script.setAttribute('${key}', ${value});`
+            }).join('\n')}
+    document.body.appendChild(script)
+    return script
+}
+
+const script = onMounted(createChangelog)
+onUnmounted(() => {
+    if (script.value) {
+        document.body.removeChild(script.value)
+    }
+})
+</script>`
+        }
+    },
+    {
+        language: 'Go',
+        template: (config) => `package main
+
+import (
+    "fmt"
+    "html/template"
+    "net/http"
+)
+
+func renderChangelog(w http.ResponseWriter, r *http.Request) {
+    tmpl := template.Must(template.New("changelog").Parse(\`
+        {{if .Popup}}<div style="--theme: {{.Theme}};">{{end}}
+        {{if .Trigger}}<button id="{{.Trigger}}">View Updates</button>{{end}}
+        <script 
+            src="{{.WidgetSrc}}"
+            ${config.isPopup ? 'data-popup="true"' : ''}
+            data-theme="{{.Theme}}"
+            {{if .Popup}}data-position="{{.Position}}"{{end}}
+            data-max-entries="{{.MaxEntries}}"
+            data-max-height="{{.MaxHeight}}"
+            {{if .Trigger}}data-trigger="{{.Trigger}}"{{end}}
+            async
+        ></script>
+        {{if .Popup}}</div>{{end}}
+    \`))
+
+    data := struct {
+        WidgetSrc   string
+        Popup       bool
+        Theme       string
+        Position    string
+        MaxEntries  int
+        MaxHeight   string
+        Trigger     string
+    }{
+        WidgetSrc:   "/api/integrations/widget/${config.projectId}",
+        Popup:       ${config.isPopup},
+        Theme:       "${config.theme}",
+        Position:    "${config.position}",
+        MaxEntries:  ${config.maxEntries},
+        MaxHeight:   "${config.maxHeight}",
+        Trigger:     "${config.trigger}",
+    }
+
+    err := tmpl.Execute(w, data)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+    }
+}`
+    },
+    {
+        language: 'Svelte',
+        template: (config) => {
+            const attributes = [
+                config.isPopup ? 'data-popup="true"' : '',
+                `data-theme="${config.theme}"`,
+                config.isPopup ? `data-position="${config.position}"` : '',
+                config.maxEntries !== DEFAULT_ENTRIES ? `data-max-entries="${config.maxEntries}"` : '',
+                config.maxHeight !== '400px' ? `data-max-height="${config.maxHeight}"` : '',
+                config.trigger ? `data-trigger="${config.trigger}"` : '',
+            ].filter(Boolean)
+
+            return `<script>
+    import { onMount, onDestroy } from 'svelte';
+
+    let script;
+
+    onMount(() => {
+        script = document.createElement('script');
+        script.src = '/api/integrations/widget/${config.projectId}';
+        script.async = true;
+        ${attributes.map(attr => {
+                const [key, value] = attr.split('=');
+                return `        script.setAttribute('${key}', ${value});`
+            }).join('\n')}
+        document.body.appendChild(script);
+    });
+
+    onDestroy(() => {
+        if (script) {
+            document.body.removeChild(script);
+        }
+    });
+</script>
+
+${config.trigger ? `<button id="${config.trigger}">View Updates</button>` : ''}`
+        }
+    },
+    {
+        language: 'Angular',
+        template: (config) => {
+            const attributes = [
+                config.isPopup ? 'data-popup="true"' : '',
+                `data-theme="${config.theme}"`,
+                config.isPopup ? `data-position="${config.position}"` : '',
+                config.maxEntries !== DEFAULT_ENTRIES ? `data-max-entries="${config.maxEntries}"` : '',
+                config.maxHeight !== '400px' ? `data-max-height="${config.maxHeight}"` : '',
+                config.trigger ? `data-trigger="${config.trigger}"` : '',
+            ].filter(Boolean)
+
+            return `import { Component, OnInit, OnDestroy } from '@angular/core';
+
+@Component({
+    selector: 'app-changelog-widget',
+    template: \`
+        ${config.trigger ? `<button id="${config.trigger}">View Updates</button>` : ''}
+    \`
+})
+export class ChangelogWidgetComponent implements OnInit, OnDestroy {
+    private script: HTMLScriptElement;
+
+    ngOnInit() {
+        this.script = document.createElement('script');
+        this.script.src = '/api/integrations/widget/${config.projectId}';
+        this.script.async = true;
+        ${attributes.map(attr => {
+                const [key, value] = attr.split('=');
+                return `        this.script.setAttribute('${key}', ${value});`
+            }).join('\n')}
+        document.body.appendChild(this.script);
+    }
+
+    ngOnDestroy() {
+        if (this.script) {
+            document.body.removeChild(this.script);
+        }
+    }
+}`
+        }
+    }
+]
+
+export default function WidgetConfigContent({projectId}: { projectId: string }) {
     const router = useRouter()
+    const [mounted, setMounted] = useState(false)
+    const [currentLanguage, setCurrentLanguage] = useState('HTML')
     const [config, setConfig] = useState<WidgetConfig>({
         theme: 'light',
         isPopup: false,
@@ -39,30 +279,8 @@ export default function WidgetConfigContent({ projectId }: { projectId: string }
     })
     const [copied, setCopied] = useState(false)
 
-    const handleMaxEntriesChange = (e: ChangeEvent<HTMLInputElement>) => {
-        const value = e.target.value.trim();
-
-        // Handle empty input
-        if (value === '') {
-            setConfig(prev => ({ ...prev, maxEntries: DEFAULT_ENTRIES }));
-            return;
-        }
-
-        // Parse the input value
-        const numValue = parseInt(value, 10);
-
-        // Handle invalid numbers, negative values, and bounds
-        if (isNaN(numValue) || numValue < MIN_ENTRIES) {
-            setConfig(prev => ({ ...prev, maxEntries: MIN_ENTRIES }));
-        } else if (numValue > MAX_ENTRIES) {
-            setConfig(prev => ({ ...prev, maxEntries: MAX_ENTRIES }));
-        } else {
-            setConfig(prev => ({ ...prev, maxEntries: numValue }));
-        }
-    };
-
-    // Fetch project to check if it's public
-    const { data: project, isLoading } = useQuery({
+    // Fetch project to check if it's public - always called
+    const {data: project, isLoading, isError} = useQuery({
         queryKey: ['project-settings', projectId],
         queryFn: async () => {
             const response = await fetch(`/api/projects/${projectId}/settings`)
@@ -71,51 +289,104 @@ export default function WidgetConfigContent({ projectId }: { projectId: string }
         }
     })
 
+    // Handle initial theme setup
+    useEffect(() => {
+        // Detect initial theme from HTML element
+        const detectInitialTheme = () => {
+            const htmlElement = document.documentElement;
+            const isDarkMode =
+                htmlElement.classList.contains('dark') ||
+                htmlElement.style.colorScheme === 'dark';
+
+            setConfig(prev => ({
+                ...prev,
+                theme: isDarkMode ? 'dark' : 'light'
+            }));
+        };
+
+        // Detect initial theme
+        detectInitialTheme();
+
+        // Create a MutationObserver to watch for class or style changes
+        const observer = new MutationObserver((mutations) => {
+            for (const mutation of mutations) {
+                if (mutation.type === 'attributes' &&
+                    (mutation.attributeName === 'class' || mutation.attributeName === 'style')) {
+                    detectInitialTheme();
+                    break;
+                }
+            }
+        });
+
+        // Start observing the html element
+        observer.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ['class', 'style']
+        });
+
+        // Mark as mounted
+        setMounted(true);
+
+        // Cleanup observer
+        return () => {
+            observer.disconnect();
+        };
+    }, [])
+
+    // Generate code based on current configuration
+    const generateEmbedCode = useMemo(() => {
+        const currentExample = CODE_EXAMPLES.find(ex => ex.language === currentLanguage)
+        return currentExample
+            ? currentExample.template({...config, projectId})
+            : ''
+    }, [config, currentLanguage, projectId])
+
+    // Copy to clipboard handler
     const handleCopy = async () => {
-        await navigator.clipboard.writeText(generateEmbedCode())
+        await navigator.clipboard.writeText(generateEmbedCode)
         setCopied(true)
         setTimeout(() => setCopied(false), 2000)
     }
 
-    if (isLoading) {
+    // Render loading state
+    if (!mounted || isLoading) {
         return (
             <div className="flex items-center justify-center h-96">
                 <div className="space-y-2 text-center">
-                    <Settings2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+                    <Settings2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground"/>
                     <p className="text-sm text-muted-foreground">Loading configuration...</p>
                 </div>
             </div>
         )
     }
 
-    if (!project?.isPublic) {
+    // Render error state
+    if (isError) {
         return (
             <div className="container max-w-5xl py-8">
                 <Alert variant="destructive" className="animate-in fade-in-50">
-                    <AlertTitle>Project is not public</AlertTitle>
+                    <AlertTitle>Error Loading Project</AlertTitle>
                     <AlertDescription>
-                        The widget is only available for public projects. Please make your project public in settings to use the widget.
+                        Unable to load project settings. Please try again later.
                     </AlertDescription>
                 </Alert>
             </div>
         )
     }
 
-    const generateEmbedCode = () => {
-        const attributes = [
-            config.isPopup ? 'data-popup="true"' : '',
-            `data-theme="${config.theme}"`,
-            config.isPopup ? `data-position="${config.position}"` : '',
-            config.maxEntries !== DEFAULT_ENTRIES ? `data-max-entries="${config.maxEntries}"` : '',
-            config.maxHeight !== '400px' ? `data-max-height="${config.maxHeight}"` : '',
-            config.trigger ? `data-trigger="${config.trigger}"` : '',
-        ].filter(Boolean).join('\n    ')
-
-        return `${config.isPopup && config.theme === 'dark' ? '<div style="--theme: dark;">\n' : ''}${config.trigger ? `<button id="${config.trigger}">View Updates</button>\n` : ''}<script 
-    src="${window.location.origin}/api/integrations/widget/${projectId}"
-    ${attributes}
-    async
-></script>${config.isPopup && config.theme === 'dark' ? '\n</div>' : ''}`
+    // Render project not public state
+    if (!project?.isPublic) {
+        return (
+            <div className="container max-w-5xl py-8">
+                <Alert variant="destructive" className="animate-in fade-in-50">
+                    <AlertTitle>Project is not public</AlertTitle>
+                    <AlertDescription>
+                        The widget is only available for public projects. Please make your project public in settings to
+                        use the widget.
+                    </AlertDescription>
+                </Alert>
+            </div>
+        )
     }
 
     return (
@@ -127,7 +398,7 @@ export default function WidgetConfigContent({ projectId }: { projectId: string }
                     onClick={() => router.back()}
                     className="hover:bg-muted"
                 >
-                    <ArrowLeft className="h-4 w-4" />
+                    <ArrowLeft className="h-4 w-4"/>
                 </Button>
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight">Widget Configuration</h1>
@@ -140,7 +411,7 @@ export default function WidgetConfigContent({ projectId }: { projectId: string }
                     <Card>
                         <CardHeader className="space-y-1">
                             <div className="flex items-center gap-2">
-                                <Settings2 className="h-4 w-4" />
+                                <Settings2 className="h-4 w-4"/>
                                 <CardTitle>Configuration</CardTitle>
                             </div>
                             <CardDescription>Customize how your widget looks and behaves</CardDescription>
@@ -170,7 +441,7 @@ export default function WidgetConfigContent({ projectId }: { projectId: string }
                                             }
                                         >
                                             <SelectTrigger>
-                                                <SelectValue placeholder="Select position" />
+                                                <SelectValue placeholder="Select position"/>
                                             </SelectTrigger>
                                             <SelectContent>
                                                 <SelectItem value="bottom-right">Bottom Right</SelectItem>
@@ -182,7 +453,8 @@ export default function WidgetConfigContent({ projectId }: { projectId: string }
                                     </div>
 
                                     <div>
-                                        <Label htmlFor="trigger" className="font-medium mb-1.5">Trigger Button ID</Label>
+                                        <Label htmlFor="trigger" className="font-medium mb-1.5">Trigger Button
+                                            ID</Label>
                                         <Input
                                             id="trigger"
                                             value={config.trigger}
@@ -225,27 +497,54 @@ export default function WidgetConfigContent({ projectId }: { projectId: string }
                     <Card>
                         <CardHeader className="space-y-1">
                             <div className="flex items-center gap-2">
-                                <Code className="h-4 w-4" />
+                                <Code className="h-4 w-4"/>
                                 <CardTitle>Installation</CardTitle>
                             </div>
                             <CardDescription>Copy and paste this code into your website</CardDescription>
                         </CardHeader>
-                        <CardContent className="relative">
-                            <Button
-                                size="icon"
-                                variant="outline"
-                                className="absolute top-4 right-4 h-8 w-8"
-                                onClick={handleCopy}
-                            >
-                                {copied ? (
-                                    <Check className="h-4 w-4 text-green-600" />
-                                ) : (
-                                    <Copy className="h-4 w-4" />
-                                )}
-                            </Button>
-                            <pre className="p-4 rounded-lg bg-muted overflow-x-auto">
-                                <code>{generateEmbedCode()}</code>
-                            </pre>
+                        <CardContent className="p-0">
+                            <div className="relative">
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="absolute top-2 right-2 z-10 bg-background hover:bg-muted"
+                                    onClick={handleCopy}
+                                >
+                                    {copied ? (
+                                        <div className="flex items-center gap-2">
+                                            <Check className="h-4 w-4 text-green-600"/>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2">
+                                            <Copy className="h-4 w-4"/>
+                                        </div>
+                                    )}
+                                </Button>
+                                <Tabs
+                                    defaultValue="HTML"
+                                    onValueChange={(value) => {
+                                        setCurrentLanguage(value);
+                                        setCopied(false);
+                                    }}
+                                >
+                                    <TabsList className="absolute top-2 left-2 z-10">
+                                        {CODE_EXAMPLES.map((example) => (
+                                            <TabsTrigger
+                                                key={example.language}
+                                                value={example.language}
+                                            >
+                                                {example.language}
+                                            </TabsTrigger>
+                                        ))}
+                                    </TabsList>
+                                    <TabsContent value={currentLanguage} className="pt-16">
+                                        <pre
+                                            className="p-4 pt-10 rounded-lg bg-muted overflow-x-auto text-sm font-mono">
+                                            <code>{generateEmbedCode}</code>
+                                        </pre>
+                                    </TabsContent>
+                                </Tabs>
+                            </div>
                         </CardContent>
                     </Card>
                 </div>
@@ -253,14 +552,14 @@ export default function WidgetConfigContent({ projectId }: { projectId: string }
                 <Card>
                     <CardHeader className="space-y-1">
                         <div className="flex items-center gap-2">
-                            <Eye className="h-4 w-4" />
+                            <Eye className="h-4 w-4"/>
                             <CardTitle>Preview</CardTitle>
                         </div>
                         <CardDescription>See how your widget looks with the current configuration</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <Tabs
-                            defaultValue="light"
+                            defaultValue={config.theme}
                             className="w-full"
                             onValueChange={(value) => setConfig(prev => ({
                                 ...prev,
@@ -272,10 +571,10 @@ export default function WidgetConfigContent({ projectId }: { projectId: string }
                                 <TabsTrigger value="dark">Dark</TabsTrigger>
                             </TabsList>
                             <TabsContent value="light" className="mt-0">
-                                <WidgetPreview config={config} />
+                                <WidgetPreview config={config}/>
                             </TabsContent>
                             <TabsContent value="dark" className="mt-0">
-                                <WidgetPreview config={config} />
+                                <WidgetPreview config={config}/>
                             </TabsContent>
                         </Tabs>
                     </CardContent>
@@ -283,4 +582,26 @@ export default function WidgetConfigContent({ projectId }: { projectId: string }
             </div>
         </div>
     )
+}
+
+// Helper function to handle max entries input
+function handleMaxEntriesChange(e: ChangeEvent<HTMLInputElement>) {
+    const value = e.target.value.trim();
+
+    // Handle empty input
+    if (value === '') {
+        return DEFAULT_ENTRIES;
+    }
+
+    // Parse the input value
+    const numValue = parseInt(value, 10);
+
+    // Handle invalid numbers, negative values, and bounds
+    if (isNaN(numValue) || numValue < MIN_ENTRIES) {
+        return MIN_ENTRIES;
+    } else if (numValue > MAX_ENTRIES) {
+        return MAX_ENTRIES;
+    }
+
+    return numValue;
 }
