@@ -8,6 +8,63 @@ const updateRoleSchema = z.object({
     role: z.enum(['ADMIN', 'STAFF'] as const),
 });
 
+/**
+ * Update a user's role
+ * @method PATCH
+ * @description Updates a user's role to either 'ADMIN' or 'STAFF'. Only admins can perform this action. Requires user authentication.
+ * @queryParams None
+ * @requestBody {
+ *   "type": "object",
+ *   "properties": {
+ *     "role": { "type": "enum", "enum": ["ADMIN", "STAFF"] },
+ *   }
+ * }
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "message": { "type": "string" },
+ *     "user": {
+ *       "type": "object",
+ *       "properties": {
+ *         "id": { "type": "string" },
+ *         "email": { "type": "string" },
+ *         "name": { "type": "string" },
+ *         "role": { "type": "string" },
+ *         "createdAt": { "type": "string", "format": "date-time" },
+ *         "lastLoginAt": { "type": "string", "format": "date-time" }
+ *       }
+ *     }
+ *   }
+ * }
+ * @error 403 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": { "type": "string" }
+ *   }
+ * }
+ * @error 400 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": { "type": "string" },
+ *     "details": {
+ *       "type": "array",
+ *       "items": {
+ *         "type": "object",
+ *         "properties": {
+ *           "message": { "type": "string" },
+ *           "path": { "type": "string" }
+ *         }
+ *       }
+ *     }
+ *   }
+ * }
+ * @error 500 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": { "type": "string" }
+ *   }
+ * }
+ */
 export async function PATCH(
     request: NextRequest,
     context: { params: { userId: string } }

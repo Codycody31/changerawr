@@ -1,6 +1,38 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
+/**
+ * Handles validation of invitation tokens and returns user data
+ * @method GET
+ * @description Validates an invitation token and returns the associated user email, role, and expiration date.
+ * @body None
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "email": { "type": "string" },
+ *     "role": { "type": "string" },
+ *     "expiresAt": { "type": "string", "format": "date-time" }
+ *   }
+ * }
+ * @error 400 {
+ *   "type": "object",
+ *   "properties": {
+ *     "message": { "type": "string" }
+ *   }
+ * }
+ * @error 404 {
+ *   "type": "object",
+ *   "properties": {
+ *     "message": { "type": "string" }
+ *   }
+ * }
+ * @error 500 {
+ *   "type": "object",
+ *   "properties": {
+ *     "message": { "type": "string" }
+ *   }
+ * }
+ */
 export async function GET(
     request: Request,
     { params }: { params: { token: string } }

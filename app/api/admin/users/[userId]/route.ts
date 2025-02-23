@@ -9,6 +9,58 @@ const updateUserSchema = z.object({
     role: z.enum(['ADMIN', 'STAFF']).optional(),
 });
 
+/**
+ * @method GET
+ * @description Fetches the user details for the given user ID. Only admins can view user details.
+ * @queryParam {string} userId - The user ID to fetch details for.
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "id": { "type": "string" },
+ *     "email": { "type": "string" },
+ *     "name": { "type": "string" },
+ *     "role": { "type": "string" },
+ *     "createdAt": { "type": "string", "format": "date-time" },
+ *     "lastLoginAt": { "type": "string", "format": "date-time" },
+ *   }
+ * }
+ * @error 400 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": {
+ *       "type": "string",
+ *       "example": "Invalid request"
+ *     }
+ *   }
+ * }
+ * @error 403 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": {
+ *       "type": "string",
+ *       "example": "Forbidden"
+ *     }
+ *   }
+ * }
+ * @error 404 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": {
+ *       "type": "string",
+ *       "example": "User not found"
+ *     }
+ *   }
+ * }
+ * @error 500 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": {
+ *       "type": "string",
+ *       "example": "Internal server error"
+ *     }
+ *   }
+ * }
+ */
 export async function GET(
     request: NextRequest,
     { params }: { params: { userId: string } }
@@ -65,6 +117,65 @@ export async function GET(
     }
 }
 
+/**
+ * @method PATCH
+ * @description Updates the user details for the given user ID. Only admins can update user details.
+ * @queryParam {string} userId - The user ID to update details for.
+ * @requestBody {
+ *   "type": "object",
+ *   "properties": {
+ *     "name": { "type": "string", "minLength": 1, "maxLength": 100, "optional": true },
+ *     "role": { "type": "string", "enum": ["ADMIN", "STAFF"], "optional": true }
+ *   }
+ * }
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "id": { "type": "string" },
+ *     "email": { "type": "string" },
+ *     "name": { "type": "string" },
+ *     "role": { "type": "string" },
+ *     "createdAt": { "type": "string", "format": "date-time" },
+ *     "lastLoginAt": { "type": "string", "format": "date-time" },
+ *   }
+ * }
+ * @error 400 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": {
+ *       "type": "string",
+ *       "example": "Invalid request"
+ *     }
+ *   }
+ * }
+ * @error 403 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": {
+ *       "type": "string",
+ *       "example": "Forbidden"
+ *     }
+ *   }
+ * }
+ * @error 404 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": {
+ *       "type": "string",
+ *       "example": "User not found"
+ *     }
+ *   }
+ * }
+ * @error 500 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": {
+ *       "type": "string",
+ *       "example": "Internal server error"
+ *     }
+ *   }
+ * }
+ */
 export async function PATCH(
     request: NextRequest,
     { params }: { params: { userId: string } }
@@ -154,6 +265,53 @@ export async function PATCH(
     }
 }
 
+/**
+ * @method DELETE
+ * @description Deletes the user with the given user ID. Only admins can delete users.
+ * @queryParam {string} userId - The user ID to delete.
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "message": { "type": "string", "example": "User deleted successfully" }
+ *   }
+ * }
+ * @error 400 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": {
+ *       "type": "string",
+ *       "example": "Invalid request"
+ *     }
+ *   }
+ * }
+ * @error 403 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": {
+ *       "type": "string",
+ *       "example": "Forbidden"
+ *     }
+ *   }
+ * }
+ * @error 404 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": {
+ *       "type": "string",
+ *       "example": "User not found"
+ *     }
+ *   }
+ * }
+ * @error 500 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": {
+ *       "type": "string",
+ *       "example": "Internal server error"
+ *     }
+ *   }
+ * }
+ */
 export async function DELETE(
     request: NextRequest,
     { params }: { params: { userId: string } }

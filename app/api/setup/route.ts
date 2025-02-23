@@ -4,12 +4,62 @@ import { db } from '@/lib/db'
 import { hashPassword } from '@/lib/auth/password'
 import { Role } from '@prisma/client'
 
+/**
+ * Schema for validating setup request body.
+ */
 const setupSchema = z.object({
     name: z.string().min(2, 'Name must be at least 2 characters'),
-    email: z.string().email('Please enter a valid email'),
+    email: z.string().email('Invalid email address'),
     password: z.string().min(8, 'Password must be at least 8 characters'),
 })
 
+/**
+ * Handles the initial setup of the admin user.
+ * @method POST
+ * @description Creates the first admin user in the system
+ * @body {
+ *   "type": "object",
+ *   "required": ["name", "email", "password"],
+ *   "properties": {
+ *     "name": {
+ *       "type": "string",
+ *       "minLength": 2,
+ *       "description": "Admin's full name"
+ *     },
+ *     "email": {
+ *       "type": "string",
+ *       "format": "email",
+ *       "description": "Admin's email address"
+ *     },
+ *     "password": {
+ *       "type": "string",
+ *       "minLength": 8,
+ *       "description": "Admin's password"
+ *     }
+ *   }
+ * }
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "message": {
+ *       "type": "string",
+ *       "example": "Setup completed successfully"
+ *     },
+ *     "user": {
+ *       "type": "object",
+ *       "properties": {
+ *         "id": { "type": "string" },
+ *         "email": { "type": "string" },
+ *         "name": { "type": "string" },
+ *         "role": { "type": "string" }
+ *       }
+ *     }
+ *   }
+ * }
+ * @error 400 Validation failed - Invalid input data
+ * @error 403 Setup already completed - Cannot run setup more than once
+ * @error 500 An unexpected error occurred during setup
+ */
 export async function POST(request: Request) {
     try {
         // Check if setup is already complete
@@ -54,16 +104,39 @@ export async function POST(request: Request) {
         if (error instanceof z.ZodError) {
             return NextResponse.json(
                 {
-                    error: 'Invalid input',
-                    details: error.errors,
+                    error: 'Validation failed',
+                    details: error.errors.map(e => ({
+                        path: e.path.join('.'),
+                        message: e.message
+                    }))
                 },
                 { status: 400 }
             )
         }
 
         return NextResponse.json(
-            { error: 'Failed to complete setup' },
+            { error: 'An unexpected error occurred during setup' },
             { status: 500 }
         )
     }
+}
+
+/**
+ * @method GET
+ * @description Method not allowed - Setup endpoint only accepts POST requests
+ * @response 405 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": {
+ *       "type": "string",
+ *       "example": "Method not allowed"
+ *     }
+ *   }
+ * }
+ */
+export async function GET() {
+    return NextResponse.json(
+        { error: 'Method not allowed' },
+        { status: 405 }
+    )
 }

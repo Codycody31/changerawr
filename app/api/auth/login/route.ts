@@ -2,14 +2,57 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { verifyPassword } from '@/lib/auth/password'
 import { generateTokens } from '@/lib/auth/tokens'
-
 import { z } from 'zod'
 
+/**
+ * Schema for validating login request body.
+ */
 const loginSchema = z.object({
     email: z.string().email('Invalid email address'),
     password: z.string().min(8, 'Password must be at least 8 characters'),
 })
 
+/**
+ * Handles user authentication and returns access tokens
+ * @method POST
+ * @description Authenticates a user with email and password, returning JWT tokens and user data
+ * @body {
+ *   "type": "object",
+ *   "required": ["email", "password"],
+ *   "properties": {
+ *     "email": {
+ *       "type": "string",
+ *       "format": "email",
+ *       "description": "User's email address"
+ *     },
+ *     "password": {
+ *       "type": "string",
+ *       "minLength": 8,
+ *       "description": "User's password"
+ *     }
+ *   }
+ * }
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "user": {
+ *       "type": "object",
+ *       "properties": {
+ *         "id": { "type": "string" },
+ *         "email": { "type": "string" },
+ *         "name": { "type": "string" },
+ *         "role": { "type": "string" },
+ *         "lastLoginAt": { "type": "string", "format": "date-time" }
+ *       }
+ *     },
+ *     "accessToken": { "type": "string" },
+ *     "refreshToken": { "type": "string" }
+ *   }
+ * }
+ * @error 400 Validation failed - Invalid email or password format
+ * @error 401 Invalid credentials
+ * @error 500 An unexpected error occurred during login
+ */
 export async function POST(request: Request) {
     try {
         const body = await request.json()
@@ -119,7 +162,19 @@ export async function POST(request: Request) {
     }
 }
 
-// Return method not allowed for other methods
+/**
+ * @method GET
+ * @description Method not allowed - Login endpoint only accepts POST requests
+ * @response 405 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": {
+ *       "type": "string",
+ *       "example": "Method not allowed"
+ *     }
+ *   }
+ * }
+ */
 export async function GET() {
     return NextResponse.json(
         { error: 'Method not allowed' },

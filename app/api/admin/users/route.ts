@@ -12,6 +12,28 @@ const createInvitationSchema = z.object({
     expiresAt: z.string().datetime().optional()
 });
 
+/**
+ * @method GET
+ * @description Retrieves a list of users with their email, name, role, creation date, and last login date.
+ * Only admins have access to this endpoint.
+ * @path /api/users
+ * @response 200 {
+ *   "type": "array",
+ *   "items": {
+ *     "type": "object",
+ *     "properties": {
+ *       "id": { "type": "string" },
+ *       "email": { "type": "string" },
+ *       "name": { "type": "string" },
+ *       "role": { "type": "string" },
+ *       "createdAt": { "type": "string", "format": "date-time" },
+ *       "lastLoginAt": { "type": "string", "format": "date-time" }
+ *     }
+ *   }
+ * }
+ * @error 401 Unauthorized - User not authorized to access this endpoint
+ * @error 500 An unexpected error occurred while fetching users
+ */
 export async function GET() {
     try {
         const user = await validateAuthAndGetUser();
@@ -63,6 +85,32 @@ export async function GET() {
     }
 }
 
+/**
+ * @method POST
+ * @description Creates an invitation link for user registration.
+ * Only admins have access to this endpoint.
+ * @path /api/invitations
+ * @request {json}
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "message": { "type": "string" },
+ *     "invitation": {
+ *       "type": "object",
+ *       "properties": {
+ *         "id": { "type": "string" },
+ *         "email": { "type": "string" },
+ *         "role": { "type": "string" },
+ *         "expiresAt": { "type": "string", "format": "date-time" },
+ *         "url": { "type": "string" }
+ *       }
+ *     }
+ *   }
+ * }
+ * @error 400 Invalid input - Email or role is missing or invalid
+ * @error 400 An active invitation already exists for this email
+ * @error 500 An unexpected error occurred while creating the invitation link
+ */
 export async function POST(request: Request) {
     try {
         const user = await validateAuthAndGetUser();
@@ -77,6 +125,14 @@ export async function POST(request: Request) {
 
         const body = await request.json();
         const validatedData = createInvitationSchema.parse(body);
+
+        // Prevent inviting system emails
+        if (validatedData.email === 'api.key@changerawr.sys') {
+            return new NextResponse(
+                JSON.stringify({ error: 'Cannot invite system email addresses' }),
+                { status: 400 }
+            );
+        }
 
         // Check if user already exists
         const existingUser = await db.user.findUnique({
@@ -125,7 +181,7 @@ export async function POST(request: Request) {
             }
         });
 
-        // Generate the full invitation URL
+        // Create the full invitation URL
         const invitationUrl = `${process.env.NEXT_PUBLIC_APP_URL}/register/${token}`;
 
         // Create audit log for invitation creation

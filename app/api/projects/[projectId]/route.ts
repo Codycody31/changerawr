@@ -1,6 +1,39 @@
 import { db } from '@/lib/db'
 import { validateAuthAndGetUser } from '@/lib/utils/changelog'
 
+/**
+ * @method GET
+ * @description Fetches a specific project, including its changelog and tags
+ * @path {projectId}
+ * @query {}
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "id": { "type": "string" },
+ *     "name": { "type": "string" },
+ *     "createdAt": { "type": "string", "format": "date-time" },
+ *     "changelog": {
+ *       "type": "array",
+ *       "items": {
+ *         "type": "object",
+ *         "properties": {
+ *           "id": { "type": "string" },
+ *           "version": { "type": "string" },
+ *           "createdAt": { "type": "string", "format": "date-time" },
+ *           "tags": {
+ *             "type": "array",
+ *             "items": {
+ *               "type": "string"
+ *             }
+ *           }
+ *         }
+ *       }
+ *     }
+ *   }
+ * }
+ * @error 404 Project not found
+ * @error 500 An unexpected error occurred while fetching the project
+ */
 export async function GET(
     request: Request,
     { params }: { params: { projectId: string } }
@@ -37,6 +70,40 @@ export async function GET(
     }
 }
 
+/**
+ * @method PATCH
+ * @description Updates a specific project
+ * @path {projectId}
+ * @request {json}
+ * @query {}
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "id": { "type": "string" },
+ *     "name": { "type": "string" },
+ *     "createdAt": { "type": "string", "format": "date-time" },
+ *     "changelog": {
+ *       "type": "array",
+ *       "items": {
+ *         "type": "object",
+ *         "properties": {
+ *           "id": { "type": "string" },
+ *           "version": { "type": "string" },
+ *           "createdAt": { "type": "string", "format": "date-time" },
+ *           "tags": {
+ *             "type": "array",
+ *             "items": {
+ *               "type": "string"
+ *             }
+ *           }
+ *         }
+ *       }
+ *     }
+ *   }
+ * }
+ * @error 404 Project not found
+ * @error 500 An unexpected error occurred while updating the project
+ */
 export async function PATCH(
     request: Request,
     { params }: { params: { projectId: string } }
@@ -60,6 +127,15 @@ export async function PATCH(
     }
 }
 
+/**
+ * @method DELETE
+ * @description Deletes a specific project
+ * @path {projectId}
+ * @query {}
+ * @response 204
+ * @error 404 Project not found
+ * @error 500 An unexpected error occurred while deleting the project
+ */
 export async function DELETE(
     request: Request,
     { params }: { params: { projectId: string } }

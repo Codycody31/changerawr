@@ -2,6 +2,18 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { db } from '@/lib/db'
 
+/**
+ * @method POST
+ * @description Clears the access and refresh tokens, and optionally invalidates the refresh token in the database
+ * @path /api/logout
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "success": { "type": "boolean", "example": true }
+ *   }
+ * }
+ * @error 500 An unexpected error occurred while logging out
+ */
 export async function POST() {
     try {
         const cookieStore = await cookies()

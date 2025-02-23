@@ -2,6 +2,56 @@ import { NextResponse } from 'next/server'
 import { validateAuthAndGetUser } from '@/lib/utils/changelog'
 import { db } from '@/lib/db'
 
+/**
+ * @method GET
+ * @description Fetches the changelog entries for a given project
+ * @query {
+ *   projectId: String, required
+ *   search?: String, optional
+ *   tag?: String, optional
+ *   startDate?: String, optional
+ *   endDate?: String, optional
+ *   page?: Number, optional
+ *   limit?: Number, optional
+ * }
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "entries": {
+ *       "type": "array",
+ *       "items": {
+ *         "type": "object",
+ *         "properties": {
+ *           "id": { "type": "string" },
+ *           "title": { "type": "string" },
+ *           "content": { "type": "string" },
+ *           "version": { "type": "number" },
+ *           "createdAt": { "type": "string", "format": "date-time" },
+ *           "tags": {
+ *             "type": "array",
+ *             "items": {
+ *               "type": "object",
+ *               "properties": {
+ *                 "id": { "type": "string" },
+ *                 "name": { "type": "string" }
+ *               }
+ *             }
+ *           }
+ *         }
+ *       }
+ *     },
+ *     "pagination": {
+ *       "page": { "type": "number" },
+ *       "limit": { "type": "number" },
+ *       "total": { "type": "number" },
+ *       "totalPages": { "type": "number" }
+ *     }
+ *   }
+ * }
+ * @error 403 Unauthorized - User does not have 'ADMIN' role
+ * @error 404 Project not found
+ * @error 500 An unexpected error occurred while fetching the changelog entries
+ */
 export async function GET(
     request: Request,
     { params }: { params: Promise<{ projectId: string }> }
@@ -102,6 +152,60 @@ export async function GET(
     }
 }
 
+/**
+ * @method POST
+ * @description Creates a new changelog entry for a given project
+ * @query {
+ *   projectId: String, required
+ * }
+ * @body {
+ *   "type": "object",
+ *   "properties": {
+ *     "title": { "type": "string" },
+ *     "content": { "type": "string" },
+ *     "version": { "type": "number" },
+ *     "tags": {
+ *       "type": "array",
+ *       "items": {
+ *         "type": "object",
+ *         "properties": {
+ *           "id": { "type": "string" },
+ *           "name": { "type": "string" }
+ *         }
+ *       }
+ *     }
+ *   },
+ *   "required": [
+ *     "title",
+ *     "content",
+ *     "version",
+ *     "tags"
+ *   ]
+ * }
+ * @response 201 {
+ *   "type": "object",
+ *   "properties": {
+ *     "id": { "type": "string" },
+ *     "title": { "type": "string" },
+ *     "content": { "type": "string" },
+ *     "version": { "type": "number" },
+ *     "createdAt": { "type": "string", "format": "date-time" },
+ *     "tags": {
+ *       "type": "array",
+ *       "items": {
+ *         "type": "object",
+ *         "properties": {
+ *           "id": { "type": "string" },
+ *           "name": { "type": "string" }
+ *         }
+ *       }
+ *     }
+ *   }
+ * }
+ * @error 403 Unauthorized - User does not have 'ADMIN' role
+ * @error 404 Project not found
+ * @error 500 An unexpected error occurred while creating the changelog entry
+ */
 export async function POST(
     request: Request,
     { params }: { params: { projectId: string } }

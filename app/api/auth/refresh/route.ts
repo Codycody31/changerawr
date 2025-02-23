@@ -2,7 +2,31 @@ import { NextResponse } from 'next/server'
 import { refreshAccessToken } from '@/lib/auth/tokens'
 import { cookies } from 'next/headers'
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+/**
+ * @method POST
+ * @description Refreshes the access token by providing a valid refresh token
+ * @path /api/token/refresh
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "user": {
+ *       "type": "object",
+ *       "properties": {
+ *         "id": { "type": "string" },
+ *         "name": { "type": "string" },
+ *         "email": { "type": "string" },
+ *         "role": { "type": "string" },
+ *         "createdAt": { "type": "string", "format": "date-time" }
+ *       }
+ *     },
+ *     "accessToken": { "type": "string" },
+ *     "refreshToken": { "type": "string" }
+ *   }
+ * }
+ * @error 400 Invalid or expired refresh token
+ * @error 401 Unauthorized - No refresh token provided
+ * @error 500 An unexpected error occurred while refreshing the token
+ */
 export async function POST(request: Request) {
     try {
         const cookieStore = await cookies()

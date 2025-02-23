@@ -11,6 +11,22 @@ const systemConfigSchema = z.object({
     enableNotifications: z.boolean(),
 })
 
+/**
+ * @method GET
+ * @description Fetches the system configuration for the authenticated user
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "defaultInvitationExpiry": { "type": "number" },
+ *     "requireApprovalForChangelogs": { "type": "boolean" },
+ *     "maxChangelogEntriesPerProject": { "type": "number" },
+ *     "enableAnalytics": { "type": "boolean" },
+ *     "enableNotifications": { "type": "boolean" }
+ *   }
+ * }
+ * @error 403 Unauthorized - User does not have 'ADMIN' role
+ * @error 500 An unexpected error occurred while fetching system configuration
+ */
 export async function GET() {
     try {
         const user = await validateAuthAndGetUser()
@@ -45,6 +61,40 @@ export async function GET() {
     }
 }
 
+/**
+ * @method PATCH
+ * @description Updates the system configuration for the authenticated user
+ * @body {
+ *   "type": "object",
+ *   "properties": {
+ *     "defaultInvitationExpiry": { "type": "number" },
+ *     "requireApprovalForChangelogs": { "type": "boolean" },
+ *     "maxChangelogEntriesPerProject": { "type": "number" },
+ *     "enableAnalytics": { "type": "boolean" },
+ *     "enableNotifications": { "type": "boolean" }
+ *   },
+ *   "required": [
+ *     "defaultInvitationExpiry",
+ *     "requireApprovalForChangelogs",
+ *     "maxChangelogEntriesPerProject",
+ *     "enableAnalytics",
+ *     "enableNotifications"
+ *   ]
+ * }
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "defaultInvitationExpiry": { "type": "number" },
+ *     "requireApprovalForChangelogs": { "type": "boolean" },
+ *     "maxChangelogEntriesPerProject": { "type": "number" },
+ *     "enableAnalytics": { "type": "boolean" },
+ *     "enableNotifications": { "type": "boolean" }
+ *   }
+ * }
+ * @error 403 Unauthorized - User does not have 'ADMIN' role
+ * @error 400 Invalid configuration data
+ * @error 500 An unexpected error occurred while updating system configuration
+ */
 export async function PATCH(request: Request) {
     try {
         const user = await validateAuthAndGetUser()

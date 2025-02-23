@@ -6,6 +6,41 @@ import { db } from "@/lib/db";
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
 
+/**
+ * Get a list of project tags
+ * @method GET
+ * @description Fetches a list of project tags along with pagination metadata. Users must be authenticated to access this endpoint.
+ * @queryParams {
+ *   page: The page number of the results, starting from 1. Defaults to 1.
+ *   limit: The number of results per page. Must be between 1 and 100. Defaults to 20.
+ *   search: A search query to filter tags by name. Case-insensitive.
+ * }
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "tags": {
+ *       "type": "array",
+ *       "items": {
+ *         "type": "object",
+ *         "properties": {
+ *           "id": { "type": "string" },
+ *           "name": { "type": "string" },
+ *         }
+ *       }
+ *     },
+ *     "pagination": {
+ *       "type": "object",
+ *       "properties": {
+ *         "page": { "type": "number" },
+ *         "limit": { "type": "number" },
+ *         "totalCount": { "type": "number" },
+ *         "totalPages": { "type": "number" },
+ *         "hasMore": { "type": "boolean" }
+ *       }
+ *     }
+ *   }
+ * }
+ */
 export async function GET(
     request: Request,
     { params }: { params: { projectId: string } }

@@ -23,6 +23,95 @@ async function getProjectIdFromEntry(entryId: string) {
     return entry?.changelog?.projectId;
 }
 
+/**
+ * @method PUT
+ * @description Updates a changelog entry by its ID. Only authorized users with role 'STAFF' or 'ADMIN' can update an entry.
+ * @body {
+ *   "type": "object",
+ *   "required": ["title", "content", "version"],
+ *   "properties": {
+ *     "title": { "type": "string", "example": "New feature: dark mode" },
+ *     "content": { "type": "string", "example": "The app now has a dark mode option." },
+ *     "version": { "type": "string", "example": "1.0.1" },
+ *     "tags": {
+ *       "type": "array",
+ *       "items": {
+ *         "type": "string",
+ *         "example": "feature"
+ *       }
+ *     }
+ *   }
+ * }
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "data": {
+ *       "type": "object",
+ *       "properties": {
+ *         "id": { "type": "string" },
+ *         "title": { "type": "string" },
+ *         "content": { "type": "string" },
+ *         "version": { "type": "string" },
+ *         "tags": {
+ *           "type": "array",
+ *           "items": {
+ *             "type": "object",
+ *             "properties": {
+ *               "id": { "type": "string" },
+ *               "name": { "type": "string" }
+ *             }
+ *           }
+ *         }
+ *       }
+ *     }
+ *   }
+ * }
+ * @error 400 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": {
+ *       "type": "string",
+ *       "example": "Invalid request data"
+ *     }
+ *   }
+ * }
+ * @error 401 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": {
+ *       "type": "string",
+ *       "example": "Unauthorized"
+ *     }
+ *   }
+ * }
+ * @error 403 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": {
+ *       "type": "string",
+ *       "example": "Forbidden"
+ *     }
+ *   }
+ * }
+ * @error 404 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": {
+ *       "type": "string",
+ *       "example": "Changelog entry not found"
+ *     }
+ *   }
+ * }
+ * @error 500 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": {
+ *       "type": "string",
+ *       "example": "Internal server error"
+ *     }
+ *   }
+ * }
+ */
 export async function PUT(
     request: Request,
     { params }: { params: { entryId: string } }
@@ -66,6 +155,69 @@ export async function PUT(
     }
 }
 
+/**
+ * @method DELETE
+ * @description Deletes a changelog entry by its ID. Only authorized users with role 'ADMIN' can delete an entry.
+ * @body {
+ *   "type": "null"
+ * }
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "data": {
+ *       "type": "object",
+ *       "properties": {
+ *         "id": { "type": "string" }
+ *       }
+ *     }
+ *   }
+ * }
+ * @error 400 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": {
+ *       "type": "string",
+ *       "example": "Invalid request data"
+ *     }
+ *   }
+ * }
+ * @error 401 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": {
+ *       "type": "string",
+ *       "example": "Unauthorized"
+ *     }
+ *   }
+ * }
+ * @error 403 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": {
+ *       "type": "string",
+ *       "example": "Forbidden"
+ *     }
+ *   }
+ * }
+ * @error 404 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": {
+ *       "type": "string",
+ *       "example": "Changelog entry not found"
+ *     }
+ *   }
+ * }
+ * @error 500 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": {
+ *       "type": "string",
+ *       "example": "Internal server error"
+ *     }
+ *   }
+ * }
+ */
 export async function DELETE(
     request: Request,
     { params }: { params: { entryId: string } }

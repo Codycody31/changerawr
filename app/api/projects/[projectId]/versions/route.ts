@@ -2,10 +2,23 @@ import { NextResponse } from 'next/server'
 import { validateAuthAndGetUser } from '@/lib/utils/changelog'
 import { db } from '@/lib/db'
 
-export async function GET(
-    request: Request,
-    context: { params: { projectId: string } }
-) {
+/**
+ * @method GET
+ * @description Fetches the versions of a given project
+ * @query {
+ *   projectId: String, required
+ * }
+ * @response 200 {
+ *   "type": "array",
+ *   "items": {
+ *     "type": "number"
+ *   }
+ * }
+ * @error 400 Invalid request data
+ * @error 403 Unauthorized - User does not have 'ADMIN' role
+ * @error 500 An unexpected error occurred while fetching the versions
+ */
+export async function GET(request: Request, context: { params: { projectId: string } }) {
     try {
         await validateAuthAndGetUser();
         const { projectId } = await (async () => context.params)();

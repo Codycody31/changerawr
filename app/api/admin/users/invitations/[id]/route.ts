@@ -3,6 +3,46 @@ import { NextResponse } from "next/server";
 import { createAuditLog } from "@/lib/utils/auditLog";
 import { db } from "@/lib/db";
 
+/**
+ * Revoke an invitation
+ * @method DELETE
+ * @description Revokes an invitation by marking it as used. Only admins have the permission to revoke invitations.
+ * @queryParams { id: string } - The invitation ID to be revoked.
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "message": { "type": "string" },
+ *     "invitation": {
+ *       "type": "object",
+ *       "properties": {
+ *         "id": { "type": "string" },
+ *         "email": { "type": "string" },
+ *         "role": { "type": "string" },
+ *         "expiresAt": { "type": "string", "format": "date-time" },
+ *         "usedAt": { "type": "string", "format": "date-time" }
+ *       }
+ *     }
+ *   }
+ * }
+ * @error 403 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": { "type": "string" }
+ *   }
+ * }
+ * @error 404 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": { "type": "string" }
+ *   }
+ * }
+ * @error 500 {
+ *   "type": "object",
+ *   "properties": {
+ *     "error": { "type": "string" }
+ *   }
+ * }
+ */
 export async function DELETE(
     request: Request,
     { params }: { params: { id: string } }

@@ -9,6 +9,53 @@ interface ProjectPreview {
     changelogCount: number
 }
 
+/**
+ * @method GET
+ * @description Retrieves dashboard statistics for the authenticated user, including recent projects, total project and changelog counts, and recent activity
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "projectPreviews": {
+ *       "type": "array",
+ *       "items": {
+ *         "type": "object",
+ *         "properties": {
+ *           "id": { "type": "string" },
+ *           "name": { "type": "string" },
+ *           "lastUpdated": { "type": "string", "format": "date-time" },
+ *           "changelogCount": { "type": "number" }
+ *         }
+ *       }
+ *     },
+ *     "totalProjects": { "type": "number" },
+ *     "totalChangelogs": { "type": "number" },
+ *     "recentActivity": {
+ *       "type": "array",
+ *       "items": {
+ *         "type": "object",
+ *         "properties": {
+ *           "id": { "type": "string" },
+ *           "type": { "type": "string", "enum": ["CHANGELOG_ENTRY"] },
+ *           "message": { "type": "string" },
+ *           "timestamp": { "type": "string", "format": "date-time" },
+ *           "projectId": { "type": "string" },
+ *           "projectName": { "type": "string" },
+ *           "updatedAt": { "type": "string", "format": "date-time" }
+ *         }
+ *       }
+ *     },
+ *     "adminStats": {
+ *       "type": "object",
+ *       "properties": {
+ *         "pendingApprovals": { "type": "number" }
+ *       },
+ *       "additionalProperties": false
+ *     }
+ *   }
+ * }
+ * @error 401 Unauthorized - User not authenticated
+ * @error 500 An unexpected error occurred while fetching dashboard statistics
+ */
 export async function GET() {
     try {
         const user = await validateAuthAndGetUser()
