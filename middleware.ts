@@ -12,7 +12,9 @@ const PUBLIC_PATHS = [
     '/api/setup/status', // Allow setup status check
     '/_next',
     '/favicon.ico',
-    '/public'
+    '/public',
+    '/widget.css',
+    '/widget-bundle.js'
 ]
 
 // Routes that should redirect to /dashboard if authenticated
@@ -39,6 +41,11 @@ export async function middleware(request: NextRequest) {
 
     // Always allow public changelog routes
     if (pathname.startsWith('/changelog/')) {
+        return NextResponse.next()
+    }
+
+    // Always allow public experiment routes
+    if (pathname.startsWith('/experiments/')) {
         return NextResponse.next()
     }
 
