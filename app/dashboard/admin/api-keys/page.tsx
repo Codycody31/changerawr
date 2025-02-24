@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, {useState} from 'react';
+import {useQuery, useMutation, useQueryClient} from '@tanstack/react-query';
 import {
     Card,
     CardContent,
@@ -9,7 +9,7 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import {Button} from '@/components/ui/button';
 import {
     Table,
     TableBody,
@@ -38,13 +38,14 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Skeleton } from '@/components/ui/skeleton';
-import { toast } from '@/hooks/use-toast';
-import { Key, Plus, Trash2, Ban, Pencil, Copy } from 'lucide-react';
-import { format } from 'date-fns';
-import { motion, AnimatePresence } from 'framer-motion';
+import {Input} from '@/components/ui/input';
+import {Label} from '@/components/ui/label';
+import {Skeleton} from '@/components/ui/skeleton';
+import {toast} from '@/hooks/use-toast';
+import {Key, Plus, Trash2, Ban, Pencil, Copy, FileText} from 'lucide-react';
+import {format} from 'date-fns';
+import {motion, AnimatePresence} from 'framer-motion';
+import Link from 'next/link';
 
 interface ApiKey {
     id: string;
@@ -137,7 +138,7 @@ export default function ApiKeysPage() {
     const [newKeyData, setNewKeyData] = useState<{ key: string; id: string } | null>(null);
     const [renameKey, setRenameKey] = useState<ApiKey | null>(null);
 
-    const { data: apiKeys, isLoading } = useQuery<ApiKey[]>({
+    const {data: apiKeys, isLoading} = useQuery<ApiKey[]>({
         queryKey: ['api-keys'],
         queryFn: async () => {
             const response = await fetch('/api/admin/api-keys');
@@ -152,8 +153,8 @@ export default function ApiKeysPage() {
         mutationFn: async (name: string) => {
             const response = await fetch('/api/admin/api-keys', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name }),
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name}),
             });
             if (!response.ok) throw new Error('Failed to create API key');
             return response.json();
@@ -162,7 +163,7 @@ export default function ApiKeysPage() {
             queryClient.setQueryData(['api-keys'], (old: ApiKey[] | undefined) => {
                 return old ? [...old, data] : [data];
             });
-            setNewKeyData({ key: data.key, id: data.id });
+            setNewKeyData({key: data.key, id: data.id});
             toast({
                 title: 'API Key Created',
                 description: 'The new API key has been created successfully.',
@@ -171,26 +172,26 @@ export default function ApiKeysPage() {
     });
 
     const renameApiKey = useMutation({
-        mutationFn: async ({ id, name }: { id: string; name: string }) => {
+        mutationFn: async ({id, name}: { id: string; name: string }) => {
             const response = await fetch(`/api/admin/api-keys/${id}`, {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name }),
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name}),
             });
             if (!response.ok) throw new Error('Failed to rename API key');
             return response.json();
         },
-        onMutate: async ({ id, name }) => {
-            await queryClient.cancelQueries({ queryKey: ['api-keys'] });
+        onMutate: async ({id, name}) => {
+            await queryClient.cancelQueries({queryKey: ['api-keys']});
             const previousKeys = queryClient.getQueryData(['api-keys']);
 
             queryClient.setQueryData(['api-keys'], (old: ApiKey[] | undefined) => {
                 return old?.map(key =>
-                    key.id === id ? { ...key, name } : key
+                    key.id === id ? {...key, name} : key
                 );
             });
 
-            return { previousKeys };
+            return {previousKeys};
         },
         onError: (err, variables, context) => {
             if (context?.previousKeys) {
@@ -198,7 +199,7 @@ export default function ApiKeysPage() {
             }
         },
         onSettled: () => {
-            queryClient.invalidateQueries({ queryKey: ['api-keys'] });
+            queryClient.invalidateQueries({queryKey: ['api-keys']});
         },
     });
 
@@ -206,23 +207,23 @@ export default function ApiKeysPage() {
         mutationFn: async (id: string) => {
             const response = await fetch(`/api/admin/api-keys/${id}`, {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ isRevoked: true }),
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({isRevoked: true}),
             });
             if (!response.ok) throw new Error('Failed to revoke API key');
             return response.json();
         },
         onMutate: async (id) => {
-            await queryClient.cancelQueries({ queryKey: ['api-keys'] });
+            await queryClient.cancelQueries({queryKey: ['api-keys']});
             const previousKeys = queryClient.getQueryData(['api-keys']);
 
             queryClient.setQueryData(['api-keys'], (old: ApiKey[] | undefined) => {
                 return old?.map(key =>
-                    key.id === id ? { ...key, isRevoked: true } : key
+                    key.id === id ? {...key, isRevoked: true} : key
                 );
             });
 
-            return { previousKeys };
+            return {previousKeys};
         },
         onError: (err, id, context) => {
             if (context?.previousKeys) {
@@ -230,7 +231,7 @@ export default function ApiKeysPage() {
             }
         },
         onSettled: () => {
-            queryClient.invalidateQueries({ queryKey: ['api-keys'] });
+            queryClient.invalidateQueries({queryKey: ['api-keys']});
         },
     });
 
@@ -242,14 +243,14 @@ export default function ApiKeysPage() {
             if (!response.ok) throw new Error('Failed to delete API key');
         },
         onMutate: async (id) => {
-            await queryClient.cancelQueries({ queryKey: ['api-keys'] });
+            await queryClient.cancelQueries({queryKey: ['api-keys']});
             const previousKeys = queryClient.getQueryData(['api-keys']);
 
             queryClient.setQueryData(['api-keys'], (old: ApiKey[] | undefined) => {
                 return old?.filter(key => key.id !== id);
             });
 
-            return { previousKeys };
+            return {previousKeys};
         },
         onError: (err, id, context) => {
             if (context?.previousKeys) {
@@ -257,7 +258,7 @@ export default function ApiKeysPage() {
             }
         },
         onSettled: () => {
-            queryClient.invalidateQueries({ queryKey: ['api-keys'] });
+            queryClient.invalidateQueries({queryKey: ['api-keys']});
         },
     });
 
@@ -281,24 +282,24 @@ export default function ApiKeysPage() {
     if (isLoading) {
         return (
             <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
+                initial={{opacity: 0}}
+                animate={{opacity: 1}}
                 className="space-y-6"
             >
                 <Card>
                     <CardHeader>
                         <div className="flex items-center justify-between">
                             <div>
-                                <Skeleton className="h-8 w-32" />
-                                <Skeleton className="h-4 w-64 mt-2" />
+                                <Skeleton className="h-8 w-32"/>
+                                <Skeleton className="h-4 w-64 mt-2"/>
                             </div>
-                            <Skeleton className="h-10 w-24" />
+                            <Skeleton className="h-10 w-24"/>
                         </div>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
                             {[1, 2, 3].map((i) => (
-                                <Skeleton key={i} className="h-16 w-full" />
+                                <Skeleton key={i} className="h-16 w-full"/>
                             ))}
                         </div>
                     </CardContent>
@@ -309,8 +310,8 @@ export default function ApiKeysPage() {
 
     return (
         <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{opacity: 0, y: 20}}
+            animate={{opacity: 1, y: 0}}
             className="space-y-6"
         >
             <Card>
@@ -322,49 +323,57 @@ export default function ApiKeysPage() {
                                 Manage API keys for accessing the Changerawr API.
                             </CardDescription>
                         </div>
-                        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                            <DialogTrigger asChild>
-                                <Button>
-                                    <Plus className="h-4 w-4 mr-2" />
-                                    Create Key
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>Create New API Key</DialogTitle>
-                                    <DialogDescription>
-                                        Give your API key a name to help you identify its use.
-                                    </DialogDescription>
-                                </DialogHeader>
-                                <form onSubmit={handleCreateKey}>
-                                    <div className="grid gap-4 py-4">
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="name">API Key Name</Label>
-                                            <Input
-                                                id="name"
-                                                value={newKeyName}
-                                                onChange={(e) => setNewKeyName(e.target.value)}
-                                                placeholder="e.g., Production API Key"
-                                            />
+                        <div className="flex items-center gap-2">
+                            <Button variant="outline" asChild>
+                                <Link href="/api-docs">
+                                    <FileText className="h-4 w-4 mr-2"/>
+                                    API Docs
+                                </Link>
+                            </Button>
+                            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                                <DialogTrigger asChild>
+                                    <Button>
+                                        <Plus className="h-4 w-4 mr-2"/>
+                                        Create Key
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>Create New API Key</DialogTitle>
+                                        <DialogDescription>
+                                            Give your API key a name to help you identify its use.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <form onSubmit={handleCreateKey}>
+                                        <div className="grid gap-4 py-4">
+                                            <div className="grid gap-2">
+                                                <Label htmlFor="name">API Key Name</Label>
+                                                <Input
+                                                    id="name"
+                                                    value={newKeyName}
+                                                    onChange={(e) => setNewKeyName(e.target.value)}
+                                                    placeholder="e.g., Production API Key"
+                                                />
+                                            </div>
                                         </div>
-                                    </div>
-                                    <DialogFooter>
-                                        <Button type="submit" disabled={!newKeyName.trim()}>
-                                            Create Key
-                                        </Button>
-                                    </DialogFooter>
-                                </form>
-                            </DialogContent>
-                        </Dialog>
+                                        <DialogFooter>
+                                            <Button type="submit" disabled={!newKeyName.trim()}>
+                                                Create Key
+                                            </Button>
+                                        </DialogFooter>
+                                    </form>
+                                </DialogContent>
+                            </Dialog>
+                        </div>
                     </div>
                 </CardHeader>
                 <CardContent>
                     <AnimatePresence>
                         {newKeyData && (
                             <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: 'auto' }}
-                                exit={{ opacity: 0, height: 0 }}
+                                initial={{opacity: 0, height: 0}}
+                                animate={{opacity: 1, height: 'auto'}}
+                                exit={{opacity: 0, height: 0}}
                                 className="mb-6 p-4 bg-yellow-900 border border-yellow-700 rounded-lg"
                             >
                                 <div className="flex flex-col space-y-2">
@@ -372,7 +381,8 @@ export default function ApiKeysPage() {
                                     <p className="text-sm text-yellow-200">
                                         Make sure to copy your API key now. You won&apos;t be able to see it again!
                                     </p>
-                                    <div className="flex items-center gap-2 p-2 bg-yellow-800 border border-yellow-700 rounded">
+                                    <div
+                                        className="flex items-center gap-2 p-2 bg-yellow-800 border border-yellow-700 rounded">
                                         <code className="flex-1 font-mono text-sm text-yellow-100">
                                             {newKeyData.key}
                                         </code>
@@ -382,7 +392,7 @@ export default function ApiKeysPage() {
                                             onClick={() => handleCopyKey(newKeyData.key)}
                                             className="text-yellow-300 hover:text-yellow-400"
                                         >
-                                            <Copy className="h-4 w-4" />
+                                            <Copy className="h-4 w-4"/>
                                         </Button>
                                     </div>
                                     <Button
@@ -439,7 +449,7 @@ export default function ApiKeysPage() {
                                                         onClick={() => setRenameKey(key)}
                                                         className="text-blue-600 hover:text-blue-700"
                                                     >
-                                                        <Pencil className="h-4 w-4" />
+                                                        <Pencil className="h-4 w-4"/>
                                                     </Button>
                                                     <AlertDialog>
                                                         <AlertDialogTrigger asChild>
@@ -448,15 +458,17 @@ export default function ApiKeysPage() {
                                                                 size="sm"
                                                                 className="text-red-600 hover:text-red-700"
                                                             >
-                                                                <Ban className="h-4 w-4" />
+                                                                <Ban className="h-4 w-4"/>
                                                             </Button>
                                                         </AlertDialogTrigger>
                                                         <AlertDialogContent>
                                                             <AlertDialogHeader>
                                                                 <AlertDialogTitle>Revoke API Key</AlertDialogTitle>
                                                                 <AlertDialogDescription>
-                                                                    Are you sure you want to revoke &ldquo;{key.name}&rdquo;?
-                                                                    This will immediately prevent any further use of this key.
+                                                                    Are you sure you want to
+                                                                    revoke &ldquo;{key.name}&rdquo;?
+                                                                    This will immediately prevent any further use of
+                                                                    this key.
                                                                 </AlertDialogDescription>
                                                             </AlertDialogHeader>
                                                             <AlertDialogFooter>
@@ -480,14 +492,15 @@ export default function ApiKeysPage() {
                                                             size="sm"
                                                             className="text-red-600 hover:text-red-700"
                                                         >
-                                                            <Trash2 className="h-4 w-4" />
+                                                            <Trash2 className="h-4 w-4"/>
                                                         </Button>
                                                     </AlertDialogTrigger>
                                                     <AlertDialogContent>
                                                         <AlertDialogHeader>
                                                             <AlertDialogTitle>Delete API Key</AlertDialogTitle>
                                                             <AlertDialogDescription>
-                                                                Are you sure you want to permanently delete &ldquo;{key.name}&rdquo;?
+                                                                Are you sure you want to permanently
+                                                                delete &ldquo;{key.name}&rdquo;?
                                                                 This action cannot be undone.
                                                             </AlertDialogDescription>
                                                         </AlertDialogHeader>
@@ -511,7 +524,7 @@ export default function ApiKeysPage() {
                                 <TableRow>
                                     <TableCell colSpan={5} className="h-32 text-center">
                                         <div className="flex flex-col items-center justify-center">
-                                            <Key className="h-12 w-12 text-muted-foreground mb-4" />
+                                            <Key className="h-12 w-12 text-muted-foreground mb-4"/>
                                             <h3 className="font-medium mb-1">No API Keys</h3>
                                             <p className="text-sm text-muted-foreground mb-4">
                                                 Create an API key to get started with the Changerawr API.
@@ -520,7 +533,7 @@ export default function ApiKeysPage() {
                                                 onClick={() => setIsCreateDialogOpen(true)}
                                                 size="sm"
                                             >
-                                                <Plus className="h-4 w-4 mr-2" />
+                                                <Plus className="h-4 w-4 mr-2"/>
                                                 Create Key
                                             </Button>
                                         </div>
@@ -538,7 +551,7 @@ export default function ApiKeysPage() {
                 currentName={renameKey?.name ?? ''}
                 onRename={async (newName) => {
                     if (!renameKey) return;
-                    await renameApiKey.mutateAsync({ id: renameKey.id, name: newName });
+                    await renameApiKey.mutateAsync({id: renameKey.id, name: newName});
                 }}
             />
         </motion.div>
