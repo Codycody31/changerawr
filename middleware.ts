@@ -1,3 +1,4 @@
+// middleware.ts
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { verifyAccessToken } from '@/lib/auth/tokens'
@@ -9,7 +10,11 @@ const PUBLIC_PATHS = [
     '/api/auth/login',
     '/api/auth/refresh',
     '/api/auth/preview',
-    '/api/setup/status', // Allow setup status check
+    '/api/auth/oauth/providers',
+    '/api/auth/oauth/authorize',
+    '/api/auth/oauth/callback',
+    '/api/setup/status',
+    '/api/check-setup', // Dedicated route for setup checks
     '/_next',
     '/favicon.ico',
     '/public',
@@ -20,19 +25,37 @@ const PUBLIC_PATHS = [
 // Routes that should redirect to /dashboard if authenticated
 const AUTH_ROUTES = ['/login', '/register', '/setup']
 
-async function checkSetupStatus(): Promise<boolean> {
+// Separate setup check function
+async function isSetupComplete(request: NextRequest): Promise<boolean> {
+    // Use a special header to prevent circular requests
+    const headers = new Headers({
+        'x-middleware-check': 'true'
+    });
+
     try {
-        const response = await fetch('http://localhost:3000/api/setup/status')
-        const data = await response.json()
-        return data.isComplete
+        // Use absolute URL to ensure we're hitting the correct endpoint
+        const baseUrl = request.nextUrl.origin;
+        const response = await fetch(`${baseUrl}/api/check-setup`, { headers });
+
+        if (!response.ok) {
+            return false;
+        }
+
+        const data = await response.json();
+        return !!data.isComplete;
     } catch (error) {
-        console.error('Setup status check failed:', error)
-        return false
+        console.error('Setup check failed:', error);
+        return false; // Default to showing setup page on error
     }
 }
 
 export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl
+
+    // Skip middleware for the setup check endpoint to avoid recursion
+    if (pathname === '/api/check-setup') {
+        return NextResponse.next();
+    }
 
     // Always allow API routes
     if (pathname.startsWith('/api/')) {
@@ -56,9 +79,9 @@ export async function middleware(request: NextRequest) {
 
     // Special handling for setup route
     if (pathname === '/setup') {
-        const isSetupComplete = await checkSetupStatus()
+        const setupComplete = await isSetupComplete(request);
 
-        if (isSetupComplete) {
+        if (setupComplete) {
             // If setup is complete, redirect to login
             return NextResponse.redirect(new URL('/login', request.url))
         }
@@ -88,8 +111,9 @@ export async function middleware(request: NextRequest) {
 
     // For non-setup routes, check if setup is complete
     if (pathname !== '/setup') {
-        const isSetupComplete = await checkSetupStatus()
-        if (!isSetupComplete) {
+        const setupComplete = await isSetupComplete(request);
+
+        if (!setupComplete) {
             // Redirect to setup if system is not initialized
             return NextResponse.redirect(new URL('/setup', request.url))
         }

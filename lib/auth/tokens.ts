@@ -8,30 +8,41 @@ const ACCESS_SECRET = new TextEncoder().encode(
 )
 
 export async function generateTokens(userId: string) {
-    // Generate access token (short-lived - 15 minutes)
-    const accessToken = await new SignJWT({ userId })
-        .setProtectedHeader({ alg: 'HS256' })
-        .setExpirationTime('15m')
-        .setIssuedAt()
-        .sign(ACCESS_SECRET)
+    console.log(`Generating tokens for user: ${userId}`);
 
-    // Generate refresh token (long-lived - 7 days)
-    const refreshToken = nanoid(64)
-    const expiresAt = new Date()
-    expiresAt.setDate(expiresAt.getDate() + 7)
+    try {
+        // Generate access token (short-lived - 15 minutes)
+        const accessToken = await new SignJWT({ userId })
+            .setProtectedHeader({ alg: 'HS256' })
+            .setExpirationTime('15m')
+            .setIssuedAt()
+            .sign(ACCESS_SECRET);
 
-    // Store refresh token in database
-    await db.refreshToken.create({
-        data: {
-            userId,
-            token: refreshToken,
-            expiresAt,
-        },
-    })
+        console.log('Access token generated successfully');
 
-    return {
-        accessToken,
-        refreshToken
+        // Generate refresh token (long-lived - 7 days)
+        const refreshToken = nanoid(64);
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 7);
+
+        // Store refresh token in database
+        await db.refreshToken.create({
+            data: {
+                userId,
+                token: refreshToken,
+                expiresAt,
+            },
+        });
+
+        console.log('Refresh token created and stored in database');
+
+        return {
+            accessToken,
+            refreshToken
+        };
+    } catch (error) {
+        console.error('Token generation error:', error);
+        throw error;
     }
 }
 

@@ -10,6 +10,7 @@ import {
     ClipboardCheck,
     FileText,
     Folder,
+    Fingerprint,
     Key,
     LayoutGrid,
     Loader2,
@@ -61,6 +62,12 @@ const NAV_SECTIONS = [
                 href: "/dashboard/admin/users",
                 label: "User Management",
                 icon: Users,
+                requiredRole: ['ADMIN']
+            },
+            {
+                href: "/dashboard/admin/oauth",
+                label: "OAuth Providers",
+                icon: Fingerprint,
                 requiredRole: ['ADMIN']
             },
             {

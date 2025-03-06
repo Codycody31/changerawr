@@ -21,12 +21,15 @@ export async function GET() {
 
         return NextResponse.json({
             isComplete: userCount > 0,
-        })
+        }, { status: 200 })
     } catch (error) {
         console.error('Setup status check error:', error)
 
         return NextResponse.json(
-            { error: 'Failed to check setup status' },
+            {
+                error: 'Failed to check setup status',
+                isComplete: false
+            },
             { status: 500 }
         )
     }

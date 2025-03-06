@@ -8,7 +8,7 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import {Users, Key, Shield, Settings, FileText, ClipboardCheck} from 'lucide-react';
+import {Users, Key, Shield, Settings, FileText, ClipboardCheck, Fingerprint} from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
@@ -27,6 +27,13 @@ const tabs = [
         icon: Users,
         path: '/dashboard/admin/users',
         pattern: /^\/dashboard\/admin\/users/
+    },
+    {
+        id: 'oauth',
+        label: 'OAuth Providers',
+        icon: Fingerprint,
+        path: '/dashboard/admin/oauth',
+        pattern: /^\/dashboard\/admin\/oauth/
     },
     {
         id: 'api-keys',
