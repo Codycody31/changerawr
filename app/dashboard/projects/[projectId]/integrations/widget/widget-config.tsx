@@ -131,7 +131,7 @@ const CODE_EXAMPLES: CodeExample[] = [
             ].filter(Boolean).join('\n    ')
 
             return `${config.isPopup && config.theme === 'dark' ? '<div style="--theme: dark;">\n' : ''}${config.trigger ? `<button id="${config.trigger}">View Updates</button>\n` : ''}<script 
-    src="${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/widget/${config.projectId}"
+    src="${window.location.origin}/api/integrations/widget/${config.projectId}"
     ${attributes}
     async
 ></script>${config.isPopup && config.theme === 'dark' ? '\n</div>' : ''}`
@@ -154,7 +154,7 @@ const CODE_EXAMPLES: CodeExample[] = [
 export default function ChangelogWidget() {
     useEffect(() => {
         const script = document.createElement('script');
-        script.src = '${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/widget/${config.projectId}';
+        script.src = '${window.location.origin}/api/integrations/widget/${config.projectId}';
         script.async = true;
         ${attributes.map(attr => {
                 const [key, value] = attr.split('=');
@@ -194,7 +194,7 @@ import { onMounted, onUnmounted } from 'vue'
 
 const createChangelog = () => {
     const script = document.createElement('script')
-    script.src = '${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/widget/${config.projectId}'
+    script.src = '${window.location.origin}/api/integrations/widget/${config.projectId}'
     script.async = true
     ${attributes.map(attr => {
                 const [key, value] = attr.split('=');
@@ -249,7 +249,7 @@ func renderChangelog(w http.ResponseWriter, r *http.Request) {
         MaxHeight   string
         Trigger     string
     }{
-        WidgetSrc:   "${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/widget/${config.projectId}",
+        WidgetSrc:   "${window.location.origin}/api/integrations/widget/${config.projectId}",
         Popup:       ${config.isPopup},
         Theme:       "${config.theme}",
         Position:    "${config.position}",
@@ -283,7 +283,7 @@ func renderChangelog(w http.ResponseWriter, r *http.Request) {
 
     onMount(() => {
         script = document.createElement('script');
-        script.src = '${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/widget/${config.projectId}';
+        script.src = '${window.location.origin}/api/integrations/widget/${config.projectId}';
         script.async = true;
         ${attributes.map(attr => {
                 const [key, value] = attr.split('=');
@@ -327,7 +327,7 @@ export class ChangelogWidgetComponent implements OnInit, OnDestroy {
 
     ngOnInit() {
         this.script = document.createElement('script');
-        this.script.src = '${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/widget/${config.projectId}';
+        this.script.src = '${window.location.origin}/api/integrations/widget/${config.projectId}';
         this.script.async = true;
         ${attributes.map(attr => {
                 const [key, value] = attr.split('=');
