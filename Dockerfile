@@ -36,10 +36,13 @@ ENV NEXT_TELEMETRY_DISABLED 1
 COPY package.json package-lock.json* ./
 RUN npm install --legacy-peer-deps
 # Install Prisma client with exact version match
-RUN npm uninstall prisma @prisma/client
+RUN npm uninstall prisma @prisma/client --legacy-peer-deps
 RUN npm install prisma@6.3.1 @prisma/client@6.3.1 --legacy-peer-deps
 # Install tsx explicitly
 RUN npm install -g tsx
+
+# Install esbuild for widget
+RUN npm install esbuild --legacy-peer-deps
 
 # Install JSDOC
 RUN npm install -g jsdoc
@@ -48,7 +51,7 @@ RUN npm install -g jsdoc
 RUN apk add --no-cache bash
 
 # Copy necessary files and directories directly from the source
-COPY widget ./widget
+COPY widgets ./widgets
 COPY scripts ./scripts
 COPY prisma ./prisma
 COPY public ./public
