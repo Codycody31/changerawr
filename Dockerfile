@@ -52,6 +52,7 @@ COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/scripts ./scripts
+COPY --from=builder /app/widget ./widget
 COPY --from=builder /app/next.config.ts ./
 
 # Copy entry point script and make it executable

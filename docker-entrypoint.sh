@@ -9,9 +9,9 @@ npx prisma generate
 echo "Running database migrations..."
 npx prisma migrate deploy
 
-## Run the widget build script
-#echo "Building widget..."
-#npm run build:widget
+# Run the widget build script
+echo "Building widget..."
+npm run build:widget
 
 # Generate Swagger documentation
 echo "Generating Swagger documentation..."
