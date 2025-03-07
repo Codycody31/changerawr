@@ -32,11 +32,14 @@ WORKDIR /app
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
 
-# Install production dependencies only
+# Install all depdendencies to satisfy entrypoint requirements
 COPY package.json package-lock.json* ./
-RUN npm ci --only=production
+RUN npm install --legacy-peer-deps
 # Install Prisma client
 RUN npm install prisma
+
+# Install JSDOC
+RUN npm install -g jsdoc
 
 # Add bash for the entry script
 RUN apk add --no-cache bash
