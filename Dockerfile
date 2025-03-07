@@ -36,7 +36,7 @@ ENV NEXT_TELEMETRY_DISABLED 1
 COPY package.json package-lock.json* ./
 RUN npm install --legacy-peer-deps
 # Install Prisma client with exact version match
-RUN npm uninstall prisma @prisma/client
+RUN npm uninstall prisma @prisma/client --legacy-peer-deps
 RUN npm install prisma@6.3.1 @prisma/client@6.3.1 --legacy-peer-deps
 # Install tsx explicitly
 RUN npm install -g tsx
