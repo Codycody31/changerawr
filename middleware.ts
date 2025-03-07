@@ -34,7 +34,7 @@ async function isSetupComplete(request: NextRequest): Promise<boolean> {
 
     try {
         // Use absolute URL to ensure we're hitting the correct endpoint
-        const baseUrl = request.nextUrl.origin;
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL
         const response = await fetch(`${baseUrl}/api/check-setup`, { headers });
 
         if (!response.ok) {
