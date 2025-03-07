@@ -16,6 +16,12 @@ interface ChangelogEntriesProps {
     projectId: string
 }
 
+// Define the API response structure
+interface ChangelogApiResponse {
+    items: ChangelogEntry[];
+    nextCursor: string | null;
+}
+
 const container = {
     hidden: {opacity: 0},
     show: {
@@ -72,17 +78,18 @@ export default function ChangelogEntries({projectId}: ChangelogEntriesProps) {
     const containerRef = useRef<HTMLDivElement>(null)
     const [activeEntry, setActiveEntry] = useState<string | null>(null)
 
+    // Fix: Use proper options for useInView from framer-motion
     const isLoadMoreVisible = useInView(loadMoreRef, {
-        rootMargin: '200px',
+        margin: "200px 0px 0px 0px",
     })
 
     const {data, fetchNextPage, hasNextPage, isFetchingNextPage, status, error} =
         useInfiniteQuery({
             queryKey: ['changelog-entries', projectId],
-            queryFn: async ({pageParam = undefined}) => {
+            queryFn: async ({pageParam}): Promise<ChangelogApiResponse> => {
                 const searchParams = new URLSearchParams()
-                if (pageParam) {
-                    searchParams.set('cursor', pageParam)
+                if (pageParam !== undefined) {
+                    searchParams.set('cursor', String(pageParam))
                 }
                 const res = await fetch(
                     `/api/changelog/${projectId}/entries?${searchParams.toString()}`
@@ -93,8 +100,8 @@ export default function ChangelogEntries({projectId}: ChangelogEntriesProps) {
                 }
                 return res.json()
             },
-            getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-            initialPageSize: 10,
+            getNextPageParam: (lastPage: ChangelogApiResponse) => lastPage.nextCursor ?? undefined,
+            initialPageParam: undefined,
             refetchOnWindowFocus: false,
         })
 
@@ -144,6 +151,7 @@ export default function ChangelogEntries({projectId}: ChangelogEntriesProps) {
         return () => window.removeEventListener('scroll', handleScroll)
     }, [data?.pages])
 
+    // Fix: Use explicit type check instead of string comparison
     if (status === 'error') {
         return (
             <div className="text-center py-12">
@@ -154,7 +162,7 @@ export default function ChangelogEntries({projectId}: ChangelogEntriesProps) {
         )
     }
 
-    const isLoading = status === 'loading'
+    const isLoading = status === 'pending'
 
     return (
         <div ref={containerRef} className="relative min-h-[50vh]">
@@ -195,7 +203,7 @@ export default function ChangelogEntries({projectId}: ChangelogEntriesProps) {
                         <>
                             {data?.pages.map((page, pageIndex) => (
                                 <div key={pageIndex} className="space-y-16">
-                                    {page.items.map((entry: ChangelogEntry) => (
+                                    {(page as ChangelogApiResponse).items.map((entry: ChangelogEntry) => (
                                         <motion.div
                                             key={entry.id}
                                             variants={item}
@@ -242,10 +250,17 @@ export default function ChangelogEntries({projectId}: ChangelogEntriesProps) {
                                                                     className="flex items-center gap-2 text-muted-foreground">
                                                                     <Clock className="w-4 h-4"/>
                                                                     <time
-                                                                        dateTime={entry.publishedAt}
+                                                                        dateTime={typeof entry.publishedAt === 'string'
+                                                                            ? entry.publishedAt
+                                                                            : entry.publishedAt.toISOString()}
                                                                         className="text-sm tabular-nums"
                                                                     >
-                                                                        {format(new Date(entry.publishedAt), 'MMMM d, yyyy')}
+                                                                        {format(
+                                                                            typeof entry.publishedAt === 'string'
+                                                                                ? new Date(entry.publishedAt)
+                                                                                : entry.publishedAt,
+                                                                            'MMMM d, yyyy'
+                                                                        )}
                                                                     </time>
                                                                 </div>
                                                             )}
@@ -326,7 +341,7 @@ export default function ChangelogEntries({projectId}: ChangelogEntriesProps) {
                                         </div>
                                     ) : (
                                         data?.pages.map((page) =>
-                                            page.items.map((entry: ChangelogEntry) => (
+                                            (page as ChangelogApiResponse).items.map((entry: ChangelogEntry) => (
                                                 <motion.button
                                                     key={entry.id}
                                                     onClick={() => {

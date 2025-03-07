@@ -114,7 +114,7 @@ async function getProjectIdFromEntry(entryId: string) {
  */
 export async function PUT(
     request: Request,
-    { params }: { params: { entryId: string } }
+    { params }: { params: Promise<{ entryId: string }> }
 ) {
     try {
         const user = await validateAuthAndGetUser()
@@ -127,7 +127,7 @@ export async function PUT(
         const body: ChangelogEntryInput = changelogEntrySchema.parse(json)
 
         const entry = await db.changelogEntry.update({
-            where: { id: params.entryId },
+            where: { id: (await params).entryId },
             data: {
                 title: body.title,
                 content: body.content,
@@ -220,7 +220,7 @@ export async function PUT(
  */
 export async function DELETE(
     request: Request,
-    { params }: { params: { entryId: string } }
+    { params }: { params: Promise<{ entryId: string }> }
 ) {
     try {
         const user = await validateAuthAndGetUser()
@@ -230,7 +230,7 @@ export async function DELETE(
         }
 
         // Get the project ID from the changelog entry
-        const projectId = await getProjectIdFromEntry(params.entryId)
+        const projectId = await getProjectIdFromEntry((await params).entryId)
 
         if (!projectId) {
             return sendError('Changelog entry not found', 404)
@@ -243,7 +243,7 @@ export async function DELETE(
                     type: 'DELETE_ENTRY',
                     status: 'PENDING',
                     staffId: user.id,
-                    changelogEntryId: params.entryId,
+                    changelogEntryId: (await params).entryId,
                     projectId: projectId
                 }
             })
@@ -256,7 +256,7 @@ export async function DELETE(
 
         // If admin, delete directly
         const entry = await db.changelogEntry.delete({
-            where: { id: params.entryId }
+            where: { id: (await params).entryId }
         })
 
         return sendSuccess({

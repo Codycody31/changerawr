@@ -67,7 +67,7 @@ const updateRoleSchema = z.object({
  */
 export async function PATCH(
     request: NextRequest,
-    context: { params: { userId: string } }
+    context: { params: Promise<{ userId: string }> }
 ) {
     try {
         const currentUser = await validateAuthAndGetUser();
@@ -81,7 +81,7 @@ export async function PATCH(
         }
 
         // Validate user ID
-        const { userId } = context.params;
+        const { userId } = await context.params;
         if (!userId) {
             return NextResponse.json(
                 { error: 'User ID is required' },

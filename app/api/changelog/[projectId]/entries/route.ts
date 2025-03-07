@@ -53,7 +53,7 @@ const ITEMS_PER_PAGE = 10
  */
 export async function GET(
     request: Request,
-    context: { params: { projectId: string } }
+    context: { params: Promise<{ projectId: string }> }
 ) {
     return await (async () => {
         try {

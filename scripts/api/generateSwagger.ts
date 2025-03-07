@@ -8,11 +8,39 @@ import 'dotenv/config'
 import packageJson from "../../package.json";
 import ora from 'ora';
 
+// Define comment-parser types since they're not exported directly
+interface CommentTag {
+  tag: string;
+  name: string;
+  type: string;
+  optional: boolean;
+  description: string;
+  line: number;
+  source: string[];
+  problems: string[];
+}
+
+interface CommentBlock {
+  description: string;
+  tags: CommentTag[];
+  source: string[];
+  problems: string[];
+  line: number;
+}
+
+// Extended OpenAPI document type to support ReDoc extensions
+interface OpenAPIDocumentWithExtensions extends OpenAPIV3.Document {
+  'x-tagGroups'?: Array<{ name: string; tags: string[] }>;
+}
+
+// Extended PathItemObject to allow method string indexing
+type HttpMethod = 'get' | 'post' | 'put' | 'delete' | 'patch';
+
 interface SwaggerRoute {
   filePath: string;
   path: string;
-  method: string;
-  docs: any;
+  method: HttpMethod;
+  docs: CommentBlock;
   section: string;
 }
 
@@ -41,65 +69,82 @@ function pathToSectionTitle(path: string): string {
       .join(' ');
 }
 
-function parseSchema(schema: any): OpenAPIV3.SchemaObject {
+function parseSchema(schema: Record<string, unknown>): OpenAPIV3.SchemaObject {
   if (typeof schema !== 'object' || !schema) {
     return { type: 'object' };
   }
 
-  const result: OpenAPIV3.SchemaObject = {
-    type: schema.type || 'object'
-  };
+  const schemaType = schema.type as OpenAPIV3.SchemaObject['type'];
 
-  if (schema.description) {
-    result.description = schema.description;
-  }
+  if (schemaType === 'array') {
+    // Handle array type schema
+    const result: OpenAPIV3.ArraySchemaObject = {
+      type: 'array',
+      items: schema.items ? parseSchema(schema.items as Record<string, unknown>) : { type: 'object' }
+    };
 
-  if (schema.example) {
-    result.example = schema.example;
-  }
-
-  if (schema.enum) {
-    result.enum = schema.enum;
-  }
-
-  if (schema.format) {
-    result.format = schema.format;
-  }
-
-  if (schema.properties) {
-    result.properties = {};
-    for (const [key, value] of Object.entries(schema.properties)) {
-      result.properties[key] = parseSchema(value);
+    if (schema.description) {
+      result.description = schema.description as string;
     }
-  }
 
-  if (schema.items) {
-    result.items = parseSchema(schema.items);
-  }
+    if (schema.example) {
+      result.example = schema.example;
+    }
 
-  if (schema.required) {
-    result.required = schema.required;
-  }
+    return result;
+  } else {
+    // Handle non-array type schema
+    const result: OpenAPIV3.NonArraySchemaObject = {
+      type: schemaType as OpenAPIV3.NonArraySchemaObjectType || 'object'
+    };
 
-  if (schema.additionalProperties) {
-    result.additionalProperties = typeof schema.additionalProperties === 'object'
-        ? parseSchema(schema.additionalProperties)
-        : schema.additionalProperties;
-  }
+    if (schema.description) {
+      result.description = schema.description as string;
+    }
 
-  return result;
+    if (schema.example) {
+      result.example = schema.example;
+    }
+
+    if (schema.enum) {
+      result.enum = schema.enum as (string | number | boolean)[];
+    }
+
+    if (schema.format) {
+      result.format = schema.format as string;
+    }
+
+    if (schema.properties) {
+      result.properties = {};
+      for (const [key, value] of Object.entries(schema.properties as Record<string, unknown>)) {
+        result.properties[key] = parseSchema(value as Record<string, unknown>);
+      }
+    }
+
+    if (schema.required) {
+      result.required = schema.required as string[];
+    }
+
+    if (schema.additionalProperties) {
+      result.additionalProperties = typeof schema.additionalProperties === 'object'
+          ? parseSchema(schema.additionalProperties as Record<string, unknown>)
+          : schema.additionalProperties as boolean;
+    }
+
+    return result;
+  }
 }
 
-function tryParseJSON(str: string, defaultValue: any = undefined) {
+function tryParseJSON(str: string, defaultValue: unknown = undefined): unknown {
   try {
     if (typeof str === 'object') return str;
     return JSON.parse(str);
-  } catch (e) {
+  } catch {
     return defaultValue;
   }
 }
 
-function processRouteOperation(route: SwaggerRoute, routeDocs: any): OpenAPIV3.OperationObject {
+function processRouteOperation(route: SwaggerRoute, routeDocs: CommentBlock): OpenAPIV3.OperationObject {
   const operation: OpenAPIV3.OperationObject = {
     tags: [route.section],
     summary: '',
@@ -114,10 +159,10 @@ function processRouteOperation(route: SwaggerRoute, routeDocs: any): OpenAPIV3.O
   for (const tag of routeDocs.tags) {
     switch (tag.tag) {
       case 'summary':
-        operation.summary = tag.text;
+        operation.summary = tag.description;
         break;
       case 'description':
-        operation.description = tag.text;
+        operation.description = tag.description;
         break;
       case 'param':
         if (!operation.parameters) {
@@ -128,16 +173,16 @@ function processRouteOperation(route: SwaggerRoute, routeDocs: any): OpenAPIV3.O
                 tag.type.includes('header') ? 'header' : 'query';
 
         if (paramLocation === 'body') {
-          const schema = tryParseJSON(tag.description);
+          const schema = tryParseJSON(tag.description) as Record<string, unknown> | undefined;
           operation.requestBody = {
             required: !tag.optional,
             content: {
               'application/json': {
                 schema: schema ? parseSchema(schema) : {
-                  type: 'object',
+                  type: 'object' as const,
                   properties: {
                     [tag.name]: {
-                      type: tag.type.replace('body.', '').toLowerCase(),
+                      type: tag.type.replace('body.', '').toLowerCase() as OpenAPIV3.NonArraySchemaObjectType,
                       description: tag.description
                     }
                   }
@@ -148,23 +193,23 @@ function processRouteOperation(route: SwaggerRoute, routeDocs: any): OpenAPIV3.O
         } else {
           operation.parameters.push({
             name: tag.name,
-            in: paramLocation,
+            in: paramLocation as OpenAPIV3.ParameterObject['in'],
             description: tag.description,
             required: !tag.optional,
             schema: {
-              type: tag.type.toLowerCase().replace(`${paramLocation}.`, '')
+              type: tag.type.toLowerCase().replace(`${paramLocation}.`, '') as OpenAPIV3.NonArraySchemaObjectType
             }
           });
         }
         break;
       case 'body':
-        const bodySchema = tryParseJSON(tag.description);
+        const bodySchema = tryParseJSON(tag.description) as Record<string, unknown> | undefined;
         operation.requestBody = {
           required: true,
           content: {
             'application/json': {
               schema: bodySchema ? parseSchema(bodySchema) : {
-                type: 'object',
+                type: 'object' as const,
                 description: tag.description
               }
             }
@@ -172,42 +217,47 @@ function processRouteOperation(route: SwaggerRoute, routeDocs: any): OpenAPIV3.O
         };
         break;
       case 'returns':
-      case 'response':
+      case 'response': {
         const statusCode = tag.name || '200';
-        const responseSchema = tryParseJSON(tag.description);
+        const responseSchema = tryParseJSON(tag.description) as Record<string, unknown> | undefined;
+        const type = (tag.type?.toLowerCase() || 'object') as OpenAPIV3.SchemaObject['type'];
+        const schemaObj = responseSchema ? parseSchema(responseSchema) : (
+            type === 'array'
+                ? { type: 'array' as const, items: { type: 'object' as const } }
+                : { type: type as OpenAPIV3.NonArraySchemaObjectType, description: tag.description }
+        );
+
         operation.responses[statusCode] = {
-          description: responseSchema?.description || 'Successful response',
+          description: (responseSchema?.description as string) || 'Successful response',
           content: {
             'application/json': {
-              schema: responseSchema ? parseSchema(responseSchema) : {
-                type: tag.type?.toLowerCase() || 'object',
-                description: tag.description
-              }
+              schema: schemaObj
             }
           }
         };
         break;
+      }
       case 'throws':
-      case 'error':
+      case 'error': {
         const errorCode = tag.name || '400';
-        const errorSchema = tryParseJSON(tag.description);
+        const errorSchema = tryParseJSON(tag.description) as Record<string, unknown> | undefined;
         operation.responses[errorCode] = {
           description: tag.description || 'Error response',
           content: {
             'application/json': {
               schema: errorSchema ? parseSchema(errorSchema) : {
-                type: 'object',
+                type: 'object' as const,
                 properties: {
                   error: {
-                    type: 'string'
+                    type: 'string' as const
                   },
                   details: {
-                    type: 'array',
+                    type: 'array' as const,
                     items: {
-                      type: 'object',
+                      type: 'object' as const,
                       properties: {
-                        path: { type: 'string' },
-                        message: { type: 'string' }
+                        path: { type: 'string' as const },
+                        message: { type: 'string' as const }
                       }
                     }
                   }
@@ -217,6 +267,7 @@ function processRouteOperation(route: SwaggerRoute, routeDocs: any): OpenAPIV3.O
           }
         };
         break;
+      }
       case 'secure':
         operation.security = [{
           [tag.name || 'cookieAuth']: []
@@ -247,7 +298,7 @@ async function processRouteFiles(
   for (const file of routeFiles) {
     const filePath = path.join(API_DIR, file);
     const content = await fs.readFile(filePath, 'utf-8');
-    const comments = parse(content);
+    const comments = parse(content) as unknown as CommentBlock[];
 
     const routePath = path.dirname(file)
         .replace(/\\/g, '/')
@@ -274,7 +325,7 @@ async function processRouteFiles(
           routes.push({
             filePath: file,
             path: routePath,
-            method: method.toLowerCase(),
+            method: method.toLowerCase() as HttpMethod,
             docs: routeDocs,
             section
           });
@@ -319,7 +370,7 @@ async function generateSwaggerDocs() {
 
     await randomDelay();
     spinner.text = 'Setting up OpenAPI structure...';
-    const swagger: OpenAPIV3.Document = {
+    const swagger: OpenAPIDocumentWithExtensions = {
       openapi: '3.0.0',
       info: {
         title: 'Changerawr API Documentation',
@@ -349,8 +400,10 @@ async function generateSwaggerDocs() {
         }
       },
       tags: [],
-      'x-tagGroups': []
     };
+
+    // Add the x-tagGroups property after object creation
+    swagger['x-tagGroups'] = [];
 
     await randomDelay(1000, 2000);
     spinner.text = 'Processing route files...';
@@ -376,7 +429,7 @@ async function generateSwaggerDocs() {
       });
     });
 
-    swagger["x-tagGroups"] = tagGroups;
+    swagger['x-tagGroups'] = tagGroups;
 
     await randomDelay(800, 1500);
     spinner.text = 'Converting routes to OpenAPI format...';
@@ -388,7 +441,12 @@ async function generateSwaggerDocs() {
       // Process operation
       const operation = processRouteOperation(route, route.docs);
 
-      pathItem[route.method] = operation;
+      // Use type-safe method assignment
+      if (route.method === 'get') pathItem.get = operation;
+      else if (route.method === 'post') pathItem.post = operation;
+      else if (route.method === 'put') pathItem.put = operation;
+      else if (route.method === 'delete') pathItem.delete = operation;
+      else if (route.method === 'patch') pathItem.patch = operation;
       swagger.paths[apiPath] = pathItem;
 
       // Add a tiny delay for each route to show progress

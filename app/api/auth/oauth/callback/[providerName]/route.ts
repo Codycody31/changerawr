@@ -18,7 +18,7 @@ import { db } from '@/lib/db';
 // app/api/auth/oauth/callback/[providerName]/route.ts
 export async function GET(
     request: Request,
-    { params }: { params: { providerName: string } }
+    { params }: { params: Promise<{ providerName: string }> }
 ) {
     // Get the base URL from the request
     const { origin } = new URL(request.url);
@@ -32,7 +32,7 @@ export async function GET(
     });
 
     try {
-        const providerName = params.providerName;
+        const providerName = (await params).providerName;
         const { searchParams } = new URL(request.url);
         const code = searchParams.get('code');
         const state = searchParams.get('state');

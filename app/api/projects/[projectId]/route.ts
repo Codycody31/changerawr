@@ -36,13 +36,13 @@ import { validateAuthAndGetUser } from '@/lib/utils/changelog'
  */
 export async function GET(
     request: Request,
-    { params }: { params: { projectId: string } }
+    { params }: { params: Promise<{ projectId: string }> }
 ) {
     try {
         await validateAuthAndGetUser()
 
         const project = await db.project.findUnique({
-            where: { id: params.projectId },
+            where: { id: (await params).projectId },
             include: {
                 changelog: {
                     include: {
@@ -106,14 +106,14 @@ export async function GET(
  */
 export async function PATCH(
     request: Request,
-    { params }: { params: { projectId: string } }
+    { params }: { params: Promise<{ projectId: string }> }
 ) {
     try {
         await validateAuthAndGetUser()
         const json = await request.json()
 
         const updated = await db.project.update({
-            where: { id: params.projectId },
+            where: { id: (await params).projectId },
             data: json,
             include: {
                 changelog: true
@@ -138,13 +138,13 @@ export async function PATCH(
  */
 export async function DELETE(
     request: Request,
-    { params }: { params: { projectId: string } }
+    { params }: { params: Promise<{ projectId: string }> }
 ) {
     try {
         await validateAuthAndGetUser()
 
         await db.project.delete({
-            where: { id: params.projectId }
+            where: { id: (await params).projectId }
         })
 
         return new Response(null, { status: 204 })

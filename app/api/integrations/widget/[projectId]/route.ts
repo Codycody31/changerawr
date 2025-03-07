@@ -14,7 +14,7 @@ import { db } from "@/lib/db";
  */
 export async function GET(
     request: Request,
-    context: { params: { projectId: string } }
+    context: { params: Promise<{ projectId: string }> }
 ) {
     try {
         const { projectId } = await (async () => context.params)();

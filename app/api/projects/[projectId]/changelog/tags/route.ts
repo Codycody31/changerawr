@@ -43,7 +43,7 @@ const MAX_PAGE_SIZE = 100;
  */
 export async function GET(
     request: Request,
-    { params }: { params: { projectId: string } }
+    { params }: { params: Promise<{ projectId: string }> }
 ) {
     try {
         await validateAuthAndGetUser();

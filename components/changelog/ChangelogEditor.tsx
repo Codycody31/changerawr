@@ -6,7 +6,58 @@ import { Input } from '@/components/ui/input';
 import { MarkdownEditor } from '@/components/MarkdownEditor';
 import { useDebounce } from 'use-debounce';
 import { toast } from "@/hooks/use-toast";
+// Import the original component
 import EditorHeader from '@/components/changelog/editor/EditorHeader';
+
+// Create a wrapper component to extend functionality
+const EnhancedEditorHeader: React.FC<React.ComponentProps<typeof EditorHeader> & {
+    onLoadMoreTags?: () => Promise<unknown>;
+}> = ({ onLoadMoreTags, availableTags, onTagsChange, ...otherProps }) => {
+    // Create enhanced tags selection with load more functionality
+    const handleTagsChange = (tags: Tag[]) => {
+        onTagsChange(tags);
+    };
+
+    // Create a ref to track if we need to load more tags
+    const tagsContainerRef = useRef<HTMLDivElement>(null);
+
+    // Setup an effect to detect when we need to load more tags
+    useEffect(() => {
+        if (!onLoadMoreTags) return;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                // If the last tag is visible and we have more to load, trigger loading
+                if (entries[0].isIntersecting) {
+                    onLoadMoreTags();
+                }
+            },
+            { threshold: 0.5 }
+        );
+
+        if (tagsContainerRef.current) {
+            observer.observe(tagsContainerRef.current);
+        }
+
+        return () => {
+            if (tagsContainerRef.current) {
+                observer.unobserve(tagsContainerRef.current);
+            }
+        };
+    }, [onLoadMoreTags]);
+
+    return (
+        <>
+            <EditorHeader
+                {...otherProps}
+                availableTags={availableTags}
+                onTagsChange={handleTagsChange}
+            />
+            {/* Hidden container to trigger infinite loading */}
+            {onLoadMoreTags && <div ref={tagsContainerRef} style={{ height: 1, opacity: 0 }} />}
+        </>
+    );
+};
 
 interface ChangelogEditorProps {
     projectId: string;
@@ -29,10 +80,38 @@ interface EditorState {
     hasUnsavedChanges: boolean;
 }
 
+// API response interfaces
+interface ProjectResponse {
+    id: string;
+    defaultTags: string[];
+    // Add other project properties as needed
+}
+
+interface EntryResponse {
+    id: string;
+    title: string;
+    content: string;
+    version: string;
+    tags: Tag[];
+    publishedAt?: string;
+    // Add other entry properties as needed
+}
+
+interface TagsResponse {
+    tags: Tag[];
+    pagination: {
+        page: number;
+        hasMore: boolean;
+    };
+}
+
 // Constants for pagination and caching
 const ITEMS_PER_PAGE = 20;
 const CACHE_TIME = 1000 * 60 * 5; // 5 minutes
 const DEBOUNCE_TIME = 1000; // 1 second
+
+// Import or extend the EditorHeader props instead of redefining them
+// The actual component likely doesn't have the onLoadMoreTags prop in its interface
 
 export function ChangelogEditor({
                                     projectId,
@@ -55,7 +134,7 @@ export function ChangelogEditor({
     // UI state with useRef for values that don't need re-renders
     const isSaving = useRef(false);
     const [lastSaveError, setLastSaveError] = useState<string | null>(null);
-    const lastSavedStateRef = useRef<EditorState | null>(null);
+    const lastSavedStateRef = useRef<Omit<EditorState, 'isPublished' | 'hasUnsavedChanges'> | null>(null);
     const saveFailedRef = useRef(false);
     const isAutoSavingRef = useRef(false);
 
@@ -71,8 +150,8 @@ export function ChangelogEditor({
                 entryId ? fetch(`/api/projects/${projectId}/changelog/${entryId}`) : Promise.resolve(null)
             ]);
 
-            const project = await projectResponse.json();
-            const entry = entryResponse ? await entryResponse.json() : null;
+            const project = await projectResponse.json() as ProjectResponse;
+            const entry = entryResponse ? await entryResponse.json() as EntryResponse : null;
 
             return { project, entry };
         },
@@ -85,7 +164,7 @@ export function ChangelogEditor({
         fetchNextPage,
         hasNextPage,
         isLoading: isTagsLoading
-    } = useInfiniteQuery({
+    } = useInfiniteQuery<TagsResponse>({
         queryKey: ['changelog-tags', projectId],
         queryFn: async ({ pageParam = 0 }) => {
             const response = await fetch(
@@ -93,10 +172,11 @@ export function ChangelogEditor({
             );
             return response.json();
         },
-        getNextPageParam: (lastPage) => {
+        getNextPageParam: (lastPage: TagsResponse) => {
             return lastPage.pagination.hasMore ? lastPage.pagination.page + 1 : undefined;
         },
         staleTime: CACHE_TIME,
+        initialPageParam: 0, // Add this to fix the missing initialPageParam error
     });
 
     // Memoized tags processing
@@ -317,7 +397,7 @@ export function ChangelogEditor({
 
     return (
         <div className="min-h-screen bg-background text-foreground">
-            <EditorHeader
+            <EnhancedEditorHeader
                 title={editorState.title}
                 isSaving={isSaving.current}
                 hasUnsavedChanges={editorState.hasUnsavedChanges}
@@ -332,7 +412,10 @@ export function ChangelogEditor({
                 selectedTags={editorState.tags}
                 availableTags={availableTags}
                 onTagsChange={handleTagsChange}
-                onLoadMoreTags={hasNextPage ? () => fetchNextPage() : undefined}
+                onLoadMoreTags={hasNextPage ? async () => {
+                    await fetchNextPage();
+                    return;
+                } : undefined}
             />
 
             <div className="container py-6">

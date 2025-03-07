@@ -53,7 +53,7 @@ import {Role} from "@/lib/types/auth";
  */
 export async function GET(
     request: Request,
-    context: { params: { projectId: string; entryId: string } }
+    context: { params: Promise<{ projectId: string; entryId: string }> }
 ) {
     try {
         await validateAuthAndGetUser();
@@ -170,7 +170,7 @@ export async function GET(
  */
 export async function PUT(
     request: Request,
-    context: { params: { projectId: string; entryId: string } }
+    context: { params: Promise<{ projectId: string; entryId: string }> }
 ) {
     try {
         await validateAuthAndGetUser();
@@ -282,7 +282,7 @@ export async function PUT(
  */
 export async function PATCH(
     request: Request,
-    context: { params: { projectId: string; entryId: string } }
+    context: { params: Promise<{ projectId: string; entryId: string }> }
 ) {
     try {
         const user = await validateAuthAndGetUser();
@@ -469,7 +469,7 @@ export async function PATCH(
  */
 export async function DELETE(
     request: Request,
-    context: { params: { projectId: string; entryId: string } }
+    context: { params: Promise<{ projectId: string; entryId: string }> }
 ) {
     try {
         const user = await validateAuthAndGetUser();

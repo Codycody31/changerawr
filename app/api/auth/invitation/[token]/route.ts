@@ -35,9 +35,9 @@ import { db } from '@/lib/db'
  */
 export async function GET(
     request: Request,
-    { params }: { params: { token: string } }
+    { params }: { params: Promise<{ token: string }> }
 ) {
-    if (!params.token) {
+    if (!(await params).token) {
         return NextResponse.json(
             { message: 'Token is required' },
             { status: 400 }
@@ -45,11 +45,11 @@ export async function GET(
     }
 
     try {
-        console.log(`Checking invitation token: ${params.token}`)
+        console.log(`Checking invitation token: ${(await params).token}`)
 
         const invitation = await db.invitationLink.findUnique({
             where: {
-                token: params.token
+                token: (await params).token
             }
         })
 

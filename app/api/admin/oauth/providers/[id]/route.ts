@@ -47,7 +47,7 @@ const updateProviderSchema = z.object({
  */
 export async function PATCH(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const user = await validateAuthAndGetUser();
@@ -60,7 +60,7 @@ export async function PATCH(
             );
         }
 
-        const { id } = params;
+        const { id } = await params;
         const body = await request.json();
         const validatedData = updateProviderSchema.parse(body);
 
@@ -178,7 +178,7 @@ export async function PATCH(
  */
 export async function DELETE(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const user = await validateAuthAndGetUser();
@@ -191,7 +191,7 @@ export async function DELETE(
             );
         }
 
-        const { id } = params;
+        const { id } = await params;
 
         // Check if provider exists
         const provider = await db.oAuthProvider.findUnique({

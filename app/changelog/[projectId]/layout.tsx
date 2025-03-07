@@ -1,9 +1,8 @@
-// app/changelog/[projectId]/layout.tsx
 import { Metadata } from 'next'
 import React from "react";
 
 interface ChangelogLayoutProps {
-    params: { projectId: string }
+    params: Promise<{ projectId: string }>
     children: React.ReactNode
 }
 

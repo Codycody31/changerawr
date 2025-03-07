@@ -141,7 +141,6 @@ const RedocDemo = ({
                 <RedocStandalone
                     specUrl={url}
                     options={{
-                        title,
                         theme,
                         nativeScrollbars: true,
                         expandResponses: "200,201",
@@ -154,8 +153,7 @@ const RedocDemo = ({
                         hideSingleRequestSampleTab: false,
                         expandSingleSchemaField: true,
                         pathInMiddlePanel: true,
-                        simpleOneOfTypeLabel: true,
-                        sideNavStyle: 'path-only'
+                        simpleOneOfTypeLabel: true
                     }}
                 />
             </div>

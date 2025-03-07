@@ -346,7 +346,13 @@ export class ChangelogWidgetComponent implements OnInit, OnDestroy {
     }
 ]
 
-function CodeInstallation({ config, projectId, codeExamples }) {
+interface CodeInstallationProps {
+    config: WidgetConfig;
+    projectId: string;
+    codeExamples: CodeExample[];
+}
+
+function CodeInstallation({ config, projectId, codeExamples }: CodeInstallationProps) {
     const [currentLanguage, setCurrentLanguage] = useState('HTML')
     const [copied, setCopied] = useState(false)
     const { theme } = useTheme()
@@ -594,7 +600,10 @@ export default function WidgetConfigContent({projectId}: { projectId: string }) 
                                                     <Label htmlFor="position">Position</Label>
                                                     <Select
                                                         value={config.position}
-                                                        onValueChange={(value) => setConfig(prev => ({...prev, position: value}))}
+                                                        onValueChange={(value) => setConfig(prev => ({
+                                                            ...prev,
+                                                            position: value as "bottom-right" | "bottom-left" | "top-right" | "top-left"
+                                                        }))}
                                                     >
                                                         <SelectTrigger>
                                                             <SelectValue placeholder="Select position" />

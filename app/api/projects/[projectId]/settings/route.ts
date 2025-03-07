@@ -37,7 +37,7 @@ const projectSettingsSchema = z.object({
  */
 export async function GET(
     request: Request,
-    context: { params: { projectId: string } }
+    context: { params: Promise<{ projectId: string }> }
 ) {
     try {
         const { projectId } = await (async () => context.params)();
@@ -123,7 +123,7 @@ export async function GET(
  */
 export async function PATCH(
     request: Request,
-    context: { params: { projectId: string } }
+    context: { params: Promise<{ projectId: string }> }
 ) {
     try {
         const { projectId } = await (async () => context.params)();

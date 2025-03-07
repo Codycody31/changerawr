@@ -33,6 +33,10 @@ interface EditorHeaderProps {
     onTagsChange: (tags: Tag[]) => void;
 }
 
+interface VersionData {
+    versions: string[];
+}
+
 const VersionSelector = ({
                              version,
                              onVersionChange,
@@ -51,7 +55,7 @@ const VersionSelector = ({
         queryFn: async () => {
             const response = await fetch(`/api/projects/${projectId}/versions`);
             if (!response.ok) throw new Error('Failed to fetch versions');
-            return response.json();
+            return await response.json() as Promise<VersionData>;
         }
     });
 
@@ -70,7 +74,7 @@ const VersionSelector = ({
     // Ensure versions is always an array and filter out invalid versions
     const allVersions = versionData.versions || [];
     const validVersions = allVersions.filter(isValidVersion);
-    const invalidVersions = allVersions.filter(v => !isValidVersion(v));
+    const invalidVersions = allVersions.filter((v: string) => !isValidVersion(v));
 
     // Group versions by type
     const groupedVersions = React.useMemo(() => {
@@ -129,7 +133,7 @@ const VersionSelector = ({
                     <CommandList>
                         <CommandEmpty>No versions found</CommandEmpty>
                         <CommandGroup heading="Suggested Updates">
-                            {groupedVersions.suggestions.map((v) => (
+                            {groupedVersions.suggestions.map((v: string) => (
                                 <CommandItem
                                     key={v}
                                     value={v}
@@ -150,7 +154,7 @@ const VersionSelector = ({
                         </CommandGroup>
                         {groupedVersions.existing.length > 0 && (
                             <CommandGroup heading="Previous Versions">
-                                {groupedVersions.existing.map((v) => (
+                                {groupedVersions.existing.map((v: string) => (
                                     <CommandItem
                                         key={v}
                                         value={v}
@@ -184,7 +188,7 @@ const VersionSelector = ({
                                 </div>
                                 {showInvalidVersions && (
                                     <CommandGroup heading="Non-standard Versions">
-                                        {invalidVersions.map((v) => (
+                                        {invalidVersions.map((v: string) => (
                                             <CommandItem
                                                 key={v}
                                                 value={v}
@@ -294,6 +298,11 @@ const TagSelector = ({
     );
 };
 
+interface EntryData {
+    publishedAt?: string;
+    // Add other fields as needed
+}
+
 const EditorHeader = ({
                           title,
                           isSaving,
@@ -318,7 +327,7 @@ const EditorHeader = ({
             if (!entryId) return null;
             const response = await fetch(`/api/projects/${projectId}/changelog/${entryId}`);
             if (!response.ok) throw new Error('Failed to fetch entry');
-            return response.json();
+            return await response.json() as Promise<EntryData>;
         },
         enabled: !!entryId,
     });

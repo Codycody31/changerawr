@@ -8,10 +8,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import Link from 'next/link'
 
 interface PageProps {
-    params: {
-        projectId: string
-    }
+    params: Promise<{
+        projectId: string;
+    }>;
 }
+
 
 interface ChangelogResponse {
     project: {

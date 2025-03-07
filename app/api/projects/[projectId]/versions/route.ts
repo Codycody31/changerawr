@@ -18,7 +18,7 @@ import { db } from '@/lib/db'
  * @error 403 Unauthorized - User does not have 'ADMIN' role
  * @error 500 An unexpected error occurred while fetching the versions
  */
-export async function GET(request: Request, context: { params: { projectId: string } }) {
+export async function GET(request: Request, context: { params: Promise<{ projectId: string }> }) {
     try {
         await validateAuthAndGetUser();
         const { projectId } = await (async () => context.params)();

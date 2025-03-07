@@ -47,7 +47,7 @@ const updateRequestSchema = z.object({
  */
 export async function PATCH(
     req: Request,
-    context: { params: { requestId: string } }
+    context: { params: Promise<{ requestId: string }> }
 ) {
     console.log('=== Processing PATCH Request ===');
 

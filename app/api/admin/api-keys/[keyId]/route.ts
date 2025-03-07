@@ -49,8 +49,8 @@ const updateApiKeySchema = z.object({
  */
 export async function GET(
     request: Request,
-    { params }: { params: { keyId: string } }
-) {
+    { params }: { params: Promise<{ keyId: string }> }
+): Promise<Response> {
     try {
         const user = await validateAuthAndGetUser();
 
@@ -62,7 +62,7 @@ export async function GET(
         }
 
         const apiKey = await db.apiKey.findUnique({
-            where: { id: params.keyId },
+            where: { id: (await params).keyId },
             select: {
                 id: true,
                 name: true,
@@ -163,8 +163,8 @@ export async function GET(
  */
 export async function PATCH(
     request: Request,
-    { params }: { params: { keyId: string } }
-) {
+    { params }: { params: Promise<{ keyId: string }> }
+): Promise<Response> {
     try {
         const user = await validateAuthAndGetUser();
 
@@ -179,7 +179,7 @@ export async function PATCH(
         const validatedData = updateApiKeySchema.parse(body);
 
         const existingKey = await db.apiKey.findUnique({
-            where: { id: params.keyId }
+            where: { id: (await params).keyId }
         });
 
         if (!existingKey) {
@@ -198,7 +198,7 @@ export async function PATCH(
         }
 
         const apiKey = await db.apiKey.update({
-            where: { id: params.keyId },
+            where: { id: (await params).keyId },
             data: {
                 ...(validatedData.name && { name: validatedData.name }),
                 ...(validatedData.isRevoked !== undefined && { isRevoked: validatedData.isRevoked }),
@@ -245,8 +245,8 @@ export async function PATCH(
  */
 export async function DELETE(
     request: Request,
-    { params }: { params: { keyId: string } }
-) {
+    { params }: { params: Promise<{ keyId: string }> }
+): Promise<Response> {
     try {
         const user = await validateAuthAndGetUser();
 
@@ -258,7 +258,7 @@ export async function DELETE(
         }
 
         const existingKey = await db.apiKey.findUnique({
-            where: { id: params.keyId }
+            where: { id: (await params).keyId }
         });
 
         if (!existingKey) {
@@ -278,7 +278,7 @@ export async function DELETE(
 
         // Permanently delete the key
         await db.apiKey.delete({
-            where: { id: params.keyId }
+            where: { id: (await params).keyId }
         });
 
         return NextResponse.json({ success: true });

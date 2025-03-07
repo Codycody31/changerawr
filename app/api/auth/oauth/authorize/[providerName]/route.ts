@@ -17,7 +17,7 @@ import { db } from '@/lib/db';
  */
 export async function GET(
     request: Request,
-    { params }: { params: { providerName: string } }
+    { params }: { params: Promise<{ providerName: string }> }
 ) {
     try {
         // Await params before destructuring

@@ -86,7 +86,7 @@ export async function POST(request: Request) {
             }
         });
     } catch (error) {
-        console.error('OAuth setup error:', error.stack);
+        console.error('OAuth setup error:', (error as Error).stack);
 
         if (error instanceof z.ZodError) {
             return NextResponse.json(

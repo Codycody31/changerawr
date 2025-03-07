@@ -208,7 +208,7 @@ export async function GET(
  */
 export async function POST(
     request: Request,
-    { params }: { params: { projectId: string } }
+    { params }: { params: Promise<{ projectId: string }> }
 ) {
     try {
         await validateAuthAndGetUser()
@@ -216,7 +216,7 @@ export async function POST(
 
         // Get the changelog for this project
         const changelog = await db.changelog.findUnique({
-            where: { projectId: await params.projectId }
+            where: { projectId: (await params).projectId }
         })
 
         if (!changelog) {

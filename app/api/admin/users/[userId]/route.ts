@@ -63,7 +63,7 @@ const updateUserSchema = z.object({
  */
 export async function GET(
     request: NextRequest,
-    { params }: { params: { userId: string } }
+    { params }: { params: Promise<{ userId: string }> }
 ) {
     try {
         const currentUser = await validateAuthAndGetUser();
@@ -76,7 +76,7 @@ export async function GET(
             );
         }
 
-        const { userId } = params;
+        const { userId } = await params;
         const targetUser = await db.user.findUnique({
             where: { id: userId },
             select: {
@@ -178,7 +178,7 @@ export async function GET(
  */
 export async function PATCH(
     request: NextRequest,
-    { params }: { params: { userId: string } }
+    { params }: { params: Promise<{ userId: string }> }
 ) {
     try {
         const currentUser = await validateAuthAndGetUser();
@@ -191,7 +191,7 @@ export async function PATCH(
             );
         }
 
-        const { userId } = params;
+        const { userId } = await params;
         const body = await request.json();
         const validatedData = updateUserSchema.parse(body);
 
@@ -314,7 +314,7 @@ export async function PATCH(
  */
 export async function DELETE(
     request: NextRequest,
-    { params }: { params: { userId: string } }
+    { params }: { params: Promise<{ userId: string }> }
 ) {
     try {
         const currentUser = await validateAuthAndGetUser();
@@ -327,7 +327,7 @@ export async function DELETE(
             );
         }
 
-        const { userId } = params;
+        const { userId } = await params;
 
         // Prevent self-deletion
         if (userId === currentUser.id) {
