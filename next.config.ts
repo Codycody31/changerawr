@@ -23,7 +23,7 @@ const nextConfig: NextConfig = {
 
         return config;
     },
-    output: 'standalone',
+    // output: 'standalone', uses next-start, leave commented-out
 };
 
 export default nextConfig;
