@@ -4,7 +4,7 @@ FROM node:20-alpine AS base
 FROM base AS deps
 WORKDIR /app
 
-# Install dependencies based on the preferred package manager
+# Copy package files
 COPY package.json package-lock.json* ./
 RUN npm install --legacy-peer-deps
 
@@ -12,6 +12,8 @@ RUN npm install --legacy-peer-deps
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
+
+# Copy the entire project
 COPY . .
 
 # Generate Prisma client
@@ -50,20 +52,10 @@ RUN npm install -g jsdoc
 # Add bash for the entry script
 RUN apk add --no-cache bash
 
-# Copy necessary files and directories directly from the source
-COPY widgets ./widgets
-COPY scripts ./scripts
-COPY prisma ./prisma
-COPY public ./public
-COPY app ./app
-COPY next.config.ts ./
+# Copy the entire project from the builder stage
+COPY --from=builder /app .
 
-# Copy the Next.js build output
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
-
-# Copy entry point script and make it executable
-COPY docker-entrypoint.sh ./
+# Ensure the entrypoint script is executable
 RUN chmod +x ./docker-entrypoint.sh
 
 EXPOSE 3000

@@ -16,3 +16,6 @@ yarn-error.log*
 coverage
 dist
 .turbo
+public/swagger.json
+public/widget-bundle.js
+public/widget-bundle.js.map
