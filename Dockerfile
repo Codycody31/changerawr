@@ -36,7 +36,7 @@ ENV NEXT_TELEMETRY_DISABLED 1
 COPY package.json package-lock.json* ./
 RUN npm install --legacy-peer-deps
 # Install Prisma client
-RUN npm install prisma
+RUN npm install prisma --legacy-peer-deps
 
 # Install JSDOC
 RUN npm install -g jsdoc
