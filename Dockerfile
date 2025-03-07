@@ -48,7 +48,7 @@ RUN npm install -g jsdoc
 RUN apk add --no-cache bash
 
 # Copy necessary files and directories directly from the source
-COPY widget ./widget
+COPY widgets ./widgets
 COPY scripts ./scripts
 COPY prisma ./prisma
 COPY public ./public
