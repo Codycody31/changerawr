@@ -706,7 +706,7 @@ export default function UsersPage() {
                                                                     variant="ghost"
                                                                     size="sm"
                                                                     onClick={() => handleCopyInvitationLink(
-                                                                        `${process.env.NEXT_PUBLIC_APP_URL}/register?token=${invitation.token}`
+                                                                        `${window.location.origin}/register?token=${invitation.token}`
                                                                     )}
                                                                 >
                                                                     <Copy className="h-4 w-4"/>
