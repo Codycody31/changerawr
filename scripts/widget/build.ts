@@ -1,4 +1,3 @@
-// scripts/widget/build.ts
 import * as esbuild from 'esbuild';
 import * as dotenv from 'dotenv';
 
