@@ -43,7 +43,7 @@ export async function GET(
             )
         }
 
-        const baseUrl = new URL(request.url).origin
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
         const feedUrl = `${baseUrl}/changelog/${project.id}`
 
         const rss = generateRSSFeed(project.changelog.entries, {
