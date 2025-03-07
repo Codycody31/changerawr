@@ -34,7 +34,7 @@ export function ThemeProvider({
         const fetchUserTheme = async () => {
             if (user && !localStorage.getItem('theme')) {
                 try {
-                    const response = await fetch('/api/settings')
+                    const response = await fetch('/api/auth/settings')
                     if (response.ok) {
                         const settings = await response.json()
                         setUserTheme(settings.theme)
