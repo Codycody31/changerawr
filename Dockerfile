@@ -35,8 +35,11 @@ ENV NEXT_TELEMETRY_DISABLED 1
 # Install all dependencies to satisfy entrypoint requirements
 COPY package.json package-lock.json* ./
 RUN npm install --legacy-peer-deps
-# Install Prisma client
-RUN npm install prisma --legacy-peer-deps
+# Install Prisma client with exact version match
+RUN npm uninstall prisma @prisma/client
+RUN npm install prisma@6.3.1 @prisma/client@6.3.1 --legacy-peer-deps
+# Install tsx explicitly
+RUN npm install -g tsx
 
 # Install JSDOC
 RUN npm install -g jsdoc
