@@ -148,7 +148,8 @@ export async function GET(
         }
 
         // Create a response with cookies and redirect to the client-side handler
-        const response = NextResponse.redirect(`${origin}/oauth-callback`, {
+        // Pass the redirectUrl as a query parameter
+        const response = NextResponse.redirect(`${origin}/oauth-callback?redirect=${encodeURIComponent(redirectUrl)}`, {
             status: 302
         });
 

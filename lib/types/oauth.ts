@@ -12,6 +12,19 @@ export interface OAuthProvider {
     isDefault?: boolean;
 }
 
+export type OAuthProviderUpdateData = {
+    name?: string;
+    clientId?: string;
+    callbackUrl?: string;
+    clientSecret?: string;
+    scopes?: string[];
+    enabled?: boolean;
+    isDefault?: boolean;
+    authorizationUrl?: string;
+    tokenUrl?: string;
+    userInfoUrl?: string;
+};
+
 export interface OAuthUserInfo {
     id: string;
     email: string;

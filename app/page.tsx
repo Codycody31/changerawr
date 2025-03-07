@@ -25,6 +25,15 @@ import Link from 'next/link'
 import { toast } from '@/hooks/use-toast'
 import { Progress } from '@/components/ui/progress'
 
+type ChangelogType = "feature" | "bugfix" | "improvement" | "breaking" | "security" | "performance";
+
+type ChangelogEntry = {
+  text: string;
+  type: ChangelogType;
+  difficulty: number;
+  tricky?: boolean;
+};
+
 // Changelog entry types
 const CHANGE_TYPES = [
   { type: 'feature', icon: Sparkles, color: 'text-green-500', label: 'Feature' },
@@ -36,7 +45,7 @@ const CHANGE_TYPES = [
 ]
 
 // Expanded changelog entries for the game with different difficulty levels
-const CHANGELOG_ENTRIES = [
+const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   // Easy
   { text: "Added dark mode support", type: "feature", difficulty: 1 },
   { text: "Fixed login screen crash", type: "bugfix", difficulty: 1 },
@@ -82,7 +91,7 @@ export default function Home() {
   const [lives, setLives] = useState(3)
   const [combo, setCombo] = useState(0)
   const [level, setLevel] = useState(1)
-  const [currentEntry, setCurrentEntry] = useState<any>(null)
+  const [currentEntry, setCurrentEntry] = useState<ChangelogEntry | null>(null);
   const [powerUp, setPowerUp] = useState<string | null>(null)
   const [powerUpTimeLeft, setPowerUpTimeLeft] = useState(0)
   const [perfectRound, setPerfectRound] = useState(false)
@@ -438,9 +447,9 @@ export default function Home() {
 
     toast({
       title: "Wrong!",
-      description: `That was a ${currentEntry.type}`,
+      description: `That was a ${currentEntry?.type || "unknown type"}`,
       variant: "destructive",
-    })
+    });
   }
 
   // Effect to check game over

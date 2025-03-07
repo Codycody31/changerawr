@@ -23,7 +23,7 @@ export async function GET(
         // Await params before destructuring
         const providerName = (await params).providerName;
         const { searchParams } = new URL(request.url);
-        const state = searchParams.get('state') || '';
+        // const state = searchParams.get('state') || '';
         const redirect = searchParams.get('redirect') || '/dashboard';
 
         // Find provider by name with case-insensitive search

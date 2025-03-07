@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { validateAuthAndGetUser } from '@/lib/utils/changelog';
 import { db } from '@/lib/db';
 import { z } from 'zod';
+import { OAuthProviderUpdateData } from '@/lib/types/oauth';
 
 const updateProviderSchema = z.object({
     name: z.string().min(1, 'Name is required').optional(),
@@ -13,7 +14,6 @@ const updateProviderSchema = z.object({
     isDefault: z.boolean().optional()
 });
 
-// app/api/admin/oauth/providers/[id]/route.ts (continued)
 /**
  * @method PATCH
  * @description Updates an existing OAuth provider
@@ -77,7 +77,7 @@ export async function PATCH(
         }
 
         // Prepare update data
-        const updateData: any = {};
+        const updateData: OAuthProviderUpdateData = {};
 
         if (validatedData.name !== undefined) {
             updateData.name = validatedData.name;
