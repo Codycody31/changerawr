@@ -22,7 +22,7 @@ RUN npx prisma generate
 # Uncomment the following line in case you want to disable telemetry during the build.
 ENV NEXT_TELEMETRY_DISABLED 1
 
-# Build the app with standalone output
+# Build the app
 RUN npm run build
 
 # Production image, copy all the files and run next
@@ -36,13 +36,10 @@ ENV NEXT_TELEMETRY_DISABLED 1
 COPY package.json package-lock.json* ./
 RUN npm install --legacy-peer-deps
 # Install Prisma client with exact version match
-RUN npm uninstall prisma @prisma/client --legacy-peer-deps
+RUN npm uninstall prisma @prisma/client
 RUN npm install prisma@6.3.1 @prisma/client@6.3.1 --legacy-peer-deps
 # Install tsx explicitly
 RUN npm install -g tsx
-
-# Install esbuild explicitly
-RUN npm install esbuild --legacy-peer-deps
 
 # Install JSDOC
 RUN npm install -g jsdoc
@@ -51,16 +48,16 @@ RUN npm install -g jsdoc
 RUN apk add --no-cache bash
 
 # Copy necessary files and directories directly from the source
-COPY widgets ./widgets
+COPY widget ./widget
 COPY scripts ./scripts
 COPY prisma ./prisma
 COPY public ./public
-COPY app/api ./app/api
+COPY app ./app
 COPY next.config.ts ./
 
-# Copy the standalone build
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+# Copy the Next.js build output
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/node_modules ./node_modules
 
 # Copy entry point script and make it executable
 COPY docker-entrypoint.sh ./
@@ -73,4 +70,4 @@ ENV HOSTNAME "0.0.0.0"
 
 # Use entrypoint for running the build scripts before starting the server
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
-CMD ["node", "server.js"]
+CMD ["npm", "start"]
