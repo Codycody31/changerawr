@@ -253,7 +253,7 @@ function OAuthSetupStep({ onNext }: StepProps) {
 
     // Get the callback URL based on window location
     const callbackUrl = typeof window !== 'undefined'
-        ? `${window.location.origin}/api/auth/oauth/callback/easypanel`
+        ? `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/oauth/callback/easypanel`
         : `http://${process.env.NEXT_PUBLIC_APP_URL}/api/auth/oauth/callback/easypanel`;
 
     const handleSubmit = async (e: React.FormEvent) => {
