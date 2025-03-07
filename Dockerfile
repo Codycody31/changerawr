@@ -42,7 +42,7 @@ RUN npm install prisma@6.3.1 @prisma/client@6.3.1 --legacy-peer-deps
 RUN npm install -g tsx
 
 # Install esbuild explicitly
-RUN npm install -g esbuild
+RUN npm install esbuild --legacy-peer-deps
 
 # Install JSDOC
 RUN npm install -g jsdoc
