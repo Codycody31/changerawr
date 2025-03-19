@@ -7,7 +7,7 @@
   },
   "servers": [
     {
-      "url": "http://localhost:3001",
+      "url": "http://localhost:3000",
       "description": "API Server"
     }
   ],
@@ -36,7 +36,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "not allowed - Setup endpoint only accepts POST requests"
       },
       "post": {
         "tags": [
@@ -166,6 +167,7 @@
           }
         },
         "security": [],
+        "description": "the first admin user in the system",
         "requestBody": {
           "required": true,
           "content": {
@@ -259,7 +261,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "a list of projects, including their latest changelog entry and entry count"
       },
       "post": {
         "tags": [
@@ -357,6 +360,7 @@
           }
         },
         "security": [],
+        "description": "a new project and its associated changelog",
         "requestBody": {
           "required": true,
           "content": {
@@ -423,7 +427,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "if the initial setup has been completed by verifying if any users exist in the database"
       }
     },
     "/api/setup/settings": {
@@ -431,6 +436,7 @@
         "tags": [
           "Setup"
         ],
+        "summary": "Not Allowed",
         "responses": {
           "405": {
             "description": "Successful response",
@@ -449,12 +455,14 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "endpoint only accepts POST requests for system configuration"
       },
       "post": {
         "tags": [
           "Setup"
         ],
+        "summary": "System Settings",
         "responses": {
           "201": {
             "description": "Successful response",
@@ -565,112 +573,7 @@
           }
         },
         "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "description": ""
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/setup/oauth": {
-      "post": {
-        "tags": [
-          "Setup"
-        ],
-        "summary": "",
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "provider": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "name": {
-                          "type": "string"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation failed - Invalid input data",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "An unexpected error occurred",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [],
+        "description": "up the initial system configuration. This endpoint can only be called once, before any system settings are configured.",
         "requestBody": {
           "required": true,
           "content": {
@@ -708,7 +611,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "not allowed - Admin user setup endpoint only accepts POST requests"
       },
       "post": {
         "tags": [
@@ -838,6 +742,114 @@
           }
         },
         "security": [],
+        "description": "a new admin user for the application",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": ""
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/setup/oauth": {
+      "post": {
+        "tags": [
+          "Setup"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "provider": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed - Invalid input data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "An unexpected error occurred",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "description": "up an OAuth provider during initial system setup",
         "requestBody": {
           "required": true,
           "content": {
@@ -963,7 +975,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "a specific project, including its changelog and tags"
       },
       "delete": {
         "tags": [
@@ -1041,7 +1054,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "a specific project"
       },
       "patch": {
         "tags": [
@@ -1154,7 +1168,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "a specific project"
       }
     },
     "/api/dashboard/stats": {
@@ -1304,7 +1319,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "dashboard statistics for the authenticated user, including recent projects, total project and changelog counts, and recent activity"
       }
     },
     "/api/changelog/requests": {
@@ -1439,7 +1455,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "pending changelog requests for authenticated user"
       },
       "post": {
         "tags": [
@@ -1627,7 +1644,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "a new pending changelog request"
       }
     },
     "/api/auth/settings": {
@@ -1724,7 +1742,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "or creates the user's settings"
       },
       "patch": {
         "tags": [
@@ -1848,7 +1867,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "the user's settings"
       }
     },
     "/api/auth/register": {
@@ -1962,7 +1982,131 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "a new user using an invitation token"
+      }
+    },
+    "/api/auth/preview": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "email": {
+                      "type": "string"
+                    },
+                    "avatarUrl": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input - Email must be a valid email address",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "An unexpected error occurred while creating the preview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "description": "a preview of a user's information"
       }
     },
     "/api/auth/refresh": {
@@ -2099,129 +2243,8 @@
             }
           }
         },
-        "security": []
-      }
-    },
-    "/api/auth/preview": {
-      "post": {
-        "tags": [
-          "Auth"
-        ],
-        "summary": "",
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "name": {
-                      "type": "string"
-                    },
-                    "email": {
-                      "type": "string"
-                    },
-                    "avatarUrl": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid input - Email must be a valid email address",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "User not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "An unexpected error occurred while creating the preview",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": []
+        "security": [],
+        "description": "the access token by providing a valid refresh token"
       }
     },
     "/api/auth/me": {
@@ -2343,7 +2366,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "the access token and retrieves the user's data"
       }
     },
     "/api/auth/logout": {
@@ -2399,7 +2423,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "the access and refresh tokens, and optionally invalidates the refresh token in the database"
       }
     },
     "/api/auth/login": {
@@ -2426,7 +2451,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "not allowed - Login endpoint only accepts POST requests"
       },
       "post": {
         "tags": [
@@ -2562,6 +2588,7 @@
           }
         },
         "security": [],
+        "description": "a user with email and password, returning JWT tokens and user data",
         "requestBody": {
           "required": true,
           "content": {
@@ -2676,7 +2703,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "a list of users with their email, name, role, creation date, and last login date. Only admins have access to this endpoint."
       },
       "post": {
         "tags": [
@@ -2779,7 +2807,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "an invitation link for user registration. Only admins have access to this endpoint."
       }
     },
     "/api/admin/dashboard": {
@@ -2908,7 +2937,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "that the authenticated user has 'ADMIN' role"
       }
     },
     "/api/admin/config": {
@@ -3004,7 +3034,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "the system configuration for the authenticated user"
       },
       "patch": {
         "tags": [
@@ -3128,6 +3159,7 @@
           }
         },
         "security": [],
+        "description": "the system configuration for the authenticated user",
         "requestBody": {
           "required": true,
           "content": {
@@ -3139,142 +3171,6 @@
             }
           }
         }
-      }
-    },
-    "/api/admin/audit-logs": {
-      "get": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "",
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "logs": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "action": {
-                            "type": "string"
-                          },
-                          "performer": {
-                            "type": "object",
-                            "properties": {
-                              "name": {
-                                "type": "string"
-                              },
-                              "email": {
-                                "type": "string"
-                              }
-                            }
-                          },
-                          "performer_email": {
-                            "type": "string"
-                          },
-                          "target": {
-                            "type": "object",
-                            "properties": {
-                              "name": {
-                                "type": "string"
-                              },
-                              "email": {
-                                "type": "string"
-                              }
-                            }
-                          },
-                          "target_email": {
-                            "type": "string"
-                          },
-                          "details": {
-                            "type": "string"
-                          },
-                          "createdAt": {
-                            "type": "string",
-                            "format": "date-time"
-                          }
-                        }
-                      }
-                    },
-                    "total": {
-                      "type": "number"
-                    },
-                    "pages": {
-                      "type": "number"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Unauthorized - User does not have 'ADMIN' role",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "An unexpected error occurred while fetching audit logs",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": []
       }
     },
     "/api/admin/api-keys": {
@@ -3402,7 +3298,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "a list of API keys for the authenticated user"
       },
       "post": {
         "tags": [
@@ -3554,6 +3451,7 @@
           }
         },
         "security": [],
+        "description": "a new API key for the authenticated user",
         "requestBody": {
           "required": true,
           "content": {
@@ -3565,6 +3463,143 @@
             }
           }
         }
+      }
+    },
+    "/api/admin/audit-logs": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "logs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "action": {
+                            "type": "string"
+                          },
+                          "performer": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "email": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "performer_email": {
+                            "type": "string"
+                          },
+                          "target": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "email": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "target_email": {
+                            "type": "string"
+                          },
+                          "details": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    },
+                    "total": {
+                      "type": "number"
+                    },
+                    "pages": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized - User does not have 'ADMIN' role",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "An unexpected error occurred while fetching audit logs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "description": "audit logs based on filters and pagination"
       }
     },
     "/api/projects/{projectId}/versions": {
@@ -3675,7 +3710,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "the versions of a given project"
       }
     },
     "/api/projects/{projectId}/settings": {
@@ -3839,7 +3875,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "the project settings for a given project"
       },
       "patch": {
         "tags": [
@@ -4002,6 +4039,7 @@
           }
         },
         "security": [],
+        "description": "the project settings for a given project",
         "requestBody": {
           "required": true,
           "content": {
@@ -4163,7 +4201,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "the changelog entries for a given project"
       },
       "post": {
         "tags": [
@@ -4302,6 +4341,7 @@
           }
         },
         "security": [],
+        "description": "a new changelog entry for a given project",
         "requestBody": {
           "required": true,
           "content": {
@@ -4421,7 +4461,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "the widget loader script for a public project"
       }
     },
     "/api/changelog/{projectId}/entries": {
@@ -4612,7 +4653,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "the changelog entries for a given public project, optionally paginated by cursor"
       }
     },
     "/api/changelog/requests/{requestId}": {
@@ -4782,6 +4824,7 @@
           }
         },
         "security": [],
+        "description": "the status of a changelog request",
         "requestBody": {
           "required": true,
           "content": {
@@ -4927,6 +4970,7 @@
           }
         },
         "security": [],
+        "description": "a changelog entry by its ID. Only authorized users with role 'STAFF' or 'ADMIN' can update an entry.",
         "requestBody": {
           "required": true,
           "content": {
@@ -5047,6 +5091,7 @@
           }
         },
         "security": [],
+        "description": "a changelog entry by its ID. Only authorized users with role 'ADMIN' can delete an entry.",
         "requestBody": {
           "required": true,
           "content": {
@@ -5083,6 +5128,9 @@
                             "type": "string"
                           },
                           "name": {
+                            "type": "string"
+                          },
+                          "urlName": {
                             "type": "string"
                           },
                           "isDefault": {
@@ -5126,7 +5174,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "a list of available OAuth providers"
       }
     },
     "/api/auth/invitation/{token}": {
@@ -5205,6 +5254,88 @@
           }
         },
         "security": [],
+        "description": "an invitation token and returns the associated user email, role, and expiration date.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": ""
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/users/invitations": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "token": {
+                        "type": "string"
+                      },
+                      "email": {
+                        "type": "string"
+                      },
+                      "role": {
+                        "type": "string"
+                      },
+                      "expiresAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "usedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "description": "a list of all invitation links in descending order by creation date. Requires admin permissions.",
         "requestBody": {
           "required": true,
           "content": {
@@ -5301,7 +5432,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "the user details for the given user ID. Only admins can view user details."
       },
       "delete": {
         "tags": [
@@ -5390,7 +5522,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "the user with the given user ID. Only admins can delete users."
       },
       "patch": {
         "tags": [
@@ -5474,87 +5607,8 @@
             }
           }
         },
-        "security": []
-      }
-    },
-    "/api/admin/users/invitations": {
-      "get": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "",
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string"
-                      },
-                      "token": {
-                        "type": "string"
-                      },
-                      "email": {
-                        "type": "string"
-                      },
-                      "role": {
-                        "type": "string"
-                      },
-                      "expiresAt": {
-                        "type": "string",
-                        "format": "date-time"
-                      },
-                      "usedAt": {
-                        "type": "string",
-                        "format": "date-time"
-                      },
-                      "createdAt": {
-                        "type": "string",
-                        "format": "date-time"
-                      },
-                      "updatedAt": {
-                        "type": "string",
-                        "format": "date-time"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
         "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "description": ""
-              }
-            }
-          }
-        }
+        "description": "the user details for the given user ID. Only admins can update user details."
       }
     },
     "/api/admin/oauth/providers": {
@@ -5687,7 +5741,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "all OAuth providers"
       },
       "post": {
         "tags": [
@@ -5808,6 +5863,7 @@
           }
         },
         "security": [],
+        "description": "a new OAuth provider",
         "requestBody": {
           "required": true,
           "content": {
@@ -5913,6 +5969,7 @@
           }
         },
         "security": [],
+        "description": "the details of an API key, including its name, last used date, created date, expiration date, revocation status, and permissions. Requires admin permissions.",
         "requestBody": {
           "required": true,
           "content": {
@@ -5978,6 +6035,7 @@
           }
         },
         "security": [],
+        "description": "an API key, making it unable to be used for authentication. Requires admin permissions.",
         "requestBody": {
           "required": true,
           "content": {
@@ -6110,6 +6168,7 @@
           }
         },
         "security": [],
+        "description": "an API key's name, revocation status, or expiration date. Requires admin permissions.",
         "requestBody": {
           "required": true,
           "content": {
@@ -6229,6 +6288,7 @@
           }
         },
         "security": [],
+        "description": "the details of a changelog entry by its ID, including its title, content, version, tags, and creation/update timestamps. Requires user authentication and permission to view the project.",
         "parameters": [
           {
             "name": "projectId",
@@ -6384,6 +6444,7 @@
           }
         },
         "security": [],
+        "description": "the title, content, version, and tags of a changelog entry by its ID. Requires user authentication and permission to edit the project.",
         "parameters": [
           {
             "name": "projectId",
@@ -6556,6 +6617,7 @@
           }
         },
         "security": [],
+        "description": "a changelog entry if the user is an admin, or creates a deletion request if the user is staff. Requires user authentication and appropriate permissions.",
         "parameters": [
           {
             "name": "projectId",
@@ -6715,6 +6777,7 @@
           }
         },
         "security": [],
+        "description": "the status (published/unpublished) of a changelog entry by its ID. Requires user authentication and permission to edit the project.",
         "parameters": [
           {
             "name": "projectId",
@@ -6756,98 +6819,8 @@
             }
           }
         },
-        "security": []
-      }
-    },
-    "/api/auth/oauth/callback/{providerName}": {
-      "get": {
-        "tags": [
-          "Auth"
-        ],
-        "summary": "",
-        "responses": {
-          "302": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "description": "Redirect to dashboard or specified redirect URL"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Authentication failed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
         "security": [],
-        "parameters": [
-          {
-            "name": "providerName",
-            "in": "query",
-            "description": "- The name of the OAuth provider",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ]
+        "description": "a list of project tags along with pagination metadata. Users must be authenticated to access this endpoint."
       }
     },
     "/api/auth/oauth/authorize/{providerName}": {
@@ -6957,6 +6930,7 @@
           }
         },
         "security": [],
+        "description": "to OAuth provider authorization URL",
         "parameters": [
           {
             "name": "providerName",
@@ -6968,6 +6942,192 @@
             }
           }
         ]
+      }
+    },
+    "/api/auth/oauth/callback/{providerName}": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "",
+        "responses": {
+          "302": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Redirect to dashboard or specified redirect URL"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Authentication failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "description": "the OAuth callback and completes authentication",
+        "parameters": [
+          {
+            "name": "providerName",
+            "in": "query",
+            "description": "- The name of the OAuth provider",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/admin/users/invitations/{id}": {
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "invitation": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "role": {
+                          "type": "string"
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "usedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "description": "an invitation by marking it as used. Only admins have the permission to revoke invitations."
       }
     },
     "/api/admin/users/{userId}/role": {
@@ -7077,100 +7237,8 @@
             }
           }
         },
-        "security": []
-      }
-    },
-    "/api/admin/users/invitations/{id}": {
-      "delete": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "",
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "type": "string"
-                    },
-                    "invitation": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "email": {
-                          "type": "string"
-                        },
-                        "role": {
-                          "type": "string"
-                        },
-                        "expiresAt": {
-                          "type": "string",
-                          "format": "date-time"
-                        },
-                        "usedAt": {
-                          "type": "string",
-                          "format": "date-time"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": []
+        "security": [],
+        "description": "a user's role to either 'ADMIN' or 'STAFF'. Only admins can perform this action. Requires user authentication."
       }
     },
     "/api/admin/oauth/providers/{id}": {
@@ -7284,6 +7352,7 @@
           }
         },
         "security": [],
+        "description": "an OAuth provider",
         "parameters": [
           {
             "name": "id",
@@ -7448,6 +7517,7 @@
           }
         },
         "security": [],
+        "description": "an existing OAuth provider",
         "parameters": [
           {
             "name": "id",
