@@ -209,6 +209,7 @@ function Calendar({
                         startMonth={startMonth}
                         endMonth={endMonth}
                         onPrevClick={onPrevClick}
+                        onNextClick={onNextClick}
                     />
                 ),
                 CaptionLabel: (props) => (
@@ -220,9 +221,8 @@ function Calendar({
                         {...props}
                     />
                 ),
-                MonthGrid: ({ className, children, ...props }) => (
+                MonthGrid: ({ className, ...props }) => (
                     <MonthGrid
-                        children={children}
                         className={className}
                         displayYears={displayYears}
                         startMonth={startMonth}
@@ -317,7 +317,7 @@ function Nav({
         }
         goToMonth(previousMonth)
         onPrevClick?.(previousMonth)
-    }, [previousMonth, goToMonth])
+    }, [previousMonth, goToMonth, onPrevClick, navView, displayYears, setDisplayYears])
 
     const handleNextClick = React.useCallback(() => {
         if (!nextMonth) return
@@ -337,7 +337,8 @@ function Nav({
         }
         goToMonth(nextMonth)
         onNextClick?.(nextMonth)
-    }, [goToMonth, nextMonth])
+    }, [goToMonth, nextMonth, onNextClick, navView, displayYears, setDisplayYears])
+
     return (
         <nav className={cn("flex items-center", className)}>
             <Button
@@ -407,7 +408,6 @@ function CaptionLabel({
 
 function MonthGrid({
                        className,
-                       children,
                        displayYears,
                        startMonth,
                        endMonth,
@@ -416,7 +416,6 @@ function MonthGrid({
                        ...props
                    }: {
     className?: string
-    children: React.ReactNode
     displayYears: { from: number; to: number }
     startMonth?: Date
     endMonth?: Date
@@ -438,7 +437,7 @@ function MonthGrid({
     }
     return (
         <table className={className} {...props}>
-            {children}
+            {props.children}
         </table>
     )
 }
