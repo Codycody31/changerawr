@@ -20,6 +20,7 @@ import {
     Settings,
     Shield,
     Users,
+    Info,
 } from 'lucide-react'
 import {Button} from '@/components/ui/button'
 import {Avatar, AvatarFallback, AvatarImage} from '@/components/ui/avatar'
@@ -92,6 +93,12 @@ const NAV_SECTIONS = [
                 href: "/dashboard/admin/system",
                 label: "System Config",
                 icon: ServerCog,
+                requiredRole: ['ADMIN']
+            },
+            {
+                href: "/dashboard/admin/about",
+                label: "About",
+                icon: Info,
                 requiredRole: ['ADMIN']
             },
         ]
