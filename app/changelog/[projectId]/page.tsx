@@ -8,7 +8,6 @@ import {Clock, GitBranch, Rss} from 'lucide-react'
 import {cn} from '@/lib/utils'
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 import Link from 'next/link'
-import {Metadata} from 'next'
 
 interface ChangelogResponse {
     project: {
@@ -39,12 +38,9 @@ async function getInitialData(projectId: string): Promise<ChangelogResponse | nu
 }
 
 // Generate metadata for SEO - use destructuring directly in parameter
-export async function generateMetadata({
-                                           params
-                                       }: {
-    params: { projectId: string }
-}): Promise<Metadata> {
-    const { projectId } = params;
+export async function generateMetadata({ params }: { params: Awaited<{ projectId: string }> }) {
+
+    const { projectId } = await params;
 
     // Get data using the projectId
     const data = await getInitialData(projectId)
@@ -118,11 +114,7 @@ function ChangelogSkeleton() {
 }
 
 // Main page component - define type inline to avoid conflicts
-export default async function Page({
-                                       params
-                                   }: {
-    params: { projectId: string }
-}) {
+export default async function Page({ params }: PageProps<{ projectId: string }>) {
     const { projectId } = params;
     const data = await getInitialData(projectId);
 
