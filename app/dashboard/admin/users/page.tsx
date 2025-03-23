@@ -69,7 +69,7 @@ interface UserData {
     name: string | null;
     role: Role;
     createdAt: string;
-    lastLogin: string | null;
+    lastLoginAt: string | null;
 }
 
 interface InvitationLink {
