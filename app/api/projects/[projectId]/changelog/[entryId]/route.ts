@@ -344,8 +344,20 @@ export async function PATCH(
 
             // Handle publishing
             if (action === 'publish') {
-                // Admins can publish directly
-                if (user.role === Role.ADMIN || project.allowAutoPublish) {
+                // Admins can always publish directly
+                if (user.role === Role.ADMIN) {
+                    const entry = await db.changelogEntry.update({
+                        where: { id: entryId },
+                        data: {
+                            publishedAt: new Date()
+                        },
+                        include: { tags: true }
+                    });
+                    return NextResponse.json(entry);
+                }
+
+                // Staff can publish directly if the project doesn't require approval OR allowAutoPublish is true
+                if (user.role === Role.STAFF && (!project.requireApproval || project.allowAutoPublish)) {
                     const entry = await db.changelogEntry.update({
                         where: { id: entryId },
                         data: {
