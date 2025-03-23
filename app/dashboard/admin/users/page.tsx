@@ -582,8 +582,8 @@ export default function UsersPage() {
                                             </TableCell>
                                             <TableCell>{format(new Date(user.createdAt), 'PP')}</TableCell>
                                             <TableCell>
-                                                {user.lastLogin
-                                                    ? format(new Date(user.lastLogin), 'PP')
+                                                {user.lastLoginAt
+                                                    ? format(new Date(user.lastLoginAt), 'PP')
                                                     : 'Never'}
                                             </TableCell>
                                             <TableCell className="text-right">
