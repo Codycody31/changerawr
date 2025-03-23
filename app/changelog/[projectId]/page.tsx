@@ -12,7 +12,7 @@ import {
     TooltipTrigger
 } from '@/components/ui/tooltip';
 import Link from 'next/link';
-import { Metadata, ResolvingMetadata } from 'next';
+import { Metadata } from 'next';
 
 interface ChangelogResponse {
     project: {
@@ -47,8 +47,7 @@ async function getInitialData(projectId: string): Promise<ChangelogResponse | nu
 }
 
 export async function generateMetadata(
-    { params }: ChangelogPageProps,
-    parent: ResolvingMetadata
+    { params }: ChangelogPageProps
 ): Promise<Metadata> {
     const { projectId } = await params;
     const data = await getInitialData(projectId);
