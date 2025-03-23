@@ -1,3 +1,4 @@
+// app/changelog/[projectId]/page.tsx
 import {Suspense} from 'react'
 import {notFound} from 'next/navigation'
 import ChangelogEntries from '@/components/changelog/ChangelogEntries'
@@ -8,9 +9,6 @@ import {cn} from '@/lib/utils'
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 import Link from 'next/link'
 import {Metadata} from 'next'
-
-// HACK: Force TypeScript to accept our params type by casting to any
-type HackyParams = unknown;
 
 interface ChangelogResponse {
     project: {
@@ -40,11 +38,13 @@ async function getInitialData(projectId: string): Promise<ChangelogResponse | nu
     return res.json()
 }
 
-// Generate metadata for SEO
-export async function generateMetadata(
-    props: HackyParams,
-): Promise<Metadata> {
-    const projectId = props.params.projectId
+// Generate metadata for SEO - use destructuring directly in parameter
+export async function generateMetadata({
+                                           params
+                                       }: {
+    params: { projectId: string }
+}): Promise<Metadata> {
+    const { projectId } = params;
 
     // Get data using the projectId
     const data = await getInitialData(projectId)
@@ -117,9 +117,13 @@ function ChangelogSkeleton() {
     )
 }
 
-// HACK: Use direct type casting to make TypeScript happy
-const ChangelogPage = async (props: HackyParams) => {
-    const projectId = props.params.projectId;
+// Main page component - define type inline to avoid conflicts
+export default async function Page({
+                                       params
+                                   }: {
+    params: { projectId: string }
+}) {
+    const { projectId } = params;
     const data = await getInitialData(projectId);
 
     if (!data) {
@@ -236,7 +240,4 @@ const ChangelogPage = async (props: HackyParams) => {
             </div>
         </div>
     );
-};
-
-// HACK: This is a bypass for the TypeScript checking
-export default ChangelogPage;
+}
