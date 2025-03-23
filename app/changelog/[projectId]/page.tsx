@@ -9,7 +9,8 @@ import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/compon
 import Link from 'next/link'
 import {Metadata} from 'next'
 
-interface PageProps {
+// Export the interface to make it available to Next.js type system
+export type PageProps = {
     params: {
         projectId: string;
     };
@@ -47,7 +48,6 @@ async function getInitialData(projectId: string): Promise<ChangelogResponse | nu
 export async function generateMetadata(
     {params}: PageProps,
 ): Promise<Metadata> {
-    // Access projectId correctly - params is no longer a Promise in Next.js 15
     const projectId = params.projectId
 
     // Get data using the projectId
@@ -85,7 +85,6 @@ export async function generateMetadata(
 // Generate static params for static generation
 export async function generateStaticParams() {
     // Fetch list of project IDs that should be statically generated
-    // This would be customized based on your data source
     try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/changelog/projects`)
         if (!res.ok) return []
@@ -123,7 +122,6 @@ function ChangelogSkeleton() {
 }
 
 export default async function ChangelogPage({params}: PageProps) {
-    // Use an IIFE to await params properly
     const projectId = params.projectId;
     const data = await getInitialData(projectId);
 
