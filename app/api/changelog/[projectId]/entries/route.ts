@@ -3,12 +3,40 @@ import { db } from '@/lib/db'
 
 const ITEMS_PER_PAGE = 10
 
+// Define type for search params
+type SortOrder = 'asc' | 'desc'
+
+// Define interfaces for the where conditions
+interface BaseWhereClause {
+    changelogId: string;
+    publishedAt: { not: null };
+    OR?: SearchCondition[] | CursorCondition[];
+    tags?: {
+        some: {
+            id: { in: string[] }
+        }
+    };
+}
+
+interface SearchCondition {
+    title?: { contains: string; mode: 'insensitive' };
+    content?: { contains: string; mode: 'insensitive' };
+}
+
+interface CursorCondition {
+    publishedAt: { lt: Date } | { gt: Date } | { equals: Date };
+    id?: { lt: string } | { gt: string };
+}
+
 /**
  * @method GET
- * @description Fetches the changelog entries for a given public project, optionally paginated by cursor
+ * @description Fetches the changelog entries for a given public project, with filtering, searching and pagination
  * @query {
  *   projectId: String, required
  *   cursor?: String, optional
+ *   search?: String, optional - Search in title and content
+ *   tags?: String, optional - Comma-separated list of tag IDs
+ *   sort?: 'newest'|'oldest', optional - Default is 'newest'
  * }
  * @response 200 {
  *   "type": "object",
@@ -28,7 +56,7 @@ const ITEMS_PER_PAGE = 10
  *           "id": { "type": "string" },
  *           "title": { "type": "string" },
  *           "content": { "type": "string" },
- *           "version": { "type": "number" },
+ *           "version": { "type": "string" },
  *           "publishedAt": { "type": "string", "format": "date-time" },
  *           "tags": {
  *             "type": "array",
@@ -43,7 +71,7 @@ const ITEMS_PER_PAGE = 10
  *         }
  *       }
  *     },
- *     "nextCursor": { "type": "string", "nullabel": true }
+ *     "nextCursor": { "type": "string", "nullable": true }
  *   }
  * }
  * @error 400 Invalid request data
@@ -60,7 +88,15 @@ export async function GET(
             const { params } = context
             const { projectId } = await (async () => params)();
             const { searchParams } = new URL(request.url)
+
+            // Get pagination, search, and filter parameters
             const cursor = searchParams.get('cursor')
+            const search = searchParams.get('search')
+            const tagsParam = searchParams.get('tags')
+            const sortParam = searchParams.get('sort') || 'newest'
+
+            const tagIds = tagsParam ? tagsParam.split(',') : []
+            const sortOrder: SortOrder = sortParam === 'oldest' ? 'asc' : 'desc'
 
             // Get project and changelog
             const project = await db.project.findUnique({
@@ -86,33 +122,62 @@ export async function GET(
                 )
             }
 
-            // Build where clause for pagination
-            const where: {
-                changelogId: string;
-                publishedAt: { not: null };
-                OR?: Array<{
-                    publishedAt: { lt: Date } | { equals: Date };
-                    id?: { lt: string };
-                }>;
-            } = {
+            // Build base where clause
+            const baseWhere: BaseWhereClause = {
                 changelogId: project.changelog.id,
                 publishedAt: { not: null }
-            };
+            }
+
+            // Add search condition if present
+            if (search) {
+                const searchConditions: SearchCondition[] = [
+                    { title: { contains: search, mode: 'insensitive' } },
+                    { content: { contains: search, mode: 'insensitive' } }
+                ]
+                baseWhere.OR = searchConditions
+            }
+
+            // Add tags filter if present
+            if (tagIds.length > 0) {
+                baseWhere.tags = {
+                    some: {
+                        id: { in: tagIds }
+                    }
+                }
+            }
+
+            // Build cursor-based pagination where clause
+            let where: BaseWhereClause = { ...baseWhere }
 
             if (cursor) {
                 const cursorEntry = await db.changelogEntry.findUnique({
                     where: { id: cursor },
                     select: { publishedAt: true }
-                });
+                })
 
                 if (cursorEntry?.publishedAt) {
-                    where.OR = [
-                        { publishedAt: { lt: cursorEntry.publishedAt } },
-                        {
-                            publishedAt: { equals: cursorEntry.publishedAt },
-                            id: { lt: cursor }
-                        }
-                    ];
+                    // Different cursor logic based on sort order
+                    const cursorConditions: CursorCondition[] = sortOrder === 'desc'
+                        ? [
+                            { publishedAt: { lt: cursorEntry.publishedAt } },
+                            {
+                                publishedAt: { equals: cursorEntry.publishedAt },
+                                id: { lt: cursor }
+                            }
+                        ]
+                        : [
+                            { publishedAt: { gt: cursorEntry.publishedAt } },
+                            {
+                                publishedAt: { equals: cursorEntry.publishedAt },
+                                id: { gt: cursor }
+                            }
+                        ]
+
+                    // Create a new where clause with cursor conditions
+                    where = {
+                        ...baseWhere,
+                        OR: cursorConditions
+                    }
                 }
             }
 
@@ -121,8 +186,8 @@ export async function GET(
                 where,
                 take: ITEMS_PER_PAGE + 1,
                 orderBy: [
-                    { publishedAt: 'desc' },
-                    { id: 'desc' }
+                    { publishedAt: sortOrder },
+                    { id: sortOrder }
                 ],
                 include: {
                     tags: {

@@ -1,33 +1,39 @@
-import { Suspense } from 'react'
-import { notFound } from 'next/navigation'
+import {Suspense} from 'react'
+import {notFound} from 'next/navigation'
 import ChangelogEntries from '@/components/changelog/ChangelogEntries'
-import { Skeleton } from '@/components/ui/skeleton'
-import { GitBranch, Clock, Rss } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import ShareButton from '@/components/changelog/ShareButton'
+import {Skeleton} from '@/components/ui/skeleton'
+import {Clock, GitBranch, Rss} from 'lucide-react'
+import {cn} from '@/lib/utils'
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 import Link from 'next/link'
+import {Metadata} from 'next'
 
 interface PageProps {
-    params: Promise<{
+    params: {
         projectId: string;
-    }>;
+    };
 }
-
 
 interface ChangelogResponse {
     project: {
         id: string
         name: string
+        description?: string
     }
     items: Array<{
         id: string
         publishedAt: string
+        title?: string
     }>
     nextCursor?: string
 }
 
 async function getInitialData(projectId: string): Promise<ChangelogResponse | null> {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/changelog/${projectId}/entries`)
+    const res = await fetch(
+        `${process.env.NEXT_PUBLIC_APP_URL}/api/changelog/${projectId}/entries`,
+        {next: {revalidate: 300}} // Revalidate every 5 minutes
+    )
 
     if (!res.ok) {
         if (res.status === 404) return null
@@ -37,9 +43,89 @@ async function getInitialData(projectId: string): Promise<ChangelogResponse | nu
     return res.json()
 }
 
-export default async function ChangelogPage({ params }: PageProps) {
+// Generate metadata for SEO
+export async function generateMetadata(
+    {params}: PageProps,
+): Promise<Metadata> {
+    // Access projectId correctly - params is no longer a Promise in Next.js 15
+    const projectId = params.projectId
+
+    // Get data using the projectId
+    const data = await getInitialData(projectId)
+
+    if (!data) {
+        return {
+            title: 'Changelog Not Found',
+            description: 'The requested changelog could not be found.'
+        }
+    }
+
+    const {project, items} = data
+    const latestUpdate = items[0]?.publishedAt
+        ? new Date(items[0].publishedAt).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        })
+        : null
+
+    return {
+        title: `${project.name} Changelog & Release Notes`,
+        description: project.description ||
+            `View the latest updates and changes for ${project.name}${latestUpdate ? ` - last updated ${latestUpdate}` : ''}.`,
+        openGraph: {
+            title: `${project.name} Changelog`,
+            description: project.description ||
+                `Stay up to date with the latest improvements, features, and bug fixes for ${project.name}.`,
+            type: 'website',
+        },
+    }
+}
+
+// Generate static params for static generation
+export async function generateStaticParams() {
+    // Fetch list of project IDs that should be statically generated
+    // This would be customized based on your data source
+    try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/changelog/projects`)
+        if (!res.ok) return []
+
+        const projects = await res.json()
+        return projects.map((project: { id: string }) => ({
+            projectId: project.id,
+        }))
+    } catch (error) {
+        console.error('Error generating static params:', error)
+        return []
+    }
+}
+
+// Loading component for Suspense
+function ChangelogSkeleton() {
+    return (
+        <div className="space-y-12">
+            {[...Array(3)].map((_, i) => (
+                <div key={i} className="space-y-4 animate-pulse">
+                    <div className="space-y-3">
+                        <Skeleton className="h-8 w-[300px]"/>
+                        <Skeleton className="h-5 w-[200px]"/>
+                    </div>
+                    <Skeleton className="h-48 w-full rounded-lg"/>
+                    <div className="flex gap-2 pt-4">
+                        <Skeleton className="h-6 w-16 rounded-full"/>
+                        <Skeleton className="h-6 w-16 rounded-full"/>
+                        <Skeleton className="h-6 w-16 rounded-full"/>
+                    </div>
+                </div>
+            ))}
+        </div>
+    )
+}
+
+export default async function ChangelogPage({params}: PageProps) {
     return await (async () => {
-        const { projectId } = await (async () => params)();
+        // Use an IIFE to await params properly
+        const projectId = params.projectId;
         const data = await getInitialData(projectId);
 
         if (!data) {
@@ -51,23 +137,29 @@ export default async function ChangelogPage({ params }: PageProps) {
             lastUpdate: data.items[0]?.publishedAt,
         };
 
+        // Generate current page URL for sharing
+        const pageUrl = `${process.env.NEXT_PUBLIC_APP_URL}/changelog/${projectId}`;
+
         return (
             <div className="min-h-screen bg-background">
-                {/* Subtle gradient background */}
-                <div className="absolute top-0 inset-x-0 h-96">
-                    <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-primary/3 to-transparent" />
-                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(var(--primary-rgb),0.07),transparent)]" />
+                {/* Gradient background */}
+                <div className="absolute top-0 inset-x-0 h-96 overflow-hidden pointer-events-none">
+                    <div className="absolute inset-0 bg-gradient-to-b from-primary/10 via-primary/5 to-transparent"/>
+                    <div
+                        className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(var(--primary-rgb),0.1),transparent)]"/>
                 </div>
 
                 <div className="relative pb-24">
-                    <header className="relative py-24 px-4 md:py-32 max-w-6xl mx-auto">
-                        <div className="text-center space-y-8">
+                    <header className="relative py-16 md:py-24 px-4 max-w-6xl mx-auto">
+                        <div className="text-center space-y-6">
                             {/* Project name */}
-                            <h1 className={cn(
-                                "text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight",
-                                "bg-gradient-to-b from-foreground via-foreground/95 to-foreground/80",
-                                "bg-clip-text text-transparent"
-                            )}>
+                            <h1
+                                className={cn(
+                                    "text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight",
+                                    "bg-gradient-to-b from-foreground via-foreground/95 to-foreground/80",
+                                    "bg-clip-text text-transparent"
+                                )}
+                            >
                                 {data.project.name}
                             </h1>
 
@@ -76,26 +168,26 @@ export default async function ChangelogPage({ params }: PageProps) {
                                 Changelog &amp; Release Notes
                             </p>
 
-                            {/* Stats display with RSS link */}
+                            {/* Stats display with RSS and share links */}
                             <div className="flex flex-col items-center gap-6">
-                                <div className="inline-flex items-center gap-8 px-8 py-4
-                                              bg-background/60 backdrop-blur-sm
-                                              border border-border/40
-                                              rounded-full
-                                              hover:bg-background/80 hover:border-border/60
-                                              transition-all duration-300">
+                                <div className="inline-flex flex-wrap justify-center items-center gap-4 md:gap-8 px-6 md:px-8 py-4
+                            bg-background/60 backdrop-blur-sm
+                            border border-border/40
+                            rounded-full
+                            hover:bg-background/80 hover:border-border/60
+                            transition-all duration-300">
                                     <div className="flex items-center gap-3">
-                                        <GitBranch className="w-5 h-5 text-muted-foreground" />
+                                        <GitBranch className="w-5 h-5 text-muted-foreground"/>
                                         <span className="font-medium text-lg">
-                                            {stats.totalEntries} Updates
-                                        </span>
+                    {stats.totalEntries} Updates
+                  </span>
                                     </div>
 
                                     {stats.lastUpdate && (
                                         <>
-                                            <div className="w-1.5 h-1.5 rounded-full bg-border" />
+                                            <div className="hidden md:block w-1.5 h-1.5 rounded-full bg-border"/>
                                             <div className="flex items-center gap-3">
-                                                <Clock className="w-5 h-5 text-muted-foreground" />
+                                                <Clock className="w-5 h-5 text-muted-foreground"/>
                                                 <time
                                                     dateTime={stats.lastUpdate}
                                                     className="font-medium text-lg tabular-nums"
@@ -110,7 +202,7 @@ export default async function ChangelogPage({ params }: PageProps) {
                                         </>
                                     )}
 
-                                    <div className="w-1.5 h-1.5 rounded-full bg-border" />
+                                    <div className="hidden md:block w-1.5 h-1.5 rounded-full bg-border"/>
 
                                     <TooltipProvider>
                                         <Tooltip>
@@ -120,7 +212,7 @@ export default async function ChangelogPage({ params }: PageProps) {
                                                     className="flex items-center gap-2 text-muted-foreground hover:text-orange-500 transition-colors duration-200"
                                                     aria-label="Subscribe to RSS feed"
                                                 >
-                                                    <Rss className="w-5 h-5" />
+                                                    <Rss className="w-5 h-5"/>
                                                     <span className="font-medium text-lg">RSS</span>
                                                 </Link>
                                             </TooltipTrigger>
@@ -129,38 +221,24 @@ export default async function ChangelogPage({ params }: PageProps) {
                                             </TooltipContent>
                                         </Tooltip>
                                     </TooltipProvider>
+
+                                    <div className="hidden md:block w-1.5 h-1.5 rounded-full bg-border"/>
+
+                                    {/* Client-side Share Button */}
+                                    <ShareButton url={pageUrl}/>
                                 </div>
                             </div>
                         </div>
                     </header>
 
                     <div className="relative max-w-7xl mx-auto px-4 md:px-6">
-                        <Suspense
-                            fallback={
-                                <div className="space-y-12">
-                                    {[...Array(3)].map((_, i) => (
-                                        <div key={i} className="space-y-4 animate-pulse">
-                                            <div className="space-y-3">
-                                                <Skeleton className="h-8 w-[300px]" />
-                                                <Skeleton className="h-5 w-[200px]" />
-                                            </div>
-                                            <Skeleton className="h-48 w-full" />
-                                            <div className="flex gap-2 pt-4">
-                                                <Skeleton className="h-6 w-16" />
-                                                <Skeleton className="h-6 w-16" />
-                                                <Skeleton className="h-6 w-16" />
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            }
-                        >
-                            <ChangelogEntries projectId={projectId} />
+                        <Suspense fallback={<ChangelogSkeleton/>}>
+                            <ChangelogEntries projectId={projectId}/>
                         </Suspense>
                     </div>
 
                     {/* Footer spacer */}
-                    <div className="h-12" />
+                    <div className="h-12"/>
                 </div>
             </div>
         );

@@ -1,5 +1,6 @@
 import { Metadata } from 'next'
 import React from "react";
+import ScrollToTopButton from "@/components/changelog/ScrollToTopButton";
 
 interface ChangelogLayoutProps {
     params: Promise<{ projectId: string }>
@@ -24,6 +25,7 @@ export async function generateMetadata(
 export default function ChangelogLayout({ children }: ChangelogLayoutProps) {
     return (
         <div className="container mx-auto py-8">
+            <ScrollToTopButton/>
             {children}
         </div>
     )
