@@ -123,124 +123,122 @@ function ChangelogSkeleton() {
 }
 
 export default async function ChangelogPage({params}: PageProps) {
-    return await (async () => {
-        // Use an IIFE to await params properly
-        const projectId = params.projectId;
-        const data = await getInitialData(projectId);
+    // Use an IIFE to await params properly
+    const projectId = params.projectId;
+    const data = await getInitialData(projectId);
 
-        if (!data) {
-            notFound();
-        }
+    if (!data) {
+        notFound();
+    }
 
-        const stats = {
-            totalEntries: data.items.length + (data.nextCursor ? '+' : ''),
-            lastUpdate: data.items[0]?.publishedAt,
-        };
+    const stats = {
+        totalEntries: data.items.length + (data.nextCursor ? '+' : ''),
+        lastUpdate: data.items[0]?.publishedAt,
+    };
 
-        // Generate current page URL for sharing
-        const pageUrl = `${process.env.NEXT_PUBLIC_APP_URL}/changelog/${projectId}`;
+    // Generate current page URL for sharing
+    const pageUrl = `${process.env.NEXT_PUBLIC_APP_URL}/changelog/${projectId}`;
 
-        return (
-            <div className="min-h-screen bg-background">
-                {/* Gradient background */}
-                <div className="absolute top-0 inset-x-0 h-96 overflow-hidden pointer-events-none">
-                    <div className="absolute inset-0 bg-gradient-to-b from-primary/10 via-primary/5 to-transparent"/>
-                    <div
-                        className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(var(--primary-rgb),0.1),transparent)]"/>
-                </div>
+    return (
+        <div className="min-h-screen bg-background">
+            {/* Gradient background */}
+            <div className="absolute top-0 inset-x-0 h-96 overflow-hidden pointer-events-none">
+                <div className="absolute inset-0 bg-gradient-to-b from-primary/10 via-primary/5 to-transparent"/>
+                <div
+                    className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(var(--primary-rgb),0.1),transparent)]"/>
+            </div>
 
-                <div className="relative pb-24">
-                    <header className="relative py-16 md:py-24 px-4 max-w-6xl mx-auto">
-                        <div className="text-center space-y-6">
-                            {/* Project name */}
-                            <h1
-                                className={cn(
-                                    "text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight",
-                                    "bg-gradient-to-b from-foreground via-foreground/95 to-foreground/80",
-                                    "bg-clip-text text-transparent"
-                                )}
-                            >
-                                {data.project.name}
-                            </h1>
+            <div className="relative pb-24">
+                <header className="relative py-16 md:py-24 px-4 max-w-6xl mx-auto">
+                    <div className="text-center space-y-6">
+                        {/* Project name */}
+                        <h1
+                            className={cn(
+                                "text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight",
+                                "bg-gradient-to-b from-foreground via-foreground/95 to-foreground/80",
+                                "bg-clip-text text-transparent"
+                            )}
+                        >
+                            {data.project.name}
+                        </h1>
 
-                            {/* Subtitle */}
-                            <p className="text-xl md:text-2xl text-muted-foreground font-medium">
-                                Changelog &amp; Release Notes
-                            </p>
+                        {/* Subtitle */}
+                        <p className="text-xl md:text-2xl text-muted-foreground font-medium">
+                            Changelog &amp; Release Notes
+                        </p>
 
-                            {/* Stats display with RSS and share links */}
-                            <div className="flex flex-col items-center gap-6">
-                                <div className="inline-flex flex-wrap justify-center items-center gap-4 md:gap-8 px-6 md:px-8 py-4
+                        {/* Stats display with RSS and share links */}
+                        <div className="flex flex-col items-center gap-6">
+                            <div className="inline-flex flex-wrap justify-center items-center gap-4 md:gap-8 px-6 md:px-8 py-4
                             bg-background/60 backdrop-blur-sm
                             border border-border/40
                             rounded-full
                             hover:bg-background/80 hover:border-border/60
                             transition-all duration-300">
-                                    <div className="flex items-center gap-3">
-                                        <GitBranch className="w-5 h-5 text-muted-foreground"/>
-                                        <span className="font-medium text-lg">
+                                <div className="flex items-center gap-3">
+                                    <GitBranch className="w-5 h-5 text-muted-foreground"/>
+                                    <span className="font-medium text-lg">
                     {stats.totalEntries} Updates
                   </span>
-                                    </div>
-
-                                    {stats.lastUpdate && (
-                                        <>
-                                            <div className="hidden md:block w-1.5 h-1.5 rounded-full bg-border"/>
-                                            <div className="flex items-center gap-3">
-                                                <Clock className="w-5 h-5 text-muted-foreground"/>
-                                                <time
-                                                    dateTime={stats.lastUpdate}
-                                                    className="font-medium text-lg tabular-nums"
-                                                >
-                                                    {new Intl.DateTimeFormat('en-US', {
-                                                        month: 'long',
-                                                        day: 'numeric',
-                                                        year: 'numeric',
-                                                    }).format(new Date(stats.lastUpdate))}
-                                                </time>
-                                            </div>
-                                        </>
-                                    )}
-
-                                    <div className="hidden md:block w-1.5 h-1.5 rounded-full bg-border"/>
-
-                                    <TooltipProvider>
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Link
-                                                    href={`/changelog/${projectId}/rss.xml`}
-                                                    className="flex items-center gap-2 text-muted-foreground hover:text-orange-500 transition-colors duration-200"
-                                                    aria-label="Subscribe to RSS feed"
-                                                >
-                                                    <Rss className="w-5 h-5"/>
-                                                    <span className="font-medium text-lg">RSS</span>
-                                                </Link>
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                                Subscribe to updates via RSS
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    </TooltipProvider>
-
-                                    <div className="hidden md:block w-1.5 h-1.5 rounded-full bg-border"/>
-
-                                    {/* Client-side Share Button */}
-                                    <ShareButton url={pageUrl}/>
                                 </div>
+
+                                {stats.lastUpdate && (
+                                    <>
+                                        <div className="hidden md:block w-1.5 h-1.5 rounded-full bg-border"/>
+                                        <div className="flex items-center gap-3">
+                                            <Clock className="w-5 h-5 text-muted-foreground"/>
+                                            <time
+                                                dateTime={stats.lastUpdate}
+                                                className="font-medium text-lg tabular-nums"
+                                            >
+                                                {new Intl.DateTimeFormat('en-US', {
+                                                    month: 'long',
+                                                    day: 'numeric',
+                                                    year: 'numeric',
+                                                }).format(new Date(stats.lastUpdate))}
+                                            </time>
+                                        </div>
+                                    </>
+                                )}
+
+                                <div className="hidden md:block w-1.5 h-1.5 rounded-full bg-border"/>
+
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Link
+                                                href={`/changelog/${projectId}/rss.xml`}
+                                                className="flex items-center gap-2 text-muted-foreground hover:text-orange-500 transition-colors duration-200"
+                                                aria-label="Subscribe to RSS feed"
+                                            >
+                                                <Rss className="w-5 h-5"/>
+                                                <span className="font-medium text-lg">RSS</span>
+                                            </Link>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            Subscribe to updates via RSS
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
+
+                                <div className="hidden md:block w-1.5 h-1.5 rounded-full bg-border"/>
+
+                                {/* Client-side Share Button */}
+                                <ShareButton url={pageUrl}/>
                             </div>
                         </div>
-                    </header>
-
-                    <div className="relative max-w-7xl mx-auto px-4 md:px-6">
-                        <Suspense fallback={<ChangelogSkeleton/>}>
-                            <ChangelogEntries projectId={projectId}/>
-                        </Suspense>
                     </div>
+                </header>
 
-                    {/* Footer spacer */}
-                    <div className="h-12"/>
+                <div className="relative max-w-7xl mx-auto px-4 md:px-6">
+                    <Suspense fallback={<ChangelogSkeleton/>}>
+                        <ChangelogEntries projectId={projectId}/>
+                    </Suspense>
                 </div>
+
+                {/* Footer spacer */}
+                <div className="h-12"/>
             </div>
-        );
-    })();
+        </div>
+    );
 }
