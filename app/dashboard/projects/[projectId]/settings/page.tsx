@@ -21,7 +21,7 @@ import {
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import {useToast} from '@/hooks/use-toast'
-import {AlertTriangle, Loader2, Plus, Puzzle, Settings, Shield, Tag, X, Lock, ExternalLink, Rss, Code, AlertCircle, Boxes} from 'lucide-react'
+import {AlertTriangle, Loader2, Plus, Puzzle, Settings, Shield, Tag, X, Lock, ExternalLink, Rss, Code, Boxes} from 'lucide-react'
 import {DestructiveActionRequest} from '@/components/changelog/RequestHandler'
 import {useAuth} from '@/context/auth'
 import {Alert, AlertDescription} from '@/components/ui/alert'
@@ -221,8 +221,7 @@ export default function ProjectSettingsPage({params}: ProjectSettingsPageProps) 
                         </CardHeader>
                         <CardContent className="space-y-6">
                             {!project.isPublic && (
-                                <Alert variant="warning">
-                                    <AlertCircle className="h-4 w-4" />
+                                <Alert hasIcon={true} variant="warning">
                                     <AlertDescription>
                                         Some integrations require your project to be public. Make your project public in settings to enable all features.
                                     </AlertDescription>

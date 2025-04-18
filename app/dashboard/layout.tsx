@@ -1,9 +1,9 @@
 'use client'
 
-import React, {useEffect, useState} from 'react'
+import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
-import {usePathname, useRouter} from 'next/navigation'
-import {useAuth} from '@/context/auth'
+import { usePathname, useRouter } from 'next/navigation'
+import { useAuth } from '@/context/auth'
 import {
     ChevronLeft,
     ChevronRight,
@@ -21,15 +21,35 @@ import {
     Shield,
     Users,
     Info,
+    X,
 } from 'lucide-react'
-import {Button} from '@/components/ui/button'
-import {Avatar, AvatarFallback, AvatarImage} from '@/components/ui/avatar'
-import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,} from '@/components/ui/dialog'
-import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,} from '@/components/ui/tooltip'
-import {Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,} from "@/components/ui/sheet"
-import {getGravatarUrl} from '@/lib/utils/gravatar'
-import {cn} from '@/lib/utils'
-import {User} from "@prisma/client";
+import { Button } from '@/components/ui/button'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog'
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip'
+import {
+    Sheet,
+    SheetContent,
+    SheetHeader,
+    SheetTitle,
+    SheetTrigger,
+    SheetClose,
+} from "@/components/ui/sheet"
+import { getGravatarUrl } from '@/lib/utils/gravatar'
+import { cn } from '@/lib/utils'
+import { User } from "@prisma/client";
+import { useMediaQuery } from '@/hooks/use-media-query'
 
 // Navigation Configuration
 const NAV_SECTIONS = [
@@ -117,7 +137,7 @@ const NAV_SECTIONS = [
 ]
 
 // User Menu Component
-function UserMenu({user, logout}: { user: User; logout: () => Promise<void> }) {
+function UserMenu({ user, logout }: { user: User; logout: () => Promise<void> }) {
     const getUserInitial = () => {
         if (user.name) return user.name[0].toUpperCase()
         if (user.email) return user.email[0].toUpperCase()
@@ -203,6 +223,14 @@ function Sidebar({
     setIsExpanded: (expanded: boolean) => void;
 }) {
     const pathname = usePathname()
+    const isTablet = useMediaQuery('(max-width: 1024px)')
+
+    useEffect(() => {
+        // Auto-collapse sidebar on tablet devices
+        if (isTablet) {
+            setIsExpanded(false)
+        }
+    }, [isTablet, setIsExpanded])
 
     // Filter navigation items based on user role
     const filteredNavSections = NAV_SECTIONS.map(section => ({
@@ -220,7 +248,7 @@ function Sidebar({
             )}
             data-expanded={isExpanded}
         >
-            <div className="flex flex-col w-full">
+            <div className="flex flex-col w-full h-full">
                 {/* Header */}
                 <div className="h-16 flex items-center justify-between border-b px-4">
                     {isExpanded && (
@@ -236,6 +264,7 @@ function Sidebar({
                         size="icon"
                         className={cn("", isExpanded ? "" : "mx-auto")}
                         onClick={() => setIsExpanded(!isExpanded)}
+                        aria-label={isExpanded ? "Collapse sidebar" : "Expand sidebar"}
                     >
                         {isExpanded ? (
                             <ChevronLeft className="h-5 w-5"/>
@@ -250,18 +279,18 @@ function Sidebar({
                     {filteredNavSections.map((section, sectionIndex) => (
                         <div key={sectionIndex} className="mb-4">
                             {isExpanded && (
-                                <p className="text-xs text-muted-foreground px-4 mb-2">
+                                <p className="text-xs font-medium text-muted-foreground px-4 mb-2">
                                     {section.title}
                                 </p>
                             )}
                             {section.items.map((item) => (
                                 <TooltipProvider key={item.href}>
-                                    <Tooltip>
+                                    <Tooltip delayDuration={300}>
                                         <TooltipTrigger asChild>
                                             <Link
                                                 href={item.href}
                                                 className={cn(
-                                                    "flex items-center p-2 transition-colors",
+                                                    "flex items-center p-2 transition-colors rounded-md mx-2",
                                                     isExpanded ? "px-4" : "justify-center",
                                                     pathname === item.href
                                                         ? "bg-accent text-accent-foreground"
@@ -289,7 +318,7 @@ function Sidebar({
                 </nav>
 
                 {/* User Section */}
-                <div className="border-t p-2">
+                <div className="border-t p-2 mt-auto">
                     {isExpanded ? (
                         <UserMenu user={user} logout={logout}/>
                     ) : (
@@ -301,6 +330,7 @@ function Sidebar({
                                         size="icon"
                                         className="w-full h-auto py-2"
                                         onClick={() => setIsExpanded(true)}
+                                        aria-label="Show user profile"
                                     >
                                         <Avatar className="h-8 w-8">
                                             <AvatarImage
@@ -326,8 +356,9 @@ function Sidebar({
 }
 
 // Mobile Navigation Component
-function MobileNav({user, logout}: { user: User; logout: () => Promise<void> }) {
+function MobileNav({ user, logout }: { user: User; logout: () => Promise<void> }) {
     const pathname = usePathname()
+    const [isOpen, setIsOpen] = useState(false)
 
     // Filter navigation items based on user role
     const filteredNavSections = NAV_SECTIONS.map(section => ({
@@ -345,46 +376,132 @@ function MobileNav({user, logout}: { user: User; logout: () => Promise<void> }) 
                 </Link>
 
                 <div className="flex items-center gap-2">
-                    <Sheet>
+                    <Sheet open={isOpen} onOpenChange={setIsOpen}>
                         <SheetTrigger asChild>
                             <Button variant="ghost" size="icon">
                                 <Menu className="h-5 w-5"/>
                             </Button>
                         </SheetTrigger>
-                        <SheetContent>
-                            <SheetHeader>
-                                <SheetTitle>Navigation</SheetTitle>
-                            </SheetHeader>
-                            <div className="mt-4">
-                                {filteredNavSections.map((section, sectionIndex) => (
-                                    <div key={sectionIndex} className="mb-4">
-                                        <p className="text-xs text-muted-foreground mb-2">
-                                            {section.title}
-                                        </p>
-                                        {section.items.map((item) => (
-                                            <Link
-                                                key={item.href}
-                                                href={item.href}
-                                                className={cn(
-                                                    "flex items-center p-2 rounded-md transition-colors mb-1",
-                                                    pathname === item.href
-                                                        ? "bg-accent text-accent-foreground"
-                                                        : "hover:bg-accent/50 text-muted-foreground hover:text-foreground"
-                                                )}
-                                            >
-                                                <item.icon className="h-5 w-5 mr-3"/>
-                                                <span className="text-sm">
-                                                    {item.label}
-                                                </span>
-                                            </Link>
+                        <SheetContent side="left" className="w-[85%] sm:w-[350px] p-0">
+                            <div className="flex flex-col h-full">
+                                <SheetHeader className="p-4 border-b">
+                                    <div className="flex items-center justify-between">
+                                        <SheetTitle className="text-lg">Menu</SheetTitle>
+                                        <SheetClose asChild>
+                                            <Button variant="ghost" size="icon">
+                                                <X className="h-4 w-4" />
+                                            </Button>
+                                        </SheetClose>
+                                    </div>
+                                </SheetHeader>
+
+                                <div className="flex-1 overflow-y-auto">
+                                    <div className="p-4">
+                                        <div className="mb-6 flex flex-col space-y-1.5">
+                                            <UserMenu user={user} logout={logout}/>
+                                        </div>
+
+                                        {filteredNavSections.map((section, sectionIndex) => (
+                                            <div key={sectionIndex} className="mb-6">
+                                                <p className="text-xs font-medium text-muted-foreground mb-2">
+                                                    {section.title}
+                                                </p>
+                                                <div className="space-y-1">
+                                                    {section.items.map((item) => (
+                                                        <SheetClose key={item.href} asChild>
+                                                            <Link
+                                                                href={item.href}
+                                                                className={cn(
+                                                                    "flex items-center p-2 rounded-md transition-colors",
+                                                                    pathname === item.href
+                                                                        ? "bg-accent text-accent-foreground"
+                                                                        : "hover:bg-accent/50 text-muted-foreground hover:text-foreground"
+                                                                )}
+                                                                onClick={() => setIsOpen(false)}
+                                                            >
+                                                                <item.icon className="h-5 w-5 mr-3"/>
+                                                                <span className="text-sm font-medium">
+                                                                    {item.label}
+                                                                </span>
+                                                            </Link>
+                                                        </SheetClose>
+                                                    ))}
+                                                </div>
+                                            </div>
                                         ))}
                                     </div>
-                                ))}
+                                </div>
+
+                                <div className="p-4 border-t mt-auto">
+                                    <Button
+                                        variant="destructive"
+                                        className="w-full"
+                                        onClick={logout}
+                                    >
+                                        <LogOut className="h-4 w-4 mr-2"/>
+                                        Logout
+                                    </Button>
+                                </div>
                             </div>
                         </SheetContent>
                     </Sheet>
 
-                    <UserMenu user={user} logout={logout}/>
+                    <Dialog>
+                        <DialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="rounded-full">
+                                <Avatar className="h-8 w-8">
+                                    <AvatarImage
+                                        src={user.email ? getGravatarUrl(user.email, 80) : undefined}
+                                        alt={user.name || 'User avatar'}
+                                    />
+                                    <AvatarFallback>
+                                        {user.name?.[0] || user.email?.[0] || '?'}
+                                    </AvatarFallback>
+                                </Avatar>
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-sm">
+                            <DialogHeader>
+                                <DialogTitle>My Account</DialogTitle>
+                            </DialogHeader>
+                            <div className="flex flex-col items-center space-y-4">
+                                <Avatar className="h-16 w-16">
+                                    <AvatarImage
+                                        src={user.email ? getGravatarUrl(user.email, 160) : undefined}
+                                        alt={user.name || 'User avatar'}
+                                    />
+                                    <AvatarFallback>{user.name?.[0] || user.email?.[0] || '?'}</AvatarFallback>
+                                </Avatar>
+                                <div className="text-center">
+                                    <p className="font-semibold">{user.name || 'Unnamed User'}</p>
+                                    <p className="text-sm text-muted-foreground">{user.email || 'No email'}</p>
+                                    <p className="text-xs uppercase text-muted-foreground mt-1">
+                                        {user.role || 'Unknown Role'}
+                                    </p>
+                                </div>
+                                <div className="flex w-full space-x-2">
+                                    <Button
+                                        variant="outline"
+                                        className="w-full"
+                                        asChild
+                                    >
+                                        <Link href="/dashboard/settings">
+                                            <Settings className="h-4 w-4 mr-2"/>
+                                            Settings
+                                        </Link>
+                                    </Button>
+                                    <Button
+                                        variant="destructive"
+                                        className="w-full"
+                                        onClick={logout}
+                                    >
+                                        <LogOut className="h-4 w-4 mr-2"/>
+                                        Logout
+                                    </Button>
+                                </div>
+                            </div>
+                        </DialogContent>
+                    </Dialog>
                 </div>
             </div>
         </header>
@@ -397,6 +514,7 @@ function LoadingScreen() {
         <div className="flex items-center justify-center min-h-screen">
             <div className="text-center">
                 <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4"/>
+                <p className="text-sm text-muted-foreground">Loading...</p>
             </div>
         </div>
     )
@@ -409,8 +527,27 @@ export default function DashboardLayout({
     children: React.ReactNode
 }) {
     const router = useRouter()
-    const {user, isLoading, logout} = useAuth()
-    const [isExpanded, setIsExpanded] = useState(true)
+    const pathname = usePathname()
+    const { user, isLoading, logout } = useAuth()
+    const [sidebarExpanded, setSidebarExpanded] = useState(true)
+    const isMobile = useMediaQuery('(max-width: 768px)')
+    const isTablet = useMediaQuery('(max-width: 1024px)')
+
+    // Set sidebar state based on screen size
+    useEffect(() => {
+        if (isTablet) {
+            setSidebarExpanded(false)
+        } else {
+            setSidebarExpanded(true)
+        }
+    }, [isTablet])
+
+    // Reset sidebar state when route changes on mobile
+    useEffect(() => {
+        if (isMobile) {
+            // Any mobile-specific navigation handling can go here
+        }
+    }, [pathname, isMobile])
 
     useEffect(() => {
         if (!isLoading && !user) {
@@ -418,9 +555,34 @@ export default function DashboardLayout({
         }
     }, [user, isLoading, router])
 
+    // Store sidebar state in localStorage
+    useEffect(() => {
+        if (!isTablet && !isMobile) {
+            try {
+                localStorage.setItem('sidebarExpanded', String(sidebarExpanded))
+            } catch (error) {
+                console.error('Error saving sidebar state:', error)
+            }
+        }
+    }, [sidebarExpanded, isTablet, isMobile])
+
+    // Load sidebar state from localStorage on initial load
+    useEffect(() => {
+        if (!isTablet && !isMobile) {
+            try {
+                const savedState = localStorage.getItem('sidebarExpanded')
+                if (savedState !== null) {
+                    setSidebarExpanded(savedState === 'true')
+                }
+            } catch (error) {
+                console.error('Error loading sidebar state:', error)
+            }
+        }
+    }, [isTablet, isMobile])
+
     // Show loading screen while checking auth
     if (isLoading) {
-        return <LoadingScreen/>
+        return <LoadingScreen />
     }
 
     // Redirect to login if no user
@@ -433,16 +595,16 @@ export default function DashboardLayout({
             <Sidebar
                 user={user}
                 logout={logout}
-                isExpanded={isExpanded}
-                setIsExpanded={setIsExpanded}
+                isExpanded={sidebarExpanded}
+                setIsExpanded={setSidebarExpanded}
             />
-            <MobileNav user={user} logout={logout}/>
+            <MobileNav user={user} logout={logout} />
 
             <main
                 className={cn(
-                    "pt-16 md:pt-0 transition-all duration-300",
-                    "md:ml-16",
-                    isExpanded ? "md:ml-64" : "md:ml-16"
+                    "transition-all duration-300 ease-in-out",
+                    "pt-20 md:pt-4", // Add padding top for mobile nav bar
+                    isMobile ? "" : (sidebarExpanded ? "md:ml-64" : "md:ml-16")
                 )}
             >
                 <div className="p-4 md:p-8 mx-auto max-w-7xl">

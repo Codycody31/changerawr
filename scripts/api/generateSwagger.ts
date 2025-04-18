@@ -7,6 +7,7 @@ import chalk from 'chalk';
 import 'dotenv/config'
 import packageJson from "../../package.json";
 import ora from 'ora';
+import {appInfo} from "@/lib/app-info";
 
 // Define comment-parser types since they're not exported directly
 interface CommentTag {
@@ -373,9 +374,9 @@ async function generateSwaggerDocs() {
     const swagger: OpenAPIDocumentWithExtensions = {
       openapi: '3.0.0',
       info: {
-        title: 'Changerawr API Documentation',
-        version: packageJson.version,
-        description: 'The official documentation for the Changerawr API. rawr'
+        title: `${appInfo.name} API Documentation`,
+        version: appInfo.version,
+        description: `The official documentation for the ${appInfo.name} API. rawr`
       },
       servers: [
         {
