@@ -51,6 +51,7 @@ import {
     EyeIcon,
     EyeOffIcon,
     XIcon,
+    UsersIcon,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -390,6 +391,18 @@ export default function EmailIntegrationPage() {
                     Back to Settings
                 </Button>
                 <h1 className="text-2xl font-bold ml-4">Email Integration</h1>
+
+                <div className="ml-auto">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1"
+                        onClick={() => router.push(`/dashboard/projects/${projectId}/integrations/emails/subscribers`)}
+                    >
+                        <UsersIcon className="h-4 w-4" />
+                        Manage Subscribers
+                    </Button>
+                </div>
             </div>
 
             <motion.div

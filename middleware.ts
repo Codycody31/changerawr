@@ -67,6 +67,11 @@ export async function middleware(request: NextRequest) {
         return NextResponse.next()
     }
 
+    // Always allow public email routes
+    if (pathname.startsWith('/unsubscribed')) {
+        return NextResponse.next()
+    }
+
     // Always allow public experiment routes
     if (pathname.startsWith('/experiments/')) {
         return NextResponse.next()

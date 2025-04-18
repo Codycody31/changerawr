@@ -101,18 +101,19 @@ model InvitationLink {
 }
 
 model Project {
-  id                String             @id @default(cuid())
-  name              String
-  isPublic          Boolean            @default(false)
-  allowAutoPublish  Boolean            @default(false)
-  requireApproval   Boolean            @default(true)
-  defaultTags       String[]           @default([])
-  changelog         Changelog?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  changelogRequests ChangelogRequest[]
-  emailConfig       EmailConfig?
-  emailLogs         EmailLog[]
+  id                  String                @id @default(cuid())
+  name                String
+  isPublic            Boolean               @default(false)
+  allowAutoPublish    Boolean               @default(false)
+  requireApproval     Boolean               @default(true)
+  defaultTags         String[]              @default([])
+  changelog           Changelog?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  changelogRequests   ChangelogRequest[]
+  emailConfig         EmailConfig?
+  emailLogs           EmailLog[]
+  ProjectSubscription ProjectSubscription[]
 }
 
 model Changelog {
@@ -247,6 +248,37 @@ model EmailLog {
   createdAt  DateTime @default(now())
 }
 
+model EmailSubscriber {
+  id               String                @id @default(cuid())
+  email            String
+  name             String?
+  isActive         Boolean               @default(true)
+  unsubscribeToken String                @unique
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  lastEmailSentAt  DateTime?
+  subscriptions    ProjectSubscription[]
+
+  @@unique([email])
+  @@index([email])
+  @@index([unsubscribeToken])
+}
+
+model ProjectSubscription {
+  id               String           @id @default(cuid())
+  projectId        String
+  project          Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  subscriberId     String
+  subscriber       EmailSubscriber  @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+  subscriptionType SubscriptionType @default(ALL_UPDATES)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@unique([projectId, subscriberId])
+  @@index([projectId])
+  @@index([subscriberId])
+}
+
 enum Role {
   ADMIN
   STAFF
@@ -269,4 +301,10 @@ enum RequestStatus {
 enum emailType {
   SINGLE_UPDATE
   DIGEST
+}
+
+enum SubscriptionType {
+  ALL_UPDATES // Receive all updates
+  MAJOR_ONLY // Only receive major version updates
+  DIGEST_ONLY // Only receive digest emails
 }

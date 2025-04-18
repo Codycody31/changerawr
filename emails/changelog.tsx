@@ -1,3 +1,5 @@
+// emails/changelog.tsx - Update existing file
+
 import * as React from 'react';
 import {
     Html,
@@ -9,7 +11,9 @@ import {
     Column,
     Heading,
     Text,
-    Hr, Markdown
+    Hr,
+    Markdown,
+    Link
 } from '@react-email/components';
 
 interface Entry {
@@ -25,12 +29,14 @@ interface ChangelogEmailProps {
     projectName: string;
     entries: Entry[];
     isDigest?: boolean;
+    unsubscribeUrl?: string;
 }
 
 export const ChangelogEmail: React.FC<ChangelogEmailProps> = ({
                                                                   projectName,
                                                                   entries,
-                                                                  isDigest = false
+                                                                  isDigest = false,
+                                                                  unsubscribeUrl
                                                               }) => {
     const title = isDigest
         ? `${projectName} - Latest Changelog Updates`
@@ -161,6 +167,20 @@ export const ChangelogEmail: React.FC<ChangelogEmailProps> = ({
                             textAlign: 'center'
                         }}>
                             You received this email because you&apos;re subscribed to changelog updates for {projectName}.
+                            {unsubscribeUrl && (
+                                <>
+                                    <br />
+                                    <Link
+                                        href={unsubscribeUrl}
+                                        style={{
+                                            color: '#666',
+                                            textDecoration: 'underline',
+                                        }}
+                                    >
+                                        Unsubscribe from these notifications
+                                    </Link>
+                                </>
+                            )}
                         </Text>
                     </Section>
                 </Container>
