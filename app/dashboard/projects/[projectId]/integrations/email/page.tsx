@@ -1,4 +1,3 @@
-// app/dashboard/projects/[projectId]/integrations/email/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -52,10 +51,63 @@ import {
     EyeOffIcon,
     XIcon,
     UsersIcon,
+    CheckCircleIcon,
+    PlusIcon,
+    UserPlusIcon,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { RenderMarkdown } from '@/components/MarkdownEditor';
+
+// Define types
+interface EmailConfig {
+    id?: string;
+    enabled: boolean;
+    smtpHost: string;
+    smtpPort: number;
+    smtpUser: string | null;
+    smtpPassword?: string | null;
+    smtpSecure: boolean;
+    fromEmail: string;
+    fromName: string | null;
+    replyToEmail: string | null;
+    defaultSubject: string | null;
+    lastTestedAt?: Date | null;
+    testStatus?: string | null;
+}
+
+interface ChangelogEntry {
+    id: string;
+    title: string;
+    content: string;
+    version?: string | null;
+    publishedAt?: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+    tags?: { id: string; name: string }[];
+}
+
+interface Project {
+    id: string;
+    name: string;
+    isPublic: boolean;
+    allowAutoPublish: boolean;
+    requireApproval: boolean;
+    defaultTags: string[];
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+// interface Subscriber {
+//     id: string;
+//     email: string;
+//     name?: string;
+//     subscriptionType: 'ALL_UPDATES' | 'MAJOR_ONLY' | 'DIGEST_ONLY';
+//     createdAt: string;
+//     lastEmailSentAt?: string;
+// }
 
 // Form schema
 const formSchema = z.object({
@@ -82,10 +134,12 @@ type TestEmailFormValues = z.infer<typeof testEmailSchema>;
 
 // Send email form schema
 const sendEmailSchema = z.object({
-    recipients: z.array(z.string().email("Invalid email address")),
+    recipientType: z.enum(['MANUAL', 'SUBSCRIBERS', 'BOTH']).default('SUBSCRIBERS'),
+    manualRecipients: z.array(z.string().email("Invalid email address")).optional(),
     subject: z.string().min(1, "Subject is required"),
     changelogEntryId: z.string().optional(),
-    isDigest: z.boolean().default(false)
+    isDigest: z.boolean().default(false),
+    subscriptionTypes: z.array(z.enum(['ALL_UPDATES', 'MAJOR_ONLY', 'DIGEST_ONLY'])).optional(),
 });
 
 type SendEmailFormValues = z.infer<typeof sendEmailSchema>;
@@ -96,15 +150,23 @@ export default function EmailIntegrationPage() {
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const projectId = params.projectId as string;
+
+    // State
     const [isTestDialogOpen, setIsTestDialogOpen] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [activeTab, setActiveTab] = useState('settings');
-    const [recipients, setRecipients] = useState<string[]>([]);
+    const [manualRecipients, setManualRecipients] = useState<string[]>([]);
     const [newRecipient, setNewRecipient] = useState('');
-    const [recentEntries, setRecentEntries] = useState<any[]>([]);
+    const [recentEntries, setRecentEntries] = useState<ChangelogEntry[]>([]);
+    const [isLoadingSubscribers, setIsLoadingSubscribers] = useState(false);
+    const [subscriberCount, setSubscriberCount] = useState<number>(0);
+    const [sendingToSubscribers, setSendingToSubscribers] = useState<boolean>(true);
+    const [selectedSubscriptionTypes, setSelectedSubscriptionTypes] = useState<('ALL_UPDATES' | 'MAJOR_ONLY' | 'DIGEST_ONLY')[]>([
+        'ALL_UPDATES', 'MAJOR_ONLY', 'DIGEST_ONLY'
+    ]);
 
     // Fetch email configuration
-    const { data: emailConfig, isLoading } = useQuery({
+    const { data: emailConfig, isLoading } = useQuery<EmailConfig>({
         queryKey: ['email-config', projectId],
         queryFn: async () => {
             const response = await fetch(`/api/projects/${projectId}/integrations/email`);
@@ -114,7 +176,7 @@ export default function EmailIntegrationPage() {
     });
 
     // Fetch project info
-    const { data: project } = useQuery({
+    const { data: project } = useQuery<Project>({
         queryKey: ['project', projectId],
         queryFn: async () => {
             const response = await fetch(`/api/projects/${projectId}`);
@@ -133,12 +195,35 @@ export default function EmailIntegrationPage() {
         },
     });
 
+    // Get subscriber count
+    const fetchSubscriberCount = async () => {
+        setIsLoadingSubscribers(true);
+        try {
+            const response = await fetch(`/api/subscribers?projectId=${projectId}&limit=1`);
+            if (response.ok) {
+                const data = await response.json();
+                setSubscriberCount(data.totalCount || 0);
+            }
+        } catch (error) {
+            console.error('Failed to fetch subscribers:', error);
+        } finally {
+            setIsLoadingSubscribers(false);
+        }
+    };
+
     // Update recent entries when data is loaded
     useEffect(() => {
         if (entriesData?.entries) {
             setRecentEntries(entriesData.entries);
         }
     }, [entriesData]);
+
+    // Fetch subscribers count on tab change
+    useEffect(() => {
+        if (activeTab === 'send') {
+            fetchSubscriberCount();
+        }
+    }, [activeTab, projectId]);
 
     // Configure main settings form
     const form = useForm<FormValues>({
@@ -169,9 +254,12 @@ export default function EmailIntegrationPage() {
     const sendEmailForm = useForm<SendEmailFormValues>({
         resolver: zodResolver(sendEmailSchema),
         defaultValues: {
-            recipients: [],
+            recipientType: 'SUBSCRIBERS',
+            manualRecipients: [],
             subject: project?.name ? `${project.name} - Changelog Update` : 'Changelog Update',
-            isDigest: false
+            changelogEntryId: undefined,
+            isDigest: false,
+            subscriptionTypes: ['ALL_UPDATES', 'MAJOR_ONLY', 'DIGEST_ONLY'],
         }
     });
 
@@ -263,10 +351,21 @@ export default function EmailIntegrationPage() {
         mutationFn: async (data: SendEmailFormValues) => {
             const isDigest = data.changelogEntryId === 'digest';
 
+            // Prepare recipients based on selection
+            let recipients: string[] = [];
+
+            if (data.recipientType === 'MANUAL' || data.recipientType === 'BOTH') {
+                recipients = [...manualRecipients];
+            }
+
+            // Build the payload
             const payload = {
-                recipients: data.recipients,
+                recipients: data.recipientType !== 'SUBSCRIBERS' ? recipients : undefined,
                 subject: data.subject,
                 isDigest,
+                subscriptionTypes: (data.recipientType === 'SUBSCRIBERS' || data.recipientType === 'BOTH')
+                    ? selectedSubscriptionTypes
+                    : undefined,
                 ...(isDigest ? {} : { changelogEntryId: data.changelogEntryId })
             };
 
@@ -283,18 +382,21 @@ export default function EmailIntegrationPage() {
 
             return response.json();
         },
-        onSuccess: () => {
+        onSuccess: (data) => {
             toast({
                 title: 'Email Sent',
-                description: 'The changelog email was sent successfully',
+                description: `Successfully sent to ${data.recipientCount || 0} recipients.`,
             });
             // Reset form
-            setRecipients([]);
+            setManualRecipients([]);
+            setSelectedSubscriptionTypes(['ALL_UPDATES', 'MAJOR_ONLY', 'DIGEST_ONLY']);
             sendEmailForm.reset({
-                recipients: [],
+                recipientType: 'SUBSCRIBERS',
+                manualRecipients: [],
                 subject: project?.name ? `${project.name} - Changelog Update` : 'Changelog Update',
                 changelogEntryId: undefined,
-                isDigest: false
+                isDigest: false,
+                subscriptionTypes: ['ALL_UPDATES', 'MAJOR_ONLY', 'DIGEST_ONLY']
             });
         },
         onError: (error) => {
@@ -315,9 +417,9 @@ export default function EmailIntegrationPage() {
             const email = z.string().email().parse(newRecipient);
 
             // Check for duplicates
-            if (!recipients.includes(email)) {
-                setRecipients([...recipients, email]);
-                sendEmailForm.setValue('recipients', [...recipients, email]);
+            if (!manualRecipients.includes(email)) {
+                setManualRecipients([...manualRecipients, email]);
+                sendEmailForm.setValue('manualRecipients', [...manualRecipients, email]);
             }
 
             setNewRecipient('');
@@ -332,10 +434,10 @@ export default function EmailIntegrationPage() {
     };
 
     const removeRecipient = (index: number) => {
-        const newRecipients = [...recipients];
+        const newRecipients = [...manualRecipients];
         newRecipients.splice(index, 1);
-        setRecipients(newRecipients);
-        sendEmailForm.setValue('recipients', newRecipients);
+        setManualRecipients(newRecipients);
+        sendEmailForm.setValue('manualRecipients', newRecipients);
     };
 
     const onSaveSubmit = (values: FormValues) => {
@@ -353,8 +455,8 @@ export default function EmailIntegrationPage() {
     };
 
     const onSendEmailSubmit = (values: SendEmailFormValues) => {
-        // Make sure we have at least one recipient
-        if (recipients.length === 0) {
+        // Make sure we have selected recipients or subscriber types
+        if (values.recipientType === 'MANUAL' && manualRecipients.length === 0) {
             toast({
                 title: 'No Recipients',
                 description: 'Please add at least one recipient email address',
@@ -363,11 +465,47 @@ export default function EmailIntegrationPage() {
             return;
         }
 
+        if (values.recipientType === 'SUBSCRIBERS' && selectedSubscriptionTypes.length === 0) {
+            toast({
+                title: 'No Subscribers Selected',
+                description: 'Please select at least one subscription type',
+                variant: 'destructive'
+            });
+            return;
+        }
+
+        if (!values.changelogEntryId) {
+            toast({
+                title: 'No Content Selected',
+                description: 'Please select a changelog entry or digest to send',
+                variant: 'destructive'
+            });
+            return;
+        }
+
         // Send the email
         sendEmailMutation.mutate({
             ...values,
-            recipients
+            manualRecipients: manualRecipients,
+            subscriptionTypes: selectedSubscriptionTypes
         });
+    };
+
+    // Toggle subscription type selection
+    const toggleSubscriptionType = (type: 'ALL_UPDATES' | 'MAJOR_ONLY' | 'DIGEST_ONLY') => {
+        if (selectedSubscriptionTypes.includes(type)) {
+            // Remove if already selected
+            setSelectedSubscriptionTypes(selectedSubscriptionTypes.filter(t => t !== type));
+        } else {
+            // Add if not selected
+            setSelectedSubscriptionTypes([...selectedSubscriptionTypes, type]);
+        }
+    };
+
+    // Handle recipient type change
+    const handleRecipientTypeChange = (value: 'MANUAL' | 'SUBSCRIBERS' | 'BOTH') => {
+        sendEmailForm.setValue('recipientType', value);
+        setSendingToSubscribers(value === 'SUBSCRIBERS' || value === 'BOTH');
     };
 
     if (isLoading) {
@@ -397,7 +535,7 @@ export default function EmailIntegrationPage() {
                         variant="outline"
                         size="sm"
                         className="gap-1"
-                        onClick={() => router.push(`/dashboard/projects/${projectId}/integrations/emails/subscribers`)}
+                        onClick={() => router.push(`/dashboard/projects/${projectId}/integrations/email/subscribers`)}
                     >
                         <UsersIcon className="h-4 w-4" />
                         Manage Subscribers
@@ -500,7 +638,7 @@ export default function EmailIntegrationPage() {
                                                         <FormItem>
                                                             <FormLabel>SMTP Username</FormLabel>
                                                             <FormControl>
-                                                                <Input placeholder="username" {...field} />
+                                                                <Input placeholder="username" {...field} value={field.value ?? ""} />
                                                             </FormControl>
                                                             <FormMessage />
                                                         </FormItem>
@@ -519,6 +657,7 @@ export default function EmailIntegrationPage() {
                                                                         type={showPassword ? "text" : "password"}
                                                                         placeholder="••••••••"
                                                                         {...field}
+                                                                        value={field.value ?? ""}
                                                                     />
                                                                     <Button
                                                                         type="button"
@@ -593,7 +732,7 @@ export default function EmailIntegrationPage() {
                                                         <FormItem>
                                                             <FormLabel>From Name</FormLabel>
                                                             <FormControl>
-                                                                <Input placeholder="Your Company Changelog" {...field} />
+                                                                <Input placeholder="Your Company Changelog" {...field} value={field.value ?? ''} />
                                                             </FormControl>
                                                             <FormMessage />
                                                         </FormItem>
@@ -607,7 +746,7 @@ export default function EmailIntegrationPage() {
                                                         <FormItem>
                                                             <FormLabel>Reply-To Email (Optional)</FormLabel>
                                                             <FormControl>
-                                                                <Input placeholder="support@yourcompany.com" {...field} />
+                                                                <Input placeholder="support@yourcompany.com" {...field} value={field.value ?? ''} />
                                                             </FormControl>
                                                             <FormMessage />
                                                         </FormItem>
@@ -621,7 +760,7 @@ export default function EmailIntegrationPage() {
                                                         <FormItem>
                                                             <FormLabel>Default Subject</FormLabel>
                                                             <FormControl>
-                                                                <Input placeholder="New Changelog Update" {...field} />
+                                                                <Input placeholder="New Changelog Update" {...field} value={field.value || ''} />
                                                             </FormControl>
                                                             <FormMessage />
                                                         </FormItem>
@@ -683,8 +822,7 @@ export default function EmailIntegrationPage() {
                                                         }
                                                     </p>
                                                     <p className="text-sm">
-                                                        {emailConfig.testStatus?.startsWith('failed')
-                                                            ? emailConfig.testStatus.replace('failed: ', '')
+                                                        {emailConfig.testStatus?.startsWith('failed') ? emailConfig.testStatus.replace('failed: ', '')
                                                             : 'Connection verified and test email sent successfully.'
                                                         }
                                                     </p>
@@ -708,20 +846,19 @@ export default function EmailIntegrationPage() {
                                     <CardTitle>Send Changelog Email</CardTitle>
                                 </div>
                                 <CardDescription>
-                                    Send changelog updates to specific recipients
+                                    Send changelog updates to specific recipients or subscribers
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
                                 {!emailConfig?.enabled ? (
                                     <Alert className="mb-6">
-                                        <AlertCircleIcon className="h-4 w-4" />
                                         <AlertDescription>
                                             Email notifications are not enabled. Please enable them in the SMTP Settings tab.
                                         </AlertDescription>
                                     </Alert>
                                 ) : (
                                     <Form {...sendEmailForm}>
-                                        <form onSubmit={sendEmailForm.handleSubmit(onSendEmailSubmit)} className="space-y-4">
+                                        <form onSubmit={sendEmailForm.handleSubmit(onSendEmailSubmit)} className="space-y-6">
                                             <FormField
                                                 control={sendEmailForm.control}
                                                 name="subject"
@@ -732,67 +869,6 @@ export default function EmailIntegrationPage() {
                                                             <Input placeholder="New Changelog Update" {...field} />
                                                         </FormControl>
                                                         <FormMessage />
-                                                    </FormItem>
-                                                )}
-                                            />
-
-                                            <FormField
-                                                control={sendEmailForm.control}
-                                                name="recipients"
-                                                render={() => (
-                                                    <FormItem>
-                                                        <FormLabel>Recipients</FormLabel>
-                                                        <div className="flex flex-wrap gap-2 p-2 border rounded-md min-h-[80px]">
-                                                            {recipients.map((email, index) => (
-                                                                <Badge
-                                                                    key={index}
-                                                                    variant="secondary"
-                                                                    className="flex items-center gap-1 px-3 py-1"
-                                                                >
-                                                                    <MailIcon className="h-3 w-3" />
-                                                                    {email}
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => removeRecipient(index)}
-                                                                        className="ml-1 hover:text-destructive"
-                                                                    >
-                                                                        <XIcon className="h-3 w-3" />
-                                                                    </button>
-                                                                </Badge>
-                                                            ))}
-                                                            <div className="flex-1 min-w-[200px]">
-                                                                <Input
-                                                                    placeholder="Add recipient email..."
-                                                                    value={newRecipient}
-                                                                    onChange={(e) => setNewRecipient(e.target.value)}
-                                                                    onKeyDown={(e) => {
-                                                                        if (e.key === 'Enter') {
-                                                                            e.preventDefault();
-                                                                            addRecipient();
-                                                                        }
-                                                                    }}
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                        {sendEmailForm.formState.errors.recipients && (
-                                                            <p className="text-sm font-medium text-destructive">
-                                                                {sendEmailForm.formState.errors.recipients.message}
-                                                            </p>
-                                                        )}
-                                                        <FormDescription>
-                                                            Enter email addresses and press Enter to add
-                                                        </FormDescription>
-                                                        <div className="flex justify-end mt-2">
-                                                            <Button
-                                                                type="button"
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={addRecipient}
-                                                                disabled={!newRecipient}
-                                                            >
-                                                                Add Recipient
-                                                            </Button>
-                                                        </div>
                                                     </FormItem>
                                                 )}
                                             />
@@ -813,7 +889,12 @@ export default function EmailIntegrationPage() {
                                                                 </SelectTrigger>
                                                             </FormControl>
                                                             <SelectContent>
-                                                                <SelectItem value="digest">Send digest of recent entries</SelectItem>
+                                                                <SelectItem value="digest">
+                                                                    <div className="flex items-center">
+                                                                        <div className="mr-2 h-2 w-2 rounded-full bg-primary"></div>
+                                                                        Send digest of recent entries
+                                                                    </div>
+                                                                </SelectItem>
                                                                 {recentEntries.map(entry => (
                                                                     <SelectItem key={entry.id} value={entry.id}>
                                                                         {entry.title} {entry.version ? `(${entry.version})` : ''}
@@ -829,23 +910,221 @@ export default function EmailIntegrationPage() {
                                                 )}
                                             />
 
-                                            <Button
-                                                type="submit"
-                                                disabled={sendEmailMutation.isPending || recipients.length === 0}
-                                                className="w-full"
-                                            >
-                                                {sendEmailMutation.isPending ? (
-                                                    <>
-                                                        <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
-                                                        Sending...
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <SendIcon className="mr-2 h-4 w-4" />
-                                                        Send Email
-                                                    </>
-                                                )}
-                                            </Button>
+                                            <div className="border rounded-md p-4">
+                                                <FormField
+                                                    control={sendEmailForm.control}
+                                                    name="recipientType"
+                                                    render={({ field }) => (
+                                                        <FormItem className="space-y-3">
+                                                            <FormLabel>Send To</FormLabel>
+                                                            <FormControl>
+                                                                <RadioGroup
+                                                                    onValueChange={(value) =>
+                                                                        handleRecipientTypeChange(value as 'MANUAL' | 'SUBSCRIBERS' | 'BOTH')
+                                                                    }
+                                                                    defaultValue={field.value}
+                                                                    className="flex flex-col space-y-1"
+                                                                >
+                                                                    <FormItem className="flex items-center space-x-3 space-y-0">
+                                                                        <FormControl>
+                                                                            <RadioGroupItem value="SUBSCRIBERS" />
+                                                                        </FormControl>
+                                                                        <FormLabel className="font-normal cursor-pointer">
+                                                                            <div className="flex items-center">
+                                                                                <UsersIcon className="h-4 w-4 mr-2 text-muted-foreground" />
+                                                                                Subscribers
+                                                                                {isLoadingSubscribers ? (
+                                                                                    <Loader2Icon className="ml-2 h-3 w-3 animate-spin" />
+                                                                                ) : (
+                                                                                    <Badge variant="outline" className="ml-2">
+                                                                                        {subscriberCount}
+                                                                                    </Badge>
+                                                                                )}
+                                                                            </div>
+                                                                        </FormLabel>
+                                                                    </FormItem>
+                                                                    <FormItem className="flex items-center space-x-3 space-y-0">
+                                                                        <FormControl>
+                                                                            <RadioGroupItem value="MANUAL" />
+                                                                        </FormControl>
+                                                                        <FormLabel className="font-normal cursor-pointer">
+                                                                            <div className="flex items-center">
+                                                                                <MailIcon className="h-4 w-4 mr-2 text-muted-foreground" />
+                                                                                Manual Recipients
+                                                                                {manualRecipients.length > 0 && (
+                                                                                    <Badge variant="outline" className="ml-2">
+                                                                                        {manualRecipients.length}
+                                                                                    </Badge>
+                                                                                )}
+                                                                            </div>
+                                                                        </FormLabel>
+                                                                    </FormItem>
+                                                                    <FormItem className="flex items-center space-x-3 space-y-0">
+                                                                        <FormControl>
+                                                                            <RadioGroupItem value="BOTH" />
+                                                                        </FormControl>
+                                                                        <FormLabel className="font-normal cursor-pointer">
+                                                                            <div className="flex items-center">
+                                                                                <UserPlusIcon className="h-4 w-4 mr-2 text-muted-foreground" />
+                                                                                Both (Subscribers and Manual Recipients)
+                                                                            </div>
+                                                                        </FormLabel>
+                                                                    </FormItem>
+                                                                </RadioGroup>
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                            </div>
+
+                                            {/* Subscription Types - Only show if sending to subscribers */}
+                                            {sendingToSubscribers && (
+                                                <div className="border rounded-md p-4">
+                                                    <h3 className="text-sm font-medium mb-2">Subscription Types</h3>
+                                                    <div className="flex flex-wrap gap-2 mt-2">
+                                                        <Badge
+                                                            variant={selectedSubscriptionTypes.includes('ALL_UPDATES') ? "default" : "outline"}
+                                                            className="cursor-pointer hover:bg-primary/90 transition-colors"
+                                                            onClick={() => toggleSubscriptionType('ALL_UPDATES')}
+                                                        >
+                                                            {selectedSubscriptionTypes.includes('ALL_UPDATES') && (
+                                                                <CheckCircleIcon className="mr-1 h-3 w-3" />
+                                                            )}
+                                                            All Updates
+                                                        </Badge>
+                                                        <Badge
+                                                            variant={selectedSubscriptionTypes.includes('MAJOR_ONLY') ? "default" : "outline"}
+                                                            className="cursor-pointer hover:bg-primary/90 transition-colors"
+                                                            onClick={() => toggleSubscriptionType('MAJOR_ONLY')}
+                                                        >
+                                                            {selectedSubscriptionTypes.includes('MAJOR_ONLY') && (
+                                                                <CheckCircleIcon className="mr-1 h-3 w-3" />
+                                                            )}
+                                                            Major Updates Only
+                                                        </Badge>
+                                                        <Badge
+                                                            variant={selectedSubscriptionTypes.includes('DIGEST_ONLY') ? "default" : "outline"}
+                                                            className="cursor-pointer hover:bg-primary/90 transition-colors"
+                                                            onClick={() => toggleSubscriptionType('DIGEST_ONLY')}
+                                                        >
+                                                            {selectedSubscriptionTypes.includes('DIGEST_ONLY') && (
+                                                                <CheckCircleIcon className="mr-1 h-3 w-3" />
+                                                            )}
+                                                            Digest Only
+                                                        </Badge>
+                                                    </div>
+                                                    <p className="text-xs text-muted-foreground mt-2">
+                                                        Select which subscription types to include in this email.
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            {/* Manual recipients - Only show if manual recipients are enabled */}
+                                            {(sendEmailForm.watch('recipientType') === 'MANUAL' || sendEmailForm.watch('recipientType') === 'BOTH') && (
+                                                <FormField
+                                                    control={sendEmailForm.control}
+                                                    name="manualRecipients"
+                                                    render={() => (
+                                                        <FormItem>
+                                                            <FormLabel>Manual Recipients</FormLabel>
+                                                            <div className="flex flex-wrap gap-2 p-2 border rounded-md min-h-[80px]">
+                                                                {manualRecipients.map((email, index) => (
+                                                                    <Badge
+                                                                        key={index}
+                                                                        variant="secondary"
+                                                                        className="flex items-center gap-1 px-3 py-1"
+                                                                    >
+                                                                        <MailIcon className="h-3 w-3" />
+                                                                        {email}
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => removeRecipient(index)}
+                                                                            className="ml-1 hover:text-destructive"
+                                                                        >
+                                                                            <XIcon className="h-3 w-3" />
+                                                                        </button>
+                                                                    </Badge>
+                                                                ))}
+                                                                <div className="flex-1 min-w-[200px]">
+                                                                    <Input
+                                                                        placeholder="Add recipient email..."
+                                                                        value={newRecipient}
+                                                                        onChange={(e) => setNewRecipient(e.target.value)}
+                                                                        onKeyDown={(e) => {
+                                                                            if (e.key === 'Enter') {
+                                                                                e.preventDefault();
+                                                                                addRecipient();
+                                                                            }
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                            {sendEmailForm.formState.errors.manualRecipients && (
+                                                                <p className="text-sm font-medium text-destructive">
+                                                                    {sendEmailForm.formState.errors.manualRecipients.message}
+                                                                </p>
+                                                            )}
+                                                            <FormDescription>
+                                                                Enter email addresses and press Enter to add
+                                                            </FormDescription>
+                                                            <div className="flex justify-end mt-2">
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={addRecipient}
+                                                                    disabled={!newRecipient}
+                                                                >
+                                                                    <PlusIcon className="h-3 w-3 mr-1" />
+                                                                    Add Recipient
+                                                                </Button>
+                                                            </div>
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                            )}
+
+                                            {/* Send button and summary */}
+                                            <div className="border rounded-md p-4 bg-muted/20">
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <h3 className="text-sm font-medium">Recipient Summary</h3>
+                                                        <p className="text-sm text-muted-foreground mt-1">
+                                                            {sendEmailForm.watch('recipientType') === 'SUBSCRIBERS' && (
+                                                                <>Sending to {subscriberCount} subscribers</>
+                                                            )}
+                                                            {sendEmailForm.watch('recipientType') === 'MANUAL' && (
+                                                                <>Sending to {manualRecipients.length} manual recipients</>
+                                                            )}
+                                                            {sendEmailForm.watch('recipientType') === 'BOTH' && (
+                                                                <>Sending to {manualRecipients.length} manual recipients and approximately {subscriberCount} subscribers</>
+                                                            )}
+                                                        </p>
+                                                    </div>
+                                                    <Button
+                                                        type="submit"
+                                                        disabled={
+                                                            sendEmailMutation.isPending ||
+                                                            (sendEmailForm.watch('recipientType') === 'MANUAL' && manualRecipients.length === 0) ||
+                                                            (sendEmailForm.watch('recipientType') === 'SUBSCRIBERS' && selectedSubscriptionTypes.length === 0) ||
+                                                            !sendEmailForm.watch('changelogEntryId')
+                                                        }
+                                                    >
+                                                        {sendEmailMutation.isPending ? (
+                                                            <>
+                                                                <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+                                                                Sending...
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <SendIcon className="mr-2 h-4 w-4" />
+                                                                Send Email
+                                                            </>
+                                                        )}
+                                                    </Button>
+                                                </div>
+                                            </div>
                                         </form>
                                     </Form>
                                 )}
@@ -864,42 +1143,64 @@ export default function EmailIntegrationPage() {
                                             {project?.name || 'Project Name'} Changelog
                                         </h2>
                                         <p style={{ color: '#666', fontSize: '14px', marginBottom: '10px', textAlign: 'center' }}>
-                                            New update to our product
+                                            {sendEmailForm.watch('changelogEntryId') === 'digest' ? 'Recent updates to our product' : 'New update to our product'}
                                         </p>
                                         <hr style={{ margin: '10px 0' }} />
 
                                         <div style={{ padding: '10px 0' }}>
                                             <div style={{ fontSize: '16px', fontWeight: 'bold', margin: '8px 0' }}>
-                                                Example Changelog Entry
-                                                <span style={{ color: '#666', fontSize: '12px', fontWeight: 'normal', marginLeft: '8px' }}>
-                          v1.0.0
-                        </span>
+                                                {recentEntries.length > 0 && sendEmailForm.watch('changelogEntryId') !== 'digest'
+                                                    ? recentEntries.find(e => e.id === sendEmailForm.watch('changelogEntryId'))?.title || 'Example Changelog Entry'
+                                                    : 'Recent Updates'}
+                                                {recentEntries.length > 0 && sendEmailForm.watch('changelogEntryId') !== 'digest' && (
+                                                    <span style={{ color: '#666', fontSize: '12px', fontWeight: 'normal', marginLeft: '8px' }}>
+                                                        {recentEntries.find(e => e.id === sendEmailForm.watch('changelogEntryId'))?.version || 'v1.0.0'}
+                                                    </span>
+                                                )}
                                             </div>
 
                                             <div style={{ marginBottom: '8px' }}>
-                        <span style={{
-                            backgroundColor: '#f1f5f9',
-                            borderRadius: '4px',
-                            color: '#475569',
-                            display: 'inline-block',
-                            fontSize: '10px',
-                            margin: '0 4px 4px 0',
-                            padding: '2px 6px'
-                        }}>
-                          Feature
-                        </span>
+                                                <span style={{
+                                                    backgroundColor: '#f1f5f9',
+                                                    borderRadius: '4px',
+                                                    color: '#475569',
+                                                    display: 'inline-block',
+                                                    fontSize: '10px',
+                                                    margin: '0 4px 4px 0',
+                                                    padding: '2px 6px'
+                                                }}>
+                                                    {sendEmailForm.watch('changelogEntryId') === 'digest' ? 'Multiple Updates' : 'Feature'}
+                                                </span>
                                             </div>
 
-                                            <p style={{ color: '#333', fontSize: '12px', lineHeight: '1.4', margin: '8px 0' }}>
-                                                This is a simplified preview of how your email will look.
-                                            </p>
+                                            {sendEmailForm.watch('changelogEntryId') === 'digest'
+                                                ? <div style={{ color: '#333', fontSize: '12px', lineHeight: '1.4', margin: '8px 0' }}>
+                                                    &apos;This digest contains multiple recent updates to our product...&apos;
+                                                </div>
+                                                : <div style={{ color: '#333', fontSize: '12px', lineHeight: '1.4', margin: '8px 0' }}>
+                                                    <RenderMarkdown>
+                                                        {recentEntries.find(e => e.id === sendEmailForm.watch('changelogEntryId'))?.content.substring(0, 100) + '...' ||
+                                                            'This is a simplified preview of how your email will look.'}
+                                                    </RenderMarkdown>
+                                                </div>}
                                         </div>
                                     </div>
                                 </div>
 
-                                <p className="text-xs text-muted-foreground">
-                                    This is a simplified preview. Actual emails will include styling and formatting based on the entry content.
-                                </p>
+                                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                    <p>
+                                        This is a simplified preview. Actual emails will include styling and formatting based on the entry content.
+                                    </p>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="hover:text-foreground transition-colors"
+                                        onClick={() => router.push(`/dashboard/projects/${projectId}/integrations/email/subscribers`)}
+                                    >
+                                        <UsersIcon className="h-3 w-3 mr-1" />
+                                        Manage Subscribers
+                                    </Button>
+                                </div>
                             </CardContent>
                         </Card>
                     </TabsContent>

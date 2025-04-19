@@ -2,15 +2,14 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { CheckCircle, ArrowLeft } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { CheckCircle } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 
-export default function UnsubscribedPage() {
+function UnsubscribedContent() {
     const searchParams = useSearchParams();
     const [email, setEmail] = useState<string | null>(null);
 
@@ -21,51 +20,104 @@ export default function UnsubscribedPage() {
         }
     }, [searchParams]);
 
+    const containerVariants = {
+        hidden: { opacity: 0 },
+        visible: {
+            opacity: 1,
+            transition: {
+                staggerChildren: 0.1,
+                delayChildren: 0.2
+            }
+        }
+    };
+
+    const itemVariants = {
+        hidden: { y: 20, opacity: 0 },
+        visible: {
+            y: 0,
+            opacity: 1,
+            transition: { type: 'spring', stiffness: 300, damping: 24 }
+        }
+    };
+
+    const iconVariants = {
+        hidden: { scale: 0.8, opacity: 0 },
+        visible: {
+            scale: 1,
+            opacity: 1,
+            transition: {
+                delay: 0.3,
+                type: 'spring',
+                stiffness: 200,
+                damping: 20
+            }
+        }
+    };
+
     return (
-        <div className="container max-w-lg mx-auto py-20 px-4">
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-            >
-                <Card className="border-2 bg-card/50 backdrop-blur-sm">
-                    <CardContent className="pt-6 text-center">
-                        <motion.div
-                            initial={{ scale: 0.8 }}
-                            animate={{ scale: 1 }}
-                            transition={{ delay: 0.3, type: 'spring' }}
-                            className="flex justify-center mb-6"
-                        >
-                            <CheckCircle className="h-16 w-16 text-green-500" />
-                        </motion.div>
+        <motion.div
+            initial="hidden"
+            animate="visible"
+            variants={containerVariants}
+            className="w-full"
+        >
+            <Card className="border-none shadow-lg bg-card/60 backdrop-blur-md overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-green-400 to-emerald-600" />
 
-                        <h1 className="text-3xl font-bold mb-2">Successfully Unsubscribed</h1>
+                <CardContent className="pt-10 pb-8 px-8">
+                    <motion.div
+                        variants={iconVariants}
+                        className="flex justify-center mb-8"
+                    >
+                        <div className="p-4 rounded-full bg-green-50 dark:bg-green-900/20">
+                            <CheckCircle className="h-16 w-16 text-green-500" strokeWidth={1.5} />
+                        </div>
+                    </motion.div>
 
+                    <motion.h1
+                        variants={itemVariants}
+                        className="text-3xl font-bold text-center mb-6"
+                    >
+                        You&apos;re Unsubscribed
+                    </motion.h1>
+
+                    <motion.div variants={itemVariants}>
                         {email ? (
-                            <p className="text-lg text-muted-foreground mb-4">
-                                The email address <strong className="text-foreground">{email}</strong> has been unsubscribed from these notifications.
+                            <p className="text-lg text-center mb-4">
+                                The email address <span className="font-semibold text-foreground px-1 py-0.5 bg-muted rounded">{email}</span> has been successfully removed from our notification list.
                             </p>
                         ) : (
-                            <p className="text-lg text-muted-foreground mb-4">
-                                You have been successfully unsubscribed from these notifications.
+                            <p className="text-lg text-center mb-4">
+                                You&apos;ve been successfully removed from our notification list.
                             </p>
                         )}
+                    </motion.div>
 
-                        <p className="text-sm mb-6">
-                            If you unsubscribed by mistake or would like to resubscribe in the future, please contact the project administrator.
+                    <motion.div
+                        variants={itemVariants}
+                        className="mt-8"
+                    >
+                        <Separator className="mb-6" />
+                        <p className="text-sm text-muted-foreground text-center">
+                            Changed your mind? Contact our support team if you&apos;d like to resubscribe.
                         </p>
-                    </CardContent>
+                    </motion.div>
+                </CardContent>
+            </Card>
+        </motion.div>
+    );
+}
 
-                    <CardFooter className="justify-center pb-6">
-                        <Link href="/" passHref>
-                            <Button variant="outline" className="gap-2">
-                                <ArrowLeft className="h-4 w-4" />
-                                Return to Homepage
-                            </Button>
-                        </Link>
-                    </CardFooter>
-                </Card>
-            </motion.div>
+export default function UnsubscribedPage() {
+    return (
+        <div className="min-h-screen flex items-center justify-center py-12 px-4 bg-gradient-to-b from-background to-muted/50">
+            <div className="w-full max-w-md">
+                <Suspense fallback={
+                    <div className="h-96 w-full rounded-lg bg-card/30 backdrop-blur-sm animate-pulse" />
+                }>
+                    <UnsubscribedContent />
+                </Suspense>
+            </div>
         </div>
     );
 }

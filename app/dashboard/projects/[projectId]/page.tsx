@@ -14,6 +14,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Settings, ExternalLink, Plus, BarChart, FileText, Cog } from 'lucide-react'
+import Script from "next/script";
 
 interface ProjectPageProps {
     params: Promise<{ projectId: string }>
@@ -172,6 +173,12 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                                         <Link href={`/dashboard/projects/${project.id}/changelog/new`}>
                                             <Plus className="h-4 w-4 mr-2" />
                                             New Entry
+                                        </Link>
+                                    </Button>
+                                    <Button className="w-full" asChild>
+                                        <Link href={`/dashboard/projects/${projectId}/changelog/`}>
+                                            <Script className="h-4 w-4 mr-2"/>
+                                            View All Entries
                                         </Link>
                                     </Button>
                                 </div>

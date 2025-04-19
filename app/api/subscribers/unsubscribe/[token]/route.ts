@@ -1,19 +1,10 @@
-// app/api/subscribers/unsubscribe/[token]/route.ts
-
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
-/**
- * @method GET
- * @description Handles one-click unsubscribe via token
- */
-export async function GET(
-    request: Request,
-    { params }: { params: { token: string } }
-) {
+export async function GET(request: NextRequest) {
     try {
-        const { token } = params;
         const { searchParams } = new URL(request.url);
+        const token = request.nextUrl.pathname.split('/').pop(); // Extract token from URL
         const projectId = searchParams.get('projectId');
 
         if (!token) {

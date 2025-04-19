@@ -1,5 +1,3 @@
-// emails/changelog.tsx - Update existing file
-
 import * as React from 'react';
 import {
     Html,
@@ -30,17 +28,34 @@ interface ChangelogEmailProps {
     entries: Entry[];
     isDigest?: boolean;
     unsubscribeUrl?: string;
+    recipientName?: string; // Added recipient name for personalization
+    recipientEmail?: string; // Added recipient email for fallback
 }
 
 export const ChangelogEmail: React.FC<ChangelogEmailProps> = ({
                                                                   projectName,
                                                                   entries,
                                                                   isDigest = false,
-                                                                  unsubscribeUrl
+                                                                  unsubscribeUrl,
+                                                                  recipientName,
+                                                                  recipientEmail
                                                               }) => {
     const title = isDigest
         ? `${projectName} - Latest Changelog Updates`
         : `${projectName} - ${entries[0]?.title || 'Changelog Update'}`;
+
+    // Create personalized greeting
+    const getPersonalizedGreeting = () => {
+        if (recipientName) {
+            return `Hello ${recipientName},`;
+        } else if (recipientEmail) {
+            // Extract name from email as fallback (e.g., john.doe@example.com -> John)
+            const possibleName = recipientEmail.split('@')[0].split('.')[0];
+            const capitalizedName = possibleName.charAt(0).toUpperCase() + possibleName.slice(1);
+            return `Hello ${capitalizedName},`;
+        }
+        return 'Hello,';
+    };
 
     return (
         <Html>
@@ -71,13 +86,25 @@ export const ChangelogEmail: React.FC<ChangelogEmailProps> = ({
                         }}>
                             {projectName} Changelog
                         </Heading>
+
+                        {/* Personalized greeting */}
+                        <Text style={{
+                            color: '#333',
+                            fontSize: '16px',
+                            margin: '0 0 15px'
+                        }}>
+                            {getPersonalizedGreeting()}
+                        </Text>
+
                         <Text style={{
                             color: '#666',
                             fontSize: '16px',
-                            margin: '0 0 20px',
-                            textAlign: 'center'
+                            margin: '0 0 20px'
                         }}>
-                            {isDigest ? 'Recent updates to our product' : 'New update to our product'}
+                            {isDigest
+                                ? `Here are the latest updates to ${projectName} that we wanted to share with you.`
+                                : `We've just published a new update to ${projectName} that we wanted to share with you.`
+                            }
                         </Text>
                         <Hr style={{ margin: '20px 0' }} />
                     </Section>
@@ -161,6 +188,13 @@ export const ChangelogEmail: React.FC<ChangelogEmailProps> = ({
 
                     <Section style={{ marginTop: '30px' }}>
                         <Hr style={{ margin: '0 0 20px' }} />
+                        <Text style={{
+                            color: '#999',
+                            fontSize: '12px',
+                            textAlign: 'center'
+                        }}>
+                            Thank you for your continued interest in {projectName}.
+                        </Text>
                         <Text style={{
                             color: '#999',
                             fontSize: '12px',

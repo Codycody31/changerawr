@@ -12,6 +12,26 @@
     }
   ],
   "paths": {
+    "/api/subscribers": {
+      "get": {
+        "tags": [
+          "Subscribers"
+        ],
+        "summary": "",
+        "responses": {},
+        "security": [],
+        "description": "subscribers for a project with pagination and search functionality"
+      },
+      "post": {
+        "tags": [
+          "Subscribers"
+        ],
+        "summary": "",
+        "responses": {},
+        "security": [],
+        "description": "or updates a subscription for a user to receive email notifications for a project"
+      }
+    },
     "/api/setup": {
       "get": {
         "tags": [
@@ -372,6 +392,37 @@
             }
           }
         }
+      }
+    },
+    "/api/subscribers/{subscriberId}": {
+      "delete": {
+        "tags": [
+          "Subscribers"
+        ],
+        "summary": "",
+        "responses": {},
+        "security": [],
+        "description": "a subscriber from a project or deletes them entirely"
+      },
+      "patch": {
+        "tags": [
+          "Subscribers"
+        ],
+        "summary": "",
+        "responses": {},
+        "security": [],
+        "description": "a subscriber's information or subscription preferences"
+      }
+    },
+    "/api/subscribers/generate-mock": {
+      "post": {
+        "tags": [
+          "Subscribers"
+        ],
+        "summary": "",
+        "responses": {},
+        "security": [],
+        "description": "endpoint to generate mock subscribers for testing"
       }
     },
     "/api/setup/status": {
@@ -2811,136 +2862,6 @@
         "description": "an invitation link for user registration. Only admins have access to this endpoint."
       }
     },
-    "/api/admin/dashboard": {
-      "get": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "",
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "userCount": {
-                      "type": "object",
-                      "properties": {
-                        "total": {
-                          "type": "number"
-                        },
-                        "admins": {
-                          "type": "number"
-                        },
-                        "staff": {
-                          "type": "number"
-                        }
-                      }
-                    },
-                    "invitations": {
-                      "type": "object",
-                      "properties": {
-                        "total": {
-                          "type": "number"
-                        },
-                        "pending": {
-                          "type": "number"
-                        }
-                      }
-                    },
-                    "changelog": {
-                      "type": "object",
-                      "properties": {
-                        "totalEntries": {
-                          "type": "number"
-                        },
-                        "entriesThisMonth": {
-                          "type": "number"
-                        }
-                      }
-                    },
-                    "systemHealth": {
-                      "type": "object",
-                      "properties": {
-                        "databaseConnected": {
-                          "type": "boolean"
-                        },
-                        "lastDataSync": {
-                          "type": "string",
-                          "format": "date-time"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Unauthorized - User does not have 'ADMIN' role",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "An unexpected error occurred while fetching dashboard data",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [],
-        "description": "that the authenticated user has 'ADMIN' role"
-      }
-    },
     "/api/admin/config": {
       "get": {
         "tags": [
@@ -3171,6 +3092,136 @@
             }
           }
         }
+      }
+    },
+    "/api/admin/dashboard": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "userCount": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "number"
+                        },
+                        "admins": {
+                          "type": "number"
+                        },
+                        "staff": {
+                          "type": "number"
+                        }
+                      }
+                    },
+                    "invitations": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "number"
+                        },
+                        "pending": {
+                          "type": "number"
+                        }
+                      }
+                    },
+                    "changelog": {
+                      "type": "object",
+                      "properties": {
+                        "totalEntries": {
+                          "type": "number"
+                        },
+                        "entriesThisMonth": {
+                          "type": "number"
+                        }
+                      }
+                    },
+                    "systemHealth": {
+                      "type": "object",
+                      "properties": {
+                        "databaseConnected": {
+                          "type": "boolean"
+                        },
+                        "lastDataSync": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized - User does not have 'ADMIN' role",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "An unexpected error occurred while fetching dashboard data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "description": "that the authenticated user has 'ADMIN' role"
       }
     },
     "/api/admin/audit-logs": {
@@ -3600,6 +3651,129 @@
             }
           }
         }
+      }
+    },
+    "/api/subscribers/unsubscribe/{token}": {
+      "get": {
+        "tags": [
+          "Subscribers"
+        ],
+        "summary": "",
+        "responses": {},
+        "security": [],
+        "description": "one-click unsubscribe via token"
+      }
+    },
+    "/api/projects/{projectId}/versions": {
+      "get": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized - User does not have 'ADMIN' role",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "An unexpected error occurred while fetching the versions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "description": "the versions of a given project"
       }
     },
     "/api/projects/{projectId}/settings": {
@@ -4993,118 +5167,6 @@
         }
       }
     },
-    "/api/projects/{projectId}/versions": {
-      "get": {
-        "tags": [
-          "Projects"
-        ],
-        "summary": "",
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "number"
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request data",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Unauthorized - User does not have 'ADMIN' role",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "An unexpected error occurred while fetching the versions",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [],
-        "description": "the versions of a given project"
-      }
-    },
     "/api/auth/oauth/providers": {
       "get": {
         "tags": [
@@ -6182,26 +6244,6 @@
         }
       }
     },
-    "/api/projects/{projectId}/integrations/email": {
-      "get": {
-        "tags": [
-          "Projects"
-        ],
-        "summary": "",
-        "responses": {},
-        "security": [],
-        "description": "the email configuration for a project"
-      },
-      "post": {
-        "tags": [
-          "Projects"
-        ],
-        "summary": "",
-        "responses": {},
-        "security": [],
-        "description": "or updates email configuration for a project"
-      }
-    },
     "/api/projects/{projectId}/changelog/{entryId}": {
       "get": {
         "tags": [
@@ -6841,6 +6883,26 @@
         },
         "security": [],
         "description": "a list of project tags along with pagination metadata. Users must be authenticated to access this endpoint."
+      }
+    },
+    "/api/projects/{projectId}/integrations/email": {
+      "get": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "",
+        "responses": {},
+        "security": [],
+        "description": "the email configuration for a project"
+      },
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "",
+        "responses": {},
+        "security": [],
+        "description": "or updates email configuration for a project"
       }
     },
     "/api/auth/oauth/callback/{providerName}": {
@@ -7581,7 +7643,7 @@
         "summary": "",
         "responses": {},
         "security": [],
-        "description": "a changelog email to specified recipients"
+        "description": "a changelog email to specified recipients or subscribers"
       }
     }
   },
@@ -7601,6 +7663,10 @@
     }
   },
   "tags": [
+    {
+      "name": "Subscribers",
+      "description": "Operations related to Subscribers"
+    },
     {
       "name": "Setup",
       "description": "Operations related to Setup"
@@ -7631,6 +7697,12 @@
     }
   ],
   "x-tagGroups": [
+    {
+      "name": "Subscribers",
+      "tags": [
+        "Subscribers"
+      ]
+    },
     {
       "name": "Setup",
       "tags": [

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { nanoid } from 'nanoid';
+import { validateAuthAndGetUser } from '@/lib/utils/changelog';
 
 /**
  * @method POST
@@ -22,15 +23,12 @@ export async function POST(request: Request) {
 
         // Verify project exists and is public
         const project = await db.project.findUnique({
-            where: {
-                id: projectId,
-                isPublic: true // Only allow subscribing to public projects
-            }
+            where: { id: projectId }
         });
 
         if (!project) {
             return NextResponse.json(
-                { error: 'Project not found or not public' },
+                { error: 'Project not found' },
                 { status: 404 }
             );
         }
@@ -109,12 +107,22 @@ export async function POST(request: Request) {
 
 /**
  * @method GET
- * @description List all subscribers for a project (admin only)
+ * @description List subscribers for a project with pagination and search functionality
+ * @query projectId - Project ID to fetch subscribers for
+ * @query page - Page number (default: 1)
+ * @query limit - Results per page (default: 10)
+ * @query search - Optional search term for email or name
  */
 export async function GET(request: Request) {
     try {
+        // Authentication check
+        await validateAuthAndGetUser();
+
         const { searchParams } = new URL(request.url);
         const projectId = searchParams.get('projectId');
+        const page = parseInt(searchParams.get('page') || '1');
+        const limit = parseInt(searchParams.get('limit') || '10');
+        const search = searchParams.get('search') || '';
 
         if (!projectId) {
             return NextResponse.json(
@@ -123,25 +131,54 @@ export async function GET(request: Request) {
             );
         }
 
-        // TODO: Implement authentication check here
+        // Make sure values are valid
+        const validPage = Math.max(1, page);
+        const validLimit = Math.min(Math.max(1, limit), 100); // Max 100 per page
+        const skip = (validPage - 1) * validLimit;
 
-        const subscribers = await db.emailSubscriber.findMany({
-            where: {
-                subscriptions: {
-                    some: { projectId }
-                },
-                isActive: true
-            },
-            include: {
-                subscriptions: {
-                    where: { projectId }
-                }
-            },
-            orderBy: {
-                createdAt: 'desc'
+        // Build search conditions
+        const searchCondition = search
+            ? {
+                OR: [
+                    { email: { contains: search, mode: 'insensitive' as const } },
+                    { name: { contains: search, mode: 'insensitive' as const } }
+                ]
             }
-        });
+            : {};
 
+        // Query with pagination and search
+        const [subscribers, totalCount] = await Promise.all([
+            db.emailSubscriber.findMany({
+                where: {
+                    ...searchCondition,
+                    subscriptions: {
+                        some: { projectId }
+                    },
+                    isActive: true
+                },
+                include: {
+                    subscriptions: {
+                        where: { projectId }
+                    }
+                },
+                orderBy: {
+                    createdAt: 'desc'
+                },
+                skip,
+                take: validLimit
+            }),
+            db.emailSubscriber.count({
+                where: {
+                    ...searchCondition,
+                    subscriptions: {
+                        some: { projectId }
+                    },
+                    isActive: true
+                }
+            })
+        ]);
+
+        // Format response
         return NextResponse.json({
             subscribers: subscribers.map(s => ({
                 id: s.id,
@@ -150,7 +187,11 @@ export async function GET(request: Request) {
                 subscriptionType: s.subscriptions[0]?.subscriptionType || 'ALL_UPDATES',
                 createdAt: s.createdAt,
                 lastEmailSentAt: s.lastEmailSentAt
-            }))
+            })),
+            page: validPage,
+            limit: validLimit,
+            totalCount,
+            totalPages: Math.ceil(totalCount / validLimit)
         });
     } catch (error) {
         console.error('Error fetching subscribers:', error);

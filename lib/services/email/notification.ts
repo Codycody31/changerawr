@@ -15,7 +15,16 @@ export interface SendEmailParams {
     subscriberIds?: string[];
 }
 
-export async function sendChangelogEmail(params: SendEmailParams) {
+export interface EmailResult {
+    success: boolean;
+    messageId: string;
+    recipientCount: number;
+}
+
+/**
+ * Sends changelog emails to specified recipients or subscribers
+ */
+export async function sendChangelogEmail(params: SendEmailParams): Promise<EmailResult> {
     try {
         const { projectId, subject, changelogEntryId, recipients, isDigest, subscriberIds } = params;
 
@@ -48,7 +57,7 @@ export async function sendChangelogEmail(params: SendEmailParams) {
         const { emailConfig } = project;
 
         // Make sure there are entries to send
-        if (project.changelog && !project.changelog.entries.length) {
+        if (!project.changelog || !project.changelog.entries.length) {
             throw new Error('No changelog entries found to send');
         }
 
@@ -74,24 +83,12 @@ export async function sendChangelogEmail(params: SendEmailParams) {
 
         // Determine recipients
         let emailRecipients: string[] = [];
-        let allSubscriberIds: string[] = [];
+        const finalSubscriberIds: string[] = [];
 
-        // If specific subscriber IDs are provided, use those
-        if (subscriberIds && subscriberIds.length > 0) {
-            const subscribers = await db.emailSubscriber.findMany({
-                where: {
-                    id: { in: subscriberIds },
-                    isActive: true,
-                    subscriptions: {
-                        some: { projectId }
-                    }
-                }
-            });
-            emailRecipients = subscribers.map(s => s.email);
-            allSubscriberIds = subscribers.map(s => s.id);
-        }
-        // If direct recipients are provided, use those
-        else if (recipients && recipients.length > 0) {
+        // Process direct recipients if provided
+        if (recipients && recipients.length > 0) {
+            emailRecipients = [...recipients];
+
             // Check if any of these recipients are already subscribers
             const existingSubscribers = await db.emailSubscriber.findMany({
                 where: {
@@ -104,7 +101,7 @@ export async function sendChangelogEmail(params: SendEmailParams) {
 
             // Create subscribers for new emails
             if (newEmails.length > 0) {
-                await Promise.all(newEmails.map(async (email) => {
+                const newSubscribers = await Promise.all(newEmails.map(async (email) => {
                     const subscriber = await db.emailSubscriber.create({
                         data: {
                             email,
@@ -118,20 +115,54 @@ export async function sendChangelogEmail(params: SendEmailParams) {
                         }
                     });
                     return subscriber;
-                }));
+                }
+                ));
+
+                // Track new subscriber IDs
+                const newSubscriberIds = newSubscribers.map(s => s.id);
+                finalSubscriberIds.push(...newSubscriberIds);
             }
 
-            // Fetch all subscribers again to get IDs for tracking
-            const allSubscribers = await db.emailSubscriber.findMany({
+            // Add existing subscriber IDs
+            finalSubscriberIds.push(...existingSubscribers.map(s => s.id));
+        }
+
+        // Add explicitly specified subscribers
+        if (subscriberIds && subscriberIds.length > 0) {
+            const existingSubscriberIds = new Set(finalSubscriberIds);
+            // Add only new subscriber IDs (avoid duplicates)
+            subscriberIds.forEach(id => {
+                if (!existingSubscriberIds.has(id)) {
+                    finalSubscriberIds.push(id);
+                }
+            });
+        }
+
+        // If sending to subscribers, get their emails
+        if (finalSubscriberIds.length > 0) {
+            const subscribers = await db.emailSubscriber.findMany({
                 where: {
-                    email: { in: recipients },
+                    id: { in: finalSubscriberIds },
+                    isActive: true
+                },
+                select: {
+                    id: true,
+                    email: true,
+                    unsubscribeToken: true
                 }
             });
 
-            emailRecipients = recipients;
-            allSubscriberIds = allSubscribers.map(s => s.id);
-        } else {
-            throw new Error('No recipients specified');
+            // Add subscriber emails to recipients
+            subscribers.forEach(subscriber => {
+                if (!emailRecipients.includes(subscriber.email)) {
+                    emailRecipients.push(subscriber.email);
+                }
+            });
+        }
+
+        // Ensure we have recipients to send to
+        if (emailRecipients.length === 0) {
+            throw new Error('No recipients to send to');
         }
 
         // Use the existing entries from the query
@@ -140,11 +171,12 @@ export async function sendChangelogEmail(params: SendEmailParams) {
         // Generate unsubscribe URLs for each subscriber
         const subscriberMap = await db.emailSubscriber.findMany({
             where: {
-                id: { in: allSubscriberIds }
+                id: { in: finalSubscriberIds }
             },
             select: {
                 id: true,
                 email: true,
+                name: true,
                 unsubscribeToken: true
             }
         });
@@ -159,11 +191,16 @@ export async function sendChangelogEmail(params: SendEmailParams) {
                 ? `${appUrl}/api/subscribers/unsubscribe/${subscriber.unsubscribeToken}?projectId=${projectId}`
                 : `${appUrl}/unsubscribe?email=${encodeURIComponent(email)}&projectId=${projectId}`;
 
+            // Get subscriber name for personalization
+            const recipientName = subscriber?.name || undefined;
+
             const emailComponent = ChangelogEmail({
                 projectName: project.name,
                 entries: entries,
                 isDigest: isDigest || false,
-                unsubscribeUrl
+                unsubscribeUrl,
+                recipientName,
+                recipientEmail: email
             });
 
             const html = emailComponent && isValidElement(emailComponent) ? await render(emailComponent, {
@@ -194,9 +231,9 @@ export async function sendChangelogEmail(params: SendEmailParams) {
         const results = await Promise.all(emailPromises);
 
         // Update last sent time for subscribers
-        if (allSubscriberIds.length > 0) {
+        if (finalSubscriberIds.length > 0) {
             await db.emailSubscriber.updateMany({
-                where: { id: { in: allSubscriberIds } },
+                where: { id: { in: finalSubscriberIds } },
                 data: { lastEmailSentAt: new Date() }
             });
         }
@@ -224,7 +261,9 @@ export async function sendChangelogEmail(params: SendEmailParams) {
     }
 }
 
-// Add function to manage subscriptions
+/**
+ * Manages subscriptions for users
+ */
 export async function manageSubscription({
                                              email,
                                              projectId,
