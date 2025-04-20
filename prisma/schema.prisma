@@ -24,6 +24,7 @@ model User {
   auditLogs        AuditLog[]         @relation("AuditLogUser")
   targetAuditLogs  AuditLog[]         @relation("AuditLogTarget")
   oauthConnections OAuthConnection[]
+  passwordResets   PasswordReset[]
 }
 
 model RefreshToken {
@@ -213,6 +214,13 @@ model SystemConfig {
   maxChangelogEntriesPerProject Int      @default(100)
   enableAnalytics               Boolean  @default(true)
   enableNotifications           Boolean  @default(true)
+  enablePasswordReset           Boolean  @default(false)
+  smtpHost                      String?
+  smtpPort                      Int?
+  smtpUser                      String?
+  smtpPassword                  String?
+  smtpSecure                    Boolean?
+  systemEmail                   String?
   updatedAt                     DateTime @updatedAt
 }
 
@@ -277,6 +285,21 @@ model ProjectSubscription {
   @@unique([projectId, subscriberId])
   @@index([projectId])
   @@index([subscriberId])
+}
+
+model PasswordReset {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email     String
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  usedAt    DateTime?
+
+  @@index([token])
+  @@index([userId])
+  @@index([email])
 }
 
 enum Role {

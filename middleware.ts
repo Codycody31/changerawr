@@ -7,6 +7,7 @@ import { verifyAccessToken } from '@/lib/auth/tokens'
 const PUBLIC_PATHS = [
     '/login',
     '/register',
+    '/forgot-password',
     '/api/auth/login',
     '/api/auth/refresh',
     '/api/auth/preview',
@@ -26,6 +27,7 @@ const PUBLIC_PATHS = [
 const AUTH_ROUTES = ['/login', '/register', '/setup']
 
 // Separate setup check function
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function isSetupComplete(request: NextRequest): Promise<boolean> {
     // Use a special header to prevent circular requests
     const headers = new Headers({
@@ -59,6 +61,11 @@ export async function middleware(request: NextRequest) {
 
     // Always allow API routes
     if (pathname.startsWith('/api/')) {
+        return NextResponse.next()
+    }
+
+    // Always allow password-reset routes
+    if (pathname.startsWith('/reset-password/')) {
         return NextResponse.next()
     }
 

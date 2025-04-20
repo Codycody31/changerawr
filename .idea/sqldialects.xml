@@ -3,5 +3,6 @@
   <component name="SqlDialectMappings">
     <file url="file://$PROJECT_DIR$/prisma/migrations/20250215051621_add_invitation_links/migration.sql" dialect="PostgreSQL" />
     <file url="file://$PROJECT_DIR$/prisma/migrations/20250221000121_add_new_request_types/migration.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/prisma/migrations/20250419000001_add_password_reset/migration.sql" dialect="PostgreSQL" />
   </component>
 </project>

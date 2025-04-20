@@ -14,6 +14,7 @@ import { ArrowLeft, User } from 'lucide-react'
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { ErrorAlert } from '@/components/ui/error-alert'
 import { useQuery } from '@tanstack/react-query'
+import Link from "next/link";
 
 const emailSchema = z.object({
     email: z.string().email('Please enter a valid email')
@@ -392,7 +393,15 @@ export default function LoginPage() {
 
                                 <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="password">Password</Label>
+                                        <div className="flex items-center justify-between">
+                                            <Label htmlFor="password">Password</Label>
+                                            <Link
+                                                href="/forgot-password"
+                                                className="text-sm font-medium text-primary hover:underline"
+                                            >
+                                                Forgot password?
+                                            </Link>
+                                        </div>
                                         <Input
                                             id="password"
                                             {...passwordForm.register('password')}

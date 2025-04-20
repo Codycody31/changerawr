@@ -12,6 +12,12 @@ import {
     CardTitle,
 } from '@/components/ui/card'
 import {
+    Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
+} from '@/components/ui/tabs'
+import {
     Form,
     FormControl,
     FormDescription,
@@ -23,10 +29,20 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-import { AlertTriangle, Check, Loader2 } from 'lucide-react'
+import { Separator } from '@/components/ui/separator'
+import {
+    AlertTriangle,
+    Check,
+    Loader2,
+    Settings,
+    Mail,
+    Bell,
+    BarChart4
+} from 'lucide-react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
+import Link from "next/link"
 
 // Define the system configuration schema
 const systemConfigSchema = z.object({
@@ -109,15 +125,25 @@ export default function SystemConfigPage() {
         )
     }
 
+    const cardVariants = {
+        hidden: { opacity: 0, y: 20 },
+        visible: { opacity: 1, y: 0 }
+    }
+
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="container max-w-4xl p-6"
+            className="container max-w-5xl p-6"
         >
-            <Card>
+            <Card className="shadow-md">
                 <CardHeader>
-                    <CardTitle>System Configuration</CardTitle>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <Settings className="h-6 w-6 text-primary" />
+                            <CardTitle>System Configuration</CardTitle>
+                        </div>
+                    </div>
                     <CardDescription>
                         Manage global system settings and defaults
                     </CardDescription>
@@ -128,140 +154,200 @@ export default function SystemConfigPage() {
                             <Loader2 className="h-6 w-6 animate-spin" />
                         </div>
                     ) : (
-                        <Form {...form}>
-                            <form onSubmit={form.handleSubmit((data) => updateConfig.mutate(data))} className="space-y-6">
-                                <FormField
-                                    control={form.control}
-                                    name="defaultInvitationExpiry"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Default Invitation Expiry (days)</FormLabel>
-                                            <FormControl>
-                                                <Input
-                                                    type="number"
-                                                    {...field}
-                                                    onChange={(e) => field.onChange(Number(e.target.value))}
-                                                />
-                                            </FormControl>
-                                            <FormDescription>
-                                                Number of days before invitation links expire
-                                            </FormDescription>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
+                        <Tabs defaultValue="general" className="w-full">
+                            <TabsList className="grid grid-cols-3 mb-6">
+                                <TabsTrigger value="general">General</TabsTrigger>
+                                <TabsTrigger value="features">Features</TabsTrigger>
+                                <TabsTrigger value="integrations">Integrations</TabsTrigger>
+                            </TabsList>
 
-                                <FormField
-                                    control={form.control}
-                                    name="requireApprovalForChangelogs"
-                                    render={({ field }) => (
-                                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                                            <div className="space-y-0.5">
-                                                <FormLabel className="text-base">
-                                                    Require Approval for Changelogs
-                                                </FormLabel>
-                                                <FormDescription>
-                                                    Require admin approval before publishing changelog entries
-                                                </FormDescription>
+                            <Form {...form}>
+                                <form onSubmit={form.handleSubmit((data) => updateConfig.mutate(data))}>
+                                    <TabsContent value="general" className="space-y-6">
+                                        <div className="grid gap-6">
+                                            <FormField
+                                                control={form.control}
+                                                name="defaultInvitationExpiry"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>Default Invitation Expiry (days)</FormLabel>
+                                                        <FormControl>
+                                                            <Input
+                                                                type="number"
+                                                                {...field}
+                                                                onChange={(e) => field.onChange(Number(e.target.value))}
+                                                            />
+                                                        </FormControl>
+                                                        <FormDescription>
+                                                            Number of days before invitation links expire
+                                                        </FormDescription>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+
+                                            <FormField
+                                                control={form.control}
+                                                name="maxChangelogEntriesPerProject"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>Max Changelog Entries per Project</FormLabel>
+                                                        <FormControl>
+                                                            <Input
+                                                                type="number"
+                                                                {...field}
+                                                                onChange={(e) => field.onChange(Number(e.target.value))}
+                                                            />
+                                                        </FormControl>
+                                                        <FormDescription>
+                                                            Maximum number of changelog entries allowed per project
+                                                        </FormDescription>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                        </div>
+                                    </TabsContent>
+
+                                    <TabsContent value="features" className="space-y-6">
+                                        <motion.div
+                                            variants={cardVariants}
+                                            initial="hidden"
+                                            animate="visible"
+                                            transition={{ staggerChildren: 0.1 }}
+                                            className="space-y-4"
+                                        >
+                                            <FormField
+                                                control={form.control}
+                                                name="requireApprovalForChangelogs"
+                                                render={({ field }) => (
+                                                    <motion.div variants={cardVariants}>
+                                                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                                                            <div className="space-y-0.5">
+                                                                <FormLabel className="text-base">
+                                                                    Require Approval for Changelogs
+                                                                </FormLabel>
+                                                                <FormDescription>
+                                                                    Require admin approval before publishing changelog entries
+                                                                </FormDescription>
+                                                            </div>
+                                                            <FormControl>
+                                                                <Switch
+                                                                    checked={field.value}
+                                                                    onCheckedChange={field.onChange}
+                                                                />
+                                                            </FormControl>
+                                                        </FormItem>
+                                                    </motion.div>
+                                                )}
+                                            />
+
+                                            <FormField
+                                                control={form.control}
+                                                name="enableAnalytics"
+                                                render={({ field }) => (
+                                                    <motion.div variants={cardVariants}>
+                                                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                                                            <div className="flex gap-2">
+                                                                <BarChart4 className="h-5 w-5 text-muted-foreground mt-0.5" />
+                                                                <div className="space-y-0.5">
+                                                                    <FormLabel className="text-base">
+                                                                        Enable Analytics
+                                                                    </FormLabel>
+                                                                    <FormDescription>
+                                                                        Collect and display analytics for changelog entries
+                                                                    </FormDescription>
+                                                                </div>
+                                                            </div>
+                                                            <FormControl>
+                                                                <Switch
+                                                                    checked={field.value}
+                                                                    onCheckedChange={field.onChange}
+                                                                />
+                                                            </FormControl>
+                                                        </FormItem>
+                                                    </motion.div>
+                                                )}
+                                            />
+
+                                            <FormField
+                                                control={form.control}
+                                                name="enableNotifications"
+                                                render={({ field }) => (
+                                                    <motion.div variants={cardVariants}>
+                                                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                                                            <div className="flex gap-2">
+                                                                <Bell className="h-5 w-5 text-muted-foreground mt-0.5" />
+                                                                <div className="space-y-0.5">
+                                                                    <FormLabel className="text-base">
+                                                                        Enable Notifications
+                                                                    </FormLabel>
+                                                                    <FormDescription>
+                                                                        Send notifications for internal actions ( e.g. approvals )
+                                                                    </FormDescription>
+                                                                </div>
+                                                            </div>
+                                                            <FormControl>
+                                                                <Switch
+                                                                    checked={field.value}
+                                                                    onCheckedChange={field.onChange}
+                                                                />
+                                                            </FormControl>
+                                                        </FormItem>
+                                                    </motion.div>
+                                                )}
+                                            />
+                                        </motion.div>
+                                    </TabsContent>
+
+                                    <TabsContent value="integrations" className="space-y-6">
+                                        <motion.div
+                                            variants={cardVariants}
+                                            initial="hidden"
+                                            animate="visible"
+                                            className="flex flex-row items-center justify-between rounded-lg border p-4"
+                                        >
+                                            <div className="flex gap-2">
+                                                <Mail className="h-5 w-5 text-muted-foreground mt-0.5" />
+                                                <div className="space-y-1">
+                                                    <h3 className="text-base font-medium">System Email</h3>
+                                                    <p className="text-sm text-muted-foreground">
+                                                        Configure SMTP settings for internal system usage.
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <FormControl>
-                                                <Switch
-                                                    checked={field.value}
-                                                    onCheckedChange={field.onChange}
-                                                />
-                                            </FormControl>
-                                        </FormItem>
-                                    )}
-                                />
+                                            <Button asChild variant="outline" size="sm">
+                                                <Link href="/dashboard/admin/system/email">
+                                                    Configure
+                                                </Link>
+                                            </Button>
+                                        </motion.div>
+                                    </TabsContent>
 
-                                <FormField
-                                    control={form.control}
-                                    name="maxChangelogEntriesPerProject"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Max Changelog Entries per Project</FormLabel>
-                                            <FormControl>
-                                                <Input
-                                                    type="number"
-                                                    {...field}
-                                                    onChange={(e) => field.onChange(Number(e.target.value))}
-                                                />
-                                            </FormControl>
-                                            <FormDescription>
-                                                Maximum number of changelog entries allowed per project
-                                            </FormDescription>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
+                                    <Separator className="my-6" />
 
-                                <div className="space-y-4">
-                                    <FormField
-                                        control={form.control}
-                                        name="enableAnalytics"
-                                        render={({ field }) => (
-                                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                                                <div className="space-y-0.5">
-                                                    <FormLabel className="text-base">
-                                                        Enable Analytics
-                                                    </FormLabel>
-                                                    <FormDescription>
-                                                        Collect and display analytics for changelog entries
-                                                    </FormDescription>
-                                                </div>
-                                                <FormControl>
-                                                    <Switch
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={form.control}
-                                        name="enableNotifications"
-                                        render={({ field }) => (
-                                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                                                <div className="space-y-0.5">
-                                                    <FormLabel className="text-base">
-                                                        Enable Notifications
-                                                    </FormLabel>
-                                                    <FormDescription>
-                                                        Send notifications for changelog updates and approvals
-                                                    </FormDescription>
-                                                </div>
-                                                <FormControl>
-                                                    <Switch
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                            </FormItem>
-                                        )}
-                                    />
-                                </div>
-
-                                <Button
-                                    type="submit"
-                                    className="w-full"
-                                    disabled={updateConfig.isPending}
-                                >
-                                    {updateConfig.isPending ? (
-                                        <>
-                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                            Updating...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Check className="mr-2 h-4 w-4" />
-                                            Save Changes
-                                        </>
-                                    )}
-                                </Button>
-                            </form>
-                        </Form>
+                                    <div className="flex justify-end">
+                                        <Button
+                                            type="submit"
+                                            disabled={updateConfig.isPending}
+                                            className="px-8"
+                                        >
+                                            {updateConfig.isPending ? (
+                                                <>
+                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                    Updating...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Check className="mr-2 h-4 w-4" />
+                                                    Save Changes
+                                                </>
+                                            )}
+                                        </Button>
+                                    </div>
+                                </form>
+                            </Form>
+                        </Tabs>
                     )}
                 </CardContent>
             </Card>
