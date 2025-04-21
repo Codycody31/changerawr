@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { RequestDataType } from '@/lib/types/changelog';
 import type { Prisma, RequestStatus } from '@prisma/client';
+import {sendNotificationEmail} from "@/lib/services/email/notification";
 
 // Types
 interface ProcessRequestOptions {
@@ -208,6 +209,44 @@ class ChangelogRequestService {
                 metadata: safeOptions.metadata
             };
         });
+
+        // After transaction completes successfully, send notification
+        try {
+            // Need to fetch staff with settings included since it's not in the transaction result
+            const staffWithSettings = await db.user.findUnique({
+                where: { id: result.data.staffId },
+                include: { settings: true }
+            });
+
+            // Only send notification if user has them enabled (or if no preference is set)
+            if (staffWithSettings && staffWithSettings.settings?.enableNotifications !== false) {
+                // Fetch admin name for the notification
+                const admin = result.data.adminId
+                    ? await db.user.findUnique({
+                        where: { id: result.data.adminId },
+                        select: { name: true }
+                    })
+                    : null;
+
+                const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+                const dashboardUrl = `${appUrl}/dashboard/projects/${result.data.projectId}`;
+
+                await sendNotificationEmail({
+                    userId: result.data.staffId,
+                    status: safeOptions.status,
+                    request: {
+                        type: result.data.type,
+                        projectName: result.data.project?.name || 'Unknown Project',
+                        entryTitle: result.data.ChangelogEntry?.title,
+                        adminName: admin?.name || 'an administrator'
+                    },
+                    dashboardUrl
+                });
+            }
+        } catch (emailError) {
+            // Just log email errors, don't fail the request
+            console.error('Failed to send notification email:', emailError);
+        }
 
         return result;
     }

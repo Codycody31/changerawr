@@ -1,3 +1,4 @@
+// app/api/auth/settings/route.ts
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { validateAuthAndGetUser } from '@/lib/utils/changelog';
@@ -12,7 +13,8 @@ import { validateAuthAndGetUser } from '@/lib/utils/changelog';
  *     "id": { "type": "string" },
  *     "userId": { "type": "string" },
  *     "theme": { "type": "string", "enum": ["light", "dark"] },
- *     "name": { "type": "string" }
+ *     "name": { "type": "string" },
+ *     "enableNotifications": { "type": "boolean" }
  *   }
  * }
  * @error 401 Unauthorized - User not authenticated
@@ -32,6 +34,7 @@ export async function GET() {
                 data: {
                     userId: user.id,
                     theme: 'light',
+                    enableNotifications: true,
                 },
             });
             return NextResponse.json(defaultSettings);
@@ -58,7 +61,8 @@ export async function GET() {
  *     "id": { "type": "string" },
  *     "userId": { "type": "string" },
  *     "theme": { "type": "string", "enum": ["light", "dark"] },
- *     "name": { "type": "string" }
+ *     "name": { "type": "string" },
+ *     "enableNotifications": { "type": "boolean" }
  *   }
  * }
  * @error 400 Invalid request data
@@ -71,10 +75,20 @@ export async function PATCH(request: Request) {
         const data = await request.json();
 
         // Validate the request data
-        const validUpdates: { theme?: string; name?: string } = {};
+        const validUpdates: {
+            theme?: string;
+            name?: string;
+            enableNotifications?: boolean;
+        } = {};
+
         if (data.theme && ['light', 'dark'].includes(data.theme)) {
             validUpdates.theme = data.theme;
         }
+
+        if (data.enableNotifications !== undefined) {
+            validUpdates.enableNotifications = Boolean(data.enableNotifications);
+        }
+
         if (data.name !== undefined) {
             // Update user name
             await db.user.update({
@@ -89,7 +103,8 @@ export async function PATCH(request: Request) {
                 where: { userId: user.id },
                 create: {
                     userId: user.id,
-                    ...validUpdates,
+                    theme: validUpdates.theme || 'light',
+                    enableNotifications: validUpdates.enableNotifications !== undefined ? validUpdates.enableNotifications : true,
                 },
                 update: validUpdates,
             });

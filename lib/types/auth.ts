@@ -1,3 +1,5 @@
+import {Settings} from "@prisma/client";
+
 export enum Role {
     ADMIN = 'ADMIN',
     STAFF = 'STAFF',
@@ -12,6 +14,7 @@ export interface User {
     createdAt: Date;
     updatedAt: Date;
     lastLoginAt: Date;
+    settings: Settings;
 }
 
 export interface LoginCredentials {

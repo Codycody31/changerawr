@@ -5,6 +5,8 @@ import { db } from '@/lib/db';
 import { ChangelogEmail } from '@/emails/changelog';
 import SMTPTransport from "nodemailer/lib/smtp-transport";
 import { nanoid } from 'nanoid';
+import ApprovalNotificationEmail from "@/emails/approval-notification";
+import RejectionNotificationEmail from "@/emails/rejection-notification";
 
 export interface SendEmailParams {
     projectId: string;
@@ -19,6 +21,20 @@ export interface EmailResult {
     success: boolean;
     messageId: string;
     recipientCount: number;
+}
+
+interface NotificationRequestInfo {
+    type: string;
+    projectName: string;
+    entryTitle?: string;
+    adminName?: string;
+}
+
+interface SendNotificationParams {
+    userId: string;
+    status: 'APPROVED' | 'REJECTED' | 'PENDING';
+    request: NotificationRequestInfo;
+    dashboardUrl: string;
 }
 
 /**
@@ -258,6 +274,118 @@ export async function sendChangelogEmail(params: SendEmailParams): Promise<Email
     } catch (error) {
         console.error('Failed to send changelog email:', error);
         throw error;
+    }
+}
+
+/**
+ * Sends a notification email to a user about request status
+ */
+export async function sendNotificationEmail({
+                                                userId,
+                                                status,
+                                                request,
+                                                dashboardUrl
+                                            }: SendNotificationParams): Promise<boolean> {
+    try {
+        // Get user details
+        const user = await db.user.findUnique({
+            where: { id: userId },
+            include: { settings: true }
+        });
+
+        if (!user || (user.settings?.enableNotifications === false)) {
+            return false; // User doesn't want notifications
+        }
+
+        // Get system email settings
+        const systemConfig = await db.systemConfig.findFirst({
+            where: { id: 1 }
+        });
+
+        if (!systemConfig || !systemConfig.systemEmail || !systemConfig.smtpHost) {
+            console.error('System email not configured for notifications');
+            return false;
+        }
+
+        // Set up transport
+        const transporterOptions: SMTPTransport.Options = {
+            host: systemConfig.smtpHost,
+            port: systemConfig.smtpPort || 587,
+            secure: !!systemConfig.smtpSecure,
+            auth: systemConfig.smtpUser && systemConfig.smtpPassword
+                ? {
+                    user: systemConfig.smtpUser,
+                    pass: systemConfig.smtpPassword,
+                }
+                : undefined,
+            tls: {
+                rejectUnauthorized: !!systemConfig.smtpSecure,
+            },
+        };
+
+        const transporter = createTransport(transporterOptions);
+
+        // Choose the right email template
+        const emailProps = {
+            recipientName: user.name || undefined,
+            projectName: request.projectName,
+            requestType: request.type,
+            entryTitle: request.entryTitle,
+            adminName: request.adminName || 'an administrator',
+            dashboardUrl
+        };
+
+        // Use the appropriate email template based on status
+        const emailComponent = status === 'APPROVED'
+            ? ApprovalNotificationEmail(emailProps)
+            : RejectionNotificationEmail(emailProps);
+
+        // Render the email
+        const html = isValidElement(emailComponent)
+            ? await render(emailComponent, { pretty: true })
+            : '';
+
+        const text = isValidElement(emailComponent)
+            ? await render(emailComponent, { plainText: true })
+            : '';
+
+        // Set the subject based on status
+        const subject = status === 'APPROVED'
+            ? `Request Approved for ${request.projectName}`
+            : `Request Not Approved for ${request.projectName}`;
+
+        // Send the email
+        const mailOptions: SendMailOptions = {
+            from: `"Changerawr Notifications" <${systemConfig.systemEmail}>`,
+            to: user.email,
+            subject,
+            html,
+            text,
+        };
+
+        const result = await transporter.sendMail(mailOptions);
+
+        // Log the notification
+        await db.auditLog.create({
+            data: {
+                action: 'NOTIFICATION_SENT',
+                userId,
+                details: {
+                    notificationType: 'email',
+                    subject,
+                    status,
+                    requestType: request.type,
+                    projectName: request.projectName,
+                    messageId: result.messageId,
+                    timestamp: new Date().toISOString()
+                }
+            }
+        });
+
+        return true;
+    } catch (error) {
+        console.error('Failed to send notification email:', error);
+        return false;
     }
 }
 
