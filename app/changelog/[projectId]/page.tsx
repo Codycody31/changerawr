@@ -13,12 +13,14 @@ import {
 } from '@/components/ui/tooltip';
 import Link from 'next/link';
 import { Metadata } from 'next';
+import SubscriptionForm from "@/components/subscription-form";
 
 interface ChangelogResponse {
     project: {
         id: string;
         name: string;
         description?: string;
+        emailNotificationsEnabled?: boolean;
     };
     items: Array<{
         id: string;
@@ -218,6 +220,10 @@ export default async function ChangelogPage({ params }: ChangelogPageProps) {
                                 />
                             </div>
                         </div>
+                        {/* Only show subscription form if email notifications are enabled */}
+                        {data.project.emailNotificationsEnabled && (
+                            <SubscriptionForm projectId={projectId} projectName={data.project.name} />
+                        )}
                     </div>
                 </header>
 

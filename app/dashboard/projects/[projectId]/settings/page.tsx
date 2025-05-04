@@ -21,7 +21,7 @@ import {
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import {useToast} from '@/hooks/use-toast'
-import {AlertTriangle, Loader2, Plus, Puzzle, Settings, Shield, Tag, X, Lock, ExternalLink, Rss, Code, Boxes} from 'lucide-react'
+import {AlertTriangle, Loader2, Plus, Puzzle, Settings, Shield, Tag, X, Lock, ExternalLink, Rss, Code, Boxes, Mail} from 'lucide-react'
 import {DestructiveActionRequest} from '@/components/changelog/RequestHandler'
 import {useAuth} from '@/context/auth'
 import {Alert, AlertDescription} from '@/components/ui/alert'
@@ -259,6 +259,29 @@ export default function ProjectSettingsPage({params}: ProjectSettingsPageProps) 
                                     </div>
                                 </div>
 
+                                {/* Email Integration */}
+                                <div className="group relative rounded-lg border p-4 hover:border-primary/50 transition-colors">
+                                    <div className="flex items-start gap-4">
+                                        <div className="p-2 rounded-md bg-primary/10 text-primary">
+                                            <Mail className="h-5 w-5" />
+                                        </div>
+                                        <div className="flex-1 space-y-1">
+                                            <h3 className="font-medium">Email Notifications</h3>
+                                            <p className="text-sm text-muted-foreground">
+                                                Send changelog updates to your team or subscribers via email
+                                            </p>
+                                        </div>
+                                        <Button
+                                            onClick={() => router.push(`/dashboard/projects/${projectId}/integrations/email`)}
+                                            variant="outline"
+                                            className="group-hover:border-primary/50 group-hover:bg-primary/5 transition-colors"
+                                        >
+                                            <Settings className="h-4 w-4 mr-2"/>
+                                            Configure Email
+                                        </Button>
+                                    </div>
+                                </div>
+
                                 {/* RSS Feed */}
                                 <div className="group relative rounded-lg border p-4 hover:border-primary/50 transition-colors">
                                     <div className="flex items-start gap-4">
@@ -295,7 +318,7 @@ export default function ProjectSettingsPage({params}: ProjectSettingsPageProps) 
                             <div className="mt-6 pt-6 border-t">
                                 <h3 className="text-sm font-medium text-muted-foreground mb-2">More integrations coming soon</h3>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                                    {['Slack', 'Discord', 'Email Digest'].map((integration) => (
+                                    {['Slack', 'Discord'].map((integration) => (
                                         <div
                                             key={integration}
                                             className="flex items-center justify-center h-20 rounded-lg border bg-muted/30 text-sm text-muted-foreground"

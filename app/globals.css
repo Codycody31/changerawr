@@ -70,3 +70,48 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+.theme-transition-overlay {
+  opacity: 0;
+  transition: opacity 0.6s ease-in-out;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.theme-transition-active {
+  opacity: 1 !important;
+}
+
+/* Theme transition animations */
+:root {
+  --theme-transition-duration: 600ms;
+}
+
+html.light,
+html.dark {
+  transition: background-color var(--theme-transition-duration) ease,
+  color var(--theme-transition-duration) ease;
+}
+
+/* Smoothen transitions for all UI elements */
+*:not(.theme-transition-overlay) {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-timing-function: ease;
+  transition-duration: 200ms;
+}
+
+/* Override the transition for any elements that shouldn't animate */
+.no-theme-transition {
+  transition: none !important;
+}
+
+/* Add subtle pulse animation to the current theme icon */
+@keyframes pulse-theme {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+.theme-button-active-icon {
+  animation: pulse-theme 2s infinite ease-in-out;
+}
