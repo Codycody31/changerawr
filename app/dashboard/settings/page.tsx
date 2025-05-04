@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Moon, Sun, Save, ArrowLeft, Bell, Lock, RefreshCw } from 'lucide-react';
+import { Loader2, Moon, Sun, Save, ArrowLeft, Bell, Lock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { Switch } from '@/components/ui/switch';
@@ -29,38 +29,30 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 
-// Define the Settings type
-interface UserSettings {
-    id: string;
-    userId: string;
+interface FormState {
+    name: string;
     theme: string;
-    enableNotifications?: boolean;
-    createdAt: Date;
-    updatedAt: Date;
+    enableNotifications: boolean;
 }
 
 export default function SettingsPage() {
     const { user } = useAuth();
-    const { theme } = useTheme();
+    const { theme, setTheme } = useTheme();
     const router = useRouter();
     const { toast } = useToast();
     const [isLoading, setIsLoading] = useState(false);
     const [isFetching, setIsFetching] = useState(true);
     const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
     const [isResettingPassword, setIsResettingPassword] = useState(false);
-    const [needsRefresh, setNeedsRefresh] = useState(false);
     const isMobile = useMediaQuery("(max-width: 640px)");
 
-    // Store initial theme for comparison
-    const [initialTheme, setInitialTheme] = useState(theme);
+    // Original saved values - these don't change unless we explicitly save
+    const [savedValues, setSavedValues] = useState<FormState | null>(null);
 
-    // State to store fetched settings
-    const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
-
-    // Local state for form values
-    const [formState, setFormState] = useState({
-        name: user?.name || '',
-        theme: theme || 'light',
+    // Current form values that the user is editing
+    const [formState, setFormState] = useState<FormState>({
+        name: '',
+        theme: 'light',
         enableNotifications: true
     });
 
@@ -72,19 +64,25 @@ export default function SettingsPage() {
                 const response = await fetch('/api/auth/settings');
                 if (response.ok) {
                     const data = await response.json();
-                    setUserSettings(data);
-                    setFormState(prev => ({
-                        ...prev,
+
+                    const initialValues = {
                         name: user?.name || '',
                         theme: data.theme || theme || 'light',
                         enableNotifications: data.enableNotifications !== undefined
                             ? data.enableNotifications
                             : true
-                    }));
-                    setInitialTheme(data.theme || theme || 'light');
+                    };
+
+                    setSavedValues(initialValues);
+                    setFormState(initialValues);
                 }
             } catch (error) {
                 console.error('Failed to fetch settings:', error);
+                toast({
+                    title: 'Error',
+                    description: 'Failed to load your settings. Please try again.',
+                    variant: 'destructive',
+                });
             } finally {
                 setIsFetching(false);
             }
@@ -93,19 +91,20 @@ export default function SettingsPage() {
         if (user) {
             fetchSettings();
         }
-    }, [user, theme]);
+    }, [user, theme, toast]);
 
-    // Track if form has changes by comparing against initial values
-    const hasChanges =
-        formState.name !== user?.name ||
-        formState.theme !== initialTheme ||
-        formState.enableNotifications !== userSettings?.enableNotifications;
+    // Check if there are unsaved changes
+    const hasChanges = savedValues ? (
+        formState.name !== savedValues.name ||
+        formState.theme !== savedValues.theme ||
+        formState.enableNotifications !== savedValues.enableNotifications
+    ) : false;
 
-    // Handle theme toggle
+    // Handle theme toggle with immediate UI update
     const handleThemeToggle = (newTheme: string) => {
         setFormState(prev => ({ ...prev, theme: newTheme }));
-        // Flag that will need a refresh if saving a different theme
-        setNeedsRefresh(newTheme !== initialTheme);
+        // Apply theme immediately for preview
+        setTheme(newTheme);
     };
 
     // Handle name change
@@ -152,59 +151,28 @@ export default function SettingsPage() {
 
     // Handle save
     const handleSave = async () => {
-        if (!hasChanges) return;
+        if (!hasChanges || !savedValues) return;
 
         setIsLoading(true);
         try {
             const response = await fetch('/api/auth/settings', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: formState.name,
-                    theme: formState.theme,
-                    enableNotifications: formState.enableNotifications
-                }),
+                body: JSON.stringify(formState),
             });
 
             if (!response.ok) throw new Error('Failed to update settings');
 
-            // Save theme to localStorage
-            if (formState.theme !== initialTheme) {
-                localStorage.setItem('theme', formState.theme);
-            }
+            // Update saved values to reflect the new saved state
+            setSavedValues(formState);
 
-            // Show toast with appropriate message
-            if (needsRefresh) {
-                toast({
-                    title: 'Theme updated',
-                    description: 'Refresh the page to apply your new theme.',
-                    action: (
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => window.location.reload()}
-                            className="gap-1"
-                        >
-                            <RefreshCw className="h-3.5 w-3.5" />
-                            Refresh
-                        </Button>
-                    ),
-                });
-            } else {
-                toast({
-                    title: 'Settings saved',
-                    description: 'Your settings have been updated successfully.',
-                });
-            }
+            toast({
+                title: 'Settings saved',
+                description: 'Your settings have been updated successfully.',
+            });
 
-            // Update initial values
-            setInitialTheme(formState.theme);
-            setNeedsRefresh(false);
-
-            // Refresh for non-theme changes
-            if (!needsRefresh) {
-                router.refresh();
-            }
+            // Refresh the router to update any server-side data
+            router.refresh();
 
         } catch (error) {
             toast({
@@ -212,8 +180,24 @@ export default function SettingsPage() {
                 description: error instanceof Error ? error.message : 'An error occurred',
                 variant: 'destructive',
             });
+
+            // Revert theme on error
+            if (savedValues && formState.theme !== savedValues.theme) {
+                setTheme(savedValues.theme);
+            }
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    // Handle cancel/revert changes
+    const handleCancel = () => {
+        if (savedValues) {
+            setFormState(savedValues);
+            // Revert theme if it was changed
+            if (formState.theme !== savedValues.theme) {
+                setTheme(savedValues.theme);
+            }
         }
     };
 
@@ -258,12 +242,20 @@ export default function SettingsPage() {
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: 20 }}
                                 transition={{ duration: 0.2 }}
-                                className="w-full sm:w-auto"
+                                className="flex gap-2 w-full sm:w-auto"
                             >
                                 <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={handleCancel}
+                                    className="flex-1 sm:flex-initial"
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
                                     type="submit"
-                                    disabled={!hasChanges || isLoading}
-                                    className="w-full sm:min-w-[100px]"
+                                    disabled={isLoading}
+                                    className="flex-1 sm:flex-initial sm:min-w-[100px]"
                                 >
                                     {isLoading ? (
                                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -285,11 +277,6 @@ export default function SettingsPage() {
                         <CardTitle className="text-xl">Appearance</CardTitle>
                         <CardDescription>
                             Choose your preferred theme.
-                            {formState.theme !== initialTheme && (
-                                <p className="text-amber-500 dark:text-amber-400 mt-1 text-sm font-medium">
-                                    Save and refresh the page to apply theme changes.
-                                </p>
-                            )}
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -432,20 +419,30 @@ export default function SettingsPage() {
                 {/* Mobile fixed save button */}
                 {isMobile && hasChanges && (
                     <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t z-10">
-                        <Button
-                            type="submit"
-                            disabled={!hasChanges || isLoading}
-                            className="w-full"
-                        >
-                            {isLoading ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                                <>
-                                    <Save className="mr-2 h-4 w-4" />
-                                    Save Changes
-                                </>
-                            )}
-                        </Button>
+                        <div className="flex gap-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handleCancel}
+                                className="flex-1"
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                disabled={isLoading}
+                                className="flex-1"
+                            >
+                                {isLoading ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <>
+                                        <Save className="mr-2 h-4 w-4" />
+                                        Save Changes
+                                    </>
+                                )}
+                            </Button>
+                        </div>
                     </div>
                 )}
             </form>
