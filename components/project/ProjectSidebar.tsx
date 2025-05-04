@@ -80,11 +80,11 @@ function NavItem({ href, icon: Icon, label, active, external, badge, disabled }:
                             "text-muted-foreground/50 bg-muted/20 cursor-not-allowed"
                         )}>
                             <div className="flex items-center">
-                                <Icon className="mr-2 h-4 w-4" />
-                                <span>{label}</span>
+                                <Icon className="mr-2 h-4 w-4 flex-shrink-0" />
+                                <span className="truncate">{label}</span>
                             </div>
                             {badge && (
-                                <Badge variant="outline" className="ml-auto text-xs opacity-50">
+                                <Badge variant="outline" className="ml-2 text-xs opacity-50 flex-shrink-0">
                                     {badge}
                                 </Badge>
                             )}
@@ -109,16 +109,16 @@ function NavItem({ href, icon: Icon, label, active, external, badge, disabled }:
             )}
             {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
         >
-            <div className="flex items-center">
-                <Icon className="mr-2 h-4 w-4" />
-                <span>{label}</span>
+            <div className="flex items-center min-w-0">
+                <Icon className="mr-2 h-4 w-4 flex-shrink-0" />
+                <span className="truncate">{label}</span>
             </div>
             {badge && (
-                <Badge variant="outline" className="ml-auto text-xs bg-primary/5 group-hover:bg-primary/10">
+                <Badge variant="outline" className="ml-2 text-xs bg-primary/5 group-hover:bg-primary/10 flex-shrink-0">
                     {badge}
                 </Badge>
             )}
-            {external && <ExternalLink className="ml-auto h-3 w-3 opacity-70" />}
+            {external && <ExternalLink className="ml-2 h-3 w-3 opacity-70 flex-shrink-0" />}
         </Link>
     )
 }
@@ -145,73 +145,73 @@ function RecentChangelog({
                              isBookmarked
                          }: RecentChangelogProps) {
     return (
-        <div className="group flex items-start gap-2 p-2 hover:bg-accent/50 rounded-md text-sm transition-colors">
-            <div className="flex-shrink-0 h-8 w-8 bg-primary/10 rounded-md flex items-center justify-center mt-0.5">
-                <FileText className="h-4 w-4 text-primary" />
-            </div>
-            <div className="min-w-0 flex-1">
-                <Link
-                    href={`/dashboard/projects/${projectId}/changelog/${id}`}
-                    className="block"
-                >
-                    <div className="flex items-center gap-1">
-                        <p className="truncate font-medium group-hover:text-primary transition-colors">{title}</p>
-                        {!isPublished && (
-                            <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Badge variant="outline" className="ml-1 h-5 px-1 text-xs bg-amber-500/10 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300 border-amber-200 dark:border-amber-800/40">
-                                            Draft
-                                        </Badge>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <p className="text-xs">Not yet published</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
-                        )}
+        <div className="group relative">
+            <Link
+                href={`/dashboard/projects/${projectId}/changelog/${id}`}
+                className="block p-2 pr-10 hover:bg-accent/50 rounded-md transition-colors"
+            >
+                <div className="flex items-start gap-2">
+                    <div className="h-8 w-8 bg-primary/10 rounded-md flex items-center justify-center mt-0.5 flex-shrink-0">
+                        <FileText className="h-4 w-4 text-primary" />
                     </div>
-                    <div className="flex items-center text-xs text-muted-foreground mt-1 gap-2">
-                        <div className="flex items-center">
-                            <Clock className="h-3 w-3 mr-1" />
-                            <span>{formatDistanceToNow(new Date(date))} ago</span>
-                        </div>
-                        {version && (
-                            <Badge variant="secondary" className="h-4 px-1 text-[10px]">
-                                {version}
-                            </Badge>
-                        )}
-                    </div>
-                </Link>
-            </div>
-            <TooltipProvider>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5"
-                            onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                onBookmark();
-                            }}
-                        >
-                            <Star
-                                className={cn(
-                                    "h-3.5 w-3.5",
-                                    isBookmarked
-                                        ? "text-amber-500 fill-amber-500"
-                                        : "text-muted-foreground"
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-start gap-1.5">
+                            <h4 className="font-medium text-sm group-hover:text-primary transition-colors break-words line-clamp-2">
+                                {title}
+                                {!isPublished && (
+                                    <Badge
+                                        variant="outline"
+                                        className="ml-1.5 inline-flex align-baseline h-5 px-1 text-xs bg-amber-500/10 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300 border-amber-200 dark:border-amber-800/40"
+                                    >
+                                        Draft
+                                    </Badge>
                                 )}
-                            />
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        <p className="text-xs">{isBookmarked ? "Remove bookmark" : "Bookmark"}</p>
-                    </TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
+                            </h4>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                            <div className="flex items-center text-xs text-muted-foreground">
+                                <Clock className="h-3 w-3 mr-1" />
+                                <span>{formatDistanceToNow(new Date(date))} ago</span>
+                            </div>
+                            {version && (
+                                <Badge variant="secondary" className="h-4 px-1 text-[10px]">
+                                    {version}
+                                </Badge>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </Link>
+            <div className="absolute right-2 top-3">
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    onBookmark();
+                                }}
+                            >
+                                <Star
+                                    className={cn(
+                                        "h-3.5 w-3.5",
+                                        isBookmarked
+                                            ? "text-amber-500 fill-amber-500"
+                                            : "text-muted-foreground"
+                                    )}
+                                />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p className="text-xs">{isBookmarked ? "Remove bookmark" : "Bookmark"}</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+            </div>
         </div>
     )
 }
@@ -225,34 +225,39 @@ interface BookmarkedChangelogProps {
 
 function BookmarkedChangelog({ id, projectId, title, onRemove }: BookmarkedChangelogProps) {
     return (
-        <div className="group flex items-center gap-2 p-2 hover:bg-accent/50 rounded-md text-sm transition-colors">
+        <div className="group relative">
             <Link
                 href={`/dashboard/projects/${projectId}/changelog/${id}`}
-                className="flex items-center flex-1 min-w-0"
+                className="flex items-center gap-2 p-2 pr-10 hover:bg-accent/50 rounded-md text-sm transition-colors"
             >
-                <Bookmark className="h-4 w-4 text-amber-500 mr-2 flex-shrink-0" />
-                <span className="truncate">{title}</span>
+                <Bookmark className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                <span className="line-clamp-1 break-words">
+                    {title}
+                </span>
             </Link>
-            <TooltipProvider>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={(e) => {
-                                e.preventDefault();
-                                onRemove();
-                            }}
-                        >
-                            <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        <p className="text-xs">Remove bookmark</p>
-                    </TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
+            <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    onRemove();
+                                }}
+                            >
+                                <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p className="text-xs">Remove bookmark</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+            </div>
         </div>
     )
 }
@@ -352,12 +357,12 @@ export function ProjectSidebar({ projectId }: { projectId: string }) {
         <div className="hidden md:flex fixed inset-y-0 left-0 z-40 flex-col border-r bg-background w-64 transition-all duration-300">
             {/* Header */}
             <div className="h-16 flex items-center justify-between border-b p-4">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 min-w-0">
                     <Button
                         variant="ghost"
                         size="icon"
                         asChild
-                        className="h-8 w-8"
+                        className="h-8 w-8 flex-shrink-0"
                     >
                         <Link href="/dashboard/projects">
                             <ChevronLeft className="h-4 w-4" />
@@ -367,7 +372,7 @@ export function ProjectSidebar({ projectId }: { projectId: string }) {
                     <TooltipProvider>
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <h2 className="font-semibold truncate max-w-[140px]">{project?.name || 'Project'}</h2>
+                                <h2 className="font-semibold truncate flex-1">{project?.name || 'Project'}</h2>
                             </TooltipTrigger>
                             <TooltipContent>
                                 <p className="text-xs">{project?.name}</p>
@@ -381,7 +386,7 @@ export function ProjectSidebar({ projectId }: { projectId: string }) {
                         <TooltipTrigger asChild>
                             <Button
                                 size="sm"
-                                className="h-8 gap-1"
+                                className="h-8 gap-1 flex-shrink-0"
                                 asChild
                             >
                                 <Link href={`/dashboard/projects/${projectId}/changelog/new`}>

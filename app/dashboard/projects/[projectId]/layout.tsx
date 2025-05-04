@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useParams } from 'next/navigation'
 import { ProjectSidebar } from '@/components/project/ProjectSidebar'
 import { Skeleton } from '@/components/ui/skeleton'
+import React from "react";
 
 export default function ProjectLayout({
                                           children,
@@ -13,7 +14,8 @@ export default function ProjectLayout({
     const params = useParams()
     const projectId = params.projectId as string
 
-    const { data: isLoading } = useQuery({
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { data: project, isLoading } = useQuery({
         queryKey: ['project', projectId],
         queryFn: async () => {
             const response = await fetch(`/api/projects/${projectId}`)

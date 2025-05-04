@@ -20,6 +20,7 @@ interface ChangelogResponse {
         id: string;
         name: string;
         description?: string;
+        emailNotificationsEnabled?: boolean;
     };
     items: Array<{
         id: string;
@@ -219,8 +220,10 @@ export default async function ChangelogPage({ params }: ChangelogPageProps) {
                                 />
                             </div>
                         </div>
-                        {/* todo: check if project has email notifications enabled in order to decide if form should be displayed */}
-                        <SubscriptionForm projectId={projectId} projectName={data.project.name} />
+                        {/* Only show subscription form if email notifications are enabled */}
+                        {data.project.emailNotificationsEnabled && (
+                            <SubscriptionForm projectId={projectId} projectName={data.project.name} />
+                        )}
                     </div>
                 </header>
 

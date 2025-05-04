@@ -111,6 +111,11 @@ export async function GET(
                         select: {
                             id: true
                         }
+                    },
+                    emailConfig: {
+                        select: {
+                            enabled: true
+                        }
                     }
                 }
             })
@@ -210,7 +215,8 @@ export async function GET(
             return NextResponse.json({
                 project: {
                     id: project.id,
-                    name: project.name
+                    name: project.name,
+                    emailNotificationsEnabled: project.emailConfig?.enabled || false
                 },
                 items: entries,
                 nextCursor

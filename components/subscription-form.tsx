@@ -5,14 +5,13 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, ArrowRight, Check, AlertCircle, Mail, Clock, Zap, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, Check, AlertCircle, Mail, Clock, Zap, CheckCircle2, Bell } from 'lucide-react';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import Confetti from '@/components/ui/confetti';
+import confetti from 'canvas-confetti';
 
 const formSchema = z.object({
     email: z.string().email('Please enter a valid email address'),
@@ -37,14 +36,11 @@ type Step = 'email' | 'name' | 'preferences' | 'success';
 
 export default function SubscriptionForm({
                                              projectId,
-                                             projectName,
-                                             recentUpdates = []
                                          }: SubscriptionFormProps) {
     const [currentStep, setCurrentStep] = useState<Step>('email');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [showConfetti, setShowConfetti] = useState(false);
-    const formContainerRef = useRef<HTMLDivElement>(null);
+    const successRef = useRef<HTMLDivElement>(null);
 
     const form = useForm<SubscriptionFormValues>({
         resolver: zodResolver(formSchema),
@@ -55,6 +51,37 @@ export default function SubscriptionForm({
         },
         mode: 'onChange',
     });
+
+    const triggerConfetti = () => {
+        // Get the position of the success message
+        if (successRef.current) {
+            const rect = successRef.current.getBoundingClientRect();
+            const x = rect.left + rect.width / 2;
+            const y = rect.top + rect.height / 2;
+
+            // Convert to relative position (0-1)
+            const xRelative = x / window.innerWidth;
+            const yRelative = y / window.innerHeight;
+
+            // Fire confetti from the success message position
+            confetti({
+                particleCount: 100,
+                spread: 70,
+                origin: { x: xRelative, y: yRelative },
+                colors: ['#818cf8', '#c4b5fd', '#a78bfa', '#8b5cf6', '#7c3aed'],
+                disableForReducedMotion: true,
+            });
+        } else {
+            // Fallback to center if ref is not available
+            confetti({
+                particleCount: 100,
+                spread: 70,
+                origin: { x: 0.5, y: 0.4 },
+                colors: ['#818cf8', '#c4b5fd', '#a78bfa', '#8b5cf6', '#7c3aed'],
+                disableForReducedMotion: true,
+            });
+        }
+    };
 
     const onSubmit = async (values: SubscriptionFormValues) => {
         setIsSubmitting(true);
@@ -78,7 +105,8 @@ export default function SubscriptionForm({
             }
 
             setCurrentStep('success');
-            setShowConfetti(true);
+            // Trigger confetti after a short delay to allow the success animation to start
+            setTimeout(triggerConfetti, 300);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to subscribe');
         } finally {
@@ -108,59 +136,26 @@ export default function SubscriptionForm({
     const restartForm = () => {
         form.reset();
         setCurrentStep('email');
-        setShowConfetti(false);
-    };
-
-    const getProgressBarWidth = () => {
-        switch (currentStep) {
-            case 'email': return 'w-1/3';
-            case 'name': return 'w-2/3';
-            case 'preferences': return 'w-full';
-            case 'success': return 'w-full';
-            default: return 'w-0';
-        }
     };
 
     return (
         <div
-            ref={formContainerRef}
             className={cn(
-                "w-full max-w-2xl mx-auto rounded-xl overflow-hidden",
-                "bg-card border border-border/60 shadow-lg",
-                "transition-all duration-300",
-                "backdrop-blur-sm"
+                "w-full max-w-md mx-auto mt-16 mb-8",
+                "transition-all duration-300"
             )}
         >
-            {showConfetti && <Confetti />}
-
-            <div className="p-6 border-b border-border/30 flex items-center gap-3">
-                <div className="bg-muted rounded-full p-2 flex items-center justify-center">
-                    <Bell className="h-5 w-5 text-muted-foreground" />
+            {/* More subtle and integrated notification section */}
+            <div className="flex items-center justify-center gap-3 mb-8">
+                <div className="h-px flex-1 bg-border/40" />
+                <div className="flex items-center gap-2 text-muted-foreground">
+                    <Bell className="h-4 w-4" />
+                    <span className="text-sm font-medium">Get Updates</span>
                 </div>
-                <div>
-                    <h2 className="text-xl font-semibold">Stay updated with {projectName}</h2>
-                    <p className="text-muted-foreground text-sm">
-                        Subscribe to receive the latest changes and updates
-                    </p>
-                </div>
-                <Badge className="ml-auto bg-primary/10 hover:bg-primary/20 text-primary border-primary/20">
-                    Changelog
-                </Badge>
+                <div className="h-px flex-1 bg-border/40" />
             </div>
 
-            {/* Progress bar */}
-            {currentStep !== 'success' && (
-                <div className="w-full bg-muted h-1">
-                    <motion.div
-                        className="bg-primary h-1"
-                        initial={{ width: '0%' }}
-                        animate={{ width: getProgressBarWidth() }}
-                        transition={{ duration: 0.3 }}
-                    />
-                </div>
-            )}
-
-            <div className="p-6">
+            <div className="relative">
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                         <AnimatePresence mode="wait">
@@ -170,47 +165,45 @@ export default function SubscriptionForm({
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -10 }}
-                                    transition={{ duration: 0.3 }}
+                                    transition={{ duration: 0.2 }}
+                                    className="space-y-3"
                                 >
-                                    <div className="space-y-4">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <Mail className="h-5 w-5 text-muted-foreground" />
-                                            <h3 className="text-lg font-medium">What&apos;s your email address?</h3>
-                                        </div>
+                                    {error && (
+                                        <Alert variant="destructive" className="mb-3">
+                                            <AlertCircle className="h-4 w-4" />
+                                            <AlertDescription>{error}</AlertDescription>
+                                        </Alert>
+                                    )}
 
-                                        {error && (
-                                            <Alert variant="destructive" className="mb-4">
-                                                <AlertCircle className="h-4 w-4" />
-                                                <AlertDescription>{error}</AlertDescription>
-                                            </Alert>
-                                        )}
-
-                                        <FormField
-                                            control={form.control}
-                                            name="email"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormControl>
+                                    <FormField
+                                        control={form.control}
+                                        name="email"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormControl>
+                                                    <div className="relative">
+                                                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
                                                         <Input
-                                                            placeholder="Enter your email address"
-                                                            className="h-11"
+                                                            placeholder="your@email.com"
+                                                            className="pl-10 h-10 bg-background/50 border-border/50 placeholder:text-muted-foreground/50"
                                                             {...field}
                                                         />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
+                                                    </div>
+                                                </FormControl>
+                                                <FormMessage className="text-xs" />
+                                            </FormItem>
+                                        )}
+                                    />
 
-                                        <Button
-                                            type="button"
-                                            onClick={handleNext}
-                                            className="w-full h-11 font-medium"
-                                        >
-                                            Continue
-                                            <ArrowRight className="ml-2 h-4 w-4" />
-                                        </Button>
-                                    </div>
+                                    <Button
+                                        type="button"
+                                        onClick={handleNext}
+                                        className="w-full h-10"
+                                        variant="secondary"
+                                    >
+                                        Continue
+                                        <ArrowRight className="ml-2 h-4 w-4" />
+                                    </Button>
                                 </motion.div>
                             )}
 
@@ -220,47 +213,49 @@ export default function SubscriptionForm({
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -10 }}
-                                    transition={{ duration: 0.3 }}
+                                    transition={{ duration: 0.2 }}
+                                    className="space-y-3"
                                 >
-                                    <div className="space-y-4">
-                                        <h3 className="text-lg font-medium mb-2">Would you like to add your name?</h3>
-                                        <p className="text-sm text-muted-foreground mb-4">This helps us personalize your notifications.</p>
+                                    <div className="text-center mb-4">
+                                        <p className="text-sm text-muted-foreground">
+                                            Add your name for personalized updates
+                                        </p>
+                                    </div>
 
-                                        <FormField
-                                            control={form.control}
-                                            name="name"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormControl>
-                                                        <Input
-                                                            placeholder="Your name (optional)"
-                                                            className="h-11"
-                                                            {...field}
-                                                        />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
+                                    <FormField
+                                        control={form.control}
+                                        name="name"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormControl>
+                                                    <Input
+                                                        placeholder="Your name (optional)"
+                                                        className="h-10 bg-background/50 border-border/50"
+                                                        {...field}
+                                                    />
+                                                </FormControl>
+                                                <FormMessage className="text-xs" />
+                                            </FormItem>
+                                        )}
+                                    />
 
-                                        <div className="flex gap-3 pt-2">
-                                            <Button
-                                                type="button"
-                                                onClick={skipNameStep}
-                                                variant="outline"
-                                                className="flex-1"
-                                            >
-                                                Skip
-                                            </Button>
-                                            <Button
-                                                type="button"
-                                                onClick={handleNext}
-                                                className="flex-1 font-medium"
-                                            >
-                                                Continue
-                                                <ArrowRight className="ml-2 h-4 w-4" />
-                                            </Button>
-                                        </div>
+                                    <div className="flex gap-2">
+                                        <Button
+                                            type="button"
+                                            onClick={skipNameStep}
+                                            variant="ghost"
+                                            className="flex-1 h-10"
+                                        >
+                                            Skip
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            onClick={handleNext}
+                                            variant="secondary"
+                                            className="flex-1 h-10"
+                                        >
+                                            Continue
+                                        </Button>
                                     </div>
                                 </motion.div>
                             )}
@@ -271,162 +266,119 @@ export default function SubscriptionForm({
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -10 }}
-                                    transition={{ duration: 0.3 }}
+                                    transition={{ duration: 0.2 }}
+                                    className="space-y-3"
                                 >
-                                    <div className="space-y-4">
-                                        <h3 className="text-lg font-medium mb-2">How would you like to be notified?</h3>
-                                        <p className="text-sm text-muted-foreground mb-4">Choose your preferred notification method.</p>
-
-                                        <FormField
-                                            control={form.control}
-                                            name="subscriptionType"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormControl>
-                                                        <div className="grid gap-3">
-                                                            <button
-                                                                type="button"
-                                                                className={cn(
-                                                                    "flex items-center p-4 rounded-lg border",
-                                                                    field.value === 'ALL_UPDATES'
-                                                                        ? "bg-primary/10 border-primary"
-                                                                        : "bg-card border-border hover:bg-muted",
-                                                                    "transition-colors group"
-                                                                )}
-                                                                onClick={() => field.onChange('ALL_UPDATES')}
-                                                            >
-                                                                <div className={cn(
-                                                                    "w-5 h-5 rounded-full flex items-center justify-center border",
-                                                                    field.value === 'ALL_UPDATES'
-                                                                        ? "bg-primary border-primary"
-                                                                        : "border-muted-foreground group-hover:border-foreground"
-                                                                )}>
-                                                                    {field.value === 'ALL_UPDATES' && (
-                                                                        <Check className="h-3 w-3 text-primary-foreground" />
-                                                                    )}
-                                                                </div>
-                                                                <div className="ml-3 flex-1 text-left">
-                                                                    <p className="font-medium">All Updates</p>
-                                                                    <p className="text-sm text-muted-foreground">Get notified about every change and update</p>
-                                                                </div>
-                                                                <Zap className={cn(
-                                                                    "h-6 w-6",
-                                                                    field.value === 'ALL_UPDATES' ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
-                                                                )} />
-                                                            </button>
-
-                                                            <button
-                                                                type="button"
-                                                                className={cn(
-                                                                    "flex items-center p-4 rounded-lg border",
-                                                                    field.value === 'MAJOR_ONLY'
-                                                                        ? "bg-primary/10 border-primary"
-                                                                        : "bg-card border-border hover:bg-muted",
-                                                                    "transition-colors group"
-                                                                )}
-                                                                onClick={() => field.onChange('MAJOR_ONLY')}
-                                                            >
-                                                                <div className={cn(
-                                                                    "w-5 h-5 rounded-full flex items-center justify-center border",
-                                                                    field.value === 'MAJOR_ONLY'
-                                                                        ? "bg-primary border-primary"
-                                                                        : "border-muted-foreground group-hover:border-foreground"
-                                                                )}>
-                                                                    {field.value === 'MAJOR_ONLY' && (
-                                                                        <Check className="h-3 w-3 text-primary-foreground" />
-                                                                    )}
-                                                                </div>
-                                                                <div className="ml-3 flex-1 text-left">
-                                                                    <p className="font-medium">Major Updates Only</p>
-                                                                    <p className="text-sm text-muted-foreground">Only notify me about significant features and changes</p>
-                                                                </div>
-                                                                <CheckCircle2 className={cn(
-                                                                    "h-6 w-6",
-                                                                    field.value === 'MAJOR_ONLY' ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
-                                                                )} />
-                                                            </button>
-
-                                                            <button
-                                                                type="button"
-                                                                className={cn(
-                                                                    "flex items-center p-4 rounded-lg border",
-                                                                    field.value === 'DIGEST_ONLY'
-                                                                        ? "bg-primary/10 border-primary"
-                                                                        : "bg-card border-border hover:bg-muted",
-                                                                    "transition-colors group"
-                                                                )}
-                                                                onClick={() => field.onChange('DIGEST_ONLY')}
-                                                            >
-                                                                <div className={cn(
-                                                                    "w-5 h-5 rounded-full flex items-center justify-center border",
-                                                                    field.value === 'DIGEST_ONLY'
-                                                                        ? "bg-primary border-primary"
-                                                                        : "border-muted-foreground group-hover:border-foreground"
-                                                                )}>
-                                                                    {field.value === 'DIGEST_ONLY' && (
-                                                                        <Check className="h-3 w-3 text-primary-foreground" />
-                                                                    )}
-                                                                </div>
-                                                                <div className="ml-3 flex-1 text-left">
-                                                                    <p className="font-medium">Weekly Digest</p>
-                                                                    <p className="text-sm text-muted-foreground">Receive a weekly summary of all updates</p>
-                                                                </div>
-                                                                <Clock className={cn(
-                                                                    "h-6 w-6",
-                                                                    field.value === 'DIGEST_ONLY' ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
-                                                                )} />
-                                                            </button>
-                                                        </div>
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-
-                                        <Button
-                                            type="submit"
-                                            className="w-full h-11 font-medium mt-4"
-                                            disabled={isSubmitting}
-                                        >
-                                            {isSubmitting ? (
-                                                <>
-                                                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                                    Subscribing...
-                                                </>
-                                            ) : (
-                                                'Subscribe'
-                                            )}
-                                        </Button>
+                                    <div className="text-center mb-4">
+                                        <p className="text-sm text-muted-foreground">
+                                            How often should we notify you?
+                                        </p>
                                     </div>
+
+                                    <FormField
+                                        control={form.control}
+                                        name="subscriptionType"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormControl>
+                                                    <div className="grid gap-2">
+                                                        {[
+                                                            {
+                                                                value: 'ALL_UPDATES',
+                                                                icon: Zap,
+                                                                title: 'All Updates',
+                                                                description: 'Every change'
+                                                            },
+                                                            {
+                                                                value: 'MAJOR_ONLY',
+                                                                icon: CheckCircle2,
+                                                                title: 'Major Only',
+                                                                description: 'Important updates'
+                                                            },
+                                                            {
+                                                                value: 'DIGEST_ONLY',
+                                                                icon: Clock,
+                                                                title: 'Weekly Digest',
+                                                                description: 'Weekly summary'
+                                                            }
+                                                        ].map((option) => (
+                                                            <button
+                                                                key={option.value}
+                                                                type="button"
+                                                                className={cn(
+                                                                    "flex items-center p-3 rounded-md text-left transition-all text-sm",
+                                                                    field.value === option.value
+                                                                        ? "bg-muted/50 text-foreground"
+                                                                        : "text-muted-foreground hover:bg-muted/30",
+                                                                )}
+                                                                onClick={() => field.onChange(option.value)}
+                                                            >
+                                                                <option.icon className={cn(
+                                                                    "h-4 w-4 mr-3",
+                                                                    field.value === option.value ? "text-primary" : "text-muted-foreground"
+                                                                )} />
+                                                                <div className="flex-1">
+                                                                    <p className="font-medium">{option.title}</p>
+                                                                    <p className="text-xs">{option.description}</p>
+                                                                </div>
+                                                                {field.value === option.value && (
+                                                                    <Check className="h-4 w-4 text-primary" />
+                                                                )}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </FormControl>
+                                                <FormMessage className="text-xs" />
+                                            </FormItem>
+                                        )}
+                                    />
+
+                                    <Button
+                                        type="submit"
+                                        className="w-full h-10"
+                                        disabled={isSubmitting}
+                                    >
+                                        {isSubmitting ? (
+                                            <>
+                                                <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                                Subscribing...
+                                            </>
+                                        ) : (
+                                            'Subscribe'
+                                        )}
+                                    </Button>
                                 </motion.div>
                             )}
 
                             {currentStep === 'success' && (
                                 <motion.div
                                     key="success-step"
-                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    ref={successRef}
+                                    initial={{ opacity: 0, scale: 0.95 }}
                                     animate={{ opacity: 1, scale: 1 }}
-                                    transition={{ duration: 0.4, type: "spring", stiffness: 120 }}
-                                    className="py-8 text-center"
+                                    transition={{ duration: 0.2 }}
+                                    className="text-center py-6"
                                 >
                                     <motion.div
                                         initial={{ scale: 0.8 }}
                                         animate={{ scale: 1 }}
-                                        transition={{ type: "spring", stiffness: 200, damping: 10, delay: 0.2 }}
-                                        className="bg-primary/20 rounded-full p-4 w-20 h-20 mx-auto mb-6 flex items-center justify-center"
+                                        transition={{ type: "spring", stiffness: 200, damping: 15 }}
+                                        className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-4"
                                     >
-                                        <Check className="h-10 w-10 text-primary" />
+                                        <Check className="h-6 w-6 text-primary" />
                                     </motion.div>
 
-                                    <h3 className="text-2xl font-medium mb-3">You&apos;re subscribed!</h3>
-                                    <p className="text-muted-foreground mb-8 max-w-md mx-auto">
-                                        Thank you for subscribing to {projectName} updates. You&apos;ll receive notifications based on your preferences.
+                                    <h3 className="text-lg font-medium mb-1">You&apos;re all set!</h3>
+                                    <p className="text-sm text-muted-foreground mb-6">
+                                        We&apos;ll notify you about updates.
                                     </p>
 
                                     <Button
                                         type="button"
                                         onClick={restartForm}
-                                        variant="outline"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-muted-foreground"
                                     >
                                         Subscribe another email
                                     </Button>
@@ -436,25 +388,6 @@ export default function SubscriptionForm({
                     </form>
                 </Form>
             </div>
-
-            {recentUpdates.length > 0 && currentStep !== 'success' && (
-                <div className="px-6 py-5 border-t border-border/30 bg-muted/50">
-                    <h3 className="text-sm font-medium mb-4">Recent Updates</h3>
-                    <ul className="space-y-4">
-                        {recentUpdates.map((update, index) => (
-                            <li key={index} className="flex items-start gap-3">
-                                <div className="min-w-6 h-6 rounded-full bg-muted flex items-center justify-center mt-0.5">
-                                    <Check className="h-3.5 w-3.5 text-primary" />
-                                </div>
-                                <div>
-                                    <p className="text-sm font-medium">{update.title}</p>
-                                    <p className="text-xs text-muted-foreground">{update.date}</p>
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            )}
         </div>
     );
 }
