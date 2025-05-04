@@ -28,6 +28,8 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import {PasskeysSection} from "@/components/settings/passkeys-section";
+import {SecuritySettings} from "@/components/settings/security-settings";
 
 interface FormState {
     name: string;
@@ -381,6 +383,12 @@ export default function SettingsPage() {
                         </div>
                     </CardContent>
                 </Card>
+
+                {/* Passkeys Section */}
+                <PasskeysSection/>
+
+                {/* 2FA Mode Section */}
+                <SecuritySettings/>
 
                 {/* Password Reset Dialog */}
                 <Dialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>

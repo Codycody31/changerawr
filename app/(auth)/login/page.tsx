@@ -10,11 +10,15 @@ import { useAuth } from '@/context/auth'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, User } from 'lucide-react'
+import { ArrowLeft, User, Fingerprint } from 'lucide-react'
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { ErrorAlert } from '@/components/ui/error-alert'
 import { useQuery } from '@tanstack/react-query'
 import Link from "next/link";
+import {
+    startAuthentication,
+    browserSupportsWebAuthn,
+} from '@simplewebauthn/browser';
 
 const emailSchema = z.object({
     email: z.string().email('Please enter a valid email')
@@ -132,11 +136,14 @@ const ProviderLogo: React.FC<ProviderLogoProps> = ({ providerName, size = "md" }
 };
 
 export default function LoginPage() {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { login, user, isLoading } = useAuth()
     const router = useRouter()
     const [error, setError] = useState('')
     const [step, setStep] = useState<'email' | 'password'>('email')
     const [userPreview, setUserPreview] = useState<UserPreview | null>(null)
+    const [supportsWebAuthn, setSupportsWebAuthn] = useState(false)
+    const [isAuthenticating, setIsAuthenticating] = useState(false)
 
     // Fetch OAuth providers
     const { data: oauthProviders, isLoading: isLoadingProviders } = useQuery({
@@ -168,6 +175,10 @@ export default function LoginPage() {
             password: ''
         }
     })
+
+    useEffect(() => {
+        setSupportsWebAuthn(browserSupportsWebAuthn());
+    }, []);
 
     useEffect(() => {
         const handleOAuthRedirect = async () => {
@@ -228,13 +239,38 @@ export default function LoginPage() {
             setError('')
             if (!userPreview) return
 
-            await login(userPreview.email, data.password)
-        } catch (err: unknown) {
-            setError('Authentication failed')
-            console.log(err)
-            passwordForm.reset()
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: userPreview.email,
+                    password: data.password
+                }),
+                credentials: 'include'
+            });
+
+            const responseData = await response.json();
+
+            // Handle 2FA requirement
+            if (response.status === 403 && responseData.requiresSecondFactor) {
+                // Store the session token and redirect to 2FA page
+                sessionStorage.setItem('2faSessionToken', responseData.sessionToken);
+                sessionStorage.setItem('2faType', responseData.secondFactorType);
+                router.push('/two-factor');
+                return;
+            }
+
+            if (!response.ok) {
+                throw new Error(responseData.error || 'Authentication failed');
+            }
+
+            // Regular login success
+            router.push('/dashboard');
+        } catch (error) {
+            setError(error instanceof Error ? error.message : 'Authentication failed');
+            passwordForm.reset();
         }
-    }
+    };
 
     const handleBack = () => {
         setStep('email')
@@ -252,6 +288,64 @@ export default function LoginPage() {
             .replace(/[^a-z0-9]/g, ''); // Remove any non-alphanumeric characters
 
         window.location.href = `/api/auth/oauth/authorize/${providerNameForUrl}?redirect=/dashboard`;
+    };
+
+    const handlePasskeyLogin = async () => {
+        try {
+            setError('');
+            setIsAuthenticating(true);
+
+            // Get authentication options
+            const optionsResponse = await fetch('/api/auth/passkeys/authenticate/options', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: userPreview?.email || emailForm.getValues('email') || undefined
+                }),
+            });
+
+            if (!optionsResponse.ok) {
+                throw new Error('Failed to get authentication options');
+            }
+
+            const { options, challenge } = await optionsResponse.json();
+
+            // Start WebAuthn authentication
+            const authenticationResponse = await startAuthentication(options);
+
+            // Verify with server
+            const verifyResponse = await fetch('/api/auth/passkeys/authenticate/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    response: authenticationResponse,
+                    challenge,
+                }),
+            });
+
+            if (!verifyResponse.ok) {
+                const errorData = await verifyResponse.json();
+                throw new Error(errorData.error || 'Authentication failed');
+            }
+
+            const verifyData = await verifyResponse.json();
+
+            // Check if 2FA is required
+            if (verifyData.requiresSecondFactor) {
+                sessionStorage.setItem('2faSessionToken', verifyData.sessionToken);
+                sessionStorage.setItem('2faType', verifyData.secondFactorType);
+                router.push('/two-factor');
+                return;
+            }
+
+            // Success - redirect to dashboard
+            router.push('/dashboard');
+        } catch (err) {
+            console.error('Passkey login error:', err);
+            setError(err instanceof Error ? err.message : 'Failed to authenticate with passkey');
+        } finally {
+            setIsAuthenticating(false);
+        }
     };
 
     if (isLoading) {
@@ -323,8 +417,8 @@ export default function LoginPage() {
                                     </Button>
                                 </form>
 
-                                {/* OAuth Provider Buttons */}
-                                {!isLoadingProviders && oauthProviders && oauthProviders.length > 0 && (
+                                {/* Auth Options */}
+                                {(supportsWebAuthn || (!isLoadingProviders && oauthProviders && oauthProviders.length > 0)) && (
                                     <>
                                         <div className="relative">
                                             <div className="absolute inset-0 flex items-center">
@@ -338,7 +432,31 @@ export default function LoginPage() {
                                         </div>
 
                                         <div className="flex flex-col gap-2">
-                                            {oauthProviders.map((provider: OAuthProvider) => (
+                                            {/* Passkey Button */}
+                                            {supportsWebAuthn && (
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    className="w-full"
+                                                    onClick={handlePasskeyLogin}
+                                                    disabled={isAuthenticating}
+                                                >
+                                                    {isAuthenticating ? (
+                                                        <span className="flex items-center gap-2">
+                                                            <span className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                                                            Authenticating...
+                                                        </span>
+                                                    ) : (
+                                                        <>
+                                                            <Fingerprint className="mr-2 h-4 w-4" />
+                                                            Sign in with Passkey
+                                                        </>
+                                                    )}
+                                                </Button>
+                                            )}
+
+                                            {/* OAuth Provider Buttons */}
+                                            {!isLoadingProviders && oauthProviders && oauthProviders.map((provider: OAuthProvider) => (
                                                 <Button
                                                     key={provider.id}
                                                     variant="outline"
@@ -431,6 +549,42 @@ export default function LoginPage() {
                                             'Sign in'
                                         )}
                                     </Button>
+
+                                    {/* Show passkey option in password step too */}
+                                    {supportsWebAuthn && (
+                                        <>
+                                            <div className="relative">
+                                                <div className="absolute inset-0 flex items-center">
+                                                    <span className="w-full border-t" />
+                                                </div>
+                                                <div className="relative flex justify-center text-xs uppercase">
+                                                    <span className="bg-background px-2 text-muted-foreground">
+                                                        Or
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                className="w-full"
+                                                onClick={handlePasskeyLogin}
+                                                disabled={isAuthenticating}
+                                            >
+                                                {isAuthenticating ? (
+                                                    <span className="flex items-center gap-2">
+                                                        <span className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                                                        Authenticating...
+                                                    </span>
+                                                ) : (
+                                                    <>
+                                                        <Fingerprint className="mr-2 h-4 w-4" />
+                                                        Use Passkey Instead
+                                                    </>
+                                                )}
+                                            </Button>
+                                        </>
+                                    )}
                                 </form>
                             </motion.div>
                         )}

@@ -8,23 +8,27 @@ generator client {
 }
 
 model User {
-  id               String             @id @default(cuid())
-  email            String             @unique
-  password         String
-  name             String?
-  role             Role               @default(STAFF)
-  refreshTokens    RefreshToken[]
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
-  lastLoginAt      DateTime?
-  settings         Settings?
-  staffRequests    ChangelogRequest[] @relation("StaffRequests")
-  adminResponses   ChangelogRequest[] @relation("AdminResponses")
-  ApiKey           ApiKey[]
-  auditLogs        AuditLog[]         @relation("AuditLogUser")
-  targetAuditLogs  AuditLog[]         @relation("AuditLogTarget")
-  oauthConnections OAuthConnection[]
-  passwordResets   PasswordReset[]
+  id                String             @id @default(cuid())
+  email             String             @unique
+  password          String
+  name              String?
+  role              Role               @default(STAFF)
+  refreshTokens     RefreshToken[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  lastLoginAt       DateTime?
+  settings          Settings?
+  staffRequests     ChangelogRequest[] @relation("StaffRequests")
+  adminResponses    ChangelogRequest[] @relation("AdminResponses")
+  ApiKey            ApiKey[]
+  auditLogs         AuditLog[]         @relation("AuditLogUser")
+  targetAuditLogs   AuditLog[]         @relation("AuditLogTarget")
+  oauthConnections  OAuthConnection[]
+  passwordResets    PasswordReset[]
+  passkeys          Passkey[]
+  lastChallenge     String?
+  twoFactorMode     TwoFactorMode?     @default(NONE)
+  twoFactorSessions TwoFactorSession[]
 }
 
 model RefreshToken {
@@ -116,6 +120,22 @@ model Project {
   emailConfig         EmailConfig?
   emailLogs           EmailLog[]
   ProjectSubscription ProjectSubscription[]
+}
+
+model Passkey {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String // User-friendly name for the passkey
+  credentialId String    @unique
+  publicKey    String // Base64 encoded public key
+  counter      Int       @default(0)
+  transports   String[] // Transport types (usb, nfc, ble, internal)
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+
+  @@index([userId])
+  @@index([credentialId])
 }
 
 model Changelog {
@@ -303,6 +323,18 @@ model PasswordReset {
   @@index([email])
 }
 
+model TwoFactorSession {
+  id        String        @id @default(cuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      TwoFactorMode
+  expiresAt DateTime
+  createdAt DateTime      @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
 enum Role {
   ADMIN
   STAFF
@@ -331,4 +363,10 @@ enum SubscriptionType {
   ALL_UPDATES // Receive all updates
   MAJOR_ONLY // Only receive major version updates
   DIGEST_ONLY // Only receive digest emails
+}
+
+enum TwoFactorMode {
+  NONE // No additional security
+  PASSKEY_PLUS_PASSWORD // Passkey login requires password
+  PASSWORD_PLUS_PASSKEY // Password login requires passkey
 }

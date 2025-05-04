@@ -49,6 +49,14 @@ const loginSchema = z.object({
  *     "refreshToken": { "type": "string" }
  *   }
  * }
+ * @response 403 {
+ *   "type": "object",
+ *   "properties": {
+ *     "requiresSecondFactor": { "type": "boolean" },
+ *     "secondFactorType": { "type": "string", "enum": ["passkey", "password"] },
+ *     "message": { "type": "string" }
+ *   }
+ * }
  * @error 400 Validation failed - Invalid email or password format
  * @error 401 Invalid credentials
  * @error 500 An unexpected error occurred during login
@@ -68,6 +76,7 @@ export async function POST(request: Request) {
                 name: true,
                 role: true,
                 lastLoginAt: true,
+                twoFactorMode: true,
             },
         })
 
@@ -88,58 +97,30 @@ export async function POST(request: Request) {
             )
         }
 
-        // Update last login timestamp and clean up old refresh tokens
-        await db.$transaction([
-            db.user.update({
-                where: { id: user.id },
-                data: { lastLoginAt: new Date() }
-            }),
-            db.refreshToken.deleteMany({
-                where: {
+        // Check if user requires second factor
+        if (user.twoFactorMode === 'PASSWORD_PLUS_PASSKEY') {
+            // Create a temporary token to track the first factor completion
+            const firstFactorToken = await db.twoFactorSession.create({
+                data: {
                     userId: user.id,
-                    OR: [
-                        { expiresAt: { lt: new Date() } },
-                        { invalidated: true },
-                    ],
+                    type: 'PASSWORD_PLUS_PASSKEY',
+                    expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
                 },
             })
-        ])
 
-        // Generate new tokens
-        const tokens = await generateTokens(user.id)
-
-        // Create response with user data
-        const response = {
-            user: {
-                id: user.id,
-                email: user.email,
-                name: user.name,
-                role: user.role,
-                lastLoginAt: user.lastLoginAt,
-            },
-            ...tokens,
+            return NextResponse.json(
+                {
+                    requiresSecondFactor: true,
+                    secondFactorType: 'passkey',
+                    sessionToken: firstFactorToken.id,
+                    message: 'Additional verification required'
+                },
+                { status: 403 }
+            )
         }
 
-        // Create response and set cookies
-        const nextResponse = NextResponse.json(response)
-
-        // Set access token as HTTP-only cookie
-        nextResponse.cookies.set('accessToken', tokens.accessToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            maxAge: 15 * 60, // 15 minutes
-        })
-
-        // Set refresh token as HTTP-only cookie
-        nextResponse.cookies.set('refreshToken', tokens.refreshToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            maxAge: 7 * 24 * 60 * 60, // 7 days
-        })
-
-        return nextResponse
+        // Regular login flow (no 2FA or passkey-first login)
+        return await completeLogin(user.id)
     } catch (error) {
         if (error instanceof z.ZodError) {
             return NextResponse.json(
@@ -160,6 +141,74 @@ export async function POST(request: Request) {
             { status: 500 }
         )
     }
+}
+
+// Helper function to complete login and set tokens
+async function completeLogin(userId: string) {
+    // Update last login timestamp and clean up old refresh tokens
+    await db.$transaction([
+        db.user.update({
+            where: { id: userId },
+            data: { lastLoginAt: new Date() }
+        }),
+        db.refreshToken.deleteMany({
+            where: {
+                userId: userId,
+                OR: [
+                    { expiresAt: { lt: new Date() } },
+                    { invalidated: true },
+                ],
+            },
+        })
+    ])
+
+    // Generate new tokens
+    const tokens = await generateTokens(userId)
+
+    // Get user data for response
+    const user = await db.user.findUnique({
+        where: { id: userId },
+        select: {
+            id: true,
+            email: true,
+            name: true,
+            role: true,
+            lastLoginAt: true,
+        }
+    })
+
+    // Create response with user data
+    const response = {
+        user: {
+            id: user!.id,
+            email: user!.email,
+            name: user!.name,
+            role: user!.role,
+            lastLoginAt: user!.lastLoginAt,
+        },
+        ...tokens,
+    }
+
+    // Create response and set cookies
+    const nextResponse = NextResponse.json(response)
+
+    // Set access token as HTTP-only cookie
+    nextResponse.cookies.set('accessToken', tokens.accessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 15 * 60, // 15 minutes
+    })
+
+    // Set refresh token as HTTP-only cookie
+    nextResponse.cookies.set('refreshToken', tokens.refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60, // 7 days
+    })
+
+    return nextResponse
 }
 
 /**
