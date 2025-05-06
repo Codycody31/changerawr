@@ -29,7 +29,6 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import {PasskeysSection} from "@/components/settings/passkeys-section";
-import {SecuritySettings} from "@/components/settings/security-settings";
 
 interface FormState {
     name: string;
