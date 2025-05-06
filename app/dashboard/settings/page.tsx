@@ -388,7 +388,7 @@ export default function SettingsPage() {
                 <PasskeysSection/>
 
                 {/* 2FA Mode Section */}
-                <SecuritySettings/>
+                {/*<SecuritySettings/>*/}
 
                 {/* Password Reset Dialog */}
                 <Dialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
