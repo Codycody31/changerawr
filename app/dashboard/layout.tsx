@@ -22,6 +22,7 @@ import {
     Users,
     Info,
     X,
+    Sparkles,
 } from 'lucide-react'
 import {Button} from '@/components/ui/button'
 import {Avatar, AvatarFallback, AvatarImage} from '@/components/ui/avatar'
@@ -102,6 +103,12 @@ const NAV_SECTIONS = [
                 href: "/dashboard/admin/audit-logs",
                 label: "Audit Logs",
                 icon: FileText,
+                requiredRole: ['ADMIN']
+            },
+            {
+                href: "/dashboard/admin/ai-settings",
+                label: "AI Integration",
+                icon: Sparkles,
                 requiredRole: ['ADMIN']
             },
             {
