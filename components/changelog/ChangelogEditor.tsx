@@ -9,6 +9,9 @@ import { toast } from "@/hooks/use-toast";
 import EditorHeader from '@/components/changelog/editor/EditorHeader';
 import * as dotenv from 'dotenv';
 
+// Load environment variables
+dotenv.config();
+
 // Create a wrapper component to extend functionality
 const EnhancedEditorHeader: React.FC<React.ComponentProps<typeof EditorHeader> & {
     onLoadMoreTags?: () => Promise<unknown>;
@@ -143,7 +146,7 @@ export function ChangelogEditor({
     const [debouncedState] = useDebounce(editorState, DEBOUNCE_TIME);
 
     // Get Secton API key from environment or config
-    const sectonApiKey = process.env.PC_SECTION_KEY || 'sk_'; // env is placeholder until I add config to database
+    const sectonApiKey = 'YOUR_API_KEY';
 
     // Optimized data fetching with react-query
     const { data: initialData, isLoading: isInitialDataLoading } = useQuery({
@@ -459,6 +462,7 @@ export function ChangelogEditor({
                         />
                     </CardContent>
                 </Card>
+                apikey: ${sectonApiKey}
 
                 <MarkdownEditor
                     key={entryId || 'new'}

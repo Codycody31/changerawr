@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { AICompletionType } from '@/lib/utils/ai/types';
 
 // Command group definition
@@ -49,17 +49,65 @@ export function useSlashCommands({
                                      enableAICommands = true,
                                  }: UseSlashCommandsProps) {
     // Slash menu state
-    const [state, setState] = useState<SlashCommandState>({
+    const [menuState, setMenuState] = useState<SlashCommandState>({
         visible: false,
         query: '',
         position: null,
         activeCommandIndex: 0,
     });
 
-    // Track if we're currently processing slash input
-    const [lastKeyWasSlash, setLastKeyWasSlash] = useState(false);
+    // Use refs to track state without causing updates
+    const stateRef = useRef(menuState);
+    const lastKeyWasSlashRef = useRef(false);
 
-    // Default command groups
+    // Update ref when state changes
+    useEffect(() => {
+        stateRef.current = menuState;
+    }, [menuState]);
+
+    // AI commands group
+    const aiCommandGroup: CommandGroup = {
+        name: 'AI',
+        commands: [
+            {
+                name: 'ai complete',
+                description: 'Complete your thought',
+                icon: '✨',
+                category: 'ai',
+                action: () => onAICommand?.(AICompletionType.COMPLETE),
+            },
+            {
+                name: 'ai expand',
+                description: 'Elaborate on this topic',
+                icon: '↔️',
+                category: 'ai',
+                action: () => onAICommand?.(AICompletionType.EXPAND),
+            },
+            {
+                name: 'ai improve',
+                description: 'Enhance writing style',
+                icon: '✏️',
+                category: 'ai',
+                action: () => onAICommand?.(AICompletionType.IMPROVE),
+            },
+            {
+                name: 'ai summarize',
+                description: 'Summarize content',
+                icon: '📝',
+                category: 'ai',
+                action: () => onAICommand?.(AICompletionType.SUMMARIZE),
+            },
+            {
+                name: 'ai custom',
+                description: 'Custom AI instruction',
+                icon: '🤖',
+                category: 'ai',
+                action: () => onAICommand?.(AICompletionType.CUSTOM),
+            },
+        ],
+    };
+
+    // Default basic commands
     const defaultCommandGroups: CommandGroup[] = [
         {
             name: 'Basic',
@@ -171,180 +219,160 @@ export function useSlashCommands({
         }
     ];
 
-    // AI commands group (conditionally added if enableAICommands is true)
-    const aiCommandGroup: CommandGroup = {
-        name: 'AI',
-        commands: [
-            {
-                name: 'ai complete',
-                description: 'Complete your thought',
-                icon: '✨',
-                category: 'ai',
-                action: () => onAICommand?.(AICompletionType.COMPLETE),
-            },
-            {
-                name: 'ai expand',
-                description: 'Elaborate on this topic',
-                icon: '↔️',
-                category: 'ai',
-                action: () => onAICommand?.(AICompletionType.EXPAND),
-            },
-            {
-                name: 'ai improve',
-                description: 'Enhance writing style',
-                icon: '✏️',
-                category: 'ai',
-                action: () => onAICommand?.(AICompletionType.IMPROVE),
-            },
-            {
-                name: 'ai summarize',
-                description: 'Summarize content',
-                icon: '📝',
-                category: 'ai',
-                action: () => onAICommand?.(AICompletionType.SUMMARIZE),
-            },
-            {
-                name: 'ai custom',
-                description: 'Custom AI instruction',
-                icon: '🤖',
-                category: 'ai',
-                action: () => onAICommand?.(AICompletionType.CUSTOM),
-            },
-        ],
-    };
-
     // Combine command groups
-    const commandGroups = propCommandGroups || [
+    const allCommandGroups = propCommandGroups || [
         ...defaultCommandGroups,
-        ...(enableAICommands ? [aiCommandGroup] : []),
+        ...(enableAICommands && onAICommand ? [aiCommandGroup] : []),
     ];
 
-    // Flatten all commands for easier handling
-    const allCommands = commandGroups.flatMap(group => group.commands);
+    // Get filtered command groups based on query
+    const getFilteredCommandGroups = useCallback(() => {
+        const query = stateRef.current.query.toLowerCase();
 
-    // Filter commands based on query
-    const filteredCommandGroups = commandGroups.map(group => ({
-        ...group,
-        commands: group.commands.filter(cmd =>
-            cmd.name.toLowerCase().includes(state.query.toLowerCase())
-        ),
-    })).filter(group => group.commands.length > 0);
+        return allCommandGroups
+            .map(group => ({
+                ...group,
+                commands: group.commands.filter(cmd =>
+                    cmd.name.toLowerCase().includes(query)
+                )
+            }))
+            .filter(group => group.commands.length > 0);
+    }, [allCommandGroups]);
 
-    // Get filtered commands as a flat list
-    const filteredCommands = filteredCommandGroups.flatMap(group => group.commands);
-
-    /**
-     * Handle keydown events for slash commands
-     */
-    const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-        // If ESC pressed, close menu
-        if (e.key === 'Escape' && state.visible) {
-            e.preventDefault();
-            setState(prev => ({ ...prev, visible: false }));
-            return;
-        }
-
-        // If menu is visible, handle navigation and selection
-        if (state.visible) {
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                setState(prev => ({
-                    ...prev,
-                    activeCommandIndex: (prev.activeCommandIndex + 1) % filteredCommands.length
-                }));
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                setState(prev => ({
-                    ...prev,
-                    activeCommandIndex: (prev.activeCommandIndex - 1 + filteredCommands.length) % filteredCommands.length
-                }));
-            } else if (e.key === 'Enter' || e.key === 'Tab') {
-                e.preventDefault();
-
-                if (filteredCommands.length > 0) {
-                    const selectedCommand = filteredCommands[state.activeCommandIndex];
-                    executeCommand(selectedCommand);
-                }
-            }
-        }
-
-        // Track slash key press
-        if (e.key === '/') {
-            setLastKeyWasSlash(true);
-        } else {
-            setLastKeyWasSlash(false);
-        }
-    }, [state, filteredCommands]);
-
-    /**
-     * Handle content changes for slash commands
-     */
-    const handleContentChange = useCallback(() => {
-        if (lastKeyWasSlash && !state.visible) {
-            // If the last key was a slash, show the menu
-            setState({
-                visible: true,
-                query: '',
-                position: calculateMenuPosition(),
-                activeCommandIndex: 0,
-            });
-        } else if (state.visible) {
-            // Extract the query from content
-            const textBeforeCursor = content.substring(0, cursorPosition);
-            const lastSlashIndex = textBeforeCursor.lastIndexOf('/');
-
-            if (lastSlashIndex !== -1) {
-                const query = textBeforeCursor.substring(lastSlashIndex + 1);
-                setState(prev => ({ ...prev, query }));
-            } else {
-                // If there's no slash, hide the menu
-                setState(prev => ({ ...prev, visible: false }));
-            }
-        }
-    }, [lastKeyWasSlash, state.visible, content, cursorPosition]);
-
-    /**
-     * Calculate menu position based on cursor
-     */
+    // Calculate menu position
     const calculateMenuPosition = useCallback(() => {
-        // This is a placeholder. In a real implementation, you'd get the actual position
-        // of the cursor in the textarea. This would involve DOM measurements.
         return { x: 0, y: 0 };
     }, []);
 
-    /**
-     * Execute a command and hide the menu
-     */
-    const executeCommand = useCallback((command: Command) => {
-        // Replace the slash command in the text
-        const textBeforeCursor = content.substring(0, cursorPosition);
-        const lastSlashIndex = textBeforeCursor.lastIndexOf('/');
-
-        // If the command is an AI command, remove the slash command
-        if (command.category === 'ai') {
-            const beforeSlashText = content.substring(0, lastSlashIndex);
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const afterQueryText = content.substring(cursorPosition);
-
-            // Execute AI command
-            command.action(beforeSlashText);
-
-            // Close slash menu
-            setState(prev => ({ ...prev, visible: false }));
-        } else {
-            // Execute regular command
-            command.action();
-
-            // Close slash menu
-            setState(prev => ({ ...prev, visible: false }));
+    // Handle keydown events for slash commands
+    const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+        // Track if the key is a slash to potentially show menu
+        if (e.key === '/') {
+            lastKeyWasSlashRef.current = true;
+            return;
         }
-    }, [content, cursorPosition, onInsertText]);
 
-    /**
-     * Show the slash menu
-     */
+        // If not a slash, reset flag
+        if (e.key !== 'Shift') { // Ignore shift key presses
+            lastKeyWasSlashRef.current = false;
+        }
+
+        // Handle navigation when menu is visible
+        if (stateRef.current.visible) {
+            // Close menu on escape
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                setMenuState(prev => ({ ...prev, visible: false }));
+                return;
+            }
+
+            // Get current filtered commands
+            const filteredGroups = getFilteredCommandGroups();
+            const filteredCommands = filteredGroups.flatMap(group => group.commands);
+
+            // Navigation keys
+            if (filteredCommands.length > 0) {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    setMenuState(prev => ({
+                        ...prev,
+                        activeCommandIndex: (prev.activeCommandIndex + 1) % filteredCommands.length
+                    }));
+                    return;
+                }
+
+                if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setMenuState(prev => ({
+                        ...prev,
+                        activeCommandIndex: (prev.activeCommandIndex - 1 + filteredCommands.length) % filteredCommands.length
+                    }));
+                    return;
+                }
+
+                // Selection keys
+                if (e.key === 'Enter' || e.key === 'Tab') {
+                    e.preventDefault();
+
+                    try {
+                        const selectedCommand = filteredCommands[stateRef.current.activeCommandIndex];
+                        if (selectedCommand) {
+                            executeCommand(selectedCommand);
+                        }
+                    } catch (error) {
+                        console.error('Error executing command:', error);
+                        setMenuState(prev => ({ ...prev, visible: false }));
+                    }
+                    return;
+                }
+            }
+        }
+    }, [getFilteredCommandGroups]);
+
+    // Execute a command and hide the menu
+    const executeCommand = useCallback((command: Command) => {
+        try {
+            // Replace the slash command in the text if needed
+            const textBeforeCursor = content.substring(0, cursorPosition);
+            const lastSlashIndex = textBeforeCursor.lastIndexOf('/');
+
+            // If the command is an AI command, remove the slash command
+            if (command.category === 'ai' && onAICommand) {
+                // Temporarily store context
+                const beforeSlashText = content.substring(0, lastSlashIndex);
+
+                // Execute AI command
+                command.action(beforeSlashText);
+            } else {
+                // Execute regular command
+                command.action();
+            }
+
+            // Close menu
+            setMenuState(prev => ({ ...prev, visible: false }));
+        } catch (error) {
+            console.error('Error executing command:', error);
+            setMenuState(prev => ({ ...prev, visible: false }));
+        }
+    }, [content, cursorPosition, onAICommand]);
+
+    // Check if a slash was typed and show menu if needed
+    useEffect(() => {
+        try {
+            if (lastKeyWasSlashRef.current && !stateRef.current.visible) {
+                // Show menu when slash is pressed
+                setMenuState({
+                    visible: true,
+                    query: '',
+                    position: calculateMenuPosition(),
+                    activeCommandIndex: 0,
+                });
+            } else if (stateRef.current.visible) {
+                // Update query based on text after slash
+                const textBeforeCursor = content.substring(0, cursorPosition);
+                const lastSlashIndex = textBeforeCursor.lastIndexOf('/');
+
+                if (lastSlashIndex !== -1) {
+                    // Extract query from content
+                    const query = textBeforeCursor.substring(lastSlashIndex + 1);
+
+                    // Only update if query changed to avoid re-renders
+                    if (query !== stateRef.current.query) {
+                        setMenuState(prev => ({ ...prev, query }));
+                    }
+                } else {
+                    // If there's no slash anymore, hide the menu
+                    setMenuState(prev => ({ ...prev, visible: false }));
+                }
+            }
+        } catch (error) {
+            console.error('Error in slash command effect:', error);
+        }
+    }, [content, cursorPosition, calculateMenuPosition]);
+
+    // Show the slash menu
     const showMenu = useCallback((position: { x: number; y: number } = { x: 0, y: 0 }) => {
-        setState({
+        setMenuState({
             visible: true,
             query: '',
             position,
@@ -352,39 +380,24 @@ export function useSlashCommands({
         });
     }, []);
 
-    /**
-     * Hide the slash menu
-     */
+    // Hide the slash menu
     const hideMenu = useCallback(() => {
-        setState(prev => ({ ...prev, visible: false }));
+        setMenuState(prev => ({ ...prev, visible: false }));
     }, []);
 
-    /**
-     * Handle command click
-     */
+    // Handle command click
     const handleCommandClick = useCallback((command: Command) => {
         executeCommand(command);
     }, [executeCommand]);
 
-    // Update menu state when content changes
-    useEffect(() => {
-        handleContentChange();
-    }, [content, cursorPosition, handleContentChange]);
-
-    // Reset state if AI commands get disabled
-    useEffect(() => {
-        if (!enableAICommands) {
-            // Hide menu if it was showing an AI command
-            const activeCommand = filteredCommands[state.activeCommandIndex];
-            if (activeCommand?.category === 'ai') {
-                setState(prev => ({ ...prev, visible: false }));
-            }
-        }
-    }, [enableAICommands, filteredCommands, state.activeCommandIndex]);
+    // Get current filtered data
+    const filteredCommandGroups = getFilteredCommandGroups();
+    const allCommands = allCommandGroups.flatMap(group => group.commands);
+    const filteredCommands = filteredCommandGroups.flatMap(group => group.commands);
 
     return {
         menu: {
-            ...state,
+            ...menuState,
             filteredCommandGroups,
             allCommands,
             filteredCommands,

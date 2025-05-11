@@ -102,17 +102,26 @@ export const DEFAULT_KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     },
 ];
 
+// Store active handlers to prevent duplicates and allow cleanup
+const activeHandlers = new Map<HTMLElement, (e: KeyboardEvent) => void>();
+
 /**
  * Check if keyboard event matches a shortcut
+ * @param event The keyboard event
+ * @param shortcut The shortcut to match against
  */
 export function matchesShortcut(event: KeyboardEvent, shortcut: KeyboardShortcut): boolean {
-    // Match modifiers
-    if ((shortcut.ctrlKey || shortcut.metaKey) && !(event.ctrlKey || event.metaKey)) return false;
-    if (shortcut.shiftKey && !event.shiftKey) return false;
-    if (shortcut.altKey && !event.altKey) return false;
-
-    // For non-modifier keys, match key exactly
+    // For non-modifier keys, we need to match key and modifiers exactly
     if (shortcut.key.toLowerCase() !== event.key.toLowerCase()) return false;
+
+    // Ctrl/Cmd check (either event or shortcut must have it, and they must match)
+    if ((shortcut.ctrlKey || shortcut.metaKey) !== (event.ctrlKey || event.metaKey)) return false;
+
+    // Shift check
+    if ((shortcut.shiftKey === true) !== event.shiftKey) return false;
+
+    // Alt check
+    if ((shortcut.altKey === true) !== event.altKey) return false;
 
     return true;
 }
@@ -152,18 +161,34 @@ export function formatShortcut(shortcut: KeyboardShortcut): string {
  */
 export function createShortcutHandler(config: KeyboardShortcutsConfig) {
     return (event: KeyboardEvent) => {
-        // Skip if target is an input and enableInInputs is false
-        if (!config.enableInInputs && ['INPUT', 'TEXTAREA'].includes((event.target as HTMLElement).tagName)) {
-            return;
+        // Critical fix: Skip if target is an input/textarea and NO modifiers
+        // This allows normal typing to work in inputs/textareas
+        if (!config.enableInInputs) {
+            const tagName = (event.target as HTMLElement)?.tagName;
+            if (tagName === 'INPUT' || tagName === 'TEXTAREA') {
+                // Only process shortcuts with modifiers
+                if (!event.ctrlKey && !event.metaKey && !event.altKey) {
+                    return;
+                }
+            }
         }
 
         // Check each shortcut
         for (const shortcut of config.shortcuts) {
             if (matchesShortcut(event, shortcut)) {
+                // Only prevent default if specified
                 if (shortcut.preventDefault) {
                     event.preventDefault();
                 }
-                shortcut.action();
+
+                try {
+                    // Execute the action
+                    shortcut.action();
+                } catch (error) {
+                    console.error("Error executing keyboard shortcut:", error);
+                }
+
+                // Stop after first match
                 return;
             }
         }
@@ -178,6 +203,15 @@ export function bindShortcutsToElement(
     shortcuts: KeyboardShortcut[],
     options: Partial<KeyboardShortcutsConfig> = {}
 ): () => void {
+    // Remove any existing handler for this element
+    if (activeHandlers.has(element)) {
+        const oldHandler = activeHandlers.get(element);
+        if (oldHandler) {
+            element.removeEventListener('keydown', oldHandler as EventListener);
+        }
+    }
+
+    // Set up config with defaults
     const config: KeyboardShortcutsConfig = {
         shortcuts,
         enableInInputs: options.enableInInputs ?? false,
@@ -185,12 +219,14 @@ export function bindShortcutsToElement(
 
     const handler = createShortcutHandler(config);
 
-    // Add the event listener
+    // Store and add the handler
+    activeHandlers.set(element, handler);
     element.addEventListener('keydown', handler as EventListener);
 
     // Return a cleanup function
     return () => {
         element.removeEventListener('keydown', handler as EventListener);
+        activeHandlers.delete(element);
     };
 }
 

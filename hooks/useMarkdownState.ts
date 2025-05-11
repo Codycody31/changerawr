@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef } from 'react';
 
 export type PreviewMode = 'edit' | 'preview' | 'split';
 
@@ -22,190 +22,110 @@ export interface MarkdownEditorOptions {
 }
 
 /**
- * Hook for managing markdown editor state
+ * Simplified hook for managing markdown editor state
+ * Removed potential sources of infinite updates
  */
 export function useMarkdownState(options: MarkdownEditorOptions = {}) {
     const {
         initialValue = '',
         autosaveKey,
-        autosaveInterval = 5000,
         onChange,
         onSave,
     } = options;
 
-    // Initialize with saved content if available
-    const initialContent = autosaveKey
-        ? localStorage.getItem(autosaveKey) || initialValue
-        : initialValue;
+    // Get initial content from localStorage if available
+    const getInitialContent = () => {
+        if (autosaveKey && typeof window !== 'undefined') {
+            return localStorage.getItem(autosaveKey) || initialValue;
+        }
+        return initialValue;
+    };
 
-    // Main state
-    const [content, setContent] = useState(initialContent);
+    // Basic state - only the essentials
+    const [content, setContent] = useState(getInitialContent());
     const [selectionStart, setSelectionStart] = useState(0);
     const [selectionEnd, setSelectionEnd] = useState(0);
     const [previewMode, setPreviewMode] = useState<PreviewMode>('edit');
 
-    // Store current selection info in a ref to avoid losing it during renders
+    // Refs
+    const textAreaRef = useRef<HTMLTextAreaElement | null>(null);
     const selectionRef = useRef({
         start: 0,
         end: 0,
         text: ''
     });
 
-    // Derived state
-    const selectedText = content.substring(selectionStart, selectionEnd);
-    const cursorPosition = selectionEnd;
-
-    // Metrics
-    const [wordCount, setWordCount] = useState(0);
-    const [charCount, setCharCount] = useState(0);
-
-    // History tracking
-    const [history, setHistory] = useState<string[]>([initialContent]);
-    const [historyIndex, setHistoryIndex] = useState(0);
-
-    // Autosave functionality
-    const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    // Text area ref
-    const textAreaRef = useRef<HTMLTextAreaElement | null>(null);
-
-    // Update metrics whenever content changes
-    useEffect(() => {
-        // Count words
-        const words = content.trim() ? content.trim().split(/\s+/).length : 0;
-        setWordCount(words);
-
-        // Count characters
-        setCharCount(content.length);
-
-        // Trigger onChange callback
-        onChange?.(content);
-
-    }, [content, onChange]);
-
-    // Set up autosave
-    useEffect(() => {
-        if (autosaveKey) {
-            // Clear any existing autosave timer
-            if (autosaveTimerRef.current) {
-                clearInterval(autosaveTimerRef.current);
-            }
-
-            // Set up new autosave timer
-            autosaveTimerRef.current = setInterval(() => {
-                localStorage.setItem(autosaveKey, content);
-            }, autosaveInterval);
-
-            // Clean up on unmount
-            return () => {
-                if (autosaveTimerRef.current) {
-                    clearInterval(autosaveTimerRef.current);
-                }
-            };
-        }
-    }, [autosaveKey, autosaveInterval, content]);
-
-    /**
-     * Update the content and add to history
-     */
+    // Simplified content update with minimal dependencies
     const updateContent = useCallback((newContent: string) => {
-        if (newContent === content) return;
-
         setContent(newContent);
+        if (onChange) {
+            onChange(newContent);
+        }
+    }, [onChange]);
 
-        // Add to history if it's different from the current state
-        const newHistory = [...history.slice(0, historyIndex + 1), newContent];
-        setHistory(newHistory);
-        setHistoryIndex(historyIndex + 1);
-    }, [content, history, historyIndex]);
-
-    /**
-     * Handle content change from editor
-     * Safe implementation with null checks
-     */
+    // Basic change handler that just updates content
     const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        if (!e || !e.target) return;
-
-        const newContent = e.target.value;
-
-        // Safely access selection properties
-        const target = e.target;
-        const start = typeof target.selectionStart === 'number' ? target.selectionStart : 0;
-        const end = typeof target.selectionEnd === 'number' ? target.selectionEnd : 0;
-
-        // Update selection ref
-        selectionRef.current = {
-            start,
-            end,
-            text: newContent.substring(start, end)
-        };
-
-        // Update state
-        setSelectionStart(start);
-        setSelectionEnd(end);
-        updateContent(newContent);
+        if (e && e.target) {
+            updateContent(e.target.value);
+        }
     }, [updateContent]);
 
-    /**
-     * Handle selection change safely
-     */
+    // Selection handler that uses refs to avoid state updates
     const handleSelect = useCallback((e: React.SyntheticEvent<HTMLTextAreaElement>) => {
-        if (!e || !e.currentTarget) return;
+        if (e && e.currentTarget) {
+            const target = e.currentTarget;
+            const start = target.selectionStart;
+            const end = target.selectionEnd;
 
-        const target = e.currentTarget;
-        const start = typeof target.selectionStart === 'number' ? target.selectionStart : 0;
-        const end = typeof target.selectionEnd === 'number' ? target.selectionEnd : 0;
+            // Update ref without state updates
+            selectionRef.current = {
+                start,
+                end,
+                text: content.substring(start, end)
+            };
 
-        // Update selection ref
-        selectionRef.current = {
-            start,
-            end,
-            text: content.substring(start, end)
-        };
+            // Only update state if we need to
+            if (start !== selectionStart) {
+                setSelectionStart(start);
+            }
+            if (end !== selectionEnd) {
+                setSelectionEnd(end);
+            }
+        }
+    }, [content, selectionStart, selectionEnd]);
 
-        // Update state
-        setSelectionStart(start);
-        setSelectionEnd(end);
-    }, [content]);
-
-    /**
-     * Insert text at the current cursor position or replace selected text
-     */
+    // Insert text at cursor position
     const insertText = useCallback((text: string) => {
         if (!textAreaRef.current) return;
 
         const { start, end } = selectionRef.current;
-
-        const newContent =
-            content.substring(0, start) +
-            text +
-            content.substring(end);
+        const newContent = content.substring(0, start) + text + content.substring(end);
 
         updateContent(newContent);
 
-        // Focus and set selection after React updates the DOM
-        setTimeout(() => {
+        // Update cursor position after text insert
+        const newPosition = start + text.length;
+
+        // Request animation frame to ensure DOM is updated
+        window.requestAnimationFrame(() => {
             if (textAreaRef.current) {
                 textAreaRef.current.focus();
-
-                const newPosition = start + text.length;
                 textAreaRef.current.setSelectionRange(newPosition, newPosition);
 
                 // Update selection state
-                setSelectionStart(newPosition);
-                setSelectionEnd(newPosition);
                 selectionRef.current = {
                     start: newPosition,
                     end: newPosition,
                     text: ''
                 };
+
+                setSelectionStart(newPosition);
+                setSelectionEnd(newPosition);
             }
-        }, 0);
+        });
     }, [content, updateContent]);
 
-    /**
-     * Wrap selected text with prefix and suffix
-     */
+    // Wrap selected text with prefix and suffix
     const wrapText = useCallback((prefix: string, suffix: string = '') => {
         if (!textAreaRef.current) return;
 
@@ -220,98 +140,80 @@ export function useMarkdownState(options: MarkdownEditorOptions = {}) {
 
         updateContent(newContent);
 
-        // Focus and restore selection after React updates the DOM
-        setTimeout(() => {
+        // Calculate new selection range
+        const newSelectionStart = start + prefix.length;
+        const newSelectionEnd = newSelectionStart + text.length;
+
+        // Focus and select the wrapped text
+        window.requestAnimationFrame(() => {
             if (textAreaRef.current) {
                 textAreaRef.current.focus();
-
-                const newSelectionStart = start + prefix.length;
-                const newSelectionEnd = newSelectionStart + text.length;
-
                 textAreaRef.current.setSelectionRange(newSelectionStart, newSelectionEnd);
 
                 // Update selection state
-                setSelectionStart(newSelectionStart);
-                setSelectionEnd(newSelectionEnd);
                 selectionRef.current = {
                     start: newSelectionStart,
                     end: newSelectionEnd,
                     text
                 };
+
+                setSelectionStart(newSelectionStart);
+                setSelectionEnd(newSelectionEnd);
             }
-        }, 0);
+        });
     }, [content, updateContent]);
 
-    /**
-     * Save the content
-     */
+    // Simple save function
     const save = useCallback(() => {
-        if (autosaveKey) {
+        // Save to localStorage if autosaveKey provided
+        if (autosaveKey && typeof window !== 'undefined') {
             localStorage.setItem(autosaveKey, content);
         }
 
-        onSave?.(content);
-    }, [content, autosaveKey, onSave]);
-
-    /**
-     * Undo the last change
-     */
-    const undo = useCallback(() => {
-        if (historyIndex > 0) {
-            const newIndex = historyIndex - 1;
-            setHistoryIndex(newIndex);
-            setContent(history[newIndex]);
+        // Call onSave callback if provided
+        if (onSave) {
+            onSave(content);
         }
-    }, [history, historyIndex]);
+    }, [autosaveKey, content, onSave]);
 
-    /**
-     * Redo the last undone change
-     */
-    const redo = useCallback(() => {
-        if (historyIndex < history.length - 1) {
-            const newIndex = historyIndex + 1;
-            setHistoryIndex(newIndex);
-            setContent(history[newIndex]);
-        }
-    }, [history, historyIndex]);
+    // Calculate word and character count
+    const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
+    const charCount = content.length;
 
-    // Current editor state object
-    const editorState: MarkdownEditorState = {
-        content,
-        selectionStart,
-        selectionEnd,
-        selectedText,
-        cursorPosition,
-        previewMode,
-        wordCount,
-        charCount,
-    };
+    // Cursor position (same as selection end)
+    const cursorPosition = selectionEnd;
 
-    // Actions object
-    const actions = {
-        setContent: updateContent,
-        setPreviewMode,
-        handleChange,
-        handleSelect,
-        insertText,
-        wrapText,
-        save,
-        undo,
-        redo,
-    };
-
-    // Refs object
-    const refs = {
-        textAreaRef,
-        selectionRef,
-    };
+    // Selected text (derived from content and selection)
+    const selectedText = content.substring(selectionStart, selectionEnd);
 
     return {
-        state: editorState,
-        actions,
-        refs,
-        canUndo: historyIndex > 0,
-        canRedo: historyIndex < history.length - 1,
+        state: {
+            content,
+            selectionStart,
+            selectionEnd,
+            selectedText,
+            cursorPosition,
+            previewMode,
+            wordCount,
+            charCount
+        },
+        actions: {
+            setContent: updateContent,
+            setPreviewMode,
+            handleChange,
+            handleSelect,
+            insertText,
+            wrapText,
+            save,
+            undo: () => {}, // Placeholder
+            redo: () => {}  // Placeholder
+        },
+        refs: {
+            textAreaRef,
+            selectionRef
+        },
+        canUndo: false,
+        canRedo: false
     };
 }
 

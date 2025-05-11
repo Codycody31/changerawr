@@ -1,7 +1,6 @@
 'use client';
 
-import React from 'react';
-import { motion } from 'framer-motion';
+import React, { memo } from 'react';
 import {
     Bold,
     Italic,
@@ -22,7 +21,8 @@ import {
     FileDown,
     EyeOff,
     Split,
-    Eye
+    Eye,
+    Table
 } from 'lucide-react';
 
 import {
@@ -80,25 +80,159 @@ export interface MarkdownToolbarProps {
     className?: string;
 }
 
+// Create stable action component to prevent re-renders
+const ToolbarAction = memo(({ action }: { action: ToolbarAction }) => {
+    return (
+        <TooltipProvider>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <Button
+                        variant={action.variant || (action.isActive ? 'default' : 'ghost')}
+                        size="icon"
+                        onClick={action.onClick}
+                        className="h-8 w-8"
+                        type="button"
+                    >
+                        {action.icon}
+                    </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                    <div className="flex justify-between w-full">
+                        <span>{action.label}</span>
+                        {action.shortcut && (
+                            <span className="text-muted-foreground ml-4">{action.shortcut}</span>
+                        )}
+                    </div>
+                </TooltipContent>
+            </Tooltip>
+        </TooltipProvider>
+    );
+});
+ToolbarAction.displayName = 'ToolbarAction';
+
+// Create stable dropdown component to prevent re-renders
+const ToolbarDropdownComponent = memo(({ dropdown }: { dropdown: ToolbarDropdown }) => {
+    return (
+        <DropdownMenu>
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" type="button">
+                                {dropdown.icon}
+                            </Button>
+                        </DropdownMenuTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent>{dropdown.name}</TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
+
+            <DropdownMenuContent align="start">
+                <DropdownMenuLabel>{dropdown.name}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {dropdown.actions.map((action, actionIndex) => (
+                    <DropdownMenuItem
+                        key={`dropdown-action-${actionIndex}`}
+                        onClick={action.onClick}
+                    >
+                        <span className="mr-2">{action.icon}</span>
+                        <span>{action.label}</span>
+                        {action.shortcut && (
+                            <span className="ml-auto text-xs text-muted-foreground">
+                                {action.shortcut}
+                            </span>
+                        )}
+                    </DropdownMenuItem>
+                ))}
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+});
+ToolbarDropdownComponent.displayName = 'ToolbarDropdownComponent';
+
+// Create stable view mode component to prevent re-renders
+const ViewModeSelector = memo(({
+                                   viewMode,
+                                   onViewModeChange
+                               }: {
+    viewMode: 'edit' | 'preview' | 'split',
+    onViewModeChange: (mode: 'edit' | 'preview' | 'split') => void
+}) => {
+    return (
+        <div className="flex border rounded-md overflow-hidden">
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                            variant={viewMode === 'edit' ? 'default' : 'ghost'}
+                            size="sm"
+                            onClick={() => onViewModeChange('edit')}
+                            className="rounded-none px-2 h-8"
+                            type="button"
+                        >
+                            <EyeOff size={15} />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Edit</TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                            variant={viewMode === 'preview' ? 'default' : 'ghost'}
+                            size="sm"
+                            onClick={() => onViewModeChange('preview')}
+                            className="rounded-none px-2 h-8"
+                            type="button"
+                        >
+                            <Eye size={15} />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Preview</TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                            variant={viewMode === 'split' ? 'default' : 'ghost'}
+                            size="sm"
+                            onClick={() => onViewModeChange('split')}
+                            className="rounded-none px-2 h-8"
+                            type="button"
+                        >
+                            <Split size={15} />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Split View</TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
+        </div>
+    );
+});
+ViewModeSelector.displayName = 'ViewModeSelector';
+
 /**
  * Toolbar component for the markdown editor
  */
-export default function MarkdownToolbar({
-                                            groups = [],
-                                            dropdowns = [],
-                                            canUndo = false,
-                                            canRedo = false,
-                                            onUndo,
-                                            onRedo,
-                                            onSave,
-                                            onExport,
-                                            viewMode = 'edit',
-                                            onViewModeChange,
-                                            onAIAssist,
-                                            enableAI = false,
-                                            className = '',
-                                        }: MarkdownToolbarProps) {
-
+const MarkdownToolbar = memo(({
+                                  groups = [],
+                                  dropdowns = [],
+                                  canUndo = false,
+                                  canRedo = false,
+                                  onUndo,
+                                  onRedo,
+                                  onSave,
+                                  onExport,
+                                  viewMode = 'edit',
+                                  onViewModeChange,
+                                  onAIAssist,
+                                  enableAI = false,
+                                  className = '',
+                              }: MarkdownToolbarProps) => {
     // Default formatting actions
     const defaultFormatGroup: ToolbarGroup = {
         name: 'format',
@@ -219,6 +353,7 @@ export default function MarkdownToolbar({
                                 onClick={onUndo}
                                 disabled={!canUndo}
                                 className="h-8 w-8"
+                                type="button"
                             >
                                 <RotateCcw size={16} />
                             </Button>
@@ -241,6 +376,7 @@ export default function MarkdownToolbar({
                                 onClick={onRedo}
                                 disabled={!canRedo}
                                 className="h-8 w-8"
+                                type="button"
                             >
                                 <RotateCw size={16} />
                             </Button>
@@ -261,28 +397,7 @@ export default function MarkdownToolbar({
                     <React.Fragment key={`group-${groupIndex}`}>
                         <div className="flex items-center space-x-1">
                             {group.actions.map((action, actionIndex) => (
-                                <TooltipProvider key={`action-${actionIndex}`}>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Button
-                                                variant={action.variant || (action.isActive ? 'default' : 'ghost')}
-                                                size="icon"
-                                                onClick={action.onClick}
-                                                className="h-8 w-8"
-                                            >
-                                                {action.icon}
-                                            </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            <div className="flex justify-between w-full">
-                                                <span>{action.label}</span>
-                                                {action.shortcut && (
-                                                    <span className="text-muted-foreground ml-4">{action.shortcut}</span>
-                                                )}
-                                            </div>
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </TooltipProvider>
+                                <ToolbarAction key={`action-${actionIndex}`} action={action} />
                             ))}
                         </div>
 
@@ -298,39 +413,7 @@ export default function MarkdownToolbar({
 
                 {/* Dropdowns */}
                 {allDropdowns.map((dropdown, dropdownIndex) => (
-                    <DropdownMenu key={`dropdown-${dropdownIndex}`}>
-                        <TooltipProvider>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                                            {dropdown.icon}
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                </TooltipTrigger>
-                                <TooltipContent>{dropdown.name}</TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-
-                        <DropdownMenuContent align="start">
-                            <DropdownMenuLabel>{dropdown.name}</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            {dropdown.actions.map((action, actionIndex) => (
-                                <DropdownMenuItem
-                                    key={`dropdown-action-${actionIndex}`}
-                                    onClick={action.onClick}
-                                >
-                                    <span className="mr-2">{action.icon}</span>
-                                    <span>{action.label}</span>
-                                    {action.shortcut && (
-                                        <span className="ml-auto text-xs text-muted-foreground">
-                      {action.shortcut}
-                    </span>
-                                    )}
-                                </DropdownMenuItem>
-                            ))}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                    <ToolbarDropdownComponent key={`dropdown-${dropdownIndex}`} dropdown={dropdown} />
                 ))}
             </div>
 
@@ -341,17 +424,16 @@ export default function MarkdownToolbar({
                     <TooltipProvider>
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={onAIAssist}
-                                        className="h-8 gap-1 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-950 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50"
-                                    >
-                                        <Sparkles size={14} />
-                                        <span>AI</span>
-                                    </Button>
-                                </motion.div>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={onAIAssist}
+                                    className="h-8 gap-1 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-950 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50"
+                                    type="button"
+                                >
+                                    <Sparkles size={14} />
+                                    <span>AI</span>
+                                </Button>
                             </TooltipTrigger>
                             <TooltipContent>
                                 <div className="flex justify-between w-full">
@@ -373,6 +455,7 @@ export default function MarkdownToolbar({
                                     size="icon"
                                     onClick={onSave}
                                     className="h-8 w-8"
+                                    type="button"
                                 >
                                     <Save size={16} />
                                 </Button>
@@ -397,6 +480,7 @@ export default function MarkdownToolbar({
                                     size="icon"
                                     onClick={onExport}
                                     className="h-8 w-8"
+                                    type="button"
                                 >
                                     <FileDown size={16} />
                                 </Button>
@@ -410,59 +494,18 @@ export default function MarkdownToolbar({
                 {onViewModeChange && (
                     <>
                         <Separator orientation="vertical" className="mx-1 h-6" />
-
-                        <div className="flex border rounded-md overflow-hidden">
-                            <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button
-                                            variant={viewMode === 'edit' ? 'default' : 'ghost'}
-                                            size="sm"
-                                            onClick={() => onViewModeChange('edit')}
-                                            className="rounded-none px-2 h-8"
-                                        >
-                                            <EyeOff size={15} />
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>Edit</TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
-
-                            <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button
-                                            variant={viewMode === 'preview' ? 'default' : 'ghost'}
-                                            size="sm"
-                                            onClick={() => onViewModeChange('preview')}
-                                            className="rounded-none px-2 h-8"
-                                        >
-                                            <Eye size={15} />
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>Preview</TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
-
-                            <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button
-                                            variant={viewMode === 'split' ? 'default' : 'ghost'}
-                                            size="sm"
-                                            onClick={() => onViewModeChange('split')}
-                                            className="rounded-none px-2 h-8"
-                                        >
-                                            <Split size={15} />
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>Split View</TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
-                        </div>
+                        <ViewModeSelector
+                            viewMode={viewMode}
+                            onViewModeChange={onViewModeChange}
+                        />
                     </>
                 )}
             </div>
         </div>
     );
-}
+});
+
+// Display name for React DevTools
+MarkdownToolbar.displayName = 'MarkdownToolbar';
+
+export default MarkdownToolbar;

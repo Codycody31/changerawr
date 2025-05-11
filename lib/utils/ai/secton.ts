@@ -71,8 +71,10 @@ export class SectonClient {
                 messages: request.messages || [],
                 temperature: request.temperature ?? 0.7,
                 max_tokens: request.max_tokens ?? 1024,
-                stream: false, // Currently not using streaming
             };
+
+            // Log the outgoing request body
+            console.log('AI Request:', JSON.stringify(completionRequest, null, 2));
 
             const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
                 method: 'POST',
@@ -85,11 +87,19 @@ export class SectonClient {
 
             if (!response.ok) {
                 const error = await response.json();
+                console.error('AI Error Response:', error);
                 throw new AIError('Failed to create completion', response.status, error);
             }
 
-            return await response.json();
+            // Parse the JSON response
+            const jsonResponse = await response.json();
+
+            // Log the complete response
+            console.log('AI Response:', JSON.stringify(jsonResponse, null, 2));
+
+            return jsonResponse;
         } catch (error) {
+            console.error('AI Completion Error:', error);
             if (error instanceof AIError) {
                 throw error;
             }
@@ -110,7 +120,7 @@ export class SectonClient {
             messages,
         });
 
-        return completion.messages[1]?.content || '';
+        return completion.messages[completion.messages.length - 1]?.content || '';
     }
 
     /**
