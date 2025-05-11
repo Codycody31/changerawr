@@ -1,6 +1,7 @@
 // app/api/admin/config/system-email/route.ts
 import { NextResponse } from 'next/server';
 import { validateAuthAndGetUser } from '@/lib/utils/changelog';
+import { createAuditLog } from '@/lib/utils/auditLog'; // Add this import
 import { db } from '@/lib/db';
 import { z } from 'zod';
 import { createTransport } from 'nodemailer';
@@ -56,6 +57,21 @@ export async function GET() {
                 systemEmail: true
             }
         });
+
+        // Create audit log for viewing system email config
+        try {
+            await createAuditLog(
+                'VIEW_SYSTEM_EMAIL_CONFIG',
+                user.id,
+                user.id, // Use admin's ID as target to avoid foreign key issues
+                {
+                    configExists: !!config
+                }
+            );
+        } catch (auditLogError) {
+            console.error('Failed to create audit log:', auditLogError);
+            // Continue execution even if audit log creation fails
+        }
 
         if (!config) {
             // Return default configuration if none exists
@@ -126,6 +142,63 @@ export async function POST(request: Request) {
             where: { id: 1 }
         });
 
+        // Track what changes are being made
+        const changes: Record<string, { from: unknown; to: unknown }> = {};
+        const isNewConfig = !existingConfig;
+
+        if (existingConfig) {
+            // Compare each field and track changes
+            if (validatedData.enablePasswordReset !== existingConfig.enablePasswordReset) {
+                changes.enablePasswordReset = {
+                    from: existingConfig.enablePasswordReset,
+                    to: validatedData.enablePasswordReset
+                };
+            }
+
+            if (validatedData.smtpHost !== existingConfig.smtpHost) {
+                changes.smtpHost = {
+                    from: existingConfig.smtpHost,
+                    to: validatedData.smtpHost
+                };
+            }
+
+            if (validatedData.smtpPort !== existingConfig.smtpPort) {
+                changes.smtpPort = {
+                    from: existingConfig.smtpPort,
+                    to: validatedData.smtpPort
+                };
+            }
+
+            if (validatedData.smtpUser !== existingConfig.smtpUser) {
+                changes.smtpUser = {
+                    from: existingConfig.smtpUser,
+                    to: validatedData.smtpUser
+                };
+            }
+
+            if (validatedData.smtpPassword) {
+                // Don't log actual password values, just note that it was changed
+                changes.smtpPassword = {
+                    from: '********',
+                    to: '********'
+                };
+            }
+
+            if (validatedData.smtpSecure !== existingConfig.smtpSecure) {
+                changes.smtpSecure = {
+                    from: existingConfig.smtpSecure,
+                    to: validatedData.smtpSecure
+                };
+            }
+
+            if (validatedData.systemEmail !== existingConfig.systemEmail) {
+                changes.systemEmail = {
+                    from: existingConfig.systemEmail,
+                    to: validatedData.systemEmail
+                };
+            }
+        }
+
         // Prepare data for update or create
         const data = {
             ...validatedData,
@@ -141,7 +214,7 @@ export async function POST(request: Request) {
         };
 
         // Update or create system config
-        await db.systemConfig.upsert({
+        const updatedConfig = await db.systemConfig.upsert({
             where: { id: 1 },
             update: data,
             create: {
@@ -155,6 +228,43 @@ export async function POST(request: Request) {
                 enableNotifications: true
             }
         });
+
+        // Create appropriate audit log based on operation
+        try {
+            if (isNewConfig) {
+                // This is the initial email configuration
+                await createAuditLog(
+                    'CREATE_SYSTEM_EMAIL_CONFIG',
+                    user.id,
+                    user.id, // Use admin's ID as target to avoid foreign key issues
+                    {
+                        // Don't include actual credentials in audit log
+                        config: {
+                            enablePasswordReset: updatedConfig.enablePasswordReset,
+                            smtpHost: updatedConfig.smtpHost,
+                            smtpPort: updatedConfig.smtpPort,
+                            smtpUser: updatedConfig.smtpUser ? '(configured)' : '(not set)',
+                            smtpSecure: updatedConfig.smtpSecure,
+                            systemEmail: updatedConfig.systemEmail,
+                        }
+                    }
+                );
+            } else if (Object.keys(changes).length > 0) {
+                // This is an update to existing configuration
+                await createAuditLog(
+                    'UPDATE_SYSTEM_EMAIL_CONFIG',
+                    user.id,
+                    user.id, // Use admin's ID as target to avoid foreign key issues
+                    {
+                        changes,
+                        changeCount: Object.keys(changes).length
+                    }
+                );
+            }
+        } catch (auditLogError) {
+            console.error('Failed to create audit log:', auditLogError);
+            // Continue execution even if audit log creation fails
+        }
 
         return NextResponse.json({
             success: true,
@@ -178,7 +288,7 @@ export async function POST(request: Request) {
 }
 
 /**
- * @method POST
+ * @method PATCH
  * @description Tests the system email configuration by sending a test email
  * @path /api/admin/config/system-email/test
  * @body {
@@ -223,6 +333,26 @@ export async function PATCH(request: Request) {
 
         const validatedData = testEmailSchema.parse(body);
 
+        // Create audit log for test attempt before sending (in case of failure)
+        try {
+            await createAuditLog(
+                'TEST_SYSTEM_EMAIL_CONFIG',
+                user.id,
+                user.id, // Use admin's ID as target to avoid foreign key issues
+                {
+                    smtpHost: validatedData.smtpHost,
+                    smtpPort: validatedData.smtpPort,
+                    smtpUser: validatedData.smtpUser ? '(configured)' : '(not set)',
+                    smtpSecure: validatedData.smtpSecure,
+                    systemEmail: validatedData.systemEmail,
+                    testEmail: validatedData.testEmail
+                }
+            );
+        } catch (auditLogError) {
+            console.error('Failed to create audit log:', auditLogError);
+            // Continue execution even if audit log creation fails
+        }
+
         // Set up transporter for test
         const transporterOptions: SMTPTransport.Options = {
             host: validatedData.smtpHost,
@@ -242,7 +372,7 @@ export async function PATCH(request: Request) {
         const transporter = createTransport(transporterOptions);
 
         // Send test email
-        await transporter.sendMail({
+        const info = await transporter.sendMail({
             from: `"Changerawr System" <${validatedData.systemEmail}>`,
             to: validatedData.testEmail,
             subject: "Test Email from Changerawr System",
@@ -258,12 +388,43 @@ export async function PATCH(request: Request) {
             `
         });
 
+        // Update the audit log or create a new one for successful test
+        try {
+            await createAuditLog(
+                'SYSTEM_EMAIL_TEST_SUCCESS',
+                user.id,
+                user.id, // Use admin's ID as target to avoid foreign key issues
+                {
+                    messageId: info.messageId,
+                    recipient: validatedData.testEmail
+                }
+            );
+        } catch (auditLogError) {
+            console.error('Failed to create success audit log:', auditLogError);
+            // Continue execution even if audit log creation fails
+        }
+
         return NextResponse.json({
             success: true,
             message: 'Test email sent successfully'
         });
     } catch (error) {
         console.error('Failed to test system email configuration:', error);
+
+        // Create audit log for test failure
+        try {
+            const user = await validateAuthAndGetUser();
+            await createAuditLog(
+                'SYSTEM_EMAIL_TEST_FAILURE',
+                user.id,
+                user.id, // Use admin's ID as target to avoid foreign key issues
+                {
+                    error: error instanceof Error ? error.message : 'Unknown error'
+                }
+            );
+        } catch (auditLogError) {
+            console.error('Failed to create failure audit log:', auditLogError);
+        }
 
         if (error instanceof z.ZodError) {
             return NextResponse.json(

@@ -1,9 +1,9 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, {useEffect, useState} from 'react'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
-import { useAuth } from '@/context/auth'
+import {usePathname, useRouter} from 'next/navigation'
+import {useAuth} from '@/context/auth'
 import {
     ChevronLeft,
     ChevronRight,
@@ -23,10 +23,11 @@ import {
     Info,
     X,
 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import {Button} from '@/components/ui/button'
+import {Avatar, AvatarFallback, AvatarImage} from '@/components/ui/avatar'
 import {
     Dialog,
+    DialogClose,
     DialogContent,
     DialogHeader,
     DialogTitle,
@@ -46,10 +47,10 @@ import {
     SheetTrigger,
     SheetClose,
 } from "@/components/ui/sheet"
-import { getGravatarUrl } from '@/lib/utils/gravatar'
-import { cn } from '@/lib/utils'
-import { User } from "@prisma/client";
-import { useMediaQuery } from '@/hooks/use-media-query'
+import {getGravatarUrl} from '@/lib/utils/gravatar'
+import {cn} from '@/lib/utils'
+import {User} from "@prisma/client";
+import {useMediaQuery} from '@/hooks/use-media-query'
 
 // Navigation Configuration
 const NAV_SECTIONS = [
@@ -137,7 +138,7 @@ const NAV_SECTIONS = [
 ]
 
 // User Menu Component
-function UserMenu({ user, logout }: { user: User; logout: () => Promise<void> }) {
+function UserMenu({user, logout}: { user: User; logout: () => Promise<void> }) {
     const getUserInitial = () => {
         if (user.name) return user.name[0].toUpperCase()
         if (user.email) return user.email[0].toUpperCase()
@@ -189,11 +190,14 @@ function UserMenu({ user, logout }: { user: User; logout: () => Promise<void> })
                             variant="outline"
                             className="w-full"
                             asChild
+                            onClick={() => {}}
                         >
-                            <Link href="/dashboard/settings">
-                                <Settings className="h-4 w-4 mr-2"/>
-                                Settings
-                            </Link>
+                            <DialogClose asChild>
+                                <Link href="/dashboard/settings">
+                                    <Settings className="h-4 w-4 mr-2"/>
+                                    Settings
+                                </Link>
+                            </DialogClose>
                         </Button>
                         <Button
                             variant="destructive"
@@ -356,7 +360,7 @@ function Sidebar({
 }
 
 // Mobile Navigation Component
-function MobileNav({ user, logout }: { user: User; logout: () => Promise<void> }) {
+function MobileNav({user, logout}: { user: User; logout: () => Promise<void> }) {
     const pathname = usePathname()
     const [isOpen, setIsOpen] = useState(false)
 
@@ -389,7 +393,7 @@ function MobileNav({ user, logout }: { user: User; logout: () => Promise<void> }
                                         <SheetTitle className="text-lg">Menu</SheetTitle>
                                         <SheetClose asChild>
                                             <Button variant="ghost" size="icon">
-                                                <X className="h-4 w-4" />
+                                                <X className="h-4 w-4"/>
                                             </Button>
                                         </SheetClose>
                                     </div>
@@ -528,7 +532,7 @@ export default function DashboardLayout({
 }) {
     const router = useRouter()
     const pathname = usePathname()
-    const { user, isLoading, logout } = useAuth()
+    const {user, isLoading, logout} = useAuth()
     const [sidebarExpanded, setSidebarExpanded] = useState(true)
     const isMobile = useMediaQuery('(max-width: 768px)')
     const isTablet = useMediaQuery('(max-width: 1024px)')
@@ -582,7 +586,7 @@ export default function DashboardLayout({
 
     // Show loading screen while checking auth
     if (isLoading) {
-        return <LoadingScreen />
+        return <LoadingScreen/>
     }
 
     // Redirect to login if no user
@@ -598,7 +602,7 @@ export default function DashboardLayout({
                 isExpanded={sidebarExpanded}
                 setIsExpanded={setSidebarExpanded}
             />
-            <MobileNav user={user} logout={logout} />
+            <MobileNav user={user} logout={logout}/>
 
             <main
                 className={cn(

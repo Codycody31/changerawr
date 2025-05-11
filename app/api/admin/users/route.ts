@@ -60,15 +60,25 @@ export async function GET() {
             }
         });
 
+        // Get metrics for the audit log
+        const userMetrics = {
+            userCount: users.length || 0,
+            adminCount: users.filter(u => u.role === 'ADMIN').length,
+            staffCount: users.filter(u => u.role === 'STAFF').length,
+            newUsersLast30Days: users.filter(u => {
+                const thirtyDaysAgo = new Date();
+                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                return u.createdAt > thirtyDaysAgo;
+            }).length
+        };
+
         // Log the action of viewing users
         try {
             await createAuditLog(
                 'VIEW_USERS_LIST',
                 user.id,
-                user.id,
-                {
-                    userCount: users.length || 0
-                }
+                user.id, // Using admin's own ID to avoid foreign key issues
+                userMetrics
             );
         } catch (auditLogError) {
             console.error('Failed to create audit log:', auditLogError);
@@ -128,6 +138,21 @@ export async function POST(request: Request) {
 
         // Prevent inviting system emails
         if (validatedData.email === 'api.key@changerawr.sys') {
+            // Log attempted invitation of system email
+            try {
+                await createAuditLog(
+                    'INVALID_INVITATION_ATTEMPT',
+                    user.id,
+                    user.id, // Using admin's own ID to avoid foreign key issues
+                    {
+                        reason: 'System email address',
+                        attemptedEmail: validatedData.email
+                    }
+                );
+            } catch (auditLogError) {
+                console.error('Failed to create audit log:', auditLogError);
+            }
+
             return new NextResponse(
                 JSON.stringify({ error: 'Cannot invite system email addresses' }),
                 { status: 400 }
@@ -140,6 +165,21 @@ export async function POST(request: Request) {
         });
 
         if (existingUser) {
+            // Log attempted invitation of existing user
+            try {
+                await createAuditLog(
+                    'INVALID_INVITATION_ATTEMPT',
+                    user.id,
+                    existingUser.id, // This is a valid user ID so we can use it
+                    {
+                        reason: 'User already exists',
+                        attemptedEmail: validatedData.email
+                    }
+                );
+            } catch (auditLogError) {
+                console.error('Failed to create audit log:', auditLogError);
+            }
+
             return new NextResponse(
                 JSON.stringify({ error: 'User with this email already exists' }),
                 { status: 400 }
@@ -158,6 +198,23 @@ export async function POST(request: Request) {
         });
 
         if (existingInvitation) {
+            // Log attempted duplicate invitation
+            try {
+                await createAuditLog(
+                    'INVALID_INVITATION_ATTEMPT',
+                    user.id,
+                    user.id, // Using admin's own ID to avoid foreign key issues
+                    {
+                        reason: 'Active invitation already exists',
+                        attemptedEmail: validatedData.email,
+                        existingInvitationId: existingInvitation.id,
+                        existingExpiresAt: existingInvitation.expiresAt.toISOString()
+                    }
+                );
+            } catch (auditLogError) {
+                console.error('Failed to create audit log:', auditLogError);
+            }
+
             return new NextResponse(
                 JSON.stringify({ error: 'An active invitation already exists for this email' }),
                 { status: 400 }
@@ -189,11 +246,13 @@ export async function POST(request: Request) {
             await createAuditLog(
                 'CREATE_INVITATION',
                 user.id,
-                invitationLink.id || user.id,
+                user.id, // Using admin's own ID to avoid foreign key issues
                 {
-                    invitationEmail: invitationLink.email || 'N/A',
-                    invitationRole: invitationLink.role || 'N/A',
-                    expiresAt: (invitationLink.expiresAt || new Date()).toISOString()
+                    invitationId: invitationLink.id,
+                    invitationEmail: invitationLink.email,
+                    invitationRole: invitationLink.role,
+                    expiresAt: invitationLink.expiresAt.toISOString(),
+                    tokenLength: token.length
                 }
             );
         } catch (auditLogError) {
@@ -216,6 +275,21 @@ export async function POST(request: Request) {
         );
     } catch (error) {
         if (error instanceof z.ZodError) {
+            // Log validation error
+            try {
+                const user = await validateAuthAndGetUser();
+                await createAuditLog(
+                    'INVITATION_VALIDATION_ERROR',
+                    user.id,
+                    user.id, // Using admin's own ID to avoid foreign key issues
+                    {
+                        errors: error.errors
+                    }
+                );
+            } catch (auditLogError) {
+                console.error('Failed to create audit log:', auditLogError);
+            }
+
             return new NextResponse(
                 JSON.stringify({ error: 'Invalid request data', details: error.errors }),
                 { status: 400 }

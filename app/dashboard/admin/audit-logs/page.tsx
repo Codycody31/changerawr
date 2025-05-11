@@ -1,23 +1,12 @@
 'use client'
 
-import React, { useState, useMemo, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import React, { useState, useEffect, useCallback } from 'react'
 import { format, parseISO, subDays } from 'date-fns'
-import { motion, AnimatePresence } from 'framer-motion'
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table'
+import { motion } from 'framer-motion'
 import {
     Card,
     CardContent,
-    CardDescription,
     CardHeader,
-    CardTitle,
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -35,6 +24,7 @@ import {
     DialogHeader,
     DialogTitle,
     DialogDescription,
+    DialogFooter,
 } from '@/components/ui/dialog'
 import {
     Popover,
@@ -49,7 +39,13 @@ import {
     Calendar as CalendarIcon,
     Filter,
     Download,
+    Loader2,
+    Search,
+    Copy,
+    Check,
 } from 'lucide-react'
+import { Progress } from '@/components/ui/progress'
+import { ScrollArea } from '@/components/ui/scroll-area'
 
 // Types
 interface AuditLog {
@@ -72,7 +68,7 @@ interface AuditLog {
 interface AuditLogsResponse {
     logs: AuditLog[]
     total: number
-    pages: number
+    nextCursor?: string | null
 }
 
 interface FilterState {
@@ -116,9 +112,25 @@ function useDebounce<T>(value: T, delay: number = 500): T {
 }
 
 export default function AuditLogsPage() {
-    // State
-    const [page, setPage] = useState(1)
+    // State for all logs
+    const [allLogs, setAllLogs] = useState<AuditLog[]>([])
+    const [isLoading, setIsLoading] = useState(false)
+    const [isLoadingMore, setIsLoadingMore] = useState(false)
+    const [isError, setIsError] = useState(false)
+    const [nextCursor, setNextCursor] = useState<string | null>(null)
+    const [hasMore, setHasMore] = useState(true)
+    const [total, setTotal] = useState(0)
+    const [loadProgress, setLoadProgress] = useState(0)
+    const [tableHeight, setTableHeight] = useState(450)
+
+    // UI state
     const [searchInput, setSearchInput] = useState('')
+    const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null)
+    const [isFilterOpen, setIsFilterOpen] = useState(false)
+    const [copied, setCopied] = useState(false)
+    const [activeFilters, setActiveFilters] = useState(0)
+
+    // Filters state
     const [filters, setFilters] = useState<FilterState>({
         search: '',
         action: '',
@@ -127,52 +139,158 @@ export default function AuditLogsPage() {
             to: new Date()
         }
     })
-    const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null)
-    const [isFilterOpen, setIsFilterOpen] = useState(false)
-    const pageSize = 20
+
+    // Constants
+    const chunkSize = 100
 
     // Debounced search
     const debouncedSearch = useDebounce(searchInput)
 
+    // UseEffect to calculate available height for the table
+    useEffect(() => {
+        const calculateHeight = () => {
+            const windowHeight = window.innerHeight;
+            const otherElementsHeight = 220;
+            const availableHeight = Math.max(350, windowHeight - otherElementsHeight);
+            setTableHeight(availableHeight);
+        };
+
+        calculateHeight();
+        window.addEventListener('resize', calculateHeight);
+        return () => window.removeEventListener('resize', calculateHeight);
+    }, []);
+
     // Update filters when debounced search changes
     useEffect(() => {
-        setFilters(prev => ({ ...prev, search: debouncedSearch }))
-        setPage(1)
-    }, [debouncedSearch])
+        setFilters(prev => ({ ...prev, search: debouncedSearch }));
+        if (allLogs.length > 0) {
+            resetData();
+        }
+    }, [debouncedSearch]);
 
-    // Data fetching
-    const {
-        data,
-        isLoading,
-        isError,
-        refetch,
-        isFetching
-    } = useQuery<AuditLogsResponse>({
-        queryKey: ['audit-logs', page, filters],
-        queryFn: async () => {
+    // Count active filters
+    useEffect(() => {
+        let count = 0;
+        if (filters.action) count++;
+        if (filters.dateRange.from || filters.dateRange.to) count++;
+        if (filters.userId) count++;
+        if (filters.targetId) count++;
+        setActiveFilters(count);
+    }, [filters]);
+
+    // Function to reset data
+    const resetData = useCallback(() => {
+        setAllLogs([]);
+        setNextCursor(null);
+        setHasMore(true);
+        setLoadProgress(0);
+        setIsError(false);
+        fetchInitialData();
+    }, [filters]); // Added filters dependency
+
+    // Function to fetch initial data
+    const fetchInitialData = useCallback(async () => {
+        try {
+            setIsLoading(true);
+            setIsError(false);
+
             const params = new URLSearchParams({
-                page: page.toString(),
-                pageSize: pageSize.toString(),
+                useChunking: 'true',
+                chunkSize: chunkSize.toString(),
                 search: filters.search,
                 action: filters.action,
                 from: filters.dateRange.from?.toISOString() || '',
                 to: filters.dateRange.to?.toISOString() || '',
                 userId: filters.userId || '',
                 targetId: filters.targetId || ''
-            })
+            });
 
-            const response = await fetch(`/api/admin/audit-logs?${params}`)
-            if (!response.ok) throw new Error('Failed to fetch audit logs')
-            return response.json()
+            const response = await fetch(`/api/admin/audit-logs?${params}`);
+
+            if (!response.ok) throw new Error('Failed to fetch audit logs');
+
+            const data: AuditLogsResponse = await response.json();
+
+            setAllLogs(data.logs || []);
+            setNextCursor(data.nextCursor || null);
+            setHasMore(!!data.nextCursor);
+            setTotal(data.total || 0);
+
+            if (data.total > 0) {
+                setLoadProgress(Math.min(100, ((data.logs?.length || 0) / data.total) * 100));
+            } else {
+                setLoadProgress(0);
+            }
+        } catch (error) {
+            console.error('Error fetching audit logs:', error);
+            setIsError(true);
+        } finally {
+            setIsLoading(false);
         }
-    })
+    }, [filters, chunkSize]);
 
-    // Actions list
-    const uniqueActions = useMemo(() => {
-        if (!data?.logs) return []
-        const actions = new Set(data.logs.map(log => log.action))
-        return Array.from(actions).sort()
-    }, [data?.logs])
+    // Function to load more data
+    const loadMoreLogs = useCallback(async () => {
+        if (isLoadingMore || !hasMore || !nextCursor) return;
+
+        try {
+            setIsLoadingMore(true);
+
+            const params = new URLSearchParams({
+                useChunking: 'true',
+                cursor: nextCursor,
+                chunkSize: chunkSize.toString(),
+                search: filters.search,
+                action: filters.action,
+                from: filters.dateRange.from?.toISOString() || '',
+                to: filters.dateRange.to?.toISOString() || '',
+                userId: filters.userId || '',
+                targetId: filters.targetId || ''
+            });
+
+            const response = await fetch(`/api/admin/audit-logs?${params}`);
+
+            if (!response.ok) throw new Error('Failed to fetch more audit logs');
+
+            const data: AuditLogsResponse = await response.json();
+
+            // Merge new logs with existing logs (avoiding duplicates)
+            const existingIds = new Set(allLogs.map(log => log.id));
+            const uniqueNewLogs = (data.logs || []).filter(log => !existingIds.has(log.id));
+
+            if (uniqueNewLogs.length > 0) {
+                setAllLogs(prev => [...prev, ...uniqueNewLogs]);
+            }
+
+            setNextCursor(data.nextCursor || null);
+            setHasMore(!!data.nextCursor);
+
+            // Update progress percentage
+            if (data.total > 0) {
+                setLoadProgress(Math.min(100, ((allLogs.length + uniqueNewLogs.length) / data.total) * 100));
+            }
+        } catch (error) {
+            console.error('Error fetching more audit logs:', error);
+        } finally {
+            setIsLoadingMore(false);
+        }
+    }, [allLogs, nextCursor, hasMore, isLoadingMore, filters, chunkSize]);
+
+    // Load initial data
+    useEffect(() => {
+        fetchInitialData();
+    }, [fetchInitialData]);
+
+    // Copy details to clipboard
+    const copyDetails = useCallback(() => {
+        if (!selectedLog) return;
+
+        const detailsText = formatLogDetails(selectedLog.details);
+        navigator.clipboard.writeText(detailsText).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        });
+    }, [selectedLog]);
 
     // Export function
     const exportLogs = async () => {
@@ -187,27 +305,26 @@ export default function AuditLogsPage() {
                 export: 'true'
             });
 
-            const response = await fetch(`/api/admin/audit-logs?${params}`)
-            if (!response.ok) throw new Error('Failed to export logs')
+            const response = await fetch(`/api/admin/audit-logs?${params}`);
+            if (!response.ok) throw new Error('Failed to export logs');
 
-            const blob = await response.blob()
-            const url = window.URL.createObjectURL(blob)
-            const a = document.createElement('a')
-            a.href = url
-            a.download = `audit-logs-${format(new Date(), 'yyyy-MM-dd')}.csv`
-            document.body.appendChild(a)
-            a.click()
-            window.URL.revokeObjectURL(url)
-            document.body.removeChild(a)
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `audit-logs-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
         } catch (error) {
-            console.error('Export failed:', error)
-            // Here you might want to show a toast notification for the error
+            console.error('Export failed:', error);
         }
-    }
+    };
 
     // Reset filters
     const resetFilters = () => {
-        setSearchInput('')
+        setSearchInput('');
         setFilters({
             search: '',
             action: '',
@@ -215,400 +332,441 @@ export default function AuditLogsPage() {
                 from: subDays(new Date(), 7),
                 to: new Date()
             }
-        })
-        setPage(1)
-    }
+        });
+        setIsFilterOpen(false);
+        resetData();
+    };
+
+    // Action badge variant
+    const getActionVariant = (action: string) => {
+        if (action.includes('CREATE') || action.includes('ADD')) return 'success';
+        if (action.includes('DELETE') || action.includes('REMOVE')) return 'destructive';
+        if (action.includes('UPDATE') || action.includes('EDIT')) return 'warning';
+        if (action.includes('LOGIN') || action.includes('LOGOUT') || action.includes('VIEW')) return 'default';
+        if (action.includes('REVOKE') || action.includes('REVOCATION')) return 'outline';
+        return 'secondary';
+    };
+
+    // Handle scroll to bottom for loading more
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        if (!hasMore || isLoadingMore) return;
+
+        const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+        if (scrollTop + clientHeight >= scrollHeight - 100) {
+            loadMoreLogs();
+        }
+    };
 
     return (
-        <div className="space-y-4">
-            <Card>
-                <CardHeader>
-                    <div className="flex justify-between items-center">
-                        <div>
-                            <CardTitle>Audit Logs</CardTitle>
-                            <CardDescription>
-                                Track and monitor system activities
-                            </CardDescription>
-                        </div>
-                        <div className="flex gap-2">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={exportLogs}
-                                disabled={isLoading || isFetching}
-                            >
-                                <Download className="h-4 w-4 mr-2" />
-                                Export
-                            </Button>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => refetch()}
-                                disabled={isLoading || isFetching}
-                            >
-                                <RefreshCw
-                                    className={`h-4 w-4 mr-2 ${isFetching ? 'animate-spin' : ''}`}
-                                />
-                                Refresh
-                            </Button>
-                        </div>
+        <div className="container mx-auto py-6">
+            <Card className="border shadow-sm">
+                <CardHeader className="flex flex-row items-center justify-between px-6 py-4 space-y-0 border-b">
+                    <div>
+                        <h2 className="text-xl font-semibold leading-none tracking-tight">Audit Logs</h2>
+                        <p className="text-sm text-muted-foreground mt-1">Track and monitor system activities</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={exportLogs}
+                            disabled={isLoading || allLogs.length === 0}
+                            className="flex items-center gap-1"
+                        >
+                            <Download className="h-4 w-4" />
+                            Export
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={resetData}
+                            disabled={isLoading}
+                            className="flex items-center gap-1"
+                        >
+                            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                            Refresh
+                        </Button>
                     </div>
                 </CardHeader>
 
-                <CardContent>
-                    {/* Filters */}
-                    <div className="flex flex-col gap-4 mb-6">
-                        <div className="flex gap-4 items-center">
-                            <div className="flex-1">
-                                <Input
-                                    placeholder="Search logs..."
-                                    value={searchInput}
-                                    onChange={(e) => setSearchInput(e.target.value)}
-                                    className="max-w-md"
-                                />
-                            </div>
-
-                            <Popover open={isFilterOpen} onOpenChange={setIsFilterOpen}>
-                                <PopoverTrigger asChild>
-                                    <Button variant="outline" size="sm">
-                                        <Filter className="h-4 w-4 mr-2" />
-                                        Filters
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-80">
-                                    <div className="space-y-4">
-                                        <div className="space-y-2">
-                                            <h4 className="font-medium">Action Type</h4>
-                                            <Select
-                                                value={filters.action}
-                                                onValueChange={(value) => {
-                                                    setFilters(prev => ({
-                                                        ...prev,
-                                                        action: value === 'all' ? '' : value
-                                                    }))
-                                                    setPage(1)
-                                                }}
-                                            >
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select action" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="all">All Actions</SelectItem>
-                                                    {uniqueActions.map(action => (
-                                                        <SelectItem key={action} value={action}>
-                                                            {action}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <h4 className="font-medium">Date Range</h4>
-                                            <div className="grid gap-2">
-                                                <div className="flex items-center gap-2">
-                                                    <CalendarIcon className="h-4 w-4" />
-                                                    <span className="text-sm">
-                                                        {filters.dateRange.from
-                                                            ? format(filters.dateRange.from, 'PP')
-                                                            : 'Pick start date'
-                                                        }
-                                                        {' → '}
-                                                        {filters.dateRange.to
-                                                            ? format(filters.dateRange.to, 'PP')
-                                                            : 'Pick end date'
-                                                        }
-                                                    </span>
-                                                </div>
-                                                <Calendar
-                                                    mode="range"
-                                                    selected={{
-                                                        from: filters.dateRange.from || undefined,
-                                                        to: filters.dateRange.to || undefined
-                                                    }}
-                                                    onSelect={(range) => {
-                                                        setFilters(prev => ({
-                                                            ...prev,
-                                                            dateRange: {
-                                                                from: range?.from || null,
-                                                                to: range?.to || null
-                                                            }
-                                                        }))
-                                                        setPage(1)
-                                                    }}
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                </PopoverContent>
-                            </Popover>
-
-                            {(filters.search || filters.action || filters.dateRange.from || filters.dateRange.to) && (
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={resetFilters}
-                                    className="text-destructive"
-                                >
-                                    <XCircle className="h-4 w-4 mr-2" />
-                                    Clear
-                                </Button>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Table */}
-                    <div className="relative">
-                        <AnimatePresence mode="wait">
-                            {isFetching && (
-                                <motion.div
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    className="absolute inset-0 bg-background/50 backdrop-blur-sm z-10 flex items-center justify-center"
-                                >
-                                    <RefreshCw className="h-6 w-6 animate-spin" />
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-
-                        <div className="rounded-md border">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Timestamp</TableHead>
-                                        <TableHead>Action</TableHead>
-                                        <TableHead>Performer</TableHead>
-                                        <TableHead>Target</TableHead>
-                                        <TableHead className="w-[100px]">Details</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {isError ? (
-                                        <TableRow>
-                                            <TableCell
-                                                colSpan={5}
-                                                className="h-24 text-center text-destructive"
-                                            >
-                                                Failed to load audit logs
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : data?.logs?.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell
-                                                colSpan={5}
-                                                className="h-24 text-center text-muted-foreground"
-                                            >
-                                                No audit logs found
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : (
-                                        data?.logs?.map((log) => (
-                                            <TableRow key={log.id}>
-                                                <TableCell className="whitespace-nowrap">
-                                                    {format(parseISO(log.createdAt), 'yyyy-MM-dd HH:mm:ss')}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge variant="secondary">
-                                                        {log.action}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="flex flex-col">
-                                                        <span className="font-medium">
-                                                            {log.user.name || log.user.email}
-                                                        </span>
-                                                        {log.user.name && (
-                                                            <span className="text-xs text-muted-foreground">
-                                                                {log.user.email}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    {log.targetUser ? (
-                                                        <div className="flex flex-col">
-                                                            <span className="font-medium">
-                                                                {log.targetUser.name || log.targetUser.email}
-                                                            </span>
-                                                            {log.targetUser.name && (
-                                                                <span className="text-xs text-muted-foreground">
-                                                                    {log.targetUser.email}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-muted-foreground">N/A</span>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => setSelectedLog(log)}
-                                                    >
-                                                        <Info className="h-4 w-4" />
-                                                    </Button>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </div>
-
-                    {/* Pagination */}
-                    <div className="flex items-center justify-between mt-4">
-                        <p className="text-sm text-muted-foreground">
-                            Showing {((page - 1) * pageSize) + 1} to{' '}
-                            {Math.min(page * pageSize, data?.total || 0)} of{' '}
-                            {data?.total || 0} entries
-                        </p>
-                        <div className="flex items-center gap-2">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setPage(p => Math.max(1, p - 1))}
-                                disabled={page === 1 || isLoading}
-                            >
-                                Previous
-                            </Button>
+                <CardContent className="p-6">
+                    {/* Progress indicator */}
+                    <div className="mb-4">
+                        <div className="flex justify-between items-center text-sm mb-1.5">
                             <div className="flex items-center gap-1">
-                                {Array.from({ length: Math.min(5, data?.pages || 1) }, (_, i) => {
-                                    const pageNumber = page <= 3
-                                        ? i + 1
-                                        : page + i - 2
-                                    if (pageNumber <= (data?.pages || 1)) {
-                                        return (
-                                            <Button
-                                                key={pageNumber}
-                                                variant={page === pageNumber ? "default" : "outline"}
-                                                size="sm"
-                                                onClick={() => setPage(pageNumber)}
-                                                className="w-8"
-                                            >
-                                                {pageNumber}
-                                            </Button>
-                                        )
-                                    }
-                                    return null
-                                })}
-                                {data?.pages && data.pages > 5 && page < data.pages - 2 && (
-                                    <>
-                                        <span className="mx-1">...</span>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => setPage(data.pages)}
-                                            className="w-8"
-                                        >
-                                            {data.pages}
-                                        </Button>
-                                    </>
+                                <span className="font-medium">{allLogs.length}</span>
+                                <span className="text-muted-foreground">of</span>
+                                <span className="font-medium">{total}</span>
+                                <span className="text-muted-foreground">logs</span>
+                                {isLoading && (
+                                    <span className="inline-flex items-center gap-1 ml-2 text-muted-foreground">
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                        Loading...
+                                    </span>
                                 )}
                             </div>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setPage(p => p + 1)}
-                                disabled={!data?.logs || page >= (data?.pages || 1) || isLoading}
-                            >
-                                Next
-                            </Button>
+                            <span className="text-muted-foreground">{Math.floor(loadProgress)}% loaded</span>
                         </div>
+                        <Progress value={loadProgress} className="h-2" />
                     </div>
 
-                    {/* Details Dialog */}
-                    <Dialog
-                        open={!!selectedLog}
-                        onOpenChange={(open) => !open && setSelectedLog(null)}
-                    >
-                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                            <DialogHeader>
-                                <DialogTitle>Log Details</DialogTitle>
-                                <DialogDescription>
-                                    Detailed information about this audit log entry
-                                </DialogDescription>
-                            </DialogHeader>
+                    {/* Search and filters */}
+                    <div className="flex gap-2 mb-4">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search logs..."
+                                value={searchInput}
+                                onChange={e => setSearchInput(e.target.value)}
+                                className="pl-9"
+                            />
+                        </div>
 
-                            {selectedLog && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className="space-y-6"
-                                >
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <h4 className="font-medium mb-1">Timestamp</h4>
-                                            <p className="text-sm">
-                                                {format(parseISO(selectedLog.createdAt), 'PPpp')}
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <h4 className="font-medium mb-1">Action</h4>
-                                            <Badge variant="secondary">
-                                                {selectedLog.action}
-                                            </Badge>
-                                        </div>
+                        <Popover open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" className="flex items-center gap-2">
+                                    <Filter className="h-4 w-4" />
+                                    Filters
+                                    {activeFilters > 0 && (
+                                        <Badge variant="secondary" className="ml-1">
+                                            {activeFilters}
+                                        </Badge>
+                                    )}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80 p-4" align="end">
+                                <div className="space-y-4">
+                                    <h3 className="font-medium">Filter Logs</h3>
+                                    {/* Action filter */}
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Action Type</label>
+                                        <Select
+                                            value={filters.action}
+                                            onValueChange={(value) => {
+                                                setFilters(prev => ({
+                                                    ...prev,
+                                                    action: value === 'all' ? '' : value
+                                                }));
+                                            }}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select action" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">All Actions</SelectItem>
+                                                <SelectItem value="CREATE_USER">CREATE_USER</SelectItem>
+                                                <SelectItem value="DELETE_USER">DELETE_USER</SelectItem>
+                                                <SelectItem value="UPDATE_USER">UPDATE_USER</SelectItem>
+                                                <SelectItem value="LOGIN">LOGIN</SelectItem>
+                                                <SelectItem value="RENAME_API_KEY">RENAME_API_KEY</SelectItem>
+                                            </SelectContent>
+                                        </Select>
                                     </div>
 
+                                    {/* Date range filter */}
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Date Range</label>
+                                        <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-md text-sm">
+                                            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                                            <span>
+                                                {filters.dateRange.from
+                                                    ? format(filters.dateRange.from, 'MMM d, yyyy')
+                                                    : 'Start date'
+                                                }
+                                                {' → '}
+                                                {filters.dateRange.to
+                                                    ? format(filters.dateRange.to, 'MMM d, yyyy')
+                                                    : 'End date'
+                                                }
+                                            </span>
+                                        </div>
+                                        <Calendar
+                                            mode="range"
+                                            selected={{
+                                                from: filters.dateRange.from || undefined,
+                                                to: filters.dateRange.to || undefined
+                                            }}
+                                            onSelect={(range) => {
+                                                setFilters(prev => ({
+                                                    ...prev,
+                                                    dateRange: {
+                                                        from: range?.from || null,
+                                                        to: range?.to || null
+                                                    }
+                                                }));
+                                            }}
+                                            className="border rounded-md p-3"
+                                        />
+                                    </div>
+
+                                    <div className="flex justify-between pt-2">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={resetFilters}
+                                        >
+                                            Reset
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            onClick={() => {
+                                                resetData();
+                                                setIsFilterOpen(false);
+                                            }}
+                                        >
+                                            Apply
+                                        </Button>
+                                    </div>
+                                </div>
+                            </PopoverContent>
+                        </Popover>
+
+                        {(filters.search || filters.action || filters.dateRange.from || filters.dateRange.to) && (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={resetFilters}
+                                title="Clear all filters"
+                            >
+                                <XCircle className="h-4 w-4" />
+                            </Button>
+                        )}
+                    </div>
+
+                    {/* Simple Table */}
+                    <div className="border rounded-md">
+                        {isError ? (
+                            <div className="flex items-center justify-center p-8">
+                                <div className="text-center">
+                                    <p className="text-sm text-destructive font-medium mb-2">Failed to load audit logs</p>
+                                    <Button
+                                        onClick={resetData}
+                                        variant="outline"
+                                        size="sm"
+                                    >
+                                        Try Again
+                                    </Button>
+                                </div>
+                            </div>
+                        ) : allLogs.length === 0 && !isLoading ? (
+                            <div className="flex items-center justify-center p-8">
+                                <div className="text-center">
+                                    <p className="text-sm font-medium mb-1">No audit logs found</p>
+                                    <p className="text-sm text-muted-foreground mb-4">Try adjusting your search criteria</p>
+                                    {(filters.search || filters.action || filters.dateRange.from || filters.dateRange.to) && (
+                                        <Button
+                                            onClick={resetFilters}
+                                            variant="outline"
+                                            size="sm"
+                                        >
+                                            Reset Filters
+                                        </Button>
+                                    )}
+                                </div>
+                            </div>
+                        ) : (
+                            <div
+                                className="overflow-auto relative"
+                                style={{ height: tableHeight }}
+                                onScroll={handleScroll}
+                            >
+                                <table className="w-full">
+                                    <thead className="sticky top-0 bg-background z-10">
+                                    <tr className="border-b">
+                                        <th className="text-left p-3 font-medium text-muted-foreground text-sm">Timestamp</th>
+                                        <th className="text-left p-3 font-medium text-muted-foreground text-sm">Action</th>
+                                        <th className="text-left p-3 font-medium text-muted-foreground text-sm">Performer</th>
+                                        <th className="text-left p-3 font-medium text-muted-foreground text-sm">Target</th>
+                                        <th className="text-right p-3 font-medium text-muted-foreground text-sm w-20">Details</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    {allLogs.map((log, index) => (
+                                        <motion.tr
+                                            key={log.id}
+                                            className={`${index % 2 === 0 ? 'bg-background' : 'bg-muted/5'} hover:bg-muted/20 cursor-pointer`}
+                                            onClick={() => setSelectedLog(log)}
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            transition={{ duration: 0.2, delay: index * 0.01 }}
+                                        >
+                                            <td className="p-3 text-sm whitespace-nowrap">
+                                                {format(parseISO(log.createdAt), 'yyyy-MM-dd HH:mm:ss')}
+                                            </td>
+                                            <td className="p-3">
+                                                <Badge variant={getActionVariant(log.action)} className="font-medium">
+                                                    {log.action}
+                                                </Badge>
+                                            </td>
+                                            <td className="p-3 text-sm">
+                                                {log.user.name || log.user.email}
+                                            </td>
+                                            <td className="p-3 text-sm">
+                                                {log.targetUser
+                                                    ? (log.targetUser.name || log.targetUser.email)
+                                                    : "—"}
+                                            </td>
+                                            <td className="p-3 text-right">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="ml-auto h-8 w-8"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSelectedLog(log);
+                                                    }}
+                                                >
+                                                    <Info className="h-4 w-4" />
+                                                </Button>
+                                            </td>
+                                        </motion.tr>
+                                    ))}
+                                    </tbody>
+                                </table>
+
+                                {isLoadingMore && (
+                                    <div className="text-center py-3 bg-background bg-opacity-75 backdrop-blur-sm">
+                                        <div className="flex items-center justify-center gap-2 text-sm">
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                            <span>Loading more logs...</span>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {!hasMore && allLogs.length > 0 && (
+                                    <div className="text-center py-3 text-sm text-muted-foreground bg-background bg-opacity-75 backdrop-blur-sm">
+                                        You&apos;ve reached the end of the logs ({allLogs.length} records)
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Details Dialog */}
+            <Dialog
+                open={!!selectedLog}
+                onOpenChange={(open) => !open && setSelectedLog(null)}
+            >
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center">
+                            Log Details
+                            {selectedLog && (
+                                <Badge
+                                    variant={getActionVariant(selectedLog.action)}
+                                    className="ml-2"
+                                >
+                                    {selectedLog.action}
+                                </Badge>
+                            )}
+                        </DialogTitle>
+                        <DialogDescription>
+                            {selectedLog && format(parseISO(selectedLog.createdAt), 'PPpp')}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {selectedLog && (
+                        <ScrollArea className="max-h-[60vh]">
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <h4 className="font-medium mb-2">Performer</h4>
-                                        <Card className="bg-muted">
-                                            <CardContent className="p-4">
-                                                <div className="flex flex-col">
-                                                    <span className="font-medium">
-                                                        {selectedLog.user.name || selectedLog.user.email}
-                                                    </span>
-                                                    {selectedLog.user.name && (
-                                                        <span className="text-sm text-muted-foreground">
-                                                            {selectedLog.user.email}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </CardContent>
-                                        </Card>
+                                        <h4 className="text-sm font-medium text-muted-foreground mb-1">Performer</h4>
+                                        <div className="bg-muted p-3 rounded-md">
+                                            <p className="font-medium">
+                                                {selectedLog.user.name || selectedLog.user.email}
+                                            </p>
+                                            {selectedLog.user.name && (
+                                                <p className="text-sm text-muted-foreground mt-1">
+                                                    {selectedLog.user.email}
+                                                </p>
+                                            )}
+                                        </div>
                                     </div>
 
                                     {selectedLog.targetUser && (
                                         <div>
-                                            <h4 className="font-medium mb-2">Target</h4>
-                                            <Card className="bg-muted">
-                                                <CardContent className="p-4">
-                                                    <div className="flex flex-col">
-                                                        <span className="font-medium">
-                                                            {selectedLog.targetUser.name || selectedLog.targetUser.email}
-                                                        </span>
-                                                        {selectedLog.targetUser.name && (
-                                                            <span className="text-sm text-muted-foreground">
-                                                                {selectedLog.targetUser.email}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </CardContent>
-                                            </Card>
+                                            <h4 className="text-sm font-medium text-muted-foreground mb-1">Target</h4>
+                                            <div className="bg-muted p-3 rounded-md">
+                                                <p className="font-medium">
+                                                    {selectedLog.targetUser.name || selectedLog.targetUser.email}
+                                                </p>
+                                                {selectedLog.targetUser.name && (
+                                                    <p className="text-sm text-muted-foreground mt-1">
+                                                        {selectedLog.targetUser.email}
+                                                    </p>
+                                                )}
+                                            </div>
                                         </div>
                                     )}
+                                </div>
 
-                                    {selectedLog.details && (
-                                        <div>
-                                            <h4 className="font-medium mb-2">Details</h4>
-                                            <Card className="bg-muted">
-                                                <CardContent className="p-4">
-                                                    <pre className="text-xs whitespace-pre-wrap font-mono">
-                                                        {formatLogDetails(selectedLog.details)}
-                                                    </pre>
-                                                </CardContent>
-                                            </Card>
+                                {selectedLog.details && (
+                                    <div>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h4 className="text-sm font-medium text-muted-foreground">Details</h4>
+
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={copyDetails}
+                                            >
+                                                {copied ? (
+                                                    <>
+                                                        <Check className="h-3.5 w-3.5 mr-1" />
+                                                        Copied
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Copy className="h-3.5 w-3.5 mr-1" />
+                                                        Copy
+                                                    </>
+                                                )}
+                                            </Button>
                                         </div>
-                                    )}
-                                </motion.div>
-                            )}
-                        </DialogContent>
-                    </Dialog>
-                </CardContent>
-            </Card>
+
+                                        <div className="bg-muted/50 rounded-md overflow-hidden">
+                                            <pre className="p-3 text-sm whitespace-pre-wrap font-mono overflow-auto">
+                                                {formatLogDetails(selectedLog.details)}
+                                            </pre>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div>
+                                    <h4 className="text-sm font-medium text-muted-foreground mb-2">System Information</h4>
+                                    <div className="grid grid-cols-2 gap-3 text-sm">
+                                        <div className="bg-muted/50 p-3 rounded-md">
+                                            <p className="text-muted-foreground mb-1">Log ID</p>
+                                            <p className="font-mono break-all">{selectedLog.id}</p>
+                                        </div>
+                                        <div className="bg-muted/50 p-3 rounded-md">
+                                            <p className="text-muted-foreground mb-1">User ID</p>
+                                            <p className="font-mono break-all">{selectedLog.userId}</p>
+                                        </div>
+                                        {selectedLog.targetUserId && (
+                                            <div className="bg-muted/50 p-3 rounded-md">
+                                                <p className="text-muted-foreground mb-1">Target User ID</p>
+                                                <p className="font-mono break-all">{selectedLog.targetUserId}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </ScrollArea>
+                    )}
+
+                    <DialogFooter>
+                        <Button
+                            variant="secondary"
+                            onClick={() => setSelectedLog(null)}
+                        >
+                            Close
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

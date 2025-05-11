@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { validateAuthAndGetUser } from '@/lib/utils/changelog';
 import { db } from '@/lib/db';
 import { z } from 'zod';
+import { createAuditLog } from '@/lib/utils/auditLog';
 
 const updateApiKeySchema = z.object({
     name: z.string().min(1).max(100).optional(),
@@ -177,9 +178,17 @@ export async function PATCH(
 
         const body = await request.json();
         const validatedData = updateApiKeySchema.parse(body);
+        const keyId = (await params).keyId;
 
         const existingKey = await db.apiKey.findUnique({
-            where: { id: (await params).keyId }
+            where: { id: keyId },
+            include: {
+                user: {
+                    select: {
+                        id: true
+                    }
+                }
+            }
         });
 
         if (!existingKey) {
@@ -197,8 +206,29 @@ export async function PATCH(
             );
         }
 
+        // Track what changed for the audit log
+        const changes: Record<string, { from: unknown; to: unknown }> = {};
+
+        if (validatedData.name && validatedData.name !== existingKey.name) {
+            changes.name = { from: existingKey.name, to: validatedData.name };
+        }
+
+        if (validatedData.isRevoked !== undefined && validatedData.isRevoked !== existingKey.isRevoked) {
+            changes.isRevoked = { from: existingKey.isRevoked, to: validatedData.isRevoked };
+        }
+
+        if (validatedData.expiresAt !== undefined) {
+            const newExpiresAt = validatedData.expiresAt ? new Date(validatedData.expiresAt) : null;
+            const oldExpiresAt = existingKey.expiresAt?.toISOString() || null;
+            const newExpiresAtStr = newExpiresAt?.toISOString() || null;
+
+            if (oldExpiresAt !== newExpiresAtStr) {
+                changes.expiresAt = { from: oldExpiresAt, to: newExpiresAtStr };
+            }
+        }
+
         const apiKey = await db.apiKey.update({
-            where: { id: (await params).keyId },
+            where: { id: keyId },
             data: {
                 ...(validatedData.name && { name: validatedData.name }),
                 ...(validatedData.isRevoked !== undefined && { isRevoked: validatedData.isRevoked }),
@@ -216,6 +246,35 @@ export async function PATCH(
                 permissions: true
             }
         });
+
+        // Determine the audit log action based on what changed
+        if (Object.keys(changes).length > 0) {
+            let auditAction = 'UPDATE_API_KEY';
+
+            // Use a more specific action if only one type of change occurred
+            if (changes.isRevoked && changes.isRevoked.to === true && Object.keys(changes).length === 1) {
+                auditAction = 'REVOKE_API_KEY';
+            } else if (changes.name && Object.keys(changes).length === 1) {
+                auditAction = 'RENAME_API_KEY';
+            }
+
+            try {
+                await createAuditLog(
+                    auditAction,
+                    user.id,
+                    user.id, // Use the admin's ID as the target user ID to avoid foreign key issues
+                    {
+                        apiKeyId: keyId,
+                        apiKeyName: apiKey.name,
+                        changes,
+                        ownerId: existingKey.user.id
+                    }
+                );
+            } catch (auditLogError) {
+                console.error('Failed to create audit log:', auditLogError);
+                // Continue execution even if audit log creation fails
+            }
+        }
 
         return NextResponse.json(apiKey);
     } catch (error) {
@@ -257,8 +316,16 @@ export async function DELETE(
             );
         }
 
+        const keyId = (await params).keyId;
         const existingKey = await db.apiKey.findUnique({
-            where: { id: (await params).keyId }
+            where: { id: keyId },
+            include: {
+                user: {
+                    select: {
+                        id: true
+                    }
+                }
+            }
         });
 
         if (!existingKey) {
@@ -276,10 +343,34 @@ export async function DELETE(
             );
         }
 
+        // Store key details for audit log before deletion
+        const apiKeyDetails = {
+            id: existingKey.id,
+            name: existingKey.name,
+            ownerId: existingKey.user.id
+        };
+
         // Permanently delete the key
         await db.apiKey.delete({
-            where: { id: (await params).keyId }
+            where: { id: keyId }
         });
+
+        // Create audit log for deletion
+        try {
+            await createAuditLog(
+                'DELETE_API_KEY',
+                user.id,
+                user.id, // Use the admin's ID as the target user ID to avoid foreign key issues
+                {
+                    apiKeyId: apiKeyDetails.id,
+                    apiKeyName: apiKeyDetails.name,
+                    ownerId: apiKeyDetails.ownerId
+                }
+            );
+        } catch (auditLogError) {
+            console.error('Failed to create audit log:', auditLogError);
+            // Continue execution even if audit log creation fails
+        }
 
         return NextResponse.json({ success: true });
     } catch (error) {

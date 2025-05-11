@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { validateAuthAndGetUser } from '@/lib/utils/changelog'
+import { createAuditLog } from '@/lib/utils/auditLog'
 import { db } from '@/lib/db'
 import { z } from 'zod'
 
@@ -39,6 +40,21 @@ export async function GET() {
         }
 
         const config = await db.systemConfig.findFirst()
+
+        // Create audit log for viewing system config
+        try {
+            await createAuditLog(
+                'VIEW_SYSTEM_CONFIG',
+                user.id,
+                user.id, // Use admin's ID as target to avoid foreign key issues
+                {
+                    configExists: !!config
+                }
+            )
+        } catch (auditLogError) {
+            console.error('Failed to create audit log:', auditLogError)
+            // Continue execution even if audit log creation fails
+        }
 
         if (!config) {
             // Return default configuration if none exists
@@ -109,6 +125,51 @@ export async function PATCH(request: Request) {
         const body = await request.json()
         const validatedData = systemConfigSchema.parse(body)
 
+        // Get current config to track changes
+        const existingConfig = await db.systemConfig.findFirst()
+        const isNewConfig = !existingConfig
+
+        // Track what changes are being made
+        const changes: Record<string, { from: unknown; to: unknown }> = {};
+
+        if (existingConfig) {
+            // Compare each field and track changes
+            if (validatedData.defaultInvitationExpiry !== existingConfig.defaultInvitationExpiry) {
+                changes.defaultInvitationExpiry = {
+                    from: existingConfig.defaultInvitationExpiry,
+                    to: validatedData.defaultInvitationExpiry
+                }
+            }
+
+            if (validatedData.requireApprovalForChangelogs !== existingConfig.requireApprovalForChangelogs) {
+                changes.requireApprovalForChangelogs = {
+                    from: existingConfig.requireApprovalForChangelogs,
+                    to: validatedData.requireApprovalForChangelogs
+                }
+            }
+
+            if (validatedData.maxChangelogEntriesPerProject !== existingConfig.maxChangelogEntriesPerProject) {
+                changes.maxChangelogEntriesPerProject = {
+                    from: existingConfig.maxChangelogEntriesPerProject,
+                    to: validatedData.maxChangelogEntriesPerProject
+                }
+            }
+
+            if (validatedData.enableAnalytics !== existingConfig.enableAnalytics) {
+                changes.enableAnalytics = {
+                    from: existingConfig.enableAnalytics,
+                    to: validatedData.enableAnalytics
+                }
+            }
+
+            if (validatedData.enableNotifications !== existingConfig.enableNotifications) {
+                changes.enableNotifications = {
+                    from: existingConfig.enableNotifications,
+                    to: validatedData.enableNotifications
+                }
+            }
+        }
+
         const config = await db.systemConfig.upsert({
             where: { id: 1 }, // Assuming single config record
             update: validatedData,
@@ -117,6 +178,41 @@ export async function PATCH(request: Request) {
                 ...validatedData,
             },
         })
+
+        // Create appropriate audit log based on operation
+        try {
+            if (isNewConfig) {
+                // This is the initial configuration
+                await createAuditLog(
+                    'CREATE_SYSTEM_CONFIG',
+                    user.id,
+                    user.id, // Use admin's ID as target to avoid foreign key issues
+                    {
+                        config: {
+                            defaultInvitationExpiry: config.defaultInvitationExpiry,
+                            requireApprovalForChangelogs: config.requireApprovalForChangelogs,
+                            maxChangelogEntriesPerProject: config.maxChangelogEntriesPerProject,
+                            enableAnalytics: config.enableAnalytics,
+                            enableNotifications: config.enableNotifications
+                        }
+                    }
+                )
+            } else if (Object.keys(changes).length > 0) {
+                // This is an update to existing configuration
+                await createAuditLog(
+                    'UPDATE_SYSTEM_CONFIG',
+                    user.id,
+                    user.id, // Use admin's ID as target to avoid foreign key issues
+                    {
+                        changes,
+                        changeCount: Object.keys(changes).length
+                    }
+                )
+            }
+        } catch (auditLogError) {
+            console.error('Failed to create audit log:', auditLogError)
+            // Continue execution even if audit log creation fails
+        }
 
         return NextResponse.json(config)
     } catch (error) {

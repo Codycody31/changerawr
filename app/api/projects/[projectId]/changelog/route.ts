@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { validateAuthAndGetUser } from '@/lib/utils/changelog'
+import { createAuditLog } from '@/lib/utils/auditLog' // Add this import
 import { db } from '@/lib/db'
 
 /**
@@ -58,7 +59,7 @@ export async function GET(
 ) {
     try {
         const { projectId } = await params
-        await validateAuthAndGetUser()
+        const user = await validateAuthAndGetUser()
         const { searchParams } = new URL(request.url)
 
         // Get query parameters
@@ -70,12 +71,50 @@ export async function GET(
         const limit = parseInt(searchParams.get('limit') || '10')
         const skip = (page - 1) * limit
 
+        // Log the changelog view attempt
+        try {
+            await createAuditLog(
+                'VIEW_CHANGELOG_ATTEMPT',
+                user.id,
+                user.id, // Use user's own ID to avoid foreign key issues
+                {
+                    projectId,
+                    filters: {
+                        search: search || null,
+                        tag: tag || null,
+                        startDate: startDate || null,
+                        endDate: endDate || null,
+                        page,
+                        limit
+                    },
+                    timestamp: new Date().toISOString()
+                }
+            );
+        } catch (auditLogError) {
+            console.error('Failed to create view attempt audit log:', auditLogError);
+        }
+
         // First get the changelog for this project
         const changelog = await db.changelog.findUnique({
             where: { projectId }
         })
 
         if (!changelog) {
+            // Log changelog not found error
+            try {
+                await createAuditLog(
+                    'CHANGELOG_NOT_FOUND',
+                    user.id,
+                    user.id, // Use user's own ID to avoid foreign key issues
+                    {
+                        projectId,
+                        timestamp: new Date().toISOString()
+                    }
+                );
+            } catch (auditLogError) {
+                console.error('Failed to create not found audit log:', auditLogError);
+            }
+
             return NextResponse.json(
                 { error: 'Changelog not found' },
                 { status: 404 }
@@ -133,6 +172,25 @@ export async function GET(
             }
         })
 
+        // Log the successful changelog view
+        try {
+            await createAuditLog(
+                'VIEW_CHANGELOG_SUCCESS',
+                user.id,
+                user.id, // Use user's own ID to avoid foreign key issues
+                {
+                    projectId,
+                    changelogId: changelog.id,
+                    entriesCount: entries.length,
+                    totalEntries: total,
+                    tagsCount: tags.length,
+                    timestamp: new Date().toISOString()
+                }
+            );
+        } catch (auditLogError) {
+            console.error('Failed to create view success audit log:', auditLogError);
+        }
+
         return NextResponse.json({
             entries,
             tags,
@@ -145,6 +203,27 @@ export async function GET(
         })
     } catch (error) {
         console.error('Error fetching changelog:', error)
+
+        // Log error in fetching changelog
+        try {
+            const { projectId } = await params;
+            const user = await validateAuthAndGetUser();
+            await createAuditLog(
+                'CHANGELOG_ERROR',
+                user.id,
+                user.id, // Use user's own ID to avoid foreign key issues
+                {
+                    action: 'VIEW_CHANGELOG',
+                    projectId,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                    stack: error instanceof Error ? error.stack : undefined,
+                    timestamp: new Date().toISOString()
+                }
+            );
+        } catch (auditLogError) {
+            console.error('Failed to create error audit log:', auditLogError);
+        }
+
         return NextResponse.json(
             { error: 'Failed to fetch changelog' },
             { status: 500 }
@@ -211,18 +290,89 @@ export async function POST(
     { params }: { params: Promise<{ projectId: string }> }
 ) {
     try {
-        await validateAuthAndGetUser()
-        const { title, content, version, tags } = await request.json()
+        const user = await validateAuthAndGetUser()
+        const projectId = (await params).projectId;
+        const requestBody = await request.json();
+        const { title, content, version, tags } = requestBody;
+
+        // Log the changelog entry creation attempt
+        try {
+            await createAuditLog(
+                'CREATE_CHANGELOG_ENTRY_ATTEMPT',
+                user.id,
+                user.id, // Use user's own ID to avoid foreign key issues
+                {
+                    projectId,
+                    entryTitle: title,
+                    entryVersion: version,
+                    tagCount: tags?.length || 0,
+                    contentLength: content?.length || 0,
+                    timestamp: new Date().toISOString()
+                }
+            );
+        } catch (auditLogError) {
+            console.error('Failed to create attempt audit log:', auditLogError);
+        }
 
         // Get the changelog for this project
         const changelog = await db.changelog.findUnique({
-            where: { projectId: (await params).projectId }
+            where: { projectId }
         })
 
         if (!changelog) {
+            // Log changelog not found error
+            try {
+                await createAuditLog(
+                    'CHANGELOG_NOT_FOUND',
+                    user.id,
+                    user.id, // Use user's own ID to avoid foreign key issues
+                    {
+                        action: 'CREATE_CHANGELOG_ENTRY',
+                        projectId,
+                        timestamp: new Date().toISOString()
+                    }
+                );
+            } catch (auditLogError) {
+                console.error('Failed to create not found audit log:', auditLogError);
+            }
+
             return NextResponse.json(
                 { error: 'Changelog not found' },
                 { status: 404 }
+            )
+        }
+
+        // Check for entry with same version
+        const existingEntry = await db.changelogEntry.findFirst({
+            where: {
+                changelogId: changelog.id,
+                version
+            }
+        });
+
+        if (existingEntry) {
+            // Log version conflict error
+            try {
+                await createAuditLog(
+                    'CHANGELOG_VERSION_CONFLICT',
+                    user.id,
+                    user.id, // Use user's own ID to avoid foreign key issues
+                    {
+                        projectId,
+                        changelogId: changelog.id,
+                        conflictingVersion: version,
+                        existingEntryId: existingEntry.id,
+                        existingEntryTitle: existingEntry.title,
+                        timestamp: new Date().toISOString()
+                    }
+                );
+            } catch (auditLogError) {
+                console.error('Failed to create version conflict audit log:', auditLogError);
+            }
+
+            return NextResponse.json(
+                { error: `Entry with version ${version} already exists` },
+                { status: 409 }
             )
         }
 
@@ -251,9 +401,50 @@ export async function POST(
             }
         })
 
-        return NextResponse.json(entry)
+        // Log the successful changelog entry creation
+        try {
+            await createAuditLog(
+                'CREATE_CHANGELOG_ENTRY_SUCCESS',
+                user.id,
+                user.id, // Use user's own ID to avoid foreign key issues
+                {
+                    projectId,
+                    changelogId: changelog.id,
+                    entryId: entry.id,
+                    entryTitle: entry.title,
+                    entryVersion: entry.version,
+                    tags: entry.tags.map(tag => tag.name),
+                    timestamp: new Date().toISOString()
+                }
+            );
+        } catch (auditLogError) {
+            console.error('Failed to create success audit log:', auditLogError);
+        }
+
+        return NextResponse.json(entry, { status: 201 })
     } catch (error) {
         console.error('Error creating changelog entry:', error)
+
+        // Log error in creating changelog entry
+        try {
+            const projectId = (await params).projectId;
+            const user = await validateAuthAndGetUser();
+            await createAuditLog(
+                'CHANGELOG_ERROR',
+                user.id,
+                user.id, // Use user's own ID to avoid foreign key issues
+                {
+                    action: 'CREATE_CHANGELOG_ENTRY',
+                    projectId,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                    stack: error instanceof Error ? error.stack : undefined,
+                    timestamp: new Date().toISOString()
+                }
+            );
+        } catch (auditLogError) {
+            console.error('Failed to create error audit log:', auditLogError);
+        }
+
         return NextResponse.json(
             { error: 'Failed to create changelog entry' },
             { status: 500 }

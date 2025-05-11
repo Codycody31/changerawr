@@ -4,11 +4,8 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     Card,
-    CardContent,
-    CardDescription,
     CardHeader,
     CardTitle,
-    CardFooter,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -43,15 +40,15 @@ import {
     Pencil,
     Copy,
     FileText,
-    Code,
-    ChevronRight,
     Shield,
-    CheckCircle,
-    X
+    X,
+    ExternalLink
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import Link from 'next/link';
+import SDKShowcase from '@/components/admin/api/sdk-showcase';
+import { Badge } from '@/components/ui/badge';
 
 interface ApiKey {
     id: string;
@@ -140,40 +137,40 @@ function RenameDialog({
 function NewKeyAlert({ keyData, onClose, onCopy }: { keyData: { key: string; id: string }; onClose: () => void; onCopy: (key: string) => void }) {
     return (
         <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="bg-amber-950/50 border border-amber-800/50 rounded-lg mb-6"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="bg-yellow-50 dark:bg-yellow-950/40 border border-yellow-200 dark:border-yellow-900/50 rounded-lg mb-6"
         >
             <div className="px-4 py-4">
                 <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                        <Shield className="h-5 w-5 text-amber-500" />
-                        <h4 className="font-medium text-amber-500">New API Key Created</h4>
+                        <Shield className="h-5 w-5 text-yellow-600 dark:text-yellow-500" />
+                        <h4 className="font-medium text-yellow-800 dark:text-yellow-500">New API Key Created</h4>
                     </div>
                     <Button
                         variant="ghost"
                         size="sm"
                         onClick={onClose}
-                        className="h-8 w-8 p-0 text-amber-500 hover:text-amber-600 hover:bg-transparent"
+                        className="h-8 w-8 p-0 text-yellow-600 dark:text-yellow-500 hover:text-yellow-700 dark:hover:text-yellow-600 hover:bg-transparent"
                     >
                         <X className="h-4 w-4" />
                     </Button>
                 </div>
 
-                <p className="text-sm text-amber-400 mb-3">
+                <p className="text-sm text-yellow-700 dark:text-yellow-400 mb-3">
                     Save your API key now. For security reasons, you won&apos;t be able to view it again.
                 </p>
 
                 <div className="relative">
-                    <div className="bg-amber-950/60 border border-amber-800/30 rounded-md p-3 font-mono text-sm break-all text-amber-300">
+                    <div className="bg-yellow-100 dark:bg-yellow-950/60 border border-yellow-200 dark:border-yellow-900/30 rounded-md p-3 font-mono text-sm break-all text-yellow-800 dark:text-yellow-300">
                         {keyData.key}
                     </div>
                     <Button
                         variant="outline"
                         size="sm"
                         onClick={() => onCopy(keyData.key)}
-                        className="absolute top-2 right-2 h-8 bg-amber-950/70 border-amber-800/50 text-amber-300 hover:bg-amber-900 hover:text-amber-200"
+                        className="absolute top-2 right-2 h-8 bg-yellow-100 dark:bg-yellow-950/70 border-yellow-200 dark:border-yellow-900/50 text-yellow-800 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-900 hover:text-yellow-900 dark:hover:text-yellow-200"
                     >
                         <Copy className="h-3.5 w-3.5 mr-1" />
                         Copy
@@ -181,95 +178,6 @@ function NewKeyAlert({ keyData, onClose, onCopy }: { keyData: { key: string; id:
                 </div>
             </div>
         </motion.div>
-    );
-}
-
-function ReactSDKCard() {
-    return (
-        <Card className="bg-indigo-950 text-white overflow-hidden border-0 h-full">
-            <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg font-medium">
-                        <Code className="h-5 w-5 mr-2 inline-block" />
-                        React SDK
-                    </CardTitle>
-                </div>
-                <CardDescription className="text-blue-200">
-                    Integrate Changerawr into your React applications
-                </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
-                <p className="text-sm text-blue-100">
-                    Our headless React SDK provides a powerful way to integrate Changerawr with complete UI freedom.
-                </p>
-
-                <div className="space-y-1">
-                    <p className="text-xs text-blue-300 uppercase font-medium">INSTALLATION</p>
-                    <div className="bg-slate-950 rounded-md overflow-hidden">
-                        <div className="flex items-center px-3 py-1.5 bg-slate-900 border-b border-slate-800">
-                            <div className="flex space-x-1.5">
-                                <div className="w-2.5 h-2.5 rounded-full bg-slate-700"></div>
-                                <div className="w-2.5 h-2.5 rounded-full bg-slate-700"></div>
-                                <div className="w-2.5 h-2.5 rounded-full bg-slate-700"></div>
-                            </div>
-                            <div className="ml-auto">
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 text-slate-400 hover:text-white"
-                                    onClick={() => {
-                                        navigator.clipboard.writeText("npm install @changerawr/react");
-                                        toast({
-                                            title: 'Command Copied',
-                                            description: 'The command has been copied to your clipboard.',
-                                        });
-                                    }}
-                                >
-                                    <Copy className="h-3.5 w-3.5" />
-                                </Button>
-                            </div>
-                        </div>
-                        <div className="p-3 font-mono text-xs text-slate-300">
-                            <code>npm install @changerawr/react</code>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="space-y-3">
-                    <p className="text-xs text-blue-300 uppercase font-medium">FEATURES</p>
-                    <ul className="space-y-2 text-sm">
-                        <li className="flex items-start gap-2">
-                            <CheckCircle className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
-                            <span className="text-blue-100">Full TypeScript support</span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                            <CheckCircle className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
-                            <span className="text-blue-100">React hooks for all API endpoints</span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                            <CheckCircle className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
-                            <span className="text-blue-100">Optional UI components</span>
-                        </li>
-                    </ul>
-                </div>
-            </CardContent>
-            <CardFooter className="pt-1">
-                <Button
-                    className="w-full bg-indigo-900/40 hover:bg-indigo-800/60 text-white border-0"
-                    asChild
-                >
-                    <a
-                        href="https://github.com/changerawr/react"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center justify-center"
-                    >
-                        View Documentation
-                        <ChevronRight className="h-4 w-4 ml-1" />
-                    </a>
-                </Button>
-            </CardFooter>
-        </Card>
     );
 }
 
@@ -423,273 +331,259 @@ export default function ApiKeysPage() {
 
     if (isLoading) {
         return (
-            <div className="flex min-h-screen bg-slate-950">
-                {/* Sidebar - Just a placeholder */}
-                <div className="w-64 border-r border-slate-800 p-6">
-                    <Skeleton className="h-8 w-32 mb-6" />
-                    <div className="space-y-4">
-                        {[1, 2, 3, 4, 5].map((i) => (
-                            <Skeleton key={i} className="h-6 w-full" />
-                        ))}
-                    </div>
+            <div className="container max-w-screen-2xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+                <div className="mb-6 flex justify-between items-center">
+                    <Skeleton className="h-8 w-32" />
+                    <Skeleton className="h-10 w-32" />
                 </div>
-
-                {/* Main content */}
-                <div className="flex-1 p-8">
-                    <div className="mb-6 flex justify-between items-center">
-                        <Skeleton className="h-8 w-32" />
-                        <Skeleton className="h-10 w-32" />
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-2">
+                        <Skeleton className="h-64 w-full rounded-lg" />
                     </div>
-                    <Skeleton className="h-64 w-full rounded-lg" />
+                    <div className="lg:col-span-1">
+                        <Skeleton className="h-64 w-full rounded-lg" />
+                    </div>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="flex min-h-screen bg-slate-950">
-            {/* Main content area */}
-            <div className="flex-1">
-                <div className="max-w-screen-2xl mx-auto px-8 py-6">
-                    {/* Page header */}
-                    <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
-                        <div>
-                            <h1 className="text-2xl font-bold text-white">API Keys</h1>
-                            <p className="text-slate-400 mt-1">
-                                Create and manage your API keys for authentication.
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-3 mt-4 md:mt-0">
-                            <Button variant="outline" size="sm" asChild className="h-9 bg-transparent border-slate-700 text-slate-300 hover:bg-slate-900 hover:text-white">
-                                <Link href="/api-docs">
-                                    <FileText className="h-4 w-4 mr-2" />
-                                    API Docs
-                                </Link>
+        <div className="container max-w-screen-2xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+            {/* Page header */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
+                <div>
+                    <h1 className="text-2xl font-bold">API Keys</h1>
+                    <p className="text-muted-foreground mt-1">
+                        Create and manage your API keys for authentication.
+                    </p>
+                </div>
+                <div className="flex items-center gap-3 mt-4 md:mt-0">
+                    <Button variant="outline" size="sm" asChild className="h-9">
+                        <Link href="/api-docs" className="flex items-center">
+                            <FileText className="h-4 w-4 mr-2" />
+                            API Docs
+                            <ExternalLink className="ml-1 h-3 w-3" />
+                        </Link>
+                    </Button>
+                    <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                        <DialogTrigger asChild>
+                            <Button size="sm" className="h-9">
+                                <Plus className="h-4 w-4 mr-2" />
+                                Create Key
                             </Button>
-                            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                                <DialogTrigger asChild>
-                                    <Button size="sm" className="h-9 bg-white text-slate-900 hover:bg-slate-100">
-                                        <Plus className="h-4 w-4 mr-2" />
+                        </DialogTrigger>
+                        <DialogContent className="max-w-md">
+                            <DialogHeader>
+                                <DialogTitle>Create New API Key</DialogTitle>
+                                <DialogDescription>
+                                    Give your API key a name to help you identify its use.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <form onSubmit={handleCreateKey}>
+                                <div className="grid gap-4 py-4">
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="name">API Key Name</Label>
+                                        <Input
+                                            id="name"
+                                            value={newKeyName}
+                                            onChange={(e) => setNewKeyName(e.target.value)}
+                                            placeholder="e.g., Production API Key"
+                                        />
+                                    </div>
+                                </div>
+                                <DialogFooter>
+                                    <Button type="submit" disabled={!newKeyName.trim()}>
                                         Create Key
                                     </Button>
-                                </DialogTrigger>
-                                <DialogContent className="max-w-md">
-                                    <DialogHeader>
-                                        <DialogTitle>Create New API Key</DialogTitle>
-                                        <DialogDescription>
-                                            Give your API key a name to help you identify its use.
-                                        </DialogDescription>
-                                    </DialogHeader>
-                                    <form onSubmit={handleCreateKey}>
-                                        <div className="grid gap-4 py-4">
-                                            <div className="grid gap-2">
-                                                <Label htmlFor="name">API Key Name</Label>
-                                                <Input
-                                                    id="name"
-                                                    value={newKeyName}
-                                                    onChange={(e) => setNewKeyName(e.target.value)}
-                                                    placeholder="e.g., Production API Key"
-                                                />
-                                            </div>
-                                        </div>
-                                        <DialogFooter>
-                                            <Button type="submit" disabled={!newKeyName.trim()}>
-                                                Create Key
-                                            </Button>
-                                        </DialogFooter>
-                                    </form>
-                                </DialogContent>
-                            </Dialog>
-                        </div>
-                    </div>
+                                </DialogFooter>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
+                </div>
+            </div>
 
-                    <AnimatePresence>
-                        {newKeyData && (
-                            <NewKeyAlert
-                                keyData={newKeyData}
-                                onClose={() => setNewKeyData(null)}
-                                onCopy={handleCopyKey}
-                            />
-                        )}
-                    </AnimatePresence>
+            <AnimatePresence>
+                {newKeyData && (
+                    <NewKeyAlert
+                        keyData={newKeyData}
+                        onClose={() => setNewKeyData(null)}
+                        onCopy={handleCopyKey}
+                    />
+                )}
+            </AnimatePresence>
 
-                    {/* Main Content - Table and SDK Card */}
-                    <div className="flex flex-col lg:flex-row gap-6">
-                        {/* API Keys Card */}
-                        <div className="flex-1">
-                            <Card className="overflow-hidden border-slate-800 bg-slate-950 shadow-sm">
-                                <CardHeader className="border-b border-slate-800 bg-slate-900/30 px-6 py-4">
-                                    <CardTitle className="text-base font-medium text-slate-100">Your API Keys</CardTitle>
-                                </CardHeader>
+            {/* Main Content - Table and SDK Card */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* API Keys Card */}
+                <div className="lg:col-span-2">
+                    <Card className="shadow-sm">
+                        <CardHeader className="pb-3 border-b">
+                            <CardTitle className="text-base font-medium">Your API Keys</CardTitle>
+                        </CardHeader>
 
-                                {/* API Keys Table */}
-                                <div className="overflow-hidden">
-                                    <table className="w-full">
-                                        <thead>
-                                        <tr className="border-b border-slate-800">
-                                            <th className="text-left text-xs font-medium text-slate-400 uppercase tracking-wider py-3 px-6">
-                                                Name
-                                            </th>
-                                            <th className="text-left text-xs font-medium text-slate-400 uppercase tracking-wider py-3 px-6">
-                                                Created
-                                            </th>
-                                            <th className="text-left text-xs font-medium text-slate-400 uppercase tracking-wider py-3 px-6">
-                                                Last Used
-                                            </th>
-                                            <th className="text-left text-xs font-medium text-slate-400 uppercase tracking-wider py-3 px-6">
-                                                Status
-                                            </th>
-                                            <th className="text-right text-xs font-medium text-slate-400 uppercase tracking-wider py-3 px-6">
-                                                Actions
-                                            </th>
-                                        </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-800">
-                                        {apiKeys && apiKeys.length > 0 ? (
-                                            apiKeys.map((key) => (
-                                                <tr
-                                                    key={key.id}
-                                                    className="hover:bg-slate-900/30 transition-colors"
-                                                >
-                                                    <td className="py-4 px-6 text-sm font-medium text-slate-200">
-                                                        {key.name}
-                                                    </td>
-                                                    <td className="py-4 px-6 text-sm text-slate-400">
-                                                        {format(new Date(key.createdAt), 'PPP')}
-                                                    </td>
-                                                    <td className="py-4 px-6 text-sm text-slate-400">
-                                                        {key.lastUsed
-                                                            ? format(new Date(key.lastUsed), 'PPP')
-                                                            : 'Never used'}
-                                                    </td>
-                                                    <td className="py-4 px-6 text-sm">
-                              <span
-                                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                      key.isRevoked
-                                          ? 'bg-red-900/30 text-red-400'
-                                          : 'bg-emerald-900/30 text-emerald-400'
-                                  }`}
-                              >
-                                {key.isRevoked ? 'Revoked' : 'Active'}
-                              </span>
-                                                    </td>
-                                                    <td className="py-2 px-6 text-sm text-right">
-                                                        <div className="flex items-center justify-end gap-2">
-                                                            {!key.isRevoked && (
-                                                                <>
+                        {/* API Keys Table */}
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead>
+                                <tr className="border-b">
+                                    <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-6">
+                                        Name
+                                    </th>
+                                    <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-6">
+                                        Created
+                                    </th>
+                                    <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-6">
+                                        Last Used
+                                    </th>
+                                    <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-6">
+                                        Status
+                                    </th>
+                                    <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-6">
+                                        Actions
+                                    </th>
+                                </tr>
+                                </thead>
+                                <tbody className="divide-y">
+                                {apiKeys && apiKeys.length > 0 ? (
+                                    apiKeys.map((key) => (
+                                        <tr
+                                            key={key.id}
+                                            className="hover:bg-muted/50 transition-colors"
+                                        >
+                                            <td className="py-4 px-6 text-sm font-medium">
+                                                {key.name}
+                                            </td>
+                                            <td className="py-4 px-6 text-sm text-muted-foreground">
+                                                {format(new Date(key.createdAt), 'PPP')}
+                                            </td>
+                                            <td className="py-4 px-6 text-sm text-muted-foreground">
+                                                {key.lastUsed
+                                                    ? format(new Date(key.lastUsed), 'PPP')
+                                                    : 'Never used'}
+                                            </td>
+                                            <td className="py-4 px-6 text-sm">
+                                                {key.isRevoked ? (
+                                                    <Badge variant="destructive">Revoked</Badge>
+                                                ) : (
+                                                    <Badge variant="default">Active</Badge>
+                                                )}
+                                            </td>
+                                            <td className="py-2 px-6 text-sm text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    {!key.isRevoked && (
+                                                        <>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => setRenameKey(key)}
+                                                                className="h-8 w-8 p-0"
+                                                            >
+                                                                <span className="sr-only">Rename</span>
+                                                                <Pencil className="h-4 w-4" />
+                                                            </Button>
+                                                            <AlertDialog>
+                                                                <AlertDialogTrigger asChild>
                                                                     <Button
                                                                         variant="ghost"
                                                                         size="sm"
-                                                                        onClick={() => setRenameKey(key)}
-                                                                        className="h-8 w-8 p-0 text-slate-400 hover:text-slate-100 hover:bg-slate-800/60"
+                                                                        className="h-8 w-8 p-0 text-destructive/80 hover:text-destructive hover:bg-destructive/10"
                                                                     >
-                                                                        <span className="sr-only">Rename</span>
-                                                                        <Pencil className="h-4 w-4" />
+                                                                        <span className="sr-only">Revoke</span>
+                                                                        <Ban className="h-4 w-4" />
                                                                     </Button>
-                                                                    <AlertDialog>
-                                                                        <AlertDialogTrigger asChild>
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="sm"
-                                                                                className="h-8 w-8 p-0 text-slate-400 hover:text-red-400 hover:bg-slate-800/60"
-                                                                            >
-                                                                                <span className="sr-only">Revoke</span>
-                                                                                <Ban className="h-4 w-4" />
-                                                                            </Button>
-                                                                        </AlertDialogTrigger>
-                                                                        <AlertDialogContent>
-                                                                            <AlertDialogHeader>
-                                                                                <AlertDialogTitle>Revoke API Key</AlertDialogTitle>
-                                                                                <AlertDialogDescription>
-                                                                                    Are you sure you want to
-                                                                                    revoke &ldquo;{key.name}&rdquo;?
-                                                                                    This will immediately prevent any further use of
-                                                                                    this key.
-                                                                                </AlertDialogDescription>
-                                                                            </AlertDialogHeader>
-                                                                            <AlertDialogFooter>
-                                                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                                                <AlertDialogAction
-                                                                                    onClick={() => revokeApiKey.mutate(key.id)}
-                                                                                    className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
-                                                                                >
-                                                                                    Revoke Key
-                                                                                </AlertDialogAction>
-                                                                            </AlertDialogFooter>
-                                                                        </AlertDialogContent>
-                                                                    </AlertDialog>
-                                                                </>
-                                                            )}
-                                                            {key.isRevoked && (
-                                                                <AlertDialog>
-                                                                    <AlertDialogTrigger asChild>
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="sm"
-                                                                            className="h-8 w-8 p-0 text-slate-400 hover:text-red-400 hover:bg-slate-800/60"
+                                                                </AlertDialogTrigger>
+                                                                <AlertDialogContent>
+                                                                    <AlertDialogHeader>
+                                                                        <AlertDialogTitle>Revoke API Key</AlertDialogTitle>
+                                                                        <AlertDialogDescription>
+                                                                            Are you sure you want to
+                                                                            revoke &ldquo;{key.name}&rdquo;?
+                                                                            This will immediately prevent any further use of
+                                                                            this key.
+                                                                        </AlertDialogDescription>
+                                                                    </AlertDialogHeader>
+                                                                    <AlertDialogFooter>
+                                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                        <AlertDialogAction
+                                                                            onClick={() => revokeApiKey.mutate(key.id)}
+                                                                            className="bg-destructive hover:bg-destructive/90 focus:ring-destructive"
                                                                         >
-                                                                            <span className="sr-only">Delete</span>
-                                                                            <Trash2 className="h-4 w-4" />
-                                                                        </Button>
-                                                                    </AlertDialogTrigger>
-                                                                    <AlertDialogContent>
-                                                                        <AlertDialogHeader>
-                                                                            <AlertDialogTitle>Delete API Key</AlertDialogTitle>
-                                                                            <AlertDialogDescription>
-                                                                                Are you sure you want to permanently
-                                                                                delete &ldquo;{key.name}&rdquo;?
-                                                                                This action cannot be undone.
-                                                                            </AlertDialogDescription>
-                                                                        </AlertDialogHeader>
-                                                                        <AlertDialogFooter>
-                                                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                                            <AlertDialogAction
-                                                                                onClick={() => deleteApiKey.mutate(key.id)}
-                                                                                className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
-                                                                            >
-                                                                                Delete Key
-                                                                            </AlertDialogAction>
-                                                                        </AlertDialogFooter>
-                                                                    </AlertDialogContent>
-                                                                </AlertDialog>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))
-                                        ) : (
-                                            <tr>
-                                                <td colSpan={5} className="py-16 text-center">
-                                                    <div className="flex flex-col items-center justify-center">
-                                                        <div className="bg-slate-900/50 rounded-full p-4 mb-4">
-                                                            <Key className="h-8 w-8 text-slate-500" />
-                                                        </div>
-                                                        <h3 className="text-lg font-medium text-slate-200 mb-1">No API Keys</h3>
-                                                        <p className="text-sm text-slate-400 mb-4 max-w-sm">
-                                                            Create an API key to get started with the Changerawr API.
-                                                        </p>
-                                                        <Button
-                                                            onClick={() => setIsCreateDialogOpen(true)}
-                                                            size="sm"
-                                                        >
-                                                            <Plus className="h-4 w-4 mr-2" />
-                                                            Create Key
-                                                        </Button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </Card>
+                                                                            Revoke Key
+                                                                        </AlertDialogAction>
+                                                                    </AlertDialogFooter>
+                                                                </AlertDialogContent>
+                                                            </AlertDialog>
+                                                        </>
+                                                    )}
+                                                    {key.isRevoked && (
+                                                        <AlertDialog>
+                                                            <AlertDialogTrigger asChild>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="h-8 w-8 p-0 text-destructive/80 hover:text-destructive hover:bg-destructive/10"
+                                                                >
+                                                                    <span className="sr-only">Delete</span>
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </Button>
+                                                            </AlertDialogTrigger>
+                                                            <AlertDialogContent>
+                                                                <AlertDialogHeader>
+                                                                    <AlertDialogTitle>Delete API Key</AlertDialogTitle>
+                                                                    <AlertDialogDescription>
+                                                                        Are you sure you want to permanently
+                                                                        delete &ldquo;{key.name}&rdquo;?
+                                                                        This action cannot be undone.
+                                                                    </AlertDialogDescription>
+                                                                </AlertDialogHeader>
+                                                                <AlertDialogFooter>
+                                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                    <AlertDialogAction
+                                                                        onClick={() => deleteApiKey.mutate(key.id)}
+                                                                        className="bg-destructive hover:bg-destructive/90 focus:ring-destructive"
+                                                                    >
+                                                                        Delete Key
+                                                                    </AlertDialogAction>
+                                                                </AlertDialogFooter>
+                                                            </AlertDialogContent>
+                                                        </AlertDialog>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan={5} className="py-16 text-center">
+                                            <div className="flex flex-col items-center justify-center">
+                                                <div className="rounded-full p-4 mb-4 bg-muted">
+                                                    <Key className="h-8 w-8 text-muted-foreground/60" />
+                                                </div>
+                                                <h3 className="text-lg font-medium mb-1">No API Keys</h3>
+                                                <p className="text-sm text-muted-foreground mb-4 max-w-sm">
+                                                    Create an API key to get started with the Changerawr API.
+                                                </p>
+                                                <Button
+                                                    onClick={() => setIsCreateDialogOpen(true)}
+                                                    size="sm"
+                                                >
+                                                    <Plus className="h-4 w-4 mr-2" />
+                                                    Create Key
+                                                </Button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )}
+                                </tbody>
+                            </table>
                         </div>
+                    </Card>
+                </div>
 
-                        {/* React SDK Card - Right Sidebar */}
-                        <div className="lg:w-80 xl:w-96">
-                            <ReactSDKCard />
-                        </div>
-                    </div>
+                {/* SDKs Showcase - Right Side */}
+                <div className="lg:col-span-1">
+                    <SDKShowcase className="h-full" />
                 </div>
             </div>
 

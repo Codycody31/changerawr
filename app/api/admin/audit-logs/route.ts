@@ -4,10 +4,13 @@ import { validateAuthAndGetUser } from '@/lib/utils/changelog'
 
 /**
  * @method GET
- * @description Fetches audit logs based on filters and pagination
+ * @description Fetches audit logs based on filters and pagination or chunking
  * @query {
  *   page: Number, default: 1
  *   pageSize: Number, default: 20
+ *   cursor: String, optional, for chunk-based pagination
+ *   chunkSize: Number, default: 100, for chunk-based loading
+ *   useChunking: boolean, optional, enables chunked data loading
  *   search: String, optional
  *   action: String, optional
  *   from: Date, optional
@@ -48,7 +51,8 @@ import { validateAuthAndGetUser } from '@/lib/utils/changelog'
  *       }
  *     },
  *     "total": { "type": "number" },
- *     "pages": { "type": "number" }
+ *     "pages": { "type": "number" },
+ *     "nextCursor": { "type": "string" }
  *   }
  * }
  * @error 403 Unauthorized - User does not have 'ADMIN' role
@@ -64,6 +68,9 @@ export async function GET(request: Request) {
 
         // Parse query parameters
         const { searchParams } = new URL(request.url)
+        const useChunking = searchParams.get('useChunking') === 'true'
+        const cursor = searchParams.get('cursor') || ''
+        const chunkSize = parseInt(searchParams.get('chunkSize') || '100', 10)
         const page = parseInt(searchParams.get('page') || '1', 10)
         const pageSize = parseInt(searchParams.get('pageSize') || '20', 10)
         const search = searchParams.get('search') || ''
@@ -155,7 +162,7 @@ export async function GET(request: Request) {
                     // CSV Data
                     ...csvContent.map(row =>
                         Object.values(row)
-                            .map(val => `"${val}"`)
+                            .map(val => `"${String(val).replace(/"/g, '""')}"`)
                             .join(',')
                     )
                 ].join('\n'),
@@ -168,12 +175,79 @@ export async function GET(request: Request) {
             )
         }
 
-        // Calculate pagination
-        const skip = (page - 1) * pageSize
+        // Get total count for pagination
+        const total = await db.auditLog.count({ where })
 
-        // Fetch logs with pagination
-        const [logs, total] = await Promise.all([
-            db.auditLog.findMany({
+        // Determine fetching method: chunking or pagination
+        if (useChunking) {
+            let logs;
+
+            if (cursor) {
+                // If cursor is provided, use cursor-based pagination
+                logs = await db.auditLog.findMany({
+                    where,
+                    take: chunkSize,
+                    cursor: {
+                        id: cursor
+                    },
+                    orderBy: { createdAt: 'desc' },
+                    include: {
+                        user: {
+                            select: {
+                                name: true,
+                                email: true
+                            }
+                        },
+                        targetUser: {
+                            select: {
+                                name: true,
+                                email: true
+                            }
+                        }
+                    }
+                })
+
+                // Remove the cursor item from the result
+                if (logs.length > 0 && logs[0].id === cursor) {
+                    logs = logs.slice(1)
+                }
+            } else {
+                // Initial fetch without cursor
+                logs = await db.auditLog.findMany({
+                    where,
+                    take: chunkSize,
+                    orderBy: { createdAt: 'desc' },
+                    include: {
+                        user: {
+                            select: {
+                                name: true,
+                                email: true
+                            }
+                        },
+                        targetUser: {
+                            select: {
+                                name: true,
+                                email: true
+                            }
+                        }
+                    }
+                })
+            }
+
+            // Get last item for next cursor
+            const nextCursor = logs.length > 0 ? logs[logs.length - 1].id : null
+
+            return NextResponse.json({
+                logs,
+                total,
+                pages: Math.ceil(total / chunkSize),
+                nextCursor
+            })
+        } else {
+            // Standard pagination
+            const skip = (page - 1) * pageSize
+
+            const logs = await db.auditLog.findMany({
                 where,
                 take: pageSize,
                 skip,
@@ -192,15 +266,14 @@ export async function GET(request: Request) {
                         }
                     }
                 }
-            }),
-            db.auditLog.count({ where })
-        ])
+            })
 
-        return NextResponse.json({
-            logs,
-            total,
-            pages: Math.ceil(total / pageSize)
-        })
+            return NextResponse.json({
+                logs,
+                total,
+                pages: Math.ceil(total / pageSize)
+            })
+        }
     } catch (error) {
         console.error('Audit logs fetch error:', error)
         return NextResponse.json(

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { validateAuthAndGetUser } from '@/lib/utils/changelog'
+import { createAuditLog } from '@/lib/utils/auditLog' // Add this import
 import { db } from '@/lib/db'
 import {Role} from "@/lib/types/auth";
 
@@ -56,28 +57,132 @@ export async function GET(
     context: { params: Promise<{ projectId: string; entryId: string }> }
 ) {
     try {
-        await validateAuthAndGetUser();
+        const user = await validateAuthAndGetUser();
+        const { projectId, entryId } = await (async () => context.params)();
 
-        // Unwrap the params using IIFE
-        const { entryId } = await (async () => context.params)();
+        // Log entry view attempt
+        try {
+            await createAuditLog(
+                'VIEW_CHANGELOG_ENTRY_ATTEMPT',
+                user.id,
+                user.id, // Use user's own ID to avoid foreign key issues
+                {
+                    projectId,
+                    entryId,
+                    timestamp: new Date().toISOString()
+                }
+            );
+        } catch (auditLogError) {
+            console.error('Failed to create view attempt audit log:', auditLogError);
+        }
 
         const entry = await db.changelogEntry.findUnique({
             where: { id: entryId },
             include: {
-                tags: true
+                tags: true,
+                changelog: {
+                    select: {
+                        projectId: true
+                    }
+                }
             }
         });
 
         if (!entry) {
+            // Log entry not found
+            try {
+                await createAuditLog(
+                    'CHANGELOG_ENTRY_NOT_FOUND',
+                    user.id,
+                    user.id, // Use user's own ID to avoid foreign key issues
+                    {
+                        projectId,
+                        entryId,
+                        timestamp: new Date().toISOString()
+                    }
+                );
+            } catch (auditLogError) {
+                console.error('Failed to create not found audit log:', auditLogError);
+            }
+
             return NextResponse.json(
                 { error: 'Entry not found' },
                 { status: 404 }
             );
         }
 
-        return NextResponse.json(entry);
+        // Verify the entry belongs to the requested project
+        if (entry.changelog.projectId !== projectId) {
+            // Log project mismatch
+            try {
+                await createAuditLog(
+                    'CHANGELOG_ENTRY_PROJECT_MISMATCH',
+                    user.id,
+                    user.id, // Use user's own ID to avoid foreign key issues
+                    {
+                        requestedProjectId: projectId,
+                        actualProjectId: entry.changelog.projectId,
+                        entryId,
+                        timestamp: new Date().toISOString()
+                    }
+                );
+            } catch (auditLogError) {
+                console.error('Failed to create project mismatch audit log:', auditLogError);
+            }
+
+            return NextResponse.json(
+                { error: 'Entry does not belong to this project' },
+                { status: 400 }
+            );
+        }
+
+        // Log successful entry view
+        try {
+            await createAuditLog(
+                'VIEW_CHANGELOG_ENTRY_SUCCESS',
+                user.id,
+                user.id, // Use user's own ID to avoid foreign key issues
+                {
+                    projectId,
+                    entryId: entry.id,
+                    entryTitle: entry.title,
+                    entryVersion: entry.version,
+                    tagCount: entry.tags.length,
+                    timestamp: new Date().toISOString()
+                }
+            );
+        } catch (auditLogError) {
+            console.error('Failed to create view success audit log:', auditLogError);
+        }
+
+        // Remove changelog field from response
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { changelog, ...entryData } = entry;
+        return NextResponse.json(entryData);
     } catch (error) {
         console.error('Error fetching changelog entry:', error);
+
+        // Log error
+        try {
+            const { projectId, entryId } = await (async () => context.params)();
+            const user = await validateAuthAndGetUser();
+            await createAuditLog(
+                'CHANGELOG_ENTRY_ERROR',
+                user.id,
+                user.id, // Use user's own ID to avoid foreign key issues
+                {
+                    action: 'VIEW_ENTRY',
+                    projectId,
+                    entryId,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                    stack: error instanceof Error ? error.stack : undefined,
+                    timestamp: new Date().toISOString()
+                }
+            );
+        } catch (auditLogError) {
+            console.error('Failed to create error audit log:', auditLogError);
+        }
+
         return NextResponse.json(
             { error: 'Failed to fetch changelog entry' },
             { status: 500 }
@@ -173,14 +278,128 @@ export async function PUT(
     context: { params: Promise<{ projectId: string; entryId: string }> }
 ) {
     try {
-        await validateAuthAndGetUser();
-        const { title, content, version, tags } = await request.json();
+        const user = await validateAuthAndGetUser();
+        const { projectId, entryId } = await (async () => context.params)();
+        const requestBody = await request.json();
+        const { title, content, version, tags } = requestBody;
 
-        // Unwrap the params using IIFE
-        const { entryId } = await (async () => context.params)();
+        // Log update attempt
+        try {
+            await createAuditLog(
+                'UPDATE_CHANGELOG_ENTRY_ATTEMPT',
+                user.id,
+                user.id, // Use user's own ID to avoid foreign key issues
+                {
+                    projectId,
+                    entryId,
+                    requestedChanges: {
+                        titleChanged: !!title,
+                        contentChanged: !!content,
+                        versionChanged: !!version,
+                        tagCount: tags?.length || 0
+                    },
+                    timestamp: new Date().toISOString()
+                }
+            );
+        } catch (auditLogError) {
+            console.error('Failed to create update attempt audit log:', auditLogError);
+        }
+
+        // Verify the entry exists and get existing data for comparison
+        const existingEntry = await db.changelogEntry.findUnique({
+            where: { id: entryId },
+            include: {
+                tags: true,
+                changelog: {
+                    select: {
+                        projectId: true
+                    }
+                }
+            }
+        });
+
+        if (!existingEntry) {
+            // Log entry not found
+            try {
+                await createAuditLog(
+                    'CHANGELOG_ENTRY_NOT_FOUND',
+                    user.id,
+                    user.id, // Use user's own ID to avoid foreign key issues
+                    {
+                        action: 'UPDATE_ENTRY',
+                        projectId,
+                        entryId,
+                        timestamp: new Date().toISOString()
+                    }
+                );
+            } catch (auditLogError) {
+                console.error('Failed to create not found audit log:', auditLogError);
+            }
+
+            return NextResponse.json(
+                { error: 'Entry not found' },
+                { status: 404 }
+            );
+        }
+
+        // Verify the entry belongs to the project
+        if (existingEntry.changelog.projectId !== projectId) {
+            // Log project mismatch
+            try {
+                await createAuditLog(
+                    'CHANGELOG_ENTRY_PROJECT_MISMATCH',
+                    user.id,
+                    user.id, // Use user's own ID to avoid foreign key issues
+                    {
+                        action: 'UPDATE_ENTRY',
+                        requestedProjectId: projectId,
+                        actualProjectId: existingEntry.changelog.projectId,
+                        entryId,
+                        timestamp: new Date().toISOString()
+                    }
+                );
+            } catch (auditLogError) {
+                console.error('Failed to create project mismatch audit log:', auditLogError);
+            }
+
+            return NextResponse.json(
+                { error: 'Entry does not belong to this project' },
+                { status: 400 }
+            );
+        }
+
+        // Track changes for audit log
+        const changes: Record<string, { from: unknown; to: unknown }> = {};
+
+        if (title && title !== existingEntry.title) {
+            changes.title = { from: existingEntry.title, to: title };
+        }
+
+        if (content && content !== existingEntry.content) {
+            changes.content = {
+                from: `${existingEntry.content.substring(0, 50)}${existingEntry.content.length > 50 ? '...' : ''}`,
+                to: `${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`
+            };
+        }
+
+        if (version && version !== existingEntry.version) {
+            changes.version = { from: existingEntry.version, to: version };
+        }
+
+        if (tags) {
+            const existingTagIds = existingEntry.tags.map(tag => tag.id).sort();
+            const newTagIds = tags.map((tag: { id: string }) => tag.id).sort();
+
+            if (JSON.stringify(existingTagIds) !== JSON.stringify(newTagIds)) {
+                changes.tags = {
+                    from: existingEntry.tags.map(tag => tag.name),
+                    to: tags.map((tag: { name: string }) => tag.name)
+                };
+            }
+        }
 
         // Fix the tags connection structure
-        const entry = await db.changelogEntry.update({
+        const updatedEntry = await db.changelogEntry.update({
             where: {
                 id: entryId
             },
@@ -188,6 +407,7 @@ export async function PUT(
                 title,
                 content,
                 version,
+                updatedAt: new Date(),
                 tags: {
                     set: tags.map((tag: { id: string }) => ({
                         id: tag.id
@@ -199,9 +419,51 @@ export async function PUT(
             }
         });
 
-        return NextResponse.json(entry);
+        // Log successful update with changes
+        try {
+            await createAuditLog(
+                'UPDATE_CHANGELOG_ENTRY_SUCCESS',
+                user.id,
+                user.id, // Use user's own ID to avoid foreign key issues
+                {
+                    projectId,
+                    entryId: updatedEntry.id,
+                    entryTitle: updatedEntry.title,
+                    entryVersion: updatedEntry.version,
+                    changes,
+                    changeCount: Object.keys(changes).length,
+                    timestamp: new Date().toISOString()
+                }
+            );
+        } catch (auditLogError) {
+            console.error('Failed to create update success audit log:', auditLogError);
+        }
+
+        return NextResponse.json(updatedEntry);
     } catch (error) {
         console.error('Error updating changelog entry:', error);
+
+        // Log error
+        try {
+            const { projectId, entryId } = await (async () => context.params)();
+            const user = await validateAuthAndGetUser();
+            await createAuditLog(
+                'CHANGELOG_ENTRY_ERROR',
+                user.id,
+                user.id, // Use user's own ID to avoid foreign key issues
+                {
+                    action: 'UPDATE_ENTRY',
+                    projectId,
+                    entryId,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                    stack: error instanceof Error ? error.stack : undefined,
+                    timestamp: new Date().toISOString()
+                }
+            );
+        } catch (auditLogError) {
+            console.error('Failed to create error audit log:', auditLogError);
+        }
+
         return NextResponse.json(
             { error: 'Failed to update changelog entry' },
             { status: 500 }
@@ -289,8 +551,45 @@ export async function PATCH(
         const { action } = await request.json();
         const { projectId, entryId } = await (async () => context.params)();
 
+        // Log status update attempt
+        try {
+            await createAuditLog(
+                `CHANGELOG_ENTRY_${action.toUpperCase()}_ATTEMPT`,
+                user.id,
+                user.id, // Use user's own ID to avoid foreign key issues
+                {
+                    projectId,
+                    entryId,
+                    action,
+                    userRole: user.role,
+                    timestamp: new Date().toISOString()
+                }
+            );
+        } catch (auditLogError) {
+            console.error('Failed to create status update attempt audit log:', auditLogError);
+        }
+
         // Verify user has permission
         if (user.role === Role.VIEWER) {
+            // Log permission denied
+            try {
+                await createAuditLog(
+                    'CHANGELOG_ENTRY_PERMISSION_DENIED',
+                    user.id,
+                    user.id, // Use user's own ID to avoid foreign key issues
+                    {
+                        projectId,
+                        entryId,
+                        action,
+                        userRole: user.role,
+                        requiredRole: 'STAFF or ADMIN',
+                        timestamp: new Date().toISOString()
+                    }
+                );
+            } catch (auditLogError) {
+                console.error('Failed to create permission denied audit log:', auditLogError);
+            }
+
             return NextResponse.json(
                 { error: 'Insufficient permissions' },
                 { status: 403 }
@@ -320,6 +619,23 @@ export async function PATCH(
         });
 
         if (!existingEntry) {
+            // Log entry not found
+            try {
+                await createAuditLog(
+                    'CHANGELOG_ENTRY_NOT_FOUND',
+                    user.id,
+                    user.id, // Use user's own ID to avoid foreign key issues
+                    {
+                        action: `${action.toUpperCase()}_ENTRY`,
+                        projectId,
+                        entryId,
+                        timestamp: new Date().toISOString()
+                    }
+                );
+            } catch (auditLogError) {
+                console.error('Failed to create not found audit log:', auditLogError);
+            }
+
             return NextResponse.json(
                 { error: 'Entry not found or does not belong to this project' },
                 { status: 404 }
@@ -339,6 +655,26 @@ export async function PATCH(
                     },
                     include: { tags: true }
                 });
+
+                // Log successful unpublish
+                try {
+                    await createAuditLog(
+                        'CHANGELOG_ENTRY_UNPUBLISHED',
+                        user.id,
+                        user.id, // Use user's own ID to avoid foreign key issues
+                        {
+                            projectId,
+                            entryId: entry.id,
+                            entryTitle: entry.title,
+                            entryVersion: entry.version,
+                            userRole: user.role,
+                            timestamp: new Date().toISOString()
+                        }
+                    );
+                } catch (auditLogError) {
+                    console.error('Failed to create unpublish success audit log:', auditLogError);
+                }
+
                 return NextResponse.json(entry);
             }
 
@@ -353,6 +689,27 @@ export async function PATCH(
                         },
                         include: { tags: true }
                     });
+
+                    // Log successful admin publish
+                    try {
+                        await createAuditLog(
+                            'CHANGELOG_ENTRY_PUBLISHED',
+                            user.id,
+                            user.id, // Use user's own ID to avoid foreign key issues
+                            {
+                                projectId,
+                                entryId: entry.id,
+                                entryTitle: entry.title,
+                                entryVersion: entry.version,
+                                userRole: user.role,
+                                publishedAt: entry.publishedAt?.toISOString(),
+                                timestamp: new Date().toISOString()
+                            }
+                        );
+                    } catch (auditLogError) {
+                        console.error('Failed to create admin publish success audit log:', auditLogError);
+                    }
+
                     return NextResponse.json(entry);
                 }
 
@@ -365,6 +722,29 @@ export async function PATCH(
                         },
                         include: { tags: true }
                     });
+
+                    // Log successful staff direct publish
+                    try {
+                        await createAuditLog(
+                            'CHANGELOG_ENTRY_PUBLISHED',
+                            user.id,
+                            user.id, // Use user's own ID to avoid foreign key issues
+                            {
+                                projectId,
+                                entryId: entry.id,
+                                entryTitle: entry.title,
+                                entryVersion: entry.version,
+                                userRole: user.role,
+                                publishedAt: entry.publishedAt?.toISOString(),
+                                projectRequiresApproval: project.requireApproval,
+                                projectAllowsAutoPublish: project.allowAutoPublish,
+                                timestamp: new Date().toISOString()
+                            }
+                        );
+                    } catch (auditLogError) {
+                        console.error('Failed to create staff publish success audit log:', auditLogError);
+                    }
+
                     return NextResponse.json(entry);
                 }
 
@@ -380,6 +760,24 @@ export async function PATCH(
                     });
 
                     if (existingRequest) {
+                        // Log duplicate request attempt
+                        try {
+                            await createAuditLog(
+                                'CHANGELOG_ENTRY_DUPLICATE_REQUEST',
+                                user.id,
+                                user.id, // Use user's own ID to avoid foreign key issues
+                                {
+                                    projectId,
+                                    entryId,
+                                    requestType: 'ALLOW_PUBLISH',
+                                    existingRequestId: existingRequest.id,
+                                    timestamp: new Date().toISOString()
+                                }
+                            );
+                        } catch (auditLogError) {
+                            console.error('Failed to create duplicate request audit log:', auditLogError);
+                        }
+
                         return NextResponse.json(
                             { error: 'A publish request for this entry is already pending' },
                             { status: 400 }
@@ -397,6 +795,23 @@ export async function PATCH(
                         }
                     });
 
+                    // Log successful publish request creation
+                    try {
+                        await createAuditLog(
+                            'CHANGELOG_ENTRY_PUBLISH_REQUEST_CREATED',
+                            user.id,
+                            user.id, // Use user's own ID to avoid foreign key issues
+                            {
+                                projectId,
+                                entryId,
+                                requestId: publishRequest.id,
+                                timestamp: new Date().toISOString()
+                            }
+                        );
+                    } catch (auditLogError) {
+                        console.error('Failed to create publish request audit log:', auditLogError);
+                    }
+
                     return NextResponse.json({
                         message: 'Publish request created, awaiting admin approval',
                         request: publishRequest
@@ -405,12 +820,51 @@ export async function PATCH(
             }
         }
 
+        // Log invalid action
+        try {
+            await createAuditLog(
+                'CHANGELOG_ENTRY_INVALID_ACTION',
+                user.id,
+                user.id, // Use user's own ID to avoid foreign key issues
+                {
+                    projectId,
+                    entryId,
+                    action,
+                    timestamp: new Date().toISOString()
+                }
+            );
+        } catch (auditLogError) {
+            console.error('Failed to create invalid action audit log:', auditLogError);
+        }
+
         return NextResponse.json(
             { error: 'Invalid action' },
             { status: 400 }
         );
     } catch (error) {
         console.error('Error updating changelog entry status:', error);
+
+        // Log error
+        try {
+            const { projectId, entryId } = await (async () => context.params)();
+            const user = await validateAuthAndGetUser();
+            await createAuditLog(
+                'CHANGELOG_ENTRY_ERROR',
+                user.id,
+                user.id, // Use user's own ID to avoid foreign key issues
+                {
+                    action: 'UPDATE_ENTRY_STATUS',
+                    projectId,
+                    entryId,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                    stack: error instanceof Error ? error.stack : undefined,
+                    timestamp: new Date().toISOString()
+                }
+            );
+        } catch (auditLogError) {
+            console.error('Failed to create error audit log:', auditLogError);
+        }
+
         return NextResponse.json(
             { error: 'Failed to update changelog entry status' },
             { status: 500 }
@@ -487,11 +941,100 @@ export async function DELETE(
         const user = await validateAuthAndGetUser();
         const { projectId, entryId } = await (async () => context.params)();
 
+        // Log deletion attempt
+        try {
+            await createAuditLog(
+                'DELETE_CHANGELOG_ENTRY_ATTEMPT',
+                user.id,
+                user.id, // Use user's own ID to avoid foreign key issues
+                {
+                    projectId,
+                    entryId,
+                    userRole: user.role,
+                    timestamp: new Date().toISOString()
+                }
+            );
+        } catch (auditLogError) {
+            console.error('Failed to create deletion attempt audit log:', auditLogError);
+        }
+
+        // Verify the entry exists and belongs to the project
+        const existingEntry = await db.changelogEntry.findFirst({
+            where: {
+                id: entryId,
+                changelog: {
+                    projectId
+                }
+            },
+            include: {
+                tags: true
+            }
+        });
+
+        if (!existingEntry) {
+            // Log entry not found
+            try {
+                await createAuditLog(
+                    'CHANGELOG_ENTRY_NOT_FOUND',
+                    user.id,
+                    user.id, // Use user's own ID to avoid foreign key issues
+                    {
+                        action: 'DELETE_ENTRY',
+                        projectId,
+                        entryId,
+                        timestamp: new Date().toISOString()
+                    }
+                );
+            } catch (auditLogError) {
+                console.error('Failed to create not found audit log:', auditLogError);
+            }
+
+            return NextResponse.json(
+                { error: 'Entry not found or does not belong to this project' },
+                { status: 404 }
+            );
+        }
+
         // Admin can delete directly
         if (user.role === Role.ADMIN) {
+            // Save entry details for audit log before deleting
+            const entryDetails = {
+                id: existingEntry.id,
+                title: existingEntry.title,
+                content: existingEntry.content?.substring(0, 100) + (existingEntry.content?.length > 100 ? '...' : ''),
+                version: existingEntry.version,
+                tags: existingEntry.tags.map(tag => tag.name),
+                createdAt: existingEntry.createdAt,
+                updatedAt: existingEntry.updatedAt,
+                publishedAt: existingEntry.publishedAt
+            };
+
+            // Perform the deletion
             const entry = await db.changelogEntry.delete({
                 where: { id: entryId }
             });
+
+            // Log successful deletion by admin
+            try {
+                await createAuditLog(
+                    'DELETE_CHANGELOG_ENTRY_SUCCESS',
+                    user.id,
+                    user.id, // Use user's own ID to avoid foreign key issues
+                    {
+                        projectId,
+                        entryId: entryDetails.id,
+                        entryTitle: entryDetails.title,
+                        entryVersion: entryDetails.version,
+                        entryTags: entryDetails.tags,
+                        wasPublished: !!entryDetails.publishedAt,
+                        userRole: user.role,
+                        timestamp: new Date().toISOString()
+                    }
+                );
+            } catch (auditLogError) {
+                console.error('Failed to create admin deletion success audit log:', auditLogError);
+            }
+
             return NextResponse.json(entry);
         }
 
@@ -506,6 +1049,24 @@ export async function DELETE(
             });
 
             if (existingRequest) {
+                // Log duplicate request attempt
+                try {
+                    await createAuditLog(
+                        'CHANGELOG_ENTRY_DUPLICATE_REQUEST',
+                        user.id,
+                        user.id, // Use user's own ID to avoid foreign key issues
+                        {
+                            projectId,
+                            entryId,
+                            requestType: 'DELETE_ENTRY',
+                            existingRequestId: existingRequest.id,
+                            timestamp: new Date().toISOString()
+                        }
+                    );
+                } catch (auditLogError) {
+                    console.error('Failed to create duplicate request audit log:', auditLogError);
+                }
+
                 return NextResponse.json(
                     { error: 'A deletion request for this entry is already pending' },
                     { status: 400 }
@@ -513,7 +1074,7 @@ export async function DELETE(
             }
 
             // Create deletion request
-            const request = await db.changelogRequest.create({
+            const deleteRequest = await db.changelogRequest.create({
                 data: {
                     type: 'DELETE_ENTRY',
                     staffId: user.id,
@@ -523,10 +1084,50 @@ export async function DELETE(
                 }
             });
 
+            // Log successful deletion request creation
+            try {
+                await createAuditLog(
+                    'CHANGELOG_ENTRY_DELETION_REQUEST_CREATED',
+                    user.id,
+                    user.id, // Use user's own ID to avoid foreign key issues
+                    {
+                        projectId,
+                        entryId,
+                        entryTitle: existingEntry.title,
+                        entryVersion: existingEntry.version,
+                        requestId: deleteRequest.id,
+                        userRole: user.role,
+                        timestamp: new Date().toISOString()
+                    }
+                );
+            } catch (auditLogError) {
+                console.error('Failed to create deletion request audit log:', auditLogError);
+            }
+
             return NextResponse.json({
                 message: 'Deletion request created, awaiting admin approval',
-                request
+                request: deleteRequest
             }, { status: 202 });
+        }
+
+        // Handle viewers and other roles
+        // Log permission denied
+        try {
+            await createAuditLog(
+                'CHANGELOG_ENTRY_PERMISSION_DENIED',
+                user.id,
+                user.id, // Use user's own ID to avoid foreign key issues
+                {
+                    projectId,
+                    entryId,
+                    action: 'DELETE_ENTRY',
+                    userRole: user.role,
+                    requiredRole: 'STAFF or ADMIN',
+                    timestamp: new Date().toISOString()
+                }
+            );
+        } catch (auditLogError) {
+            console.error('Failed to create permission denied audit log:', auditLogError);
         }
 
         return NextResponse.json(
@@ -535,10 +1136,31 @@ export async function DELETE(
         );
     } catch (error) {
         console.error('Error handling changelog entry deletion:', error);
+
+        // Log error
+        try {
+            const { projectId, entryId } = await (async () => context.params)();
+            const user = await validateAuthAndGetUser();
+            await createAuditLog(
+                'CHANGELOG_ENTRY_ERROR',
+                user.id,
+                user.id, // Use user's own ID to avoid foreign key issues
+                {
+                    action: 'DELETE_ENTRY',
+                    projectId,
+                    entryId,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                    stack: error instanceof Error ? error.stack : undefined,
+                    timestamp: new Date().toISOString()
+                }
+            );
+        } catch (auditLogError) {
+            console.error('Failed to create error audit log:', auditLogError);
+        }
+
         return NextResponse.json(
             { error: 'Failed to process deletion request' },
             { status: 500 }
         );
     }
 }
-

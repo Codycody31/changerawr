@@ -561,21 +561,21 @@ export default function ForgotPasswordPage() {
                                                     </>
                                                 )}
 
-                                                {isValid && !isSubmitting && (
-                                                    <span className="absolute right-0 top-0 h-full w-12 -skew-x-12 overflow-hidden flex justify-center items-center">
-                            <motion.div
-                                className="bg-white/20 h-8 w-8 rounded-full"
-                                initial={{ x: -100 }}
-                                animate={{ x: 150 }}
-                                transition={{
-                                    repeat: Infinity,
-                                    duration: 2,
-                                    ease: "easeInOut",
-                                    repeatDelay: 1
-                                }}
-                            />
-                          </span>
-                                                )}
+                          {/*                      {isValid && !isSubmitting && (*/}
+                          {/*                          <span className="absolute right-0 top-0 h-full w-12 -skew-x-12 overflow-hidden flex justify-center items-center">*/}
+                          {/*  <motion.div*/}
+                          {/*      className="bg-white/20 h-8 w-8 rounded-full"*/}
+                          {/*      initial={{ x: -100 }}*/}
+                          {/*      animate={{ x: 150 }}*/}
+                          {/*      transition={{*/}
+                          {/*          repeat: Infinity,*/}
+                          {/*          duration: 2,*/}
+                          {/*          ease: "easeInOut",*/}
+                          {/*          repeatDelay: 1*/}
+                          {/*      }}*/}
+                          {/*  />*/}
+                          {/*</span>*/}
+                          {/*                      )}*/}
                                             </Button>
                                         </motion.div>
                                     </form>

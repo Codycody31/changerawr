@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { validateAuthAndGetUser } from '@/lib/utils/changelog';
+import { createAuditLog } from '@/lib/utils/auditLog'; // Add this import
 import { db } from '@/lib/db';
 import { z } from 'zod';
 
@@ -68,6 +69,22 @@ export async function GET(request: Request) {
             orderBy: { name: 'asc' }
         });
 
+        // Log the action of viewing OAuth providers
+        try {
+            await createAuditLog(
+                'VIEW_OAUTH_PROVIDERS',
+                user.id,
+                user.id, // Use admin's ID as target to avoid foreign key issues
+                {
+                    providerCount: providers.length,
+                    includeAll: includeAll
+                }
+            );
+        } catch (auditLogError) {
+            console.error('Failed to create audit log:', auditLogError);
+            // Continue execution even if audit log creation fails
+        }
+
         return NextResponse.json({ providers });
     } catch (error) {
         console.error('Failed to fetch OAuth providers:', error);
@@ -130,12 +147,23 @@ export async function POST(request: Request) {
         // Get app URL for callback
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
+        // Track if we made another provider lose default status
+        let previousDefaultChanged = false;
+
         // If this is set as default, unset any existing default
         if (validatedData.isDefault) {
-            await db.oAuthProvider.updateMany({
+            const previousDefault = await db.oAuthProvider.findFirst({
                 where: { isDefault: true },
-                data: { isDefault: false }
+                select: { id: true, name: true }
             });
+
+            if (previousDefault) {
+                previousDefaultChanged = true;
+                await db.oAuthProvider.updateMany({
+                    where: { isDefault: true },
+                    data: { isDefault: false }
+                });
+            }
         }
 
         // Create the provider
@@ -154,6 +182,27 @@ export async function POST(request: Request) {
                 isDefault: validatedData.isDefault
             }
         });
+
+        // Create audit log for provider creation
+        try {
+            await createAuditLog(
+                'CREATE_OAUTH_PROVIDER',
+                user.id,
+                user.id, // Use admin's ID as target to avoid foreign key issues
+                {
+                    providerId: provider.id,
+                    providerName: provider.name,
+                    baseUrl: baseUrl,
+                    enabled: provider.enabled,
+                    isDefault: provider.isDefault,
+                    scopes: validatedData.scopes,
+                    previousDefaultChanged: previousDefaultChanged
+                }
+            );
+        } catch (auditLogError) {
+            console.error('Failed to create audit log:', auditLogError);
+            // Continue execution even if audit log creation fails
+        }
 
         return NextResponse.json(
             {

@@ -4,28 +4,44 @@ import React, { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
 import { useAuth } from '@/context/auth'
-import { useRouter } from 'next/navigation'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Label } from '@/components/ui/label'
-import { ArrowLeft, User, Fingerprint } from 'lucide-react'
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
-import { ErrorAlert } from '@/components/ui/error-alert'
+import Link from "next/link"
 import { useQuery } from '@tanstack/react-query'
-import Link from "next/link";
+import { motion, AnimatePresence } from 'framer-motion'
+import confetti from 'canvas-confetti'
 import {
     startAuthentication,
     browserSupportsWebAuthn,
-} from '@simplewebauthn/browser';
+} from '@simplewebauthn/browser'
+
+// UI Components
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+import { Card, CardContent, CardFooter } from '@/components/ui/card'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+
+// Icons
+import {
+    ArrowLeft,
+    User,
+    Fingerprint,
+    Eye,
+    EyeOff,
+    Loader2,
+    Lock,
+    Mail,
+    CheckCircle2
+} from 'lucide-react'
 
 const emailSchema = z.object({
     email: z.string().email('Please enter a valid email')
 })
 
 const passwordSchema = z.object({
-    password: z.string().min(8, 'Please check your password')
+    password: z.string().min(1, 'Please enter your password')
 })
 
 type EmailForm = z.infer<typeof emailSchema>
@@ -38,15 +54,15 @@ interface UserPreview {
 }
 
 interface OAuthProvider {
-    id: string;
-    name: string;
-    enabled: boolean;
-    isDefault: boolean;
+    id: string
+    name: string
+    enabled: boolean
+    isDefault: boolean
 }
 
 interface ProviderLogoProps {
-    providerName: string;
-    size?: "sm" | "md" | "lg";
+    providerName: string
+    size?: "sm" | "md" | "lg"
 }
 
 // Provider logo component that handles placeholders
@@ -56,16 +72,16 @@ const ProviderLogo: React.FC<ProviderLogoProps> = ({ providerName, size = "md" }
         sm: "w-6 h-6",
         md: "w-8 h-8",
         lg: "w-10 h-10"
-    };
+    }
 
     const iconSizes = {
         sm: 14,
         md: 18,
         lg: 20
-    };
+    }
 
     // Normalize provider name for lookup
-    const normalizedName = providerName.toLowerCase();
+    const normalizedName = providerName.toLowerCase()
 
     // Render provider logo based on the name
     if (normalizedName === 'easypanel') {
@@ -91,7 +107,7 @@ const ProviderLogo: React.FC<ProviderLogoProps> = ({ providerName, size = "md" }
                     </defs>
                 </svg>
             </div>
-        );
+        )
     } else if (normalizedName === 'github') {
         return (
             <div className={`${sizeClasses[size]} rounded-md bg-slate-900 flex items-center justify-center text-white`}>
@@ -99,7 +115,7 @@ const ProviderLogo: React.FC<ProviderLogoProps> = ({ providerName, size = "md" }
                     <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" />
                 </svg>
             </div>
-        );
+        )
     } else if (normalizedName === 'google') {
         return (
             <div className={`${sizeClasses[size]} rounded-md bg-white border flex items-center justify-center`}>
@@ -107,13 +123,13 @@ const ProviderLogo: React.FC<ProviderLogoProps> = ({ providerName, size = "md" }
                     <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z" fill="#4285F4" />
                 </svg>
             </div>
-        );
+        )
     } else if (normalizedName === 'auth0') {
         return (
             <div className={`${sizeClasses[size]} rounded-md bg-orange-50 flex items-center justify-center`}>
                 <div className={`${size === "sm" ? "w-3 h-3" : size === "md" ? "w-4 h-4" : "w-6 h-6"} rounded-full bg-orange-500`}></div>
             </div>
-        );
+        )
     } else if (normalizedName === 'okta') {
         return (
             <div className={`${sizeClasses[size]} rounded-md bg-blue-50 flex items-center justify-center text-blue-600`}>
@@ -122,7 +138,7 @@ const ProviderLogo: React.FC<ProviderLogoProps> = ({ providerName, size = "md" }
                     <circle cx="12" cy="12" r="4" />
                 </svg>
             </div>
-        );
+        )
     } else {
         // Default fallback for unknown providers
         return (
@@ -131,36 +147,99 @@ const ProviderLogo: React.FC<ProviderLogoProps> = ({ providerName, size = "md" }
                     {providerName.substring(0, 2).toUpperCase()}
                 </span>
             </div>
-        );
+        )
     }
+}
+
+// Smart confetti function from registration page
+const fireConfetti = () => {
+    const isMobile = window.innerWidth < 768;
+    const defaults = {
+        startVelocity: 30,
+        spread: 360,
+        ticks: 60,
+        zIndex: 0,
+        disableForReducedMotion: true
+    };
+
+    // Check if reduced motion is preferred
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) {
+        // Only show minimal confetti for users who prefer reduced motion
+        confetti({
+            ...defaults,
+            particleCount: 20,
+            gravity: 1,
+            origin: { y: 0.6, x: 0.5 }
+        });
+        return;
+    }
+
+    // Initial burst from the center
+    confetti({
+        ...defaults,
+        particleCount: isMobile ? 50 : 100,
+        origin: { y: 0.6, x: 0.5 }
+    });
+
+    // Create cannon effect
+    setTimeout(() => {
+        confetti({
+            ...defaults,
+            particleCount: isMobile ? 25 : 50,
+            angle: 60,
+            spread: 50,
+            origin: { x: 0, y: 0.6 }
+        });
+
+        confetti({
+            ...defaults,
+            particleCount: isMobile ? 25 : 50,
+            angle: 120,
+            spread: 50,
+            origin: { x: 1, y: 0.6 }
+        });
+    }, 250);
+
+    // Final smaller bursts
+    setTimeout(() => {
+        confetti({
+            ...defaults,
+            particleCount: isMobile ? 15 : 30,
+            angle: 90,
+            gravity: 1.2,
+            origin: { x: 0.5, y: 0.7 }
+        });
+    }, 400);
 };
 
 export default function LoginPage() {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { login, user, isLoading } = useAuth()
-    const router = useRouter()
+    const { user, isLoading: authLoading } = useAuth()
     const [error, setError] = useState('')
     const [step, setStep] = useState<'email' | 'password'>('email')
     const [userPreview, setUserPreview] = useState<UserPreview | null>(null)
     const [supportsWebAuthn, setSupportsWebAuthn] = useState(false)
     const [isAuthenticating, setIsAuthenticating] = useState(false)
+    const [showPassword, setShowPassword] = useState(false)
+    const [isSuccess, setIsSuccess] = useState(false)
+    const [redirectTo, setRedirectTo] = useState('/dashboard')
 
     // Fetch OAuth providers
     const { data: oauthProviders, isLoading: isLoadingProviders } = useQuery({
         queryKey: ['oauthProviders'],
         queryFn: async () => {
             try {
-                const response = await fetch('/api/auth/oauth/providers');
-                if (!response.ok) return [];
-                const data = await response.json();
-                return data.providers;
+                const response = await fetch('/api/auth/oauth/providers')
+                if (!response.ok) return []
+                const data = await response.json()
+                return data.providers
             } catch (error) {
-                console.error('Failed to fetch OAuth providers:', error);
-                return [];
+                console.error('Failed to fetch OAuth providers:', error)
+                return []
             }
         },
         staleTime: 60000 // 1 minute
-    });
+    })
 
     const emailForm = useForm<EmailForm>({
         resolver: zodResolver(emailSchema),
@@ -177,40 +256,59 @@ export default function LoginPage() {
     })
 
     useEffect(() => {
-        setSupportsWebAuthn(browserSupportsWebAuthn());
-    }, []);
+        setSupportsWebAuthn(browserSupportsWebAuthn())
+    }, [])
 
     useEffect(() => {
+        const searchParams = new URLSearchParams(window.location.search)
+        const redirectParam = searchParams.get('redirectTo')
+        if (redirectParam) {
+            setRedirectTo(redirectParam)
+        }
+
         const handleOAuthRedirect = async () => {
-            const searchParams = new URLSearchParams(window.location.search);
-            const oauthComplete = searchParams.get('oauth_complete');
+            const oauthComplete = searchParams.get('oauth_complete')
 
             if (oauthComplete === 'true') {
                 try {
-                    // Get redirectTo from URL or default to dashboard
-                    const redirectTo = searchParams.get('redirectTo') || '/dashboard';
-                    router.push(redirectTo);
+                    // Show success state and confetti, then redirect
+                    setIsSuccess(true)
+                    setTimeout(() => {
+                        fireConfetti()
+                    }, 300)
+
+                    // Redirect with window.location after a short delay
+                    setTimeout(() => {
+                        window.location.href = redirectTo || '/dashboard'
+                    }, 1500)
                 } catch (err) {
-                    console.error('OAuth redirect error:', err);
-                    setError('Failed to complete login');
+                    console.error('OAuth redirect error:', err)
+                    setError('Failed to complete login')
                 }
             }
-        };
+        }
 
-        if (user && !isLoading) {
-            router.push('/dashboard');
+        if (user && !authLoading) {
+            // Show success state and confetti, then redirect
+            setIsSuccess(true)
+            setTimeout(() => {
+                fireConfetti()
+            }, 300)
+
+            setTimeout(() => {
+                window.location.href = redirectTo
+            }, 1500)
         } else {
             // Check for OAuth redirects only if not already logged in
-            handleOAuthRedirect();
+            handleOAuthRedirect()
         }
 
         // Check for error in URL (typically from OAuth callback)
-        const params = new URLSearchParams(window.location.search);
-        const errorParam = params.get('error');
+        const errorParam = searchParams.get('error')
         if (errorParam) {
-            setError(decodeURIComponent(errorParam));
+            setError(decodeURIComponent(errorParam))
         }
-    }, [user, isLoading, router])
+    }, [user, authLoading, redirectTo])
 
     const onEmailSubmit = async (data: EmailForm) => {
         try {
@@ -247,30 +345,38 @@ export default function LoginPage() {
                     password: data.password
                 }),
                 credentials: 'include'
-            });
+            })
 
-            const responseData = await response.json();
+            const responseData = await response.json()
 
             // Handle 2FA requirement
             if (response.status === 403 && responseData.requiresSecondFactor) {
                 // Store the session token and redirect to 2FA page
-                sessionStorage.setItem('2faSessionToken', responseData.sessionToken);
-                sessionStorage.setItem('2faType', responseData.secondFactorType);
-                router.push('/two-factor');
-                return;
+                sessionStorage.setItem('2faSessionToken', responseData.sessionToken)
+                sessionStorage.setItem('2faType', responseData.secondFactorType)
+                window.location.href = '/two-factor'
+                return
             }
 
             if (!response.ok) {
-                throw new Error(responseData.error || 'Authentication failed');
+                throw new Error(responseData.error || 'Authentication failed')
             }
 
-            // Regular login success
-            router.push('/dashboard');
+            // Success state with confetti
+            setIsSuccess(true)
+            setTimeout(() => {
+                fireConfetti()
+            }, 300)
+
+            // Redirect with window.location
+            setTimeout(() => {
+                window.location.href = redirectTo
+            }, 1500)
         } catch (error) {
-            setError(error instanceof Error ? error.message : 'Authentication failed');
-            passwordForm.reset();
+            setError(error instanceof Error ? error.message : 'Authentication failed')
+            passwordForm.reset()
         }
-    };
+    }
 
     const handleBack = () => {
         setStep('email')
@@ -285,15 +391,16 @@ export default function LoginPage() {
         const providerNameForUrl = provider.name
             .toLowerCase()
             .replace(/\s+/g, '') // Remove all whitespace
-            .replace(/[^a-z0-9]/g, ''); // Remove any non-alphanumeric characters
+            .replace(/[^a-z0-9]/g, '') // Remove any non-alphanumeric characters
 
-        window.location.href = `/api/auth/oauth/authorize/${providerNameForUrl}?redirect=/dashboard`;
-    };
+        // Include redirectTo parameter in the OAuth URL
+        window.location.href = `/api/auth/oauth/authorize/${providerNameForUrl}?redirect=${encodeURIComponent(redirectTo)}`
+    }
 
     const handlePasskeyLogin = async () => {
         try {
-            setError('');
-            setIsAuthenticating(true);
+            setError('')
+            setIsAuthenticating(true)
 
             // Get authentication options
             const optionsResponse = await fetch('/api/auth/passkeys/authenticate/options', {
@@ -302,16 +409,16 @@ export default function LoginPage() {
                 body: JSON.stringify({
                     email: userPreview?.email || emailForm.getValues('email') || undefined
                 }),
-            });
+            })
 
             if (!optionsResponse.ok) {
-                throw new Error('Failed to get authentication options');
+                throw new Error('Failed to get authentication options')
             }
 
-            const { options, challenge } = await optionsResponse.json();
+            const { options, challenge } = await optionsResponse.json()
 
             // Start WebAuthn authentication
-            const authenticationResponse = await startAuthentication(options);
+            const authenticationResponse = await startAuthentication(options)
 
             // Verify with server
             const verifyResponse = await fetch('/api/auth/passkeys/authenticate/verify', {
@@ -321,276 +428,364 @@ export default function LoginPage() {
                     response: authenticationResponse,
                     challenge,
                 }),
-            });
+            })
 
             if (!verifyResponse.ok) {
-                const errorData = await verifyResponse.json();
-                throw new Error(errorData.error || 'Authentication failed');
+                const errorData = await verifyResponse.json()
+                throw new Error(errorData.error || 'Authentication failed')
             }
 
-            const verifyData = await verifyResponse.json();
+            const verifyData = await verifyResponse.json()
 
             // Check if 2FA is required
             if (verifyData.requiresSecondFactor) {
-                sessionStorage.setItem('2faSessionToken', verifyData.sessionToken);
-                sessionStorage.setItem('2faType', verifyData.secondFactorType);
-                router.push('/two-factor');
-                return;
+                sessionStorage.setItem('2faSessionToken', verifyData.sessionToken)
+                sessionStorage.setItem('2faType', verifyData.secondFactorType)
+                window.location.href = '/two-factor'
+                return
             }
 
-            // Success - redirect to dashboard
-            router.push('/dashboard');
-        } catch (err) {
-            console.error('Passkey login error:', err);
-            setError(err instanceof Error ? err.message : 'Failed to authenticate with passkey');
-        } finally {
-            setIsAuthenticating(false);
-        }
-    };
+            // Success state with confetti
+            setIsSuccess(true)
+            setTimeout(() => {
+                fireConfetti()
+            }, 300)
 
-    if (isLoading) {
+            // Redirect with window.location
+            setTimeout(() => {
+                window.location.href = redirectTo
+            }, 1500)
+        } catch (err) {
+            console.error('Passkey login error:', err)
+            setError(err instanceof Error ? err.message : 'Failed to authenticate with passkey')
+        } finally {
+            setIsAuthenticating(false)
+        }
+    }
+
+    const togglePasswordVisibility = () => {
+        setShowPassword(!showPassword)
+    }
+
+    if (authLoading) {
         return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="animate-pulse">Loading...</div>
+            <div className="flex flex-col items-center justify-center h-full">
+                <div className="w-14 h-14 bg-muted/30 rounded-full flex items-center justify-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+                <p className="text-muted-foreground mt-4">Loading...</p>
             </div>
         )
     }
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-background">
-            <div className="w-full max-w-sm p-8">
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5 }}
-                    className="w-full"
-                >
-                    <AnimatePresence mode="wait">
-                        {step === 'email' ? (
-                            <motion.div
-                                key="email"
-                                initial={{ opacity: 0, x: -20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: 20 }}
-                                className="space-y-6"
-                            >
-                                <div className="space-y-2 text-center">
-                                    <h1 className="text-3xl font-bold tracking-tighter">
-                                        Sign in to Changerawr
-                                    </h1>
-                                    <p className="text-gray-500">
-                                        Enter your email to get started
-                                    </p>
-                                </div>
+        <div>
+            <AnimatePresence mode="wait">
+                {isSuccess ? (
+                    <motion.div
+                        key="success"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="w-full max-w-sm mx-auto text-center"
+                    >
+                        <div className="mb-8">
+                            <div className="w-24 h-24 bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900/30 dark:to-green-800/30 rounded-full flex items-center justify-center mx-auto shadow-md">
+                                <CheckCircle2 className="h-12 w-12 text-green-600 dark:text-green-400" strokeWidth={1.5} />
+                            </div>
+                        </div>
 
-                                <form onSubmit={emailForm.handleSubmit(onEmailSubmit)} className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="email">Email address</Label>
-                                        <Input
-                                            id="email"
-                                            {...emailForm.register('email')}
-                                            type="email"
-                                            placeholder="you@example.com"
-                                            className="transition-all"
-                                            autoComplete="email"
-                                            autoFocus
-                                        />
-                                    </div>
-
-                                    <AnimatePresence>
-                                        {error && <ErrorAlert message={error} />}
-                                    </AnimatePresence>
-
-                                    <Button
-                                        type="submit"
-                                        className="w-full"
-                                        disabled={emailForm.formState.isSubmitting}
-                                    >
-                                        {emailForm.formState.isSubmitting ? (
-                                            <span className="flex items-center gap-2">
-                                                <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                                Checking...
-                                            </span>
-                                        ) : (
-                                            'Continue'
-                                        )}
-                                    </Button>
-                                </form>
-
-                                {/* Auth Options */}
-                                {(supportsWebAuthn || (!isLoadingProviders && oauthProviders && oauthProviders.length > 0)) && (
-                                    <>
-                                        <div className="relative">
-                                            <div className="absolute inset-0 flex items-center">
-                                                <span className="w-full border-t" />
+                        <div>
+                            <h2 className="text-2xl font-bold mb-2">Login Successful</h2>
+                            <p className="text-muted-foreground mb-6">
+                                You&apos;ve signed in successfully. Redirecting you now...
+                            </p>
+                        </div>
+                    </motion.div>
+                ) : (
+                    <div className="w-full max-w-sm mx-auto">
+                        <Card className="w-full shadow-lg border-t-4 border-t-primary">
+                            <CardContent className="pt-6">
+                                <AnimatePresence mode="wait">
+                                    {step === 'email' ? (
+                                        <motion.div
+                                            key="email"
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            exit={{ opacity: 0 }}
+                                            className="space-y-6"
+                                        >
+                                            <div className="text-center space-y-2">
+                                                <h1 className="text-2xl font-bold">Sign in to Changerawr</h1>
+                                                <p className="text-sm text-muted-foreground">
+                                                    Enter your email to get started
+                                                </p>
                                             </div>
-                                            <div className="relative flex justify-center text-xs uppercase">
-                                                <span className="bg-background px-2 text-muted-foreground">
-                                                    Or continue with
-                                                </span>
-                                            </div>
-                                        </div>
 
-                                        <div className="flex flex-col gap-2">
-                                            {/* Passkey Button */}
-                                            {supportsWebAuthn && (
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    className="w-full"
-                                                    onClick={handlePasskeyLogin}
-                                                    disabled={isAuthenticating}
-                                                >
-                                                    {isAuthenticating ? (
-                                                        <span className="flex items-center gap-2">
-                                                            <span className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                                                            Authenticating...
-                                                        </span>
-                                                    ) : (
-                                                        <>
-                                                            <Fingerprint className="mr-2 h-4 w-4" />
-                                                            Sign in with Passkey
-                                                        </>
-                                                    )}
-                                                </Button>
+                                            {error && (
+                                                <Alert variant="destructive">
+                                                    <AlertDescription>{error}</AlertDescription>
+                                                </Alert>
                                             )}
 
-                                            {/* OAuth Provider Buttons */}
-                                            {!isLoadingProviders && oauthProviders && oauthProviders.map((provider: OAuthProvider) => (
-                                                <Button
-                                                    key={provider.id}
-                                                    variant="outline"
-                                                    type="button"
-                                                    className="w-full relative pl-10"
-                                                    onClick={() => handleOAuthLogin(provider)}
-                                                >
-                                                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2">
-                                                        <ProviderLogo providerName={provider.name} size="md" />
-                                                    </span>
-                                                    Continue with {provider.name}
-                                                </Button>
-                                            ))}
-                                        </div>
-                                    </>
-                                )}
-                            </motion.div>
-                        ) : (
-                            <motion.div
-                                key="password"
-                                initial={{ opacity: 0, x: -20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: 20 }}
-                                className="space-y-6"
-                            >
-                                <Button
-                                    variant="ghost"
-                                    className="p-0 h-auto text-gray-500 hover:text-gray-900"
-                                    onClick={handleBack}
-                                >
-                                    <ArrowLeft size={16} className="mr-2" />
-                                    Back
-                                </Button>
-
-                                <div className="flex flex-col items-center space-y-4">
-                                    <Avatar className="h-20 w-20 rounded-lg">
-                                        <AvatarImage
-                                            src={userPreview?.avatarUrl}
-                                            alt={userPreview?.name || "User avatar"}
-                                        />
-                                        <AvatarFallback className="rounded-lg">
-                                            <User className="h-10 w-10" />
-                                        </AvatarFallback>
-                                    </Avatar>
-                                    <div className="space-y-1 text-center">
-                                        <h2 className="text-xl font-semibold">
-                                            Welcome back{userPreview?.name ? `, ${userPreview.name}` : ''}
-                                        </h2>
-                                        <p className="text-sm text-gray-500">{userPreview?.email}</p>
-                                    </div>
-                                </div>
-
-                                <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-4">
-                                    <div className="space-y-2">
-                                        <div className="flex items-center justify-between">
-                                            <Label htmlFor="password">Password</Label>
-                                            <Link
-                                                href="/forgot-password"
-                                                className="text-sm font-medium text-primary hover:underline"
-                                            >
-                                                Forgot password?
-                                            </Link>
-                                        </div>
-                                        <Input
-                                            id="password"
-                                            {...passwordForm.register('password')}
-                                            type="password"
-                                            placeholder="••••••••"
-                                            className="transition-all"
-                                            autoComplete="current-password"
-                                            autoFocus
-                                        />
-                                    </div>
-
-                                    <AnimatePresence>
-                                        {error && <ErrorAlert message={error} />}
-                                    </AnimatePresence>
-
-                                    <Button
-                                        type="submit"
-                                        className="w-full"
-                                        disabled={passwordForm.formState.isSubmitting}
-                                    >
-                                        {passwordForm.formState.isSubmitting ? (
-                                            <span className="flex items-center gap-2">
-                                                <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                                Signing in...
-                                            </span>
-                                        ) : (
-                                            'Sign in'
-                                        )}
-                                    </Button>
-
-                                    {/* Show passkey option in password step too */}
-                                    {supportsWebAuthn && (
-                                        <>
-                                            <div className="relative">
-                                                <div className="absolute inset-0 flex items-center">
-                                                    <span className="w-full border-t" />
+                                            <form onSubmit={emailForm.handleSubmit(onEmailSubmit)} className="space-y-4">
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="email">Email address</Label>
+                                                    <div className="relative">
+                                                        <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                        <Input
+                                                            id="email"
+                                                            {...emailForm.register('email')}
+                                                            type="email"
+                                                            placeholder="you@example.com"
+                                                            className="h-11 pl-10"
+                                                            autoComplete="email"
+                                                            autoFocus
+                                                        />
+                                                    </div>
+                                                    {emailForm.formState.errors.email && (
+                                                        <p className="text-sm text-destructive mt-1">
+                                                            {emailForm.formState.errors.email.message}
+                                                        </p>
+                                                    )}
                                                 </div>
-                                                <div className="relative flex justify-center text-xs uppercase">
-                                                    <span className="bg-background px-2 text-muted-foreground">
-                                                        Or
-                                                    </span>
+
+                                                <Button
+                                                    type="submit"
+                                                    className="w-full h-11"
+                                                    disabled={emailForm.formState.isSubmitting}
+                                                >
+                                                    {emailForm.formState.isSubmitting ? (
+                                                        <span className="flex items-center gap-2">
+                                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                                            Checking...
+                                                        </span>
+                                                    ) : (
+                                                        'Continue'
+                                                    )}
+                                                </Button>
+                                            </form>
+
+                                            {/* Auth Options */}
+                                            {(supportsWebAuthn || (!isLoadingProviders && oauthProviders && oauthProviders.length > 0)) && (
+                                                <div>
+                                                    <div className="relative my-6">
+                                                        <div className="absolute inset-0 flex items-center">
+                                                            <span className="w-full border-t" />
+                                                        </div>
+                                                        <div className="relative flex justify-center text-xs uppercase">
+                                                            <span className="bg-background px-2 text-muted-foreground">
+                                                                Or continue with
+                                                            </span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex flex-col gap-3 mt-6">
+                                                        {/* Passkey Button */}
+                                                        {supportsWebAuthn && (
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                className="w-full h-11"
+                                                                onClick={handlePasskeyLogin}
+                                                                disabled={isAuthenticating}
+                                                            >
+                                                                {isAuthenticating ? (
+                                                                    <span className="flex items-center gap-2">
+                                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                                        Authenticating...
+                                                                    </span>
+                                                                ) : (
+                                                                    <>
+                                                                        <Fingerprint className="mr-2 h-4 w-4" />
+                                                                        Sign in with Passkey
+                                                                    </>
+                                                                )}
+                                                            </Button>
+                                                        )}
+
+                                                        {/* OAuth Provider Buttons */}
+                                                        {!isLoadingProviders && oauthProviders && oauthProviders.map((provider: OAuthProvider) => (
+                                                            <Button
+                                                                key={provider.id}
+                                                                variant="outline"
+                                                                type="button"
+                                                                className="w-full h-11 relative pl-10"
+                                                                onClick={() => handleOAuthLogin(provider)}
+                                                            >
+                                                                <span className="absolute left-3 top-1/2 transform -translate-y-1/2">
+                                                                    <ProviderLogo providerName={provider.name} size="sm" />
+                                                                </span>
+                                                                <span>Continue with {provider.name}</span>
+                                                            </Button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </motion.div>
+                                    ) : (
+                                        <motion.div
+                                            key="password"
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            exit={{ opacity: 0 }}
+                                            className="space-y-6"
+                                        >
+                                            <Button
+                                                variant="ghost"
+                                                className="p-0 h-auto text-muted-foreground hover:text-foreground mb-2"
+                                                onClick={handleBack}
+                                            >
+                                                <ArrowLeft size={16} className="mr-2" />
+                                                Back
+                                            </Button>
+
+                                            <div className="flex flex-col items-center space-y-4">
+                                                <Avatar className="h-20 w-20 bg-gradient-to-br from-primary/20 to-primary/5 rounded-lg shadow-sm">
+                                                    <AvatarImage
+                                                        src={userPreview?.avatarUrl}
+                                                        alt={userPreview?.name || "User avatar"}
+                                                    />
+                                                    <AvatarFallback className="rounded-lg">
+                                                        <User className="h-10 w-10 text-primary" />
+                                                    </AvatarFallback>
+                                                </Avatar>
+                                                <div className="space-y-1 text-center">
+                                                    <h2 className="text-xl font-semibold">
+                                                        Welcome back{userPreview?.name ? `, ${userPreview.name}` : ''}
+                                                    </h2>
+                                                    <p className="text-sm text-muted-foreground">{userPreview?.email}</p>
                                                 </div>
                                             </div>
 
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                className="w-full"
-                                                onClick={handlePasskeyLogin}
-                                                disabled={isAuthenticating}
-                                            >
-                                                {isAuthenticating ? (
-                                                    <span className="flex items-center gap-2">
-                                                        <span className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                                                        Authenticating...
-                                                    </span>
-                                                ) : (
-                                                    <>
-                                                        <Fingerprint className="mr-2 h-4 w-4" />
-                                                        Use Passkey Instead
-                                                    </>
-                                                )}
-                                            </Button>
-                                        </>
+                                            {error && (
+                                                <Alert variant="destructive">
+                                                    <AlertDescription>{error}</AlertDescription>
+                                                </Alert>
+                                            )}
+
+                                            <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-4">
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center justify-between">
+                                                        <Label htmlFor="password">Password</Label>
+                                                        <Link
+                                                            href="/forgot-password"
+                                                            className="text-xs font-medium text-primary hover:underline"
+                                                        >
+                                                            Forgot password?
+                                                        </Link>
+                                                    </div>
+                                                    <div className="relative">
+                                                        <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                        <Input
+                                                            id="password"
+                                                            {...passwordForm.register('password')}
+                                                            type={showPassword ? 'text' : 'password'}
+                                                            placeholder="••••••••"
+                                                            className="h-11 pl-10 pr-10"
+                                                            autoComplete="current-password"
+                                                            autoFocus
+                                                        />
+                                                        <Button
+                                                            type="button" variant="ghost"
+                                                            size="sm"
+                                                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                                                            onClick={togglePasswordVisibility}
+                                                        >
+                                                            {showPassword ? (
+                                                                <EyeOff className="h-4 w-4 text-muted-foreground" />
+                                                            ) : (
+                                                                <Eye className="h-4 w-4 text-muted-foreground" />
+                                                            )}
+                                                        </Button>
+                                                    </div>
+                                                    {passwordForm.formState.errors.password && (
+                                                        <p className="text-sm text-destructive mt-1">
+                                                            {passwordForm.formState.errors.password.message}
+                                                        </p>
+                                                    )}
+                                                </div>
+
+                                                <Button
+                                                    type="submit"
+                                                    className="w-full h-11"
+                                                    disabled={passwordForm.formState.isSubmitting}
+                                                >
+                                                    {passwordForm.formState.isSubmitting ? (
+                                                        <span className="flex items-center gap-2">
+                                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                                            Signing in...
+                                                        </span>
+                                                    ) : (
+                                                        'Sign in'
+                                                    )}
+                                                </Button>
+                                            </form>
+
+                                            {/* Show passkey option in password step too */}
+                                            {supportsWebAuthn && (
+                                                <div>
+                                                    <div className="relative my-6">
+                                                        <div className="absolute inset-0 flex items-center">
+                                                            <span className="w-full border-t" />
+                                                        </div>
+                                                        <div className="relative flex justify-center text-xs uppercase">
+                                                            <span className="bg-background px-2 text-muted-foreground">
+                                                                Or
+                                                            </span>
+                                                        </div>
+                                                    </div>
+
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        className="w-full h-11"
+                                                        onClick={handlePasskeyLogin}
+                                                        disabled={isAuthenticating}
+                                                    >
+                                                        {isAuthenticating ? (
+                                                            <span className="flex items-center gap-2">
+                                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                                Authenticating...
+                                                            </span>
+                                                        ) : (
+                                                            <>
+                                                                <Fingerprint className="mr-2 h-4 w-4" />
+                                                                Use Passkey Instead
+                                                            </>
+                                                        )}
+                                                    </Button>
+                                                </div>
+                                            )}
+                                        </motion.div>
                                     )}
-                                </form>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                </motion.div>
-            </div>
+                                </AnimatePresence>
+                            </CardContent>
+
+                            <CardFooter className="pb-6 flex justify-center">
+                                {step === 'email' && (
+                                    <div className="text-center">
+                                        <p className="text-sm text-muted-foreground">
+                                            Don&apos;t have an account?{' '}
+                                            <TooltipProvider>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <Button variant="link" className="p-0 h-auto text-primary" onClick={() => setError("Contact your administrator for an invitation to join.")}>
+                                                            Request access
+                                                        </Button>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        <p className="max-w-xs">You need an invitation to create an account</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                        </p>
+                                    </div>
+                                )}
+                            </CardFooter>
+                        </Card>
+                    </div>
+                )}
+            </AnimatePresence>
         </div>
     )
 }

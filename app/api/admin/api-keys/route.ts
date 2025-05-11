@@ -177,9 +177,10 @@ export async function POST(request: Request) {
         try {
             await createAuditLog(
                 'CREATE_API_KEY',
-                user.id,
-                apiKey.id,
+                user.id,    // performedById - the admin user creating the key
+                user.id,    // targetUserId - use the user's ID instead of the API key ID
                 {
+                    apiKeyId: apiKey.id,    // Include the API key ID in the details instead
                     apiKeyName: apiKey.name,
                     expiresAt: apiKey.expiresAt?.toISOString() || 'N/A',
                     permissions: apiKey.permissions || []
