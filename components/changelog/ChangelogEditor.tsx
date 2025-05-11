@@ -3,11 +3,11 @@ import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { MarkdownEditor } from '@/components/MarkdownEditor';
+import MarkdownEditor from '@/components/markdown-editor/MarkdownEditor';
 import { useDebounce } from 'use-debounce';
 import { toast } from "@/hooks/use-toast";
-// Import the original component
 import EditorHeader from '@/components/changelog/editor/EditorHeader';
+import { Loader2 } from 'lucide-react';
 
 // Create a wrapper component to extend functionality
 const EnhancedEditorHeader: React.FC<React.ComponentProps<typeof EditorHeader> & {
@@ -105,13 +105,15 @@ interface TagsResponse {
     };
 }
 
+interface AISystemSettings {
+    enableAIAssistant: boolean;
+    aiApiKey: string | null;
+}
+
 // Constants for pagination and caching
 const ITEMS_PER_PAGE = 20;
 const CACHE_TIME = 1000 * 60 * 5; // 5 minutes
 const DEBOUNCE_TIME = 1000; // 1 second
-
-// Import or extend the EditorHeader props instead of redefining them
-// The actual component likely doesn't have the onLoadMoreTags prop in its interface
 
 export function ChangelogEditor({
                                     projectId,
@@ -138,8 +140,36 @@ export function ChangelogEditor({
     const saveFailedRef = useRef(false);
     const isAutoSavingRef = useRef(false);
 
+    // Track last saved date
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const [lastSavedTime, setLastSavedTime] = useState<Date | null>(null);
+
     // Debounced state for autosave
     const [debouncedState] = useDebounce(editorState, DEBOUNCE_TIME);
+
+    // Fetch AI system settings - important to fetch this first before rendering the editor
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { data: aiSystemSettings, isLoading: isAISettingsLoading, error: aiSettingsError } = useQuery<AISystemSettings>({
+        queryKey: ['ai-system-settings'],
+        queryFn: async () => {
+            // Using the correct API route path
+            const response = await fetch('/api/ai/settings');
+            if (!response.ok) {
+                console.error('Failed to fetch AI settings:', response.statusText);
+                return { enableAIAssistant: false, aiApiKey: null };
+            }
+
+            const data = await response.json();
+
+            return data;
+        },
+        staleTime: CACHE_TIME,
+        retry: 1,
+    });
+
+    // Get Secton API key from system settings
+    const aiEnabled = aiSystemSettings?.enableAIAssistant || false;
+    const sectonApiKey = aiSystemSettings?.aiApiKey || '';
 
     // Optimized data fetching with react-query
     const { data: initialData, isLoading: isInitialDataLoading } = useQuery({
@@ -176,7 +206,7 @@ export function ChangelogEditor({
             return lastPage.pagination.hasMore ? lastPage.pagination.page + 1 : undefined;
         },
         staleTime: CACHE_TIME,
-        initialPageParam: 0, // Add this to fix the missing initialPageParam error
+        initialPageParam: 0,
     });
 
     // Memoized tags processing
@@ -259,7 +289,7 @@ export function ChangelogEditor({
             const tagData = data.tags.map(tag =>
                 tag.id.startsWith('default-')
                     ? { name: tag.name }
-                    : { id: tag.id }  // Direct id property
+                    : { id: tag.id }
             );
 
             const response = await fetch(url, {
@@ -343,6 +373,7 @@ export function ChangelogEditor({
 
             saveFailedRef.current = false;
             lastSavedStateRef.current = currentState;
+            setLastSavedTime(new Date());
 
             setEditorState(prev => ({
                 ...prev,
@@ -369,6 +400,28 @@ export function ChangelogEditor({
         }
     }, [editorState, entryId, projectId, router, saveEntry]);
 
+    // Export handler for MarkdownEditor
+    const handleExport = useCallback(() => {
+        if (!editorState.content) return;
+
+        // Create a temporary anchor element
+        const element = document.createElement('a');
+        const file = new Blob([editorState.content], {type: 'text/markdown'});
+        element.href = URL.createObjectURL(file);
+
+        // Generate filename from title or use default
+        const safeTitle = editorState.title
+            ? editorState.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()
+            : 'changelog_entry';
+        const version = editorState.version ? `_v${editorState.version}` : '';
+        const timestamp = new Date().toISOString().slice(0, 10);
+
+        element.download = `${safeTitle}${version}_${timestamp}.md`;
+        document.body.appendChild(element);
+        element.click();
+        document.body.removeChild(element);
+    }, [editorState.content, editorState.title, editorState.version]);
+
     // Autosave effect
     useEffect(() => {
         if (saveFailedRef.current || !debouncedState.hasUnsavedChanges) return;
@@ -389,7 +442,10 @@ export function ChangelogEditor({
         return () => clearTimeout(timeoutId);
     }, [debouncedState, handleSave]);
 
-    if (isInitialDataLoading || isTagsLoading) {
+    // Check if we're still loading any data
+    const isLoading = isInitialDataLoading || isTagsLoading || isAISettingsLoading;
+
+    if (isLoading) {
         return <div className="flex items-center justify-center min-h-screen">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>;
@@ -433,23 +489,44 @@ export function ChangelogEditor({
                     </CardContent>
                 </Card>
 
-                <MarkdownEditor
-                    key={entryId || 'new'}
-                    initialValue={editorState.content}
-                    onChange={handleContentChange}
-                    placeholder="Write your changelog entry in Markdown..."
-                    className="min-h-[500px]"
-                    features={{
-                        headings: true,
-                        bold: true,
-                        italic: true,
-                        lists: true,
-                        links: true,
-                        code: true,
-                        blockquotes: true,
-                        tables: true
-                    }}
-                />
+                {/* Debug info - leave disabled! */}
+                {/*<div className="mb-4">*/}
+                {/*    <Alert variant="default">*/}
+                {/*        <AlertDescription>*/}
+                {/*            <div className="text-sm">*/}
+                {/*                <strong>AI Settings:</strong> {isAISettingsLoading ? 'Loading...' : (*/}
+                {/*                aiSettingsError ? 'Error loading settings' : (*/}
+                {/*                    <span>*/}
+                {/*                            AI Enabled: {aiEnabled ? 'Yes' : 'No'} |*/}
+                {/*                            API Key: {sectonApiKey ? 'Present' : 'Missing'}*/}
+                {/*                        </span>*/}
+                {/*                )*/}
+                {/*            )}*/}
+                {/*            </div>*/}
+                {/*        </AlertDescription>*/}
+                {/*    </Alert>*/}
+                {/*</div>*/}
+
+                {/* Only render MarkdownEditor once AI settings are loaded */}
+                {!isAISettingsLoading ? (
+                    <MarkdownEditor
+                        key={entryId || 'new'}
+                        initialValue={editorState.content}
+                        onChange={handleContentChange}
+                        onSave={handleSave}
+                        onExport={handleExport}
+                        placeholder="What's been changed today?"
+                        className="min-h-[500px]"
+                        enableAI={aiEnabled && !!sectonApiKey}
+                        aiApiKey={sectonApiKey}
+                        autoFocus={isNewChangelog}
+                    />
+                ) : (
+                    <div className="flex items-center justify-center p-12 border rounded-md bg-muted/10">
+                        <Loader2 className="w-6 h-6 mr-2 animate-spin" />
+                        <span>Loading editor...</span>
+                    </div>
+                )}
             </div>
         </div>
     );

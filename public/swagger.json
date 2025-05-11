@@ -2,7 +2,7 @@
   "openapi": "3.0.0",
   "info": {
     "title": "Changerawr API Documentation",
-    "version": "1.0.0",
+    "version": "0.2.8",
     "description": "The official documentation for the Changerawr API. rawr"
   },
   "servers": [
@@ -32,173 +32,26 @@
         "description": "or updates a subscription for a user to receive email notifications for a project"
       }
     },
+    "/api/subscribe": {
+      "post": {
+        "tags": [
+          "Subscribe"
+        ],
+        "summary": "",
+        "responses": {},
+        "security": [],
+        "description": "a subscription for a user to receive email notifications for changelog updates"
+      }
+    },
     "/api/setup": {
       "get": {
         "tags": [
           "Setup"
         ],
         "summary": "",
-        "responses": {
-          "405": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string",
-                      "example": "Method not allowed"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
+        "responses": {},
         "security": [],
-        "description": "not allowed - Setup endpoint only accepts POST requests"
-      },
-      "post": {
-        "tags": [
-          "Setup"
-        ],
-        "summary": "",
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "type": "string",
-                      "example": "Setup completed successfully"
-                    },
-                    "user": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "email": {
-                          "type": "string"
-                        },
-                        "name": {
-                          "type": "string"
-                        },
-                        "role": {
-                          "type": "string"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation failed - Invalid input data",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Setup already completed - Cannot run setup more than once",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "An unexpected error occurred during setup",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [],
-        "description": "the first admin user in the system",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "description": ""
-              }
-            }
-          }
-        }
+        "description": "current setup progress"
       }
     },
     "/api/projects": {
@@ -441,7 +294,21 @@
                   "properties": {
                     "isComplete": {
                       "type": "boolean",
-                      "description": "Indicates whether the setup has been completed (true if at least one user exists)"
+                      "description": "Indicates whether the setup has been completed"
+                    },
+                    "setupState": {
+                      "type": "object",
+                      "properties": {
+                        "adminCreated": {
+                          "type": "boolean"
+                        },
+                        "systemConfigured": {
+                          "type": "boolean"
+                        },
+                        "oauthConfigured": {
+                          "type": "boolean"
+                        }
+                      }
                     }
                   }
                 }
@@ -479,7 +346,7 @@
           }
         },
         "security": [],
-        "description": "if the initial setup has been completed by verifying if any users exist in the database"
+        "description": "if the initial setup has been completed and provides setup state information"
       }
     },
     "/api/setup/settings": {
@@ -625,113 +492,6 @@
         },
         "security": [],
         "description": "up the initial system configuration. This endpoint can only be called once, before any system settings are configured.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "description": ""
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/setup/oauth": {
-      "post": {
-        "tags": [
-          "Setup"
-        ],
-        "summary": "",
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "provider": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "name": {
-                          "type": "string"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation failed - Invalid input data",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "An unexpected error occurred",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [],
-        "description": "up an OAuth provider during initial system setup",
         "requestBody": {
           "required": true,
           "content": {
@@ -901,6 +661,113 @@
         },
         "security": [],
         "description": "a new admin user for the application",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": ""
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/setup/oauth": {
+      "post": {
+        "tags": [
+          "Setup"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "provider": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed - Invalid input data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "An unexpected error occurred",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "description": "up an OAuth provider during initial system setup",
         "requestBody": {
           "required": true,
           "content": {
@@ -1728,6 +1595,9 @@
                     },
                     "name": {
                       "type": "string"
+                    },
+                    "enableNotifications": {
+                      "type": "boolean"
                     }
                   }
                 }
@@ -1824,6 +1694,9 @@
                     },
                     "name": {
                       "type": "string"
+                    },
+                    "enableNotifications": {
+                      "type": "boolean"
                     }
                   }
                 }
@@ -2608,6 +2481,31 @@
               }
             }
           },
+          "403": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "requiresSecondFactor": {
+                      "type": "boolean"
+                    },
+                    "secondFactorType": {
+                      "type": "string",
+                      "enum": [
+                        "passkey",
+                        "password"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "500": {
             "description": "An unexpected error occurred during login",
             "content": {
@@ -2651,6 +2549,234 @@
             }
           }
         }
+      }
+    },
+    "/api/auth/forgot-password": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\", \"example\": \"Invalid email format\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Invalid email format"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\", \"example\": \"Failed to initiate password reset\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Failed to initiate password reset"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "description": "the password reset process by sending a reset email",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": ""
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/change-password": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input - Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid current password",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "An unexpected error occurred while changing the password",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "description": "the password for a logged-in user",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": ""
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/settings": {
+      "get": {
+        "tags": [
+          "Ai"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "enableAIAssistant": {
+                      "type": "boolean"
+                    },
+                    "aiApiKey": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "description": "the system AI settings including the API key for the editor"
       }
     },
     "/api/admin/users": {
@@ -2860,6 +2986,136 @@
         },
         "security": [],
         "description": "an invitation link for user registration. Only admins have access to this endpoint."
+      }
+    },
+    "/api/admin/dashboard": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "userCount": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "number"
+                        },
+                        "admins": {
+                          "type": "number"
+                        },
+                        "staff": {
+                          "type": "number"
+                        }
+                      }
+                    },
+                    "invitations": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "number"
+                        },
+                        "pending": {
+                          "type": "number"
+                        }
+                      }
+                    },
+                    "changelog": {
+                      "type": "object",
+                      "properties": {
+                        "totalEntries": {
+                          "type": "number"
+                        },
+                        "entriesThisMonth": {
+                          "type": "number"
+                        }
+                      }
+                    },
+                    "systemHealth": {
+                      "type": "object",
+                      "properties": {
+                        "databaseConnected": {
+                          "type": "boolean"
+                        },
+                        "lastDataSync": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized - User does not have 'ADMIN' role",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "An unexpected error occurred while fetching dashboard data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "description": "that the authenticated user has 'ADMIN' role"
       }
     },
     "/api/admin/config": {
@@ -3094,136 +3350,6 @@
         }
       }
     },
-    "/api/admin/dashboard": {
-      "get": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "",
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "userCount": {
-                      "type": "object",
-                      "properties": {
-                        "total": {
-                          "type": "number"
-                        },
-                        "admins": {
-                          "type": "number"
-                        },
-                        "staff": {
-                          "type": "number"
-                        }
-                      }
-                    },
-                    "invitations": {
-                      "type": "object",
-                      "properties": {
-                        "total": {
-                          "type": "number"
-                        },
-                        "pending": {
-                          "type": "number"
-                        }
-                      }
-                    },
-                    "changelog": {
-                      "type": "object",
-                      "properties": {
-                        "totalEntries": {
-                          "type": "number"
-                        },
-                        "entriesThisMonth": {
-                          "type": "number"
-                        }
-                      }
-                    },
-                    "systemHealth": {
-                      "type": "object",
-                      "properties": {
-                        "databaseConnected": {
-                          "type": "boolean"
-                        },
-                        "lastDataSync": {
-                          "type": "string",
-                          "format": "date-time"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Unauthorized - User does not have 'ADMIN' role",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "An unexpected error occurred while fetching dashboard data",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [],
-        "description": "that the authenticated user has 'ADMIN' role"
-      }
-    },
     "/api/admin/audit-logs": {
       "get": {
         "tags": [
@@ -3292,6 +3418,9 @@
                     },
                     "pages": {
                       "type": "number"
+                    },
+                    "nextCursor": {
+                      "type": "string"
                     }
                   }
                 }
@@ -3358,7 +3487,7 @@
           }
         },
         "security": [],
-        "description": "audit logs based on filters and pagination"
+        "description": "audit logs based on filters and pagination or chunking"
       }
     },
     "/api/admin/api-keys": {
@@ -3653,15 +3782,229 @@
         }
       }
     },
-    "/api/subscribers/unsubscribe/{token}": {
+    "/api/admin/ai-settings": {
       "get": {
         "tags": [
-          "Subscribers"
+          "Admin"
         ],
         "summary": "",
-        "responses": {},
-        "security": [],
-        "description": "one-click unsubscribe via token"
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "enableAIAssistant": {
+                      "type": "boolean"
+                    },
+                    "aiApiKey": {
+                      "type": "boolean"
+                    },
+                    "aiDefaultModel": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - You must be logged in as an admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - Insufficient permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "description": "the current AI assistant settings"
+      },
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request - Invalid request body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - You must be logged in as an admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - Insufficient permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "description": "AI assistant settings",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": ""
+              }
+            }
+          }
+        }
       }
     },
     "/api/projects/{projectId}/versions": {
@@ -5167,6 +5510,212 @@
         }
       }
     },
+    "/api/auth/reset-password/{token}": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "valid": {
+                      "type": "boolean"
+                    },
+                    "email": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"valid\": { \"type\": \"boolean\", \"example\": false }, \"message\": { \"type\": \"string\", \"example\": \"Invalid or expired reset token\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "valid": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Invalid or expired reset token"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "description": "a password reset token"
+      },
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "description": "a user's password using a valid token",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": ""
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/reset-password/request": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - User not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "An unexpected error occurred while initiating password reset",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "description": "a password reset for the currently logged-in user"
+      }
+    },
     "/api/auth/oauth/providers": {
       "get": {
         "tags": [
@@ -5331,92 +5880,7 @@
       }
     },
     "/api/admin/users/{userId}": {
-      "get": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "",
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "description": "{ \"type\": \"object\", \"properties\": { \"id\": { \"type\": \"string\" }, \"email\": { \"type\": \"string\" }, \"name\": { \"type\": \"string\" }, \"role\": { \"type\": \"string\" }, \"createdAt\": { \"type\": \"string\", \"format\": \"date-time\" }, \"lastLoginAt\": { \"type\": \"string\", \"format\": \"date-time\" }, } }"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\", \"example\": \"Invalid request\" } } }",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string",
-                      "example": "Invalid request"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\", \"example\": \"Forbidden\" } } }",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string",
-                      "example": "Forbidden"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\", \"example\": \"User not found\" } } }",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string",
-                      "example": "User not found"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\", \"example\": \"Internal server error\" } } }",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string",
-                      "example": "Internal server error"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [],
-        "description": "the user details for the given user ID. Only admins can view user details."
-      },
-      "delete": {
+      "patch": {
         "tags": [
           "Admin"
         ],
@@ -5430,8 +5894,32 @@
                   "type": "object",
                   "properties": {
                     "message": {
-                      "type": "string",
-                      "example": "User deleted successfully"
+                      "type": "string"
+                    },
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "role": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "lastLoginAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
                     }
                   }
                 }
@@ -5439,15 +5927,28 @@
             }
           },
           "400": {
-            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\", \"example\": \"Invalid request\" } } }",
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" }, \"details\": { \"type\": \"array\", \"items\": { \"type\": \"object\", \"properties\": { \"message\": { \"type\": \"string\" }, \"path\": { \"type\": \"string\" } } } } } }",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "error": {
-                      "type": "string",
-                      "example": "Invalid request"
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "message": {
+                            "type": "string"
+                          },
+                          "path": {
+                            "type": "string"
+                          }
+                        }
+                      }
                     }
                   }
                 }
@@ -5455,31 +5956,14 @@
             }
           },
           "403": {
-            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\", \"example\": \"Forbidden\" } } }",
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "error": {
-                      "type": "string",
-                      "example": "Forbidden"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\", \"example\": \"User not found\" } } }",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string",
-                      "example": "User not found"
+                      "type": "string"
                     }
                   }
                 }
@@ -5487,15 +5971,14 @@
             }
           },
           "500": {
-            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\", \"example\": \"Internal server error\" } } }",
+            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\" } } }",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "error": {
-                      "type": "string",
-                      "example": "Internal server error"
+                      "type": "string"
                     }
                   }
                 }
@@ -5504,92 +5987,7 @@
           }
         },
         "security": [],
-        "description": "the user with the given user ID. Only admins can delete users."
-      },
-      "patch": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "",
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "description": "{ \"type\": \"object\", \"properties\": { \"id\": { \"type\": \"string\" }, \"email\": { \"type\": \"string\" }, \"name\": { \"type\": \"string\" }, \"role\": { \"type\": \"string\" }, \"createdAt\": { \"type\": \"string\", \"format\": \"date-time\" }, \"lastLoginAt\": { \"type\": \"string\", \"format\": \"date-time\" }, } }"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\", \"example\": \"Invalid request\" } } }",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string",
-                      "example": "Invalid request"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\", \"example\": \"Forbidden\" } } }",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string",
-                      "example": "Forbidden"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\", \"example\": \"User not found\" } } }",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string",
-                      "example": "User not found"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "{ \"type\": \"object\", \"properties\": { \"error\": { \"type\": \"string\", \"example\": \"Internal server error\" } } }",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string",
-                      "example": "Internal server error"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [],
-        "description": "the user details for the given user ID. Only admins can update user details."
+        "description": "a user's role to either 'ADMIN' or 'STAFF'. Only admins can perform this action. Requires user authentication."
       }
     },
     "/api/admin/users/invitations": {
@@ -5939,6 +6337,358 @@
         }
       }
     },
+    "/api/admin/config/system-email": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "enablePasswordReset": {
+                      "type": "boolean"
+                    },
+                    "smtpHost": {
+                      "type": "string"
+                    },
+                    "smtpPort": {
+                      "type": "number"
+                    },
+                    "smtpUser": {
+                      "type": "string"
+                    },
+                    "smtpSecure": {
+                      "type": "boolean"
+                    },
+                    "systemEmail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized - User does not have 'ADMIN' role",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "An unexpected error occurred while fetching system email configuration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "description": "the system email configuration"
+      },
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input - Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized - User does not have 'ADMIN' role",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "An unexpected error occurred while updating system email configuration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "description": "the system email configuration",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": ""
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input - Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized - User does not have 'ADMIN' role",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "An unexpected error occurred while testing system email configuration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "description": "the system email configuration by sending a test email",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": ""
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/api-keys/{keyId}": {
       "get": {
         "tags": [
@@ -6242,6 +6992,158 @@
             }
           }
         }
+      }
+    },
+    "/api/admin/ai-settings/test-key": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "valid": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request - Invalid request body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - You must be logged in as an admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - Insufficient permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "description": "the validity of a Secton AI API key",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": ""
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/integrations/email": {
+      "get": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "",
+        "responses": {},
+        "security": [],
+        "description": "the email configuration for a project"
+      },
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "",
+        "responses": {},
+        "security": [],
+        "description": "or updates email configuration for a project"
       }
     },
     "/api/projects/{projectId}/changelog/{entryId}": {
@@ -6883,26 +7785,6 @@
         },
         "security": [],
         "description": "a list of project tags along with pagination metadata. Users must be authenticated to access this endpoint."
-      }
-    },
-    "/api/projects/{projectId}/integrations/email": {
-      "get": {
-        "tags": [
-          "Projects"
-        ],
-        "summary": "",
-        "responses": {},
-        "security": [],
-        "description": "the email configuration for a project"
-      },
-      "post": {
-        "tags": [
-          "Projects"
-        ],
-        "summary": "",
-        "responses": {},
-        "security": [],
-        "description": "or updates email configuration for a project"
       }
     },
     "/api/auth/oauth/callback/{providerName}": {
@@ -7668,6 +8550,10 @@
       "description": "Operations related to Subscribers"
     },
     {
+      "name": "Subscribe",
+      "description": "Operations related to Subscribe"
+    },
+    {
       "name": "Setup",
       "description": "Operations related to Setup"
     },
@@ -7688,6 +8574,10 @@
       "description": "Operations related to Auth"
     },
     {
+      "name": "Ai",
+      "description": "Operations related to Ai"
+    },
+    {
       "name": "Admin",
       "description": "Operations related to Admin"
     },
@@ -7701,6 +8591,12 @@
       "name": "Subscribers",
       "tags": [
         "Subscribers"
+      ]
+    },
+    {
+      "name": "Subscribe",
+      "tags": [
+        "Subscribe"
       ]
     },
     {
@@ -7731,6 +8627,12 @@
       "name": "Auth",
       "tags": [
         "Auth"
+      ]
+    },
+    {
+      "name": "Ai",
+      "tags": [
+        "Ai"
       ]
     },
     {
