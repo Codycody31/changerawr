@@ -3,11 +3,11 @@ import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { MarkdownEditor } from '@/components/MarkdownEditor';
+import MarkdownEditor from '@/components/markdown-editor/MarkdownEditor';
 import { useDebounce } from 'use-debounce';
 import { toast } from "@/hooks/use-toast";
-// Import the original component
 import EditorHeader from '@/components/changelog/editor/EditorHeader';
+import * as dotenv from 'dotenv';
 
 // Create a wrapper component to extend functionality
 const EnhancedEditorHeader: React.FC<React.ComponentProps<typeof EditorHeader> & {
@@ -110,9 +110,6 @@ const ITEMS_PER_PAGE = 20;
 const CACHE_TIME = 1000 * 60 * 5; // 5 minutes
 const DEBOUNCE_TIME = 1000; // 1 second
 
-// Import or extend the EditorHeader props instead of redefining them
-// The actual component likely doesn't have the onLoadMoreTags prop in its interface
-
 export function ChangelogEditor({
                                     projectId,
                                     entryId,
@@ -138,8 +135,15 @@ export function ChangelogEditor({
     const saveFailedRef = useRef(false);
     const isAutoSavingRef = useRef(false);
 
+    // Track last saved date
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const [lastSavedTime, setLastSavedTime] = useState<Date | null>(null);
+
     // Debounced state for autosave
     const [debouncedState] = useDebounce(editorState, DEBOUNCE_TIME);
+
+    // Get Secton API key from environment or config
+    const sectonApiKey = process.env.PC_SECTION_KEY || 'sk_'; // env is placeholder until I add config to database
 
     // Optimized data fetching with react-query
     const { data: initialData, isLoading: isInitialDataLoading } = useQuery({
@@ -176,7 +180,7 @@ export function ChangelogEditor({
             return lastPage.pagination.hasMore ? lastPage.pagination.page + 1 : undefined;
         },
         staleTime: CACHE_TIME,
-        initialPageParam: 0, // Add this to fix the missing initialPageParam error
+        initialPageParam: 0,
     });
 
     // Memoized tags processing
@@ -259,7 +263,7 @@ export function ChangelogEditor({
             const tagData = data.tags.map(tag =>
                 tag.id.startsWith('default-')
                     ? { name: tag.name }
-                    : { id: tag.id }  // Direct id property
+                    : { id: tag.id }
             );
 
             const response = await fetch(url, {
@@ -343,6 +347,7 @@ export function ChangelogEditor({
 
             saveFailedRef.current = false;
             lastSavedStateRef.current = currentState;
+            setLastSavedTime(new Date());
 
             setEditorState(prev => ({
                 ...prev,
@@ -368,6 +373,28 @@ export function ChangelogEditor({
             isAutoSavingRef.current = false;
         }
     }, [editorState, entryId, projectId, router, saveEntry]);
+
+    // Export handler for MarkdownEditor
+    const handleExport = useCallback(() => {
+        if (!editorState.content) return;
+
+        // Create a temporary anchor element
+        const element = document.createElement('a');
+        const file = new Blob([editorState.content], {type: 'text/markdown'});
+        element.href = URL.createObjectURL(file);
+
+        // Generate filename from title or use default
+        const safeTitle = editorState.title
+            ? editorState.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()
+            : 'changelog_entry';
+        const version = editorState.version ? `_v${editorState.version}` : '';
+        const timestamp = new Date().toISOString().slice(0, 10);
+
+        element.download = `${safeTitle}${version}_${timestamp}.md`;
+        document.body.appendChild(element);
+        element.click();
+        document.body.removeChild(element);
+    }, [editorState.content, editorState.title, editorState.version]);
 
     // Autosave effect
     useEffect(() => {
@@ -437,18 +464,19 @@ export function ChangelogEditor({
                     key={entryId || 'new'}
                     initialValue={editorState.content}
                     onChange={handleContentChange}
+                    onSave={handleSave}
+                    onExport={handleExport}
                     placeholder="Write your changelog entry in Markdown..."
                     className="min-h-[500px]"
-                    features={{
-                        headings: true,
-                        bold: true,
-                        italic: true,
-                        lists: true,
-                        links: true,
-                        code: true,
-                        blockquotes: true,
-                        tables: true
-                    }}
+                    enableAI={!!sectonApiKey}
+                    aiApiKey={sectonApiKey}
+                    autosaveKey={`changelog-${projectId}-${entryId || 'new'}`}
+                    initialPreviewMode="edit"
+                    showLineNumbers={true}
+                    resizable={true}
+                    minHeight="500px"
+                    maxHeight="800px"
+                    autoFocus={isNewChangelog}
                 />
             </div>
         </div>
