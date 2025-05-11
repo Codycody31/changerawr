@@ -26,10 +26,10 @@ export async function GET() {
         });
 
         // Log retrieved settings for debugging
-        console.log('Retrieved AI settings:', {
-            enabled: config?.enableAIAssistant,
-            hasKey: !!config?.aiApiKey
-        });
+        // console.log('Retrieved AI settings:', {
+        //     enabled: config?.enableAIAssistant,
+        //     hasKey: !!config?.aiApiKey
+        // });
 
         // Return the settings with the actual API key for use in the editor
         return NextResponse.json({
