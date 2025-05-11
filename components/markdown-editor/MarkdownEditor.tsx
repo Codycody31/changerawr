@@ -1,13 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Bold, Italic, Link, List, ListOrdered, Quote, Code, Heading1, Heading2, Heading3,
     Image, RotateCcw, RotateCw, Save, FileDown, Eye, EyeOff, Split, Sparkles } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 // Import AI integration
 import useAIAssistant from '@/hooks/useAIAssistant';
@@ -48,6 +47,7 @@ export default function MarkdownEditor({
     // Main state
     const [content, setContent] = useState(initialValue);
     const [view, setView] = useState<'edit' | 'preview' | 'split'>('edit');
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [selection, setSelection] = useState({ start: 0, end: 0 });
 
     // Track history for undo/redo
@@ -64,22 +64,25 @@ export default function MarkdownEditor({
     // Refs
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const isInitialRender = useRef(true);
 
     // Track if initial value is changed externally (controlled component behavior)
     const initialValueRef = useRef(initialValue);
 
-    // Initialize AI assistant if enabled
-    const ai = enableAI
-        ? useAIAssistant({
-            apiKey: aiApiKey,
-            onGenerated: (result) => {
-                // Show success message
-                setStatusMessage('AI content generated');
-                setTimeout(() => setStatusMessage(null), 3000);
-            }
-        })
-        : null;
+    // Initialize AI assistant (always call the hook, but conditionally use its methods)
+    const ai = useAIAssistant({
+        apiKey: aiApiKey,
+        onGenerated: () => {
+            // Show success message
+            setStatusMessage('AI content generated');
+            setTimeout(() => setStatusMessage(null), 3000);
+        }
+    });
+
+    // Only enable AI features if the prop is true
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const enabledAI = enableAI ? ai : null;
 
     // Effect to handle initialValue changes (controlled component support)
     useEffect(() => {
@@ -256,7 +259,6 @@ export default function MarkdownEditor({
     const handleLink = useCallback(() => insertFormat('[', '](url)'), [insertFormat]);
     const handleImage = useCallback(() => insertFormat('![', '](url)'), [insertFormat]);
     const handleCode = useCallback(() => insertFormat('`', '`'), [insertFormat]);
-    const handleCodeBlock = useCallback(() => insertFormat('```\n', '\n```'), [insertFormat]);
     const handleHeading1 = useCallback(() => insertFormat('# '), [insertFormat]);
     const handleHeading2 = useCallback(() => insertFormat('## '), [insertFormat]);
     const handleHeading3 = useCallback(() => insertFormat('### '), [insertFormat]);
@@ -613,7 +615,7 @@ export default function MarkdownEditor({
                     <Separator orientation="vertical" className="mx-1 h-6" />
 
                     {/* View mode selector */}
-                    <Tabs value={view} onValueChange={(v) => setView(v as any)}>
+                    <Tabs value={view} onValueChange={(v: string) => setView(v as 'edit' | 'preview' | 'split')}>
                         <TabsList className="h-8">
                             <TabsTrigger value="edit" className="h-7 px-2">
                                 <EyeOff size={14} className="mr-1" />

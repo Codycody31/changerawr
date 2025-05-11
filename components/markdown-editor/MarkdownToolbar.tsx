@@ -22,7 +22,6 @@ import {
     EyeOff,
     Split,
     Eye,
-    Table
 } from 'lucide-react';
 
 import {

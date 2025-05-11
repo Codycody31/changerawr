@@ -94,8 +94,8 @@ export class SectonClient {
             // Parse the JSON response
             const jsonResponse = await response.json();
 
-            // Log the complete response
-            console.log('AI Response:', JSON.stringify(jsonResponse, null, 2));
+            // // Log the complete response
+            // console.log('AI Response:', JSON.stringify(jsonResponse, null, 2));
 
             return jsonResponse;
         } catch (error) {

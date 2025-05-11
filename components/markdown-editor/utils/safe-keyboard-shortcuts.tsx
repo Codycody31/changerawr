@@ -25,6 +25,7 @@ export function useSafeKeyboardShortcuts(
     debug: boolean = false
 ) {
     // Ref to track currently active handlers
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
     const handlersRef = useRef<Function[]>([]);
 
     // Log function that only logs in debug mode
@@ -162,6 +163,7 @@ export function KeyboardShortcutsProvider({
     const containerRef = useRef<HTMLDivElement>(null);
 
     // Use our hook
+    // @ts-expect-error containerRef might throw an error if initialized too early
     useSafeKeyboardShortcuts(shortcuts, containerRef, enabled, debug);
 
     return (

@@ -7,10 +7,7 @@ import MarkdownEditor from '@/components/markdown-editor/MarkdownEditor';
 import { useDebounce } from 'use-debounce';
 import { toast } from "@/hooks/use-toast";
 import EditorHeader from '@/components/changelog/editor/EditorHeader';
-import * as dotenv from 'dotenv';
-
-// Load environment variables
-dotenv.config();
+import { Loader2 } from 'lucide-react';
 
 // Create a wrapper component to extend functionality
 const EnhancedEditorHeader: React.FC<React.ComponentProps<typeof EditorHeader> & {
@@ -108,6 +105,11 @@ interface TagsResponse {
     };
 }
 
+interface AISystemSettings {
+    enableAIAssistant: boolean;
+    aiApiKey: string | null;
+}
+
 // Constants for pagination and caching
 const ITEMS_PER_PAGE = 20;
 const CACHE_TIME = 1000 * 60 * 5; // 5 minutes
@@ -145,8 +147,29 @@ export function ChangelogEditor({
     // Debounced state for autosave
     const [debouncedState] = useDebounce(editorState, DEBOUNCE_TIME);
 
-    // Get Secton API key from environment or config
-    const sectonApiKey = 'YOUR_API_KEY';
+    // Fetch AI system settings - important to fetch this first before rendering the editor
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { data: aiSystemSettings, isLoading: isAISettingsLoading, error: aiSettingsError } = useQuery<AISystemSettings>({
+        queryKey: ['ai-system-settings'],
+        queryFn: async () => {
+            // Using the correct API route path
+            const response = await fetch('/api/ai/settings');
+            if (!response.ok) {
+                console.error('Failed to fetch AI settings:', response.statusText);
+                return { enableAIAssistant: false, aiApiKey: null };
+            }
+
+            const data = await response.json();
+
+            return data;
+        },
+        staleTime: CACHE_TIME,
+        retry: 1,
+    });
+
+    // Get Secton API key from system settings
+    const aiEnabled = aiSystemSettings?.enableAIAssistant || false;
+    const sectonApiKey = aiSystemSettings?.aiApiKey || '';
 
     // Optimized data fetching with react-query
     const { data: initialData, isLoading: isInitialDataLoading } = useQuery({
@@ -419,7 +442,10 @@ export function ChangelogEditor({
         return () => clearTimeout(timeoutId);
     }, [debouncedState, handleSave]);
 
-    if (isInitialDataLoading || isTagsLoading) {
+    // Check if we're still loading any data
+    const isLoading = isInitialDataLoading || isTagsLoading || isAISettingsLoading;
+
+    if (isLoading) {
         return <div className="flex items-center justify-center min-h-screen">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>;
@@ -462,26 +488,45 @@ export function ChangelogEditor({
                         />
                     </CardContent>
                 </Card>
-                apikey: ${sectonApiKey}
 
-                <MarkdownEditor
-                    key={entryId || 'new'}
-                    initialValue={editorState.content}
-                    onChange={handleContentChange}
-                    onSave={handleSave}
-                    onExport={handleExport}
-                    placeholder="Write your changelog entry in Markdown..."
-                    className="min-h-[500px]"
-                    enableAI={!!sectonApiKey}
-                    aiApiKey={sectonApiKey}
-                    autosaveKey={`changelog-${projectId}-${entryId || 'new'}`}
-                    initialPreviewMode="edit"
-                    showLineNumbers={true}
-                    resizable={true}
-                    minHeight="500px"
-                    maxHeight="800px"
-                    autoFocus={isNewChangelog}
-                />
+                {/* Debug info - leave disabled! */}
+                {/*<div className="mb-4">*/}
+                {/*    <Alert variant="default">*/}
+                {/*        <AlertDescription>*/}
+                {/*            <div className="text-sm">*/}
+                {/*                <strong>AI Settings:</strong> {isAISettingsLoading ? 'Loading...' : (*/}
+                {/*                aiSettingsError ? 'Error loading settings' : (*/}
+                {/*                    <span>*/}
+                {/*                            AI Enabled: {aiEnabled ? 'Yes' : 'No'} |*/}
+                {/*                            API Key: {sectonApiKey ? 'Present' : 'Missing'}*/}
+                {/*                        </span>*/}
+                {/*                )*/}
+                {/*            )}*/}
+                {/*            </div>*/}
+                {/*        </AlertDescription>*/}
+                {/*    </Alert>*/}
+                {/*</div>*/}
+
+                {/* Only render MarkdownEditor once AI settings are loaded */}
+                {!isAISettingsLoading ? (
+                    <MarkdownEditor
+                        key={entryId || 'new'}
+                        initialValue={editorState.content}
+                        onChange={handleContentChange}
+                        onSave={handleSave}
+                        onExport={handleExport}
+                        placeholder="What's been changed today?"
+                        className="min-h-[500px]"
+                        enableAI={aiEnabled && !!sectonApiKey}
+                        aiApiKey={sectonApiKey}
+                        autoFocus={isNewChangelog}
+                    />
+                ) : (
+                    <div className="flex items-center justify-center p-12 border rounded-md bg-muted/10">
+                        <Loader2 className="w-6 h-6 mr-2 animate-spin" />
+                        <span>Loading editor...</span>
+                    </div>
+                )}
             </div>
         </div>
     );

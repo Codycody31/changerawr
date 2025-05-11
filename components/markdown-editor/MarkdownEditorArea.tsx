@@ -43,18 +43,9 @@ const MarkdownEditorArea = forwardRef<HTMLTextAreaElement, MarkdownEditorAreaPro
          placeholder = 'Start writing...',
          resizable = false,
          minRows = 5,
-         maxRows = 20,
          className = '',
          disabled = false,
          autoFocus = false,
-         onBold,
-         onItalic,
-         onLink,
-         onCode,
-         onQuote,
-         onBulletList,
-         onNumberedList,
-         onHeading,
      }, ref) => {
         const internalRef = useRef<HTMLTextAreaElement | null>(null);
 

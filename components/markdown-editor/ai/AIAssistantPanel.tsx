@@ -186,7 +186,7 @@ export default function AIAssistantPanel({
 
     // Sample writing suggestions based on content
     const getSuggestions = () => {
-        // These would normally be generated dynamically based on content
+        // TODO: These would normally be generated dynamically based on content
         return [
             {type: AICompletionType.IMPROVE, label: 'Improve writing style'},
             {type: AICompletionType.EXPAND, label: 'Add more details'},
@@ -338,218 +338,218 @@ export default function AIAssistantPanel({
                                         </TabsList>
                                         <div className="flex mt-2">
                                             <TabsList>
-                                            <TabsTrigger
-                                                value={AICompletionType.EXPAND}
-                                                className="text-xs mr-1 h-7 px-2 rounded-md"
-                                                data-state={completionType === AICompletionType.EXPAND ? "active" : "inactive"}
-                                            >
-                                                Expand
-                                            </TabsTrigger>
-                                            <TabsTrigger
-                                                value={AICompletionType.REPHRASE}
-                                                className="text-xs mr-1 h-7 px-2 rounded-md"
-                                                data-state={completionType === AICompletionType.REPHRASE ? "active" : "inactive"}
-                                            >
-                                                Rephrase
-                                            </TabsTrigger>
-                                            <TabsTrigger
-                                                value={AICompletionType.FIX_GRAMMAR}
-                                                className="text-xs h-7 px-2 rounded-md"
-                                                data-state={completionType === AICompletionType.FIX_GRAMMAR ? "active" : "inactive"}
-                                            >
-                                                Fix Grammar
-                                            </TabsTrigger>
-                                        </TabsList>
+                                                <TabsTrigger
+                                                    value={AICompletionType.EXPAND}
+                                                    className="text-xs mr-1 h-7 px-2 rounded-md"
+                                                    data-state={completionType === AICompletionType.EXPAND ? "active" : "inactive"}
+                                                >
+                                                    Expand
+                                                </TabsTrigger>
+                                                <TabsTrigger
+                                                    value={AICompletionType.REPHRASE}
+                                                    className="text-xs mr-1 h-7 px-2 rounded-md"
+                                                    data-state={completionType === AICompletionType.REPHRASE ? "active" : "inactive"}
+                                                >
+                                                    Rephrase
+                                                </TabsTrigger>
+                                                <TabsTrigger
+                                                    value={AICompletionType.FIX_GRAMMAR}
+                                                    className="text-xs h-7 px-2 rounded-md"
+                                                    data-state={completionType === AICompletionType.FIX_GRAMMAR ? "active" : "inactive"}
+                                                >
+                                                    Fix Grammar
+                                                </TabsTrigger>
+                                            </TabsList>
+                                        </div>
+                                    </Tabs>
+
+                                    <p className="text-xs text-muted-foreground">
+                                        {getCompletionTypeDescription(completionType)}
+                                    </p>
                                 </div>
-                            </Tabs>
 
-                            <p className="text-xs text-muted-foreground">
-                                {getCompletionTypeDescription(completionType)}
-                            </p>
-                        </div>
-
-                        {/* Custom prompt input */}
-                        {completionType === AICompletionType.CUSTOM && (
-                            <div className="space-y-2">
-                                <label htmlFor="customPrompt" className="text-sm font-medium">
-                                    Custom instruction
-                                </label>
-                                <Textarea
-                                    id="customPrompt"
-                                    placeholder="Describe what you want the AI to do..."
-                                    value={customPrompt}
-                                    onChange={(e) => onCustomPromptChange(e.target.value)}
-                                    className="min-h-[80px] text-sm resize-none"
-                                />
-                            </div>
-                        )}
-
-                        {/* Content preview */}
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <h4 className="text-sm font-medium">Content to process</h4>
-                                <p className="text-xs text-muted-foreground">
-                                    {content.length} characters
-                                </p>
-                            </div>
-                            <div
-                                ref={contentPreviewRef}
-                                className="p-3 bg-muted/30 rounded-md border text-sm max-h-32 overflow-y-auto break-words whitespace-pre-wrap"
-                            >
-                                {content ? truncateContent(content, 300) : (
-                                    <span className="text-muted-foreground italic">No text selected. AI will use the current cursor position.</span>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Advanced settings */}
-                        <Collapsible
-                            open={showAdvancedSettings}
-                            onOpenChange={setShowAdvancedSettings}
-                            className="border rounded-md overflow-hidden"
-                        >
-                            <CollapsibleTrigger asChild>
-                                <div
-                                    className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/30 transition-colors">
-                                    <div className="flex items-center gap-2">
-                                        <Settings className="w-4 h-4 text-muted-foreground"/>
-                                        <span className="text-sm font-medium">Advanced settings</span>
-                                    </div>
-                                    <ChevronRight
-                                        className={`w-4 h-4 transition-transform ${showAdvancedSettings ? 'rotate-90' : ''}`}
-                                    />
-                                </div>
-                            </CollapsibleTrigger>
-                            <CollapsibleContent>
-                                <div className="p-3 border-t space-y-4">
-                                    {/* Temperature setting */}
+                                {/* Custom prompt input */}
+                                {completionType === AICompletionType.CUSTOM && (
                                     <div className="space-y-2">
-                                        <div className="flex items-center justify-between">
-                                            <label htmlFor="temperature" className="text-sm">Temperature</label>
-                                            <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">
-                            {temperature.toFixed(1)}
-                          </span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs text-muted-foreground">Precise</span>
-                                            <Slider
-                                                id="temperature"
-                                                min={0}
-                                                max={1}
-                                                step={0.1}
-                                                value={[temperature]}
-                                                onValueChange={(value) => onTemperatureChange?.(value[0])}
-                                                className="flex-grow"
-                                            />
-                                            <span className="text-xs text-muted-foreground">Creative</span>
-                                        </div>
+                                        <label htmlFor="customPrompt" className="text-sm font-medium">
+                                            Custom instruction
+                                        </label>
+                                        <Textarea
+                                            id="customPrompt"
+                                            placeholder="Describe what you want the AI to do..."
+                                            value={customPrompt}
+                                            onChange={(e) => onCustomPromptChange(e.target.value)}
+                                            className="min-h-[80px] text-sm resize-none"
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Content preview */}
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <h4 className="text-sm font-medium">Content to process</h4>
                                         <p className="text-xs text-muted-foreground">
-                                            Higher values make output more creative but less predictable
+                                            {content.length} characters
                                         </p>
                                     </div>
-                                </div>
-                            </CollapsibleContent>
-                        </Collapsible>
-
-                        {/* Error message */}
-                        {error && (
-                            <div
-                                className="p-3 bg-destructive/10 border-destructive/20 border rounded-md text-sm text-destructive">
-                                <p className="font-medium">Error</p>
-                                <p>{error.message}</p>
-                            </div>
-                        )}
-
-                        {/* Generated content */}
-                        {generatedResult && (
-                            <div ref={resultRef} className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <h4 className="text-sm font-medium">Generated content</h4>
-                                    <div className="flex gap-1">
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-6 w-6"
-                                            onClick={handleCopy}
-                                            title="Copy to clipboard"
-                                        >
-                                            {copied ? <Check className="h-3.5 w-3.5"/> :
-                                                <Copy className="h-3.5 w-3.5"/>}
-                                        </Button>
-                                        {onRegenerate && (
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-6 w-6"
-                                                onClick={onRegenerate}
-                                                title="Regenerate"
-                                            >
-                                                <RefreshCw className="h-3.5 w-3.5"/>
-                                            </Button>
+                                    <div
+                                        ref={contentPreviewRef}
+                                        className="p-3 bg-muted/30 rounded-md border text-sm max-h-32 overflow-y-auto break-words whitespace-pre-wrap"
+                                    >
+                                        {content ? truncateContent(content, 300) : (
+                                            <span className="text-muted-foreground italic">No text selected. AI will use the current cursor position.</span>
                                         )}
                                     </div>
                                 </div>
-                                <div
-                                    className="p-3 bg-primary/5 border border-primary/20 rounded-md text-sm max-h-[200px] overflow-y-auto break-words whitespace-pre-wrap">
-                                    {generatedResult.text}
-                                </div>
 
-                                {/* Metadata */}
-                                {generatedResult.metadata && (
-                                    <p className="text-xs text-muted-foreground">
-                                        Generated with {generatedResult.metadata.model}
-                                        {generatedResult.usage && ` • ${generatedResult.usage.total_tokens} tokens`}
-                                    </p>
+                                {/* Advanced settings */}
+                                <Collapsible
+                                    open={showAdvancedSettings}
+                                    onOpenChange={setShowAdvancedSettings}
+                                    className="border rounded-md overflow-hidden"
+                                >
+                                    <CollapsibleTrigger asChild>
+                                        <div
+                                            className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/30 transition-colors">
+                                            <div className="flex items-center gap-2">
+                                                <Settings className="w-4 h-4 text-muted-foreground"/>
+                                                <span className="text-sm font-medium">Advanced settings</span>
+                                            </div>
+                                            <ChevronRight
+                                                className={`w-4 h-4 transition-transform ${showAdvancedSettings ? 'rotate-90' : ''}`}
+                                            />
+                                        </div>
+                                    </CollapsibleTrigger>
+                                    <CollapsibleContent>
+                                        <div className="p-3 border-t space-y-4">
+                                            {/* Temperature setting */}
+                                            <div className="space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                    <label htmlFor="temperature" className="text-sm">Temperature</label>
+                                                    <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">
+                            {temperature.toFixed(1)}
+                          </span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs text-muted-foreground">Precise</span>
+                                                    <Slider
+                                                        id="temperature"
+                                                        min={0}
+                                                        max={1}
+                                                        step={0.1}
+                                                        value={[temperature]}
+                                                        onValueChange={(value) => onTemperatureChange?.(value[0])}
+                                                        className="flex-grow"
+                                                    />
+                                                    <span className="text-xs text-muted-foreground">Creative</span>
+                                                </div>
+                                                <p className="text-xs text-muted-foreground">
+                                                    Higher values make output more creative but less predictable
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </CollapsibleContent>
+                                </Collapsible>
+
+                                {/* Error message */}
+                                {error && (
+                                    <div
+                                        className="p-3 bg-destructive/10 border-destructive/20 border rounded-md text-sm text-destructive">
+                                        <p className="font-medium">Error</p>
+                                        <p>{error.message}</p>
+                                    </div>
+                                )}
+
+                                {/* Generated content */}
+                                {generatedResult && (
+                                    <div ref={resultRef} className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <h4 className="text-sm font-medium">Generated content</h4>
+                                            <div className="flex gap-1">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-6 w-6"
+                                                    onClick={handleCopy}
+                                                    title="Copy to clipboard"
+                                                >
+                                                    {copied ? <Check className="h-3.5 w-3.5"/> :
+                                                        <Copy className="h-3.5 w-3.5"/>}
+                                                </Button>
+                                                {onRegenerate && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-6 w-6"
+                                                        onClick={onRegenerate}
+                                                        title="Regenerate"
+                                                    >
+                                                        <RefreshCw className="h-3.5 w-3.5"/>
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div
+                                            className="p-3 bg-primary/5 border border-primary/20 rounded-md text-sm max-h-[200px] overflow-y-auto break-words whitespace-pre-wrap">
+                                            {generatedResult.text}
+                                        </div>
+
+                                        {/* Metadata */}
+                                        {generatedResult.metadata && (
+                                            <p className="text-xs text-muted-foreground">
+                                                Generated with {generatedResult.metadata.model}
+                                                {generatedResult.usage && ` • ${generatedResult.usage.total_tokens} tokens`}
+                                            </p>
+                                        )}
+                                    </div>
                                 )}
                             </div>
-                        )}
-                    </div>
-                </ScrollArea>
+                        </ScrollArea>
 
-            {/* Footer with buttons */}
-            <div className="p-4 border-t flex justify-between items-center gap-2 bg-muted/10">
-                <Button
-                    variant="outline"
-                    onClick={onClose}
-                    disabled={isLoading}
-                    className="min-w-[80px]"
-                >
-                    Cancel
-                </Button>
+                        {/* Footer with buttons */}
+                        <div className="p-4 border-t flex justify-between items-center gap-2 bg-muted/10">
+                            <Button
+                                variant="outline"
+                                onClick={onClose}
+                                disabled={isLoading}
+                                className="min-w-[80px]"
+                            >
+                                Cancel
+                            </Button>
 
-                {generatedResult ? (
-                    <Button
-                        onClick={() => onApply(generatedResult.text)}
-                        className="gap-1"
-                    >
-                        <span>Insert</span>
-                        <ArrowRight className="w-4 h-4"/>
-                    </Button>
-                ) : (
-                    <Button
-                        onClick={onGenerate}
-                        disabled={isLoading || isApiKeyValid === false || (completionType === AICompletionType.CUSTOM && !customPrompt.trim())}
-                        className="gap-1 min-w-[120px]"
-                    >
-                        {isLoading ? (
-                            <>
-                                <Loader2 className="w-4 h-4 animate-spin"/>
-                                <span>Generating...</span>
-                            </>
-                        ) : (
-                            <>
-                                <Sparkles className="w-4 h-4"/>
-                                <span>Generate</span>
-                            </>
-                        )}
-                    </Button>
-                )}
-            </div>
-        </motion.div>
-</motion.div>
-)
-}
-</AnimatePresence>
-)
-;
+                            {generatedResult ? (
+                                <Button
+                                    onClick={() => onApply(generatedResult.text)}
+                                    className="gap-1"
+                                >
+                                    <span>Insert</span>
+                                    <ArrowRight className="w-4 h-4"/>
+                                </Button>
+                            ) : (
+                                <Button
+                                    onClick={onGenerate}
+                                    disabled={isLoading || isApiKeyValid === false || (completionType === AICompletionType.CUSTOM && !customPrompt.trim())}
+                                    className="gap-1 min-w-[120px]"
+                                >
+                                    {isLoading ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 animate-spin"/>
+                                            <span>Generating...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Sparkles className="w-4 h-4"/>
+                                            <span>Generate</span>
+                                        </>
+                                    )}
+                                </Button>
+                            )}
+                        </div>
+                    </motion.div>
+                </motion.div>
+            )
+            }
+        </AnimatePresence>
+    )
+        ;
 }
