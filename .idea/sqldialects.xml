@@ -5,5 +5,9 @@
     <file url="file://$PROJECT_DIR$/prisma/migrations/20250221000121_add_new_request_types/migration.sql" dialect="PostgreSQL" />
     <file url="file://$PROJECT_DIR$/prisma/migrations/20250419000001_add_password_reset/migration.sql" dialect="PostgreSQL" />
     <file url="file://$PROJECT_DIR$/prisma/migrations/20250421000001_add_notification_preferences/migration.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/prisma/migrations/20250504203021_passkey_support/migration.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/prisma/migrations/20250504203707_add_last_challenge/migration.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/prisma/migrations/20250504211358_add_two_factor_mode/migration.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/prisma/migrations/20250504212400_add_two_factor_session/migration.sql" dialect="PostgreSQL" />
   </component>
 </project>

@@ -52,6 +52,8 @@ import {getGravatarUrl} from '@/lib/utils/gravatar'
 import {cn} from '@/lib/utils'
 import {User} from "@prisma/client";
 import {useMediaQuery} from '@/hooks/use-media-query'
+import WhatsNewModal from '@/components/dashboard/WhatsNewModal'
+import { useWhatsNew } from '@/hooks/useWhatsNew'
 
 // Navigation Configuration
 const NAV_SECTIONS = [
@@ -544,6 +546,14 @@ export default function DashboardLayout({
     const isMobile = useMediaQuery('(max-width: 768px)')
     const isTablet = useMediaQuery('(max-width: 1024px)')
 
+    // What's New modal state
+    const {
+        showWhatsNew,
+        whatsNewContent,
+        closeWhatsNew,
+        isLoading: isWhatsNewLoading
+    } = useWhatsNew()
+
     // Set sidebar state based on screen size
     useEffect(() => {
         if (isTablet) {
@@ -622,6 +632,15 @@ export default function DashboardLayout({
                     {children}
                 </div>
             </main>
+
+            {/* What's New Modal */}
+            {!isWhatsNewLoading && (
+                <WhatsNewModal
+                    content={whatsNewContent}
+                    isOpen={showWhatsNew}
+                    onClose={closeWhatsNew}
+                />
+            )}
         </div>
     )
 }
