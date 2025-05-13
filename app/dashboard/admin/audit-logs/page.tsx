@@ -452,6 +452,7 @@ export default function AuditLogsPage() {
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Select action" />
                                             </SelectTrigger>
+                                            {/* TODO: fetch all actions from changelog instead of hardcoding */}
                                             <SelectContent>
                                                 <SelectItem value="all">All Actions</SelectItem>
                                                 <SelectItem value="CREATE_USER">CREATE_USER</SelectItem>

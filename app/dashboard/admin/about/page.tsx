@@ -3,12 +3,24 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { appInfo, getCopyrightYears } from '@/lib/app-info';
-import { Heart } from 'lucide-react';
+import { Heart, History } from 'lucide-react';
 import UpdateStatus from '@/components/UpdateStatus';
+import { useWhatsNew } from '@/hooks/useWhatsNew';
+import WhatsNewModal from '@/components/dashboard/WhatsNewModal';
 
 export default function AboutPage() {
     const [databaseInfo, setDatabaseInfo] = useState<{ databaseVersion?: string }>({});
+    const {
+        showWhatsNew,
+        whatsNewContent,
+        closeWhatsNew,
+        manuallyShowWhatsNew,
+        isLoading,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        lastSeenVersion
+    } = useWhatsNew();
 
     // Function to check for updates by fetching from server
     const checkForUpdates = async () => {
@@ -55,6 +67,15 @@ export default function AboutPage() {
 
     return (
         <div className="max-w-lg mx-auto space-y-6 py-6">
+            {/* What's New Modal */}
+            {whatsNewContent && (
+                <WhatsNewModal
+                    isOpen={showWhatsNew}
+                    onClose={closeWhatsNew}
+                    content={whatsNewContent}
+                />
+            )}
+
             <Card className="border-2 overflow-hidden">
                 <CardHeader className="text-center pb-2">
                     <div className="flex justify-center mb-4">
@@ -70,6 +91,18 @@ export default function AboutPage() {
                         <Badge variant="outline" className="px-3 py-1">v{appInfo.version}</Badge>
                         <Badge variant="secondary" className="px-3 py-1">{appInfo.status}</Badge>
                     </div>
+
+                    {/* What's New Button */}
+                    <Button
+                        onClick={manuallyShowWhatsNew}
+                        variant="outline"
+                        size="sm"
+                        className="mb-4"
+                        disabled={isLoading}
+                    >
+                        <History className="h-4 w-4 mr-2" />
+                        {isLoading ? "Loading..." : "What's New in This Version"}
+                    </Button>
 
                     {/* Update Status Component */}
                     <div className="pt-2">
