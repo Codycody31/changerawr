@@ -1,6 +1,8 @@
 import { validateAuthAndGetUser } from "@/lib/utils/changelog"
-import { NextResponse } from "next/server"
+import {NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db";
+import { z } from 'zod';
+import {createAuditLog} from "@/lib/utils/auditLog";
 
 // Constants
 const DEFAULT_PAGE_SIZE = 20;
@@ -113,6 +115,142 @@ export async function GET(
         console.error('Error fetching tags:', error);
         return NextResponse.json(
             { error: 'Failed to fetch tags' },
+            { status: 500 }
+        );
+    }
+}
+
+/**
+ * @method POST
+ * @description Creates a new tag for a project's changelog
+ * @body {
+ *   "type": "object",
+ *   "required": ["name"],
+ *   "properties": {
+ *     "name": {
+ *       "type": "string",
+ *       "description": "The tag name"
+ *     }
+ *   }
+ * }
+ * @response 201 {
+ *   "type": "object",
+ *   "properties": {
+ *     "id": { "type": "string" },
+ *     "name": { "type": "string" }
+ *   }
+ * }
+ * @error 400 Validation failed - Invalid input format
+ * @error 401 Unauthorized - Please log in
+ * @error 403 Forbidden - Insufficient permissions
+ * @error 409 Tag already exists
+ * @error 500 Server error - Failed to create tag
+ * @secure cookieAuth
+ */
+
+const createTagSchema = z.object({
+    name: z.string().min(1).max(50).trim(),
+});
+
+export async function POST(
+    request: NextRequest,
+    { params }: { params: Promise<{ projectId: string }> }
+) {
+    try {
+        // Validate user
+        const user = await validateAuthAndGetUser();
+
+        if (!user) {
+            return NextResponse.json(
+                { error: 'Unauthorized' },
+                { status: 401 }
+            );
+        }
+
+        if (user.role !== 'ADMIN' && user.role !== 'STAFF') {
+            return NextResponse.json(
+                { error: 'Insufficient permissions' },
+                { status: 403 }
+            );
+        }
+
+        // Get project ID from route params
+        const { projectId } = await (async () => params)();
+
+        // Verify project exists
+        const project = await db.project.findUnique({
+            where: { id: projectId },
+        });
+
+        if (!project) {
+            return NextResponse.json(
+                { error: 'Project not found' },
+                { status: 404 }
+            );
+        }
+
+        // Parse and validate request body
+        const body = await request.json();
+        const validationResult = createTagSchema.safeParse(body);
+
+        if (!validationResult.success) {
+            return NextResponse.json(
+                {
+                    error: 'Validation failed',
+                    details: validationResult.error.format()
+                },
+                { status: 400 }
+            );
+        }
+
+        const { name } = validationResult.data;
+
+        // Check if tag already exists (case insensitive)
+        const existingTag = await db.changelogTag.findFirst({
+            where: {
+                name: {
+                    equals: name,
+                    mode: 'insensitive'
+                }
+            }
+        });
+
+        if (existingTag) {
+            // Return the existing tag instead of an error
+            return NextResponse.json(existingTag, { status: 200 });
+        }
+
+        // Create new tag
+        const newTag = await db.changelogTag.create({
+            data: {
+                name: name,
+            }
+        });
+
+        // Log action
+        try {
+            await createAuditLog(
+                'CREATE_TAG',
+                user.id,
+                user.id,
+                {
+                    reason: 'Tag assigned did not exist previously',
+                    tagId: newTag.id,
+                    tagName: newTag.name,
+                    projectId,
+                    timestamp: new Date().toISOString(),
+                }
+            );
+        } catch (auditLogError) {
+            console.error('Failed to create tag created audit log:', auditLogError);
+        }
+
+        return NextResponse.json(newTag, { status: 201 });
+
+    } catch (error) {
+        console.error('Error creating tag:', error);
+        return NextResponse.json(
+            { error: 'Failed to create tag' },
             { status: 500 }
         );
     }

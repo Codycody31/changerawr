@@ -12,7 +12,7 @@ import { Loader2 } from 'lucide-react';
 // Create a wrapper component to extend functionality
 const EnhancedEditorHeader: React.FC<React.ComponentProps<typeof EditorHeader> & {
     onLoadMoreTags?: () => Promise<unknown>;
-}> = ({ onLoadMoreTags, availableTags, onTagsChange, ...otherProps }) => {
+}> = ({ onLoadMoreTags, availableTags, onTagsChange, content, ...otherProps }) => {
     // Create enhanced tags selection with load more functionality
     const handleTagsChange = (tags: Tag[]) => {
         onTagsChange(tags);
@@ -52,6 +52,7 @@ const EnhancedEditorHeader: React.FC<React.ComponentProps<typeof EditorHeader> &
                 {...otherProps}
                 availableTags={availableTags}
                 onTagsChange={handleTagsChange}
+                content={content} // Pass the content to EditorHeader
             />
             {/* Hidden container to trigger infinite loading */}
             {onLoadMoreTags && <div ref={tagsContainerRef} style={{ height: 1, opacity: 0 }} />}
@@ -468,6 +469,9 @@ export function ChangelogEditor({
                 selectedTags={editorState.tags}
                 availableTags={availableTags}
                 onTagsChange={handleTagsChange}
+                onTitleChange={handleTitleChange}
+                content={editorState.content} // Explicitly pass content to EnhancedEditorHeader
+                aiApiKey={sectonApiKey}
                 onLoadMoreTags={hasNextPage ? async () => {
                     await fetchNextPage();
                     return;
@@ -488,24 +492,6 @@ export function ChangelogEditor({
                         />
                     </CardContent>
                 </Card>
-
-                {/* Debug info - leave disabled! */}
-                {/*<div className="mb-4">*/}
-                {/*    <Alert variant="default">*/}
-                {/*        <AlertDescription>*/}
-                {/*            <div className="text-sm">*/}
-                {/*                <strong>AI Settings:</strong> {isAISettingsLoading ? 'Loading...' : (*/}
-                {/*                aiSettingsError ? 'Error loading settings' : (*/}
-                {/*                    <span>*/}
-                {/*                            AI Enabled: {aiEnabled ? 'Yes' : 'No'} |*/}
-                {/*                            API Key: {sectonApiKey ? 'Present' : 'Missing'}*/}
-                {/*                        </span>*/}
-                {/*                )*/}
-                {/*            )}*/}
-                {/*            </div>*/}
-                {/*        </AlertDescription>*/}
-                {/*    </Alert>*/}
-                {/*</div>*/}
 
                 {/* Only render MarkdownEditor once AI settings are loaded */}
                 {!isAISettingsLoading ? (

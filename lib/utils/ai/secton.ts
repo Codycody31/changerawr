@@ -3,7 +3,7 @@
  * Provides utilities for interacting with the Secton AI service
  */
 
-import { AIModel, AIMessage, CompletionRequest, CompletionResponse, AIError } from './types';
+import {AIError, AIMessage, AIModel, CompletionRequest, CompletionResponse} from './types';
 
 /**
  * Configuration for Secton API
@@ -74,7 +74,7 @@ export class SectonClient {
             };
 
             // Log the outgoing request body
-            console.log('AI Request:', JSON.stringify(completionRequest, null, 2));
+            // console.log('AI Request:', JSON.stringify(completionRequest, null, 2));
 
             const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
                 method: 'POST',
@@ -92,12 +92,10 @@ export class SectonClient {
             }
 
             // Parse the JSON response
-            const jsonResponse = await response.json();
-
             // // Log the complete response
             // console.log('AI Response:', JSON.stringify(jsonResponse, null, 2));
 
-            return jsonResponse;
+            return await response.json();
         } catch (error) {
             console.error('AI Completion Error:', error);
             if (error instanceof AIError) {
