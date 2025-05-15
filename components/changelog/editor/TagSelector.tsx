@@ -37,6 +37,11 @@ interface TagSelectorProps {
     projectId: string; // Needed for creating new tags
 }
 
+// AI content processing parameters
+const MAX_CHARS_PER_SECTION = 150; // Characters per extracted section
+const SECTIONS_TO_EXTRACT = 3;     // Number of sections to extract
+const SECTIONS_TO_ANALYZE = 3;     // Number of sections to actually send to AI
+
 export default function TagSelector({
                                         selectedTags,
                                         availableTags,
@@ -66,6 +71,97 @@ export default function TagSelector({
     const unselectedSuggestions = suggestedTags.filter(
         tag => !selectedTags.some(selected => selected.id === tag.id)
     );
+
+    /**
+     * Extract meaningful sections from content optimized for tag detection
+     * This approach samples from beginning, middle and end of the document
+     * to get a better representation of the full content.
+     */
+    const extractContentSections = (text: string): string[] => {
+        if (!text) return [];
+
+        const cleanedText = text.trim();
+        if (cleanedText.length <= MAX_CHARS_PER_SECTION * SECTIONS_TO_EXTRACT) {
+            return [cleanedText]; // Return all content if it's short enough
+        }
+
+        const sections: string[] = [];
+
+        // Extract beginning section (always include)
+        sections.push(extractSection(cleanedText, 0, MAX_CHARS_PER_SECTION));
+
+        // If there's more content, extract middle section
+        if (cleanedText.length > MAX_CHARS_PER_SECTION * 2) {
+            const middleStart = Math.floor(cleanedText.length / 2) - (MAX_CHARS_PER_SECTION / 2);
+            sections.push(extractSection(cleanedText, middleStart, MAX_CHARS_PER_SECTION));
+        }
+
+        // If there's more content, extract ending section
+        if (cleanedText.length > MAX_CHARS_PER_SECTION * 3) {
+            const endStart = Math.max(0, cleanedText.length - MAX_CHARS_PER_SECTION);
+            sections.push(extractSection(cleanedText, endStart, MAX_CHARS_PER_SECTION));
+        }
+
+        // Extract headings if there are any (often contains important context)
+        const headingMatches = cleanedText.match(/#+\s+.*$/gm) || [];
+        if (headingMatches.length > 0) {
+            const headings = headingMatches.slice(0, 5).join('\n');
+            if (headings.length > 0) {
+                sections.push(`Key sections:\n${headings}`);
+            }
+        }
+
+        return sections;
+    };
+
+    /**
+     * Extract a section of content with intelligent boundaries
+     */
+    const extractSection = (text: string, startPos: number, length: number): string => {
+        // Safety checks
+        if (!text || startPos >= text.length) return '';
+
+        // Find start at paragraph or sentence boundary if possible
+        let actualStart = startPos;
+        let actualEnd = Math.min(text.length, startPos + length);
+
+        // If not starting at beginning, find a good start boundary
+        if (startPos > 0) {
+            // Try to find paragraph start
+            const paraStart = text.lastIndexOf('\n\n', startPos) + 2;
+            if (paraStart > 0 && paraStart < startPos && (startPos - paraStart) < length / 2) {
+                actualStart = paraStart;
+            } else {
+                // Try to find sentence start
+                const sentStart = text.lastIndexOf('. ', startPos) + 2;
+                if (sentStart > 0 && sentStart < startPos && (startPos - sentStart) < length / 3) {
+                    actualStart = sentStart;
+                }
+            }
+        }
+
+        // Find a good end boundary
+        if (actualEnd < text.length) {
+            // Try to find paragraph end
+            const paraEnd = text.indexOf('\n\n', actualEnd - 20);
+            if (paraEnd > 0 && paraEnd < (actualEnd + length / 3)) {
+                actualEnd = paraEnd;
+            } else {
+                // Try to find sentence end
+                const sentEnd = text.indexOf('. ', actualEnd - 20);
+                if (sentEnd > 0 && sentEnd < (actualEnd + length / 4)) {
+                    actualEnd = sentEnd + 1; // Include the period
+                }
+            }
+        }
+
+        // If this is not the beginning, add indication
+        const prefix = actualStart > 0 ? '... ' : '';
+        // If this is not the end, add indication
+        const suffix = actualEnd < text.length ? ' ...' : '';
+
+        return prefix + text.substring(actualStart, actualEnd) + suffix;
+    };
 
     // Apply all suggested tags at once
     const applyAllSuggestions = () => {
@@ -127,17 +223,28 @@ export default function TagSelector({
         try {
             // Prepare prompt for the AI
             const tagNames = availableTags.map(tag => tag.name).join(', ');
+
+            // Extract key sections from the content
+            const contentSections = extractContentSections(content);
+
+            // Limit number of sections if too many
+            const sectionsToUse = contentSections.slice(0, SECTIONS_TO_ANALYZE);
+
+            // Combine sections with section numbers for readability
+            const formattedSections = sectionsToUse.map((section, index) =>
+                `Section ${index + 1}:\n${section}`
+            ).join('\n\n');
+
             const prompt = `
 I need to categorize the following changelog content with appropriate tags.
 Available tags: ${tagNames}
 
-Based on the content, which tags (maximum 3) would be most relevant? 
+I'll provide key sections from the content below. Based on these sections, which tags (maximum 3) would be most relevant? 
 Only respond with tags from the provided list above, separated by commas.
 Do not add any explanations, just return the tag names.
 
-Content to analyze:
-${content.substring(0, 1000)}
-      `.trim();
+${formattedSections}
+            `.trim();
 
             // Call AI API
             const response = await fetch('https://api.secton.org/v1/chat/completions', {
@@ -156,7 +263,7 @@ ${content.substring(0, 1000)}
                         { role: 'user', content: prompt }
                     ],
                     temperature: 0.3,
-                    max_tokens: 100
+                    max_tokens: 30 // Reduced to save tokens
                 })
             });
 
@@ -322,12 +429,12 @@ ${content.substring(0, 1000)}
                                             </CardHeader>
                                             <CardContent className="p-2 pt-0">
                                                 <div className="flex flex-wrap gap-1 mt-1">
-                                                    {suggestedTags.map(tag => {
+                                                    {suggestedTags.map((tag, index) => {
                                                         const isSelected = selectedTags.some(t => t.id === tag.id);
 
                                                         return (
                                                             <Badge
-                                                                key={tag.id}
+                                                                key={`suggested-${tag.id}-${index}`}
                                                                 variant={isSelected ? "default" : "outline"}
                                                                 className={cn(
                                                                     "cursor-pointer transition-all duration-200",
@@ -458,9 +565,9 @@ ${content.substring(0, 1000)}
                                 <div className="border-t p-2 bg-muted/10">
                                     <div className="flex flex-wrap gap-1 mb-1">
                                         <p className="text-xs text-muted-foreground w-full mb-1">Selected tags:</p>
-                                        {selectedTags.map(tag => (
+                                        {selectedTags.map((tag, index) => (
                                             <Badge
-                                                key={tag.id}
+                                                key={`selected-${tag.id}-${index}`}
                                                 variant="default"
                                                 className="text-xs cursor-pointer flex items-center gap-1 bg-primary"
                                                 onClick={() => toggleTag(tag)}

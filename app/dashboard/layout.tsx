@@ -22,7 +22,7 @@ import {
     Users,
     Info,
     X,
-    Sparkles,
+    Sparkles, Clock,
 } from 'lucide-react'
 import {Button} from '@/components/ui/button'
 import {Avatar, AvatarFallback, AvatarImage} from '@/components/ui/avatar'
@@ -71,6 +71,12 @@ const NAV_SECTIONS = [
                 label: "Projects",
                 icon: Folder,
                 requiredRole: ['ADMIN', 'STAFF']
+            },
+            {
+                href: "/dashboard/requests",
+                label: "Requests",
+                icon: Clock,
+                requiredRole: ['STAFF']
             }
         ]
     },
