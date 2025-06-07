@@ -21,7 +21,7 @@ import {
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import {useToast} from '@/hooks/use-toast'
-import {AlertTriangle, Loader2, Plus, Puzzle, Settings, Shield, Tag, X, Lock, ExternalLink, Rss, Code, Boxes, Mail} from 'lucide-react'
+import {AlertTriangle, Loader2, Plus, Puzzle, Settings, Shield, Tag, X, Lock, ExternalLink, Rss, Code, Mail, Github, ArrowRight, CheckCircle, Clock} from 'lucide-react'
 import {DestructiveActionRequest} from '@/components/changelog/RequestHandler'
 import {useAuth} from '@/context/auth'
 import {Alert, AlertDescription} from '@/components/ui/alert'
@@ -123,10 +123,68 @@ export default function ProjectSettingsPage({params}: ProjectSettingsPageProps) 
     const tabs = [
         {id: 'general', label: 'General', icon: Settings},
         {id: 'access', label: 'Access', icon: Shield},
-        {id: 'integrations', label: 'Integrations', icon: Puzzle}, // Add new
+        {id: 'integrations', label: 'Integrations', icon: Puzzle},
         {id: 'tags', label: 'Tags', icon: Tag},
         {id: 'danger', label: 'Danger', icon: AlertTriangle, className: 'text-destructive'}
     ]
+
+    // Integration definitions - organized for better scalability
+    const integrations = [
+        {
+            id: 'widget',
+            name: 'Changelog Widget',
+            description: 'Embed a customizable widget into your website',
+            icon: Code,
+            status: 'stable',
+            requiresPublic: true,
+            action: {
+                type: 'navigate',
+                label: 'Configure',
+                path: `/dashboard/projects/${projectId}/integrations/widget`
+            }
+        },
+        {
+            id: 'email',
+            name: 'Email Notifications',
+            description: 'Send updates to subscribers via email',
+            icon: Mail,
+            status: 'stable',
+            requiresPublic: false,
+            action: {
+                type: 'navigate',
+                label: 'Configure',
+                path: `/dashboard/projects/${projectId}/integrations/email`
+            }
+        },
+        {
+            id: 'github',
+            name: 'GitHub Integration',
+            description: 'Use your GitHub data with changelogs',
+            icon: Github,
+            status: 'beta',
+            requiresPublic: false,
+            action: {
+                type: 'navigate',
+                label: 'Configure',
+                path: `/dashboard/projects/${projectId}/integrations/github`
+            }
+        },
+        {
+            id: 'rss',
+            name: 'RSS Feed',
+            description: 'Subscribe to changelog updates',
+            icon: Rss,
+            status: 'stable',
+            requiresPublic: true,
+            action: {
+                type: 'external',
+                label: 'View Feed',
+                url: `/changelog/${projectId}/rss.xml`
+            }
+        }
+    ]
+
+    const comingSoonIntegrations = ['Slack', 'Discord', 'Teams', 'Zapier', 'Webhook']
 
     const renderTabContent = () => {
         switch (activeTab) {
@@ -212,118 +270,112 @@ export default function ProjectSettingsPage({params}: ProjectSettingsPageProps) 
                     <Card>
                         <CardHeader>
                             <div className="flex items-center gap-2">
-                                <Boxes className="h-5 w-5 text-primary" />
+                                <Puzzle className="h-5 w-5 text-primary" />
                                 <CardTitle>Integrations</CardTitle>
                             </div>
                             <CardDescription>
-                                Add changelog widgets and integrations to your project
+                                Connect your changelog with external services
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
                             {!project.isPublic && (
-                                <Alert hasIcon={true} variant="warning">
+                                <Alert icon={<Lock className="h-4 w-4" />}>
                                     <AlertDescription>
-                                        Some integrations require your project to be public. Make your project public in settings to enable all features.
+                                        Some integrations require your project to be public. Enable public access to unlock all features.
                                     </AlertDescription>
                                 </Alert>
                             )}
 
-                            <div className="grid gap-4">
-                                {/* Widget Integration */}
-                                <div className="group relative rounded-lg border p-4 hover:border-primary/50 transition-colors">
-                                    <div className="flex items-start gap-4">
-                                        <div className="p-2 rounded-md bg-primary/10 text-primary">
-                                            <Code className="h-5 w-5" />
-                                        </div>
-                                        <div className="flex-1 space-y-1">
-                                            <h3 className="font-medium">Changelog Widget</h3>
-                                            <p className="text-sm text-muted-foreground">
-                                                Embed a customizable changelog widget directly into your website
-                                            </p>
-                                        </div>
-                                        {project.isPublic ? (
-                                            <Button
-                                                onClick={() => router.push(`/dashboard/projects/${projectId}/integrations/widget`)}
-                                                variant="outline"
-                                                className="group-hover:border-primary/50 group-hover:bg-primary/5 transition-colors"
-                                            >
-                                                <Settings className="h-4 w-4 mr-2"/>
-                                                Configure Widget
-                                            </Button>
-                                        ) : (
-                                            <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground bg-muted rounded-md">
-                                                <Lock className="h-4 w-4"/>
-                                                Requires public project
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
+                            {/* Available Integrations Grid */}
+                            <div className="grid gap-4 md:grid-cols-2">
+                                {integrations.map((integration) => {
+                                    const Icon = integration.icon
+                                    const isBlocked = integration.requiresPublic && !project.isPublic
 
-                                {/* Email Integration */}
-                                <div className="group relative rounded-lg border p-4 hover:border-primary/50 transition-colors">
-                                    <div className="flex items-start gap-4">
-                                        <div className="p-2 rounded-md bg-primary/10 text-primary">
-                                            <Mail className="h-5 w-5" />
-                                        </div>
-                                        <div className="flex-1 space-y-1">
-                                            <h3 className="font-medium">Email Notifications</h3>
-                                            <p className="text-sm text-muted-foreground">
-                                                Send changelog updates to your team or subscribers via email
-                                            </p>
-                                        </div>
-                                        <Button
-                                            onClick={() => router.push(`/dashboard/projects/${projectId}/integrations/email`)}
-                                            variant="outline"
-                                            className="group-hover:border-primary/50 group-hover:bg-primary/5 transition-colors"
+                                    return (
+                                        <Card
+                                            key={integration.id}
+                                            className={`relative transition-colors ${
+                                                isBlocked
+                                                    ? 'opacity-60'
+                                                    : 'hover:border-primary/50'
+                                            }`}
                                         >
-                                            <Settings className="h-4 w-4 mr-2"/>
-                                            Configure Email
-                                        </Button>
-                                    </div>
-                                </div>
+                                            <CardContent className="p-4">
+                                                <div className="space-y-3">
+                                                    <div className="flex items-start justify-between">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="p-2 rounded-md bg-primary/10 text-primary">
+                                                                <Icon className="h-5 w-5" />
+                                                            </div>
+                                                            <div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <h3 className="font-medium">{integration.name}</h3>
+                                                                    {integration.status === 'beta' && (
+                                                                        <Badge variant="outline" className="text-xs">
+                                                                            <Clock className="h-3 w-3 mr-1" />
+                                                                            Beta
+                                                                        </Badge>
+                                                                    )}
+                                                                    {integration.status === 'stable' && (
+                                                                        <Badge variant="outline" className="text-xs text-green-600 border-green-200">
+                                                                            <CheckCircle className="h-3 w-3 mr-1" />
+                                                                            Stable
+                                                                        </Badge>
+                                                                    )}
+                                                                </div>
+                                                                <p className="text-sm text-muted-foreground">
+                                                                    {integration.description}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
 
-                                {/* RSS Feed */}
-                                <div className="group relative rounded-lg border p-4 hover:border-primary/50 transition-colors">
-                                    <div className="flex items-start gap-4">
-                                        <div className="p-2 rounded-md bg-primary/10 text-primary">
-                                            <Rss className="h-5 w-5" />
-                                        </div>
-                                        <div className="flex-1 space-y-1">
-                                            <h3 className="font-medium">RSS Feed</h3>
-                                            <p className="text-sm text-muted-foreground">
-                                                Subscribe to your changelog updates via RSS
-                                            </p>
-                                        </div>
-                                        {project.isPublic ? (
-                                            <Button
-                                                variant="outline"
-                                                className="group-hover:border-primary/50 group-hover:bg-primary/5 transition-colors"
-                                                asChild
-                                            >
-                                                <a href={`/changelog/${projectId}/rss.xml`} target="_blank">
-                                                    <ExternalLink className="h-4 w-4 mr-2"/>
-                                                    View RSS Feed
-                                                </a>
-                                            </Button>
-                                        ) : (
-                                            <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground bg-muted rounded-md">
-                                                <Lock className="h-4 w-4"/>
-                                                Requires public project
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
+                                                    <div className="flex justify-end">
+                                                        {isBlocked ? (
+                                                            <div className="flex items-center gap-2 px-3 py-1.5 text-sm text-muted-foreground bg-muted rounded-md">
+                                                                <Lock className="h-4 w-4"/>
+                                                                Requires public project
+                                                            </div>
+                                                        ) : (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() => {
+                                                                    if (integration.action.type === 'navigate') {
+                                                                        router.push(integration.action.path!)
+                                                                    } else if (integration.action.type === 'external') {
+                                                                        window.open(integration.action.url, '_blank')
+                                                                    }
+                                                                }}
+                                                                className="gap-2"
+                                                            >
+                                                                {integration.action.label}
+                                                                {integration.action.type === 'external' ? (
+                                                                    <ExternalLink className="h-4 w-4" />
+                                                                ) : (
+                                                                    <ArrowRight className="h-4 w-4" />
+                                                                )}
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    )
+                                })}
                             </div>
 
-                            <div className="mt-6 pt-6 border-t">
-                                <h3 className="text-sm font-medium text-muted-foreground mb-2">More integrations coming soon</h3>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                                    {['Slack', 'Discord'].map((integration) => (
+                            {/* Coming Soon Section */}
+                            <div className="pt-4 border-t">
+                                <h3 className="text-sm font-medium text-muted-foreground mb-3">Coming Soon</h3>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                                    {comingSoonIntegrations.map((name) => (
                                         <div
-                                            key={integration}
-                                            className="flex items-center justify-center h-20 rounded-lg border bg-muted/30 text-sm text-muted-foreground"
+                                            key={name}
+                                            className="flex items-center justify-center h-16 rounded-lg border bg-muted/30 text-xs text-muted-foreground font-medium"
                                         >
-                                            {integration}
+                                            {name}
                                         </div>
                                     ))}
                                 </div>
@@ -393,7 +445,6 @@ export default function ProjectSettingsPage({params}: ProjectSettingsPageProps) 
                     </Card>
                 )
 
-
             case 'danger':
                 return (
                     <Card>
@@ -451,7 +502,6 @@ export default function ProjectSettingsPage({params}: ProjectSettingsPageProps) 
                                             projectId={projectId}
                                             action="DELETE_PROJECT"
                                             onSuccess={() => router.push('/dashboard/projects')}
-
                                         />
                                     )}
                                 </div>

@@ -65,6 +65,10 @@ interface ChangelogEditorProps {
     entryId?: string;
     isNewChangelog?: boolean;
     initialPublishedStatus?: boolean;
+    // New props for pre-populating content
+    initialContent?: string;
+    initialVersion?: string;
+    initialTitle?: string;
 }
 
 interface Tag {
@@ -121,17 +125,23 @@ export function ChangelogEditor({
                                     entryId,
                                     isNewChangelog = false,
                                     initialPublishedStatus = false,
+                                    initialContent = '',
+                                    initialVersion = '',
+                                    initialTitle = '',
                                 }: ChangelogEditorProps) {
     const router = useRouter();
 
+    // Track if initial values have been applied
+    const initialValuesApplied = useRef(false);
+
     // Optimized state management
     const [editorState, setEditorState] = useState<EditorState>(() => ({
-        title: '',
-        content: '',
-        version: '',
+        title: initialTitle,
+        content: initialContent,
+        version: initialVersion,
         tags: [],
         isPublished: initialPublishedStatus,
-        hasUnsavedChanges: false
+        hasUnsavedChanges: !!(initialTitle || initialContent || initialVersion) // Mark as changed if we have initial values
     }));
 
     // UI state with useRef for values that don't need re-renders
@@ -247,37 +257,56 @@ export function ChangelogEditor({
         };
     }, [initialData, tagsData?.pages]);
 
-    // Initialize editor state from fetched data
+    // Initialize editor state from fetched data or initial props
     useEffect(() => {
         if (!initialData) return;
 
         const { entry } = initialData;
-        if (!entry) {
-            if (isNewChangelog && mappedDefaultTags.length > 0) {
-                setEditorState(prev => ({
-                    ...prev,
-                    tags: mappedDefaultTags,
-                    hasUnsavedChanges: false
-                }));
-            }
+
+        // For existing entries, load their data
+        if (entry) {
+            const entryTags = entry.tags || [];
+            const formattedTags = entryTags.map(tag => ({
+                ...tag,
+                name: tag.name.charAt(0).toUpperCase() + tag.name.slice(1).toLowerCase()
+            }));
+
+            setEditorState({
+                title: entry.title || '',
+                content: entry.content || '',
+                version: entry.version || '',
+                tags: formattedTags,
+                isPublished: !!entry.publishedAt,
+                hasUnsavedChanges: false
+            });
+            initialValuesApplied.current = true;
             return;
         }
 
-        const entryTags = entry.tags || [];
-        const formattedTags = entryTags.map(tag => ({
-            ...tag,
-            name: tag.name.charAt(0).toUpperCase() + tag.name.slice(1).toLowerCase()
-        }));
+        // For new entries, apply initial values once and add default tags
+        if (isNewChangelog && !initialValuesApplied.current) {
+            const hasInitialValues = !!(initialTitle || initialContent || initialVersion);
 
-        setEditorState({
-            title: entry.title || '',
-            content: entry.content || '',
-            version: entry.version || '',
-            tags: formattedTags,
-            isPublished: !!entry.publishedAt,
-            hasUnsavedChanges: false
-        });
-    }, [initialData, isNewChangelog, mappedDefaultTags]);
+            setEditorState(prev => ({
+                ...prev,
+                title: initialTitle || prev.title,
+                content: initialContent || prev.content,
+                version: initialVersion || prev.version,
+                tags: mappedDefaultTags.length > 0 ? mappedDefaultTags : prev.tags,
+                hasUnsavedChanges: hasInitialValues || mappedDefaultTags.length > 0
+            }));
+
+            initialValuesApplied.current = true;
+
+            // Show a toast if content was pre-populated
+            if (hasInitialValues) {
+                toast({
+                    title: "Content loaded",
+                    description: "Pre-filled content has been loaded into the editor.",
+                });
+            }
+        }
+    }, [initialData, isNewChangelog, mappedDefaultTags, initialTitle, initialContent, initialVersion]);
 
     // Save mutation
     const saveEntry = useMutation({
@@ -470,7 +499,7 @@ export function ChangelogEditor({
                 availableTags={availableTags}
                 onTagsChange={handleTagsChange}
                 onTitleChange={handleTitleChange}
-                content={editorState.content} // Explicitly pass content to EnhancedEditorHeader
+                content={editorState.content}
                 aiApiKey={sectonApiKey}
                 onLoadMoreTags={hasNextPage ? async () => {
                     await fetchNextPage();
@@ -505,7 +534,7 @@ export function ChangelogEditor({
                         className="min-h-[500px]"
                         enableAI={aiEnabled && !!sectonApiKey}
                         aiApiKey={sectonApiKey}
-                        autoFocus={isNewChangelog}
+                        autoFocus={isNewChangelog && !initialContent} // Only autofocus if no initial content
                     />
                 ) : (
                     <div className="flex items-center justify-center p-12 border rounded-md bg-muted/10">

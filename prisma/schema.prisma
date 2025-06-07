@@ -120,6 +120,7 @@ model Project {
   emailConfig         EmailConfig?
   emailLogs           EmailLog[]
   ProjectSubscription ProjectSubscription[]
+  gitHubIntegration   GitHubIntegration?
 }
 
 model Passkey {
@@ -337,6 +338,28 @@ model TwoFactorSession {
 
   @@index([userId])
   @@index([expiresAt])
+}
+
+model GitHubIntegration {
+  id                     String    @id @default(cuid())
+  projectId              String    @unique
+  project                Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  repositoryUrl          String
+  accessToken            String // Encrypted access token
+  defaultBranch          String    @default("main")
+  lastSyncAt             DateTime?
+  lastCommitSha          String?
+  includeBreakingChanges Boolean   @default(true)
+  includeFixes           Boolean   @default(true)
+  includeFeatures        Boolean   @default(true)
+  includeChores          Boolean   @default(false)
+  customCommitTypes      String[]  @default([])
+  enabled                Boolean   @default(true)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  @@index([projectId])
+  @@index([enabled])
 }
 
 enum Role {

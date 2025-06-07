@@ -21,7 +21,8 @@ import {
     PenTool,
     MailIcon,
     Rss,
-    type LucideIcon
+    type LucideIcon,
+    Github
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -455,6 +456,12 @@ export function ProjectSidebar({ projectId }: { projectId: string }) {
                             icon={MailIcon}
                             label="Email"
                             active={pathname.includes(`/dashboard/projects/${projectId}/integrations/email`)}
+                        />
+                        <NavItem
+                            href={`/dashboard/projects/${projectId}/integrations/github`}
+                            icon={Github}
+                            label="GitHub"
+                            active={pathname.includes(`/dashboard/projects/${projectId}/integrations/github`)}
                         />
                     </nav>
 
