@@ -68,23 +68,25 @@ interface TestResult {
     error?: string;
 }
 
+// Default settings for when no integration exists
+const DEFAULT_SETTINGS: GitHubIntegration = {
+    enabled: false,
+    repositoryUrl: '',
+    defaultBranch: 'main',
+    autoGenerate: false,
+    includeBreakingChanges: true,
+    includeFixes: true,
+    includeFeatures: true,
+    includeChores: false,
+    customCommitTypes: ['docs', 'style', 'refactor', 'perf'],
+    lastSyncAt: null,
+    lastCommitSha: null,
+    hasAccessToken: false
+};
+
 export default function GitHubIntegrationSettings({ projectId }: { projectId: string }) {
     // State management
-    const [settings, setSettings] = useState<GitHubIntegration>({
-        enabled: false,
-        repositoryUrl: '',
-        defaultBranch: 'main',
-        autoGenerate: false,
-        includeBreakingChanges: true,
-        includeFixes: true,
-        includeFeatures: true,
-        includeChores: false,
-        customCommitTypes: ['docs', 'style', 'refactor', 'perf'],
-        lastSyncAt: null,
-        lastCommitSha: null,
-        hasAccessToken: false
-    });
-
+    const [settings, setSettings] = useState<GitHubIntegration>(DEFAULT_SETTINGS);
     const [accessToken, setAccessToken] = useState('');
     const [showToken, setShowToken] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
@@ -103,16 +105,38 @@ export default function GitHubIntegrationSettings({ projectId }: { projectId: st
     const loadSettings = async () => {
         try {
             setIsLoading(true);
+            setError(null);
+
             const response = await fetch(`/api/projects/${projectId}/integrations/github`);
+
+            if (response.status === 404) {
+                // No integration configured yet - use defaults
+                setSettings(DEFAULT_SETTINGS);
+                return;
+            }
 
             if (!response.ok) {
                 throw new Error('Failed to load GitHub integration settings');
             }
 
             const data = await response.json();
-            setSettings(data);
+
+            // Handle case where response is null (no integration)
+            if (!data) {
+                setSettings(DEFAULT_SETTINGS);
+                return;
+            }
+
+            // Merge with defaults to ensure all fields are present
+            setSettings({
+                ...DEFAULT_SETTINGS,
+                ...data
+            });
         } catch (err) {
+            console.error('Error loading GitHub settings:', err);
             setError(err instanceof Error ? err.message : 'Failed to load settings');
+            // Set defaults on error too
+            setSettings(DEFAULT_SETTINGS);
         } finally {
             setIsLoading(false);
         }
@@ -151,6 +175,7 @@ export default function GitHubIntegrationSettings({ projectId }: { projectId: st
             }
 
         } catch (err) {
+            console.error('Test connection error:', err);
             setTestResult({
                 success: false,
                 error: err instanceof Error ? err.message : 'Test failed'
@@ -162,12 +187,12 @@ export default function GitHubIntegrationSettings({ projectId }: { projectId: st
 
     // Save settings
     const saveSettings = async () => {
-        if (!settings.repositoryUrl) {
+        if (!settings.repositoryUrl.trim()) {
             setError('Repository URL is required');
             return;
         }
 
-        if (!accessToken && !settings.hasAccessToken) {
+        if (!accessToken.trim() && !settings.hasAccessToken) {
             setError('Access token is required');
             return;
         }
@@ -178,8 +203,13 @@ export default function GitHubIntegrationSettings({ projectId }: { projectId: st
 
             const payload = {
                 ...settings,
-                ...(accessToken && { accessToken }) // Only include if provided
+                ...(accessToken.trim() && { accessToken: accessToken.trim() }) // Only include if provided
             };
+
+            console.log('Saving GitHub integration with payload:', {
+                ...payload,
+                accessToken: payload.accessToken ? '[REDACTED]' : undefined
+            });
 
             const response = await fetch(`/api/projects/${projectId}/integrations/github`, {
                 method: 'POST',
@@ -189,11 +219,15 @@ export default function GitHubIntegrationSettings({ projectId }: { projectId: st
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to save settings');
+                console.error('Save failed:', errorData);
+                throw new Error(errorData.error || errorData.details || 'Failed to save settings');
             }
 
             const updatedSettings = await response.json();
-            setSettings(updatedSettings);
+            setSettings({
+                ...DEFAULT_SETTINGS,
+                ...updatedSettings
+            });
             setAccessToken(''); // Clear the input
             setSuccess('GitHub integration configured successfully!');
 
@@ -201,6 +235,7 @@ export default function GitHubIntegrationSettings({ projectId }: { projectId: st
             setTimeout(() => setSuccess(null), 3000);
 
         } catch (err) {
+            console.error('Save settings error:', err);
             setError(err instanceof Error ? err.message : 'Failed to save settings');
         } finally {
             setIsSaving(false);
@@ -223,20 +258,7 @@ export default function GitHubIntegrationSettings({ projectId }: { projectId: st
             }
 
             // Reset to default state
-            setSettings({
-                enabled: false,
-                repositoryUrl: '',
-                defaultBranch: 'main',
-                autoGenerate: false,
-                includeBreakingChanges: true,
-                includeFixes: true,
-                includeFeatures: true,
-                includeChores: false,
-                customCommitTypes: ['docs', 'style', 'refactor', 'perf'],
-                lastSyncAt: null,
-                lastCommitSha: null,
-                hasAccessToken: false
-            });
+            setSettings(DEFAULT_SETTINGS);
             setAccessToken('');
             setTestResult(null);
             setSuccess('GitHub integration removed successfully!');
@@ -245,10 +267,19 @@ export default function GitHubIntegrationSettings({ projectId }: { projectId: st
             setTimeout(() => setSuccess(null), 3000);
 
         } catch (err) {
+            console.error('Delete integration error:', err);
             setError(err instanceof Error ? err.message : 'Failed to delete integration');
         } finally {
             setIsDeleting(false);
         }
+    };
+
+    // Handle settings changes safely
+    const updateSettings = (updates: Partial<GitHubIntegration>) => {
+        setSettings(prev => ({
+            ...prev,
+            ...updates
+        }));
     };
 
     if (isLoading) {
@@ -294,7 +325,7 @@ export default function GitHubIntegrationSettings({ projectId }: { projectId: st
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
                     >
-                        <Alert variant="success">
+                        <Alert className="border-green-200 bg-green-50 text-green-900 dark:border-green-800 dark:bg-green-950/30 dark:text-green-400">
                             <AlertDescription>{success}</AlertDescription>
                         </Alert>
                     </motion.div>
@@ -326,8 +357,8 @@ export default function GitHubIntegrationSettings({ projectId }: { projectId: st
                                 <Input
                                     id="repositoryUrl"
                                     placeholder="https://github.com/username/repository"
-                                    value={settings.repositoryUrl}
-                                    onChange={(e) => setSettings(prev => ({ ...prev, repositoryUrl: e.target.value }))}
+                                    value={settings.repositoryUrl || ''}
+                                    onChange={(e) => updateSettings({ repositoryUrl: e.target.value })}
                                 />
                                 <p className="text-xs text-muted-foreground">
                                     Enter the full GitHub repository URL (e.g., https://github.com/owner/repo)
@@ -445,8 +476,8 @@ export default function GitHubIntegrationSettings({ projectId }: { projectId: st
                                 <Input
                                     id="defaultBranch"
                                     placeholder="main"
-                                    value={settings.defaultBranch}
-                                    onChange={(e) => setSettings(prev => ({ ...prev, defaultBranch: e.target.value }))}
+                                    value={settings.defaultBranch || 'main'}
+                                    onChange={(e) => updateSettings({ defaultBranch: e.target.value })}
                                 />
                                 <p className="text-xs text-muted-foreground">
                                     The default branch to use for commit analysis (usually &apos;main&apos; or &apos;master&apos;)
@@ -464,7 +495,7 @@ export default function GitHubIntegrationSettings({ projectId }: { projectId: st
                                 <Switch
                                     id="enabled"
                                     checked={settings.enabled}
-                                    onCheckedChange={(checked) => setSettings(prev => ({ ...prev, enabled: checked }))}
+                                    onCheckedChange={(checked) => updateSettings({ enabled: checked })}
                                 />
                             </div>
                         </CardContent>
@@ -528,7 +559,7 @@ export default function GitHubIntegrationSettings({ projectId }: { projectId: st
                                     </div>
                                     <Switch
                                         checked={settings.includeBreakingChanges}
-                                        onCheckedChange={(checked) => setSettings(prev => ({ ...prev, includeBreakingChanges: checked }))}
+                                        onCheckedChange={(checked) => updateSettings({ includeBreakingChanges: checked })}
                                     />
                                 </div>
 
@@ -539,7 +570,7 @@ export default function GitHubIntegrationSettings({ projectId }: { projectId: st
                                     </div>
                                     <Switch
                                         checked={settings.includeFeatures}
-                                        onCheckedChange={(checked) => setSettings(prev => ({ ...prev, includeFeatures: checked }))}
+                                        onCheckedChange={(checked) => updateSettings({ includeFeatures: checked })}
                                     />
                                 </div>
 
@@ -550,7 +581,7 @@ export default function GitHubIntegrationSettings({ projectId }: { projectId: st
                                     </div>
                                     <Switch
                                         checked={settings.includeFixes}
-                                        onCheckedChange={(checked) => setSettings(prev => ({ ...prev, includeFixes: checked }))}
+                                        onCheckedChange={(checked) => updateSettings({ includeFixes: checked })}
                                     />
                                 </div>
 
@@ -561,7 +592,7 @@ export default function GitHubIntegrationSettings({ projectId }: { projectId: st
                                     </div>
                                     <Switch
                                         checked={settings.includeChores}
-                                        onCheckedChange={(checked) => setSettings(prev => ({ ...prev, includeChores: checked }))}
+                                        onCheckedChange={(checked) => updateSettings({ includeChores: checked })}
                                     />
                                 </div>
                             </div>
@@ -578,12 +609,10 @@ export default function GitHubIntegrationSettings({ projectId }: { projectId: st
                                             variant={settings.customCommitTypes.includes(type) ? "default" : "outline"}
                                             className="cursor-pointer"
                                             onClick={() => {
-                                                setSettings(prev => ({
-                                                    ...prev,
-                                                    customCommitTypes: prev.customCommitTypes.includes(type)
-                                                        ? prev.customCommitTypes.filter(t => t !== type)
-                                                        : [...prev.customCommitTypes, type]
-                                                }));
+                                                const newCustomTypes = settings.customCommitTypes.includes(type)
+                                                    ? settings.customCommitTypes.filter(t => t !== type)
+                                                    : [...settings.customCommitTypes, type];
+                                                updateSettings({ customCommitTypes: newCustomTypes });
                                             }}
                                         >
                                             {type}
