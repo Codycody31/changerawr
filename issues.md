@@ -2,3 +2,4 @@
 - [x] audit log should load all chunked data in chunks but load all data
 - [x] fix links in AI assistant settings
 - [ ] fix theme switcher handling
+- [ ] allow for setting custom URLs for SSO Providers
