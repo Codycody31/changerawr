@@ -1,99 +1,97 @@
 'use client'
 
 import * as React from "react"
-import { ThemeProvider as NextThemesProvider } from "next-themes"
+import { ThemeProvider as NextThemesProvider, useTheme } from "next-themes"
 import { useAuth } from "@/context/auth"
 
-// Script to be injected in the document head
-const themeScript = `
-  let theme = 'light'; // Default theme
-  const auth = document.cookie.includes('accessToken=');
-  
-  if (auth) {
-    // Check localStorage first for cached theme
-    const cachedTheme = localStorage.getItem('theme');
-    if (cachedTheme) {
-      theme = cachedTheme;
-    }
-  }
-  
-  document.documentElement.classList.toggle('dark', theme === 'dark');
-  
-  // Add a small transition delay to prevent flash during theme change
-  document.documentElement.style.transition = "background-color 0.2s ease-in-out";
-`;
+// Theme sync component that handles user settings integration
+function ThemeSync() {
+    const { theme, setTheme } = useTheme()
+    const { user, isLoading } = useAuth()
+    const [hasSynced, setHasSynced] = React.useState(false)
+
+    // Check if user is authenticated (not loading and has user)
+    const isAuthenticated = !isLoading && !!user
+
+    // Sync theme with user settings when authenticated
+    React.useEffect(() => {
+        async function syncTheme() {
+            if (!isAuthenticated || !user || hasSynced) return
+
+            try {
+                const response = await fetch('/api/auth/settings')
+                if (response.ok) {
+                    const settings = await response.json()
+                    if (settings.theme && settings.theme !== theme) {
+                        setTheme(settings.theme)
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to sync theme from user settings:', error)
+            } finally {
+                setHasSynced(true)
+            }
+        }
+
+        syncTheme()
+    }, [isAuthenticated, user, theme, setTheme, hasSynced])
+
+    // Save theme changes to user settings when authenticated
+    React.useEffect(() => {
+        async function saveTheme() {
+            if (!isAuthenticated || !user || !hasSynced || !theme) return
+
+            try {
+                await fetch('/api/auth/settings', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ theme })
+                })
+            } catch (error) {
+                console.error('Failed to save theme to user settings:', error)
+            }
+        }
+
+        // Debounce theme saves
+        const timeoutId = setTimeout(saveTheme, 500)
+        return () => clearTimeout(timeoutId)
+    }, [theme, isAuthenticated, user, hasSynced])
+
+    return null
+}
 
 export function ThemeProvider({
                                   children,
                                   ...props
                               }: React.ComponentProps<typeof NextThemesProvider>) {
-    const { user } = useAuth()
-    const [userTheme, setUserTheme] = React.useState<string | undefined>(
-        typeof window !== 'undefined' ? localStorage.getItem('theme') || 'light' : 'light'
+    return (
+        <NextThemesProvider
+            {...props}
+            attribute="class"
+            defaultTheme="light"
+            enableSystem={false}
+            disableTransitionOnChange={false}
+            storageKey="theme"
+        >
+            <ThemeSync />
+            {children}
+        </NextThemesProvider>
     )
-    const [isLoading, setIsLoading] = React.useState(true)
+}
 
-    // Fetch user settings only if authenticated and no cached theme
+// Custom hook for theme with loading state
+export function useThemeWithLoading() {
+    const { theme, setTheme, resolvedTheme } = useTheme()
+    const [mounted, setMounted] = React.useState(false)
+
     React.useEffect(() => {
-        const fetchUserTheme = async () => {
-            if (user && !localStorage.getItem('theme')) {
-                try {
-                    setIsLoading(true)
-                    const response = await fetch('/api/auth/settings')
-                    if (response.ok) {
-                        const settings = await response.json()
-                        setUserTheme(settings.theme)
-                        localStorage.setItem('theme', settings.theme)
-                    }
-                } catch (error) {
-                    console.error('Failed to fetch theme settings:', error)
-                } finally {
-                    setIsLoading(false)
-                }
-            } else {
-                setIsLoading(false)
-            }
-        }
-
-        fetchUserTheme()
-    }, [user])
-
-    // Listen for storage changes to detect theme changes from other tabs
-    React.useEffect(() => {
-        const handleStorageChange = (event: StorageEvent) => {
-            if (event.key === 'theme' && event.newValue) {
-                setUserTheme(event.newValue)
-            }
-        }
-
-        window.addEventListener('storage', handleStorageChange)
-        return () => window.removeEventListener('storage', handleStorageChange)
+        setMounted(true)
     }, [])
 
-    // Check for theme changes every time userTheme updates
-    React.useEffect(() => {
-        if (userTheme && !isLoading) {
-            localStorage.setItem('theme', userTheme)
-        }
-    }, [userTheme, isLoading])
-
-    return (
-        <>
-            <script
-                dangerouslySetInnerHTML={{
-                    __html: themeScript,
-                }}
-            />
-            <NextThemesProvider
-                {...props}
-                defaultTheme="light"
-                forcedTheme={userTheme}
-                enableSystem={false}
-                attribute="class"
-                disableTransitionOnChange
-            >
-                {children}
-            </NextThemesProvider>
-        </>
-    )
+    return {
+        theme,
+        setTheme,
+        resolvedTheme,
+        isLoading: !mounted
+    }
 }

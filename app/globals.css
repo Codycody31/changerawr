@@ -34,6 +34,7 @@ body {
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
   }
+
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
@@ -66,52 +67,58 @@ body {
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
   }
 }
 
-.theme-transition-overlay {
-  opacity: 0;
-  transition: opacity 0.6s ease-in-out;
-  z-index: 9999;
-  pointer-events: none;
+/* Smooth theme transitions */
+html {
+  transition: color-scheme 0.3s ease;
 }
 
-.theme-transition-active {
-  opacity: 1 !important;
+html[data-theme="dark"] {
+  color-scheme: dark;
 }
 
-/* Theme transition animations */
-:root {
-  --theme-transition-duration: 600ms;
+html[data-theme="light"] {
+  color-scheme: light;
 }
 
-html.light,
-html.dark {
-  transition: background-color var(--theme-transition-duration) ease,
-  color var(--theme-transition-duration) ease;
+/* Smooth transitions for theme-aware elements */
+* {
+  transition-property: background-color, border-color, color, fill, stroke, box-shadow;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
 }
 
-/* Smoothen transitions for all UI elements */
-*:not(.theme-transition-overlay) {
-  transition-property: background-color, border-color, color, fill, stroke;
-  transition-timing-function: ease;
-  transition-duration: 200ms;
-}
-
-/* Override the transition for any elements that shouldn't animate */
-.no-theme-transition {
+/* Disable transitions for elements that shouldn't animate */
+.no-transition,
+.no-transition * {
   transition: none !important;
 }
 
-/* Add subtle pulse animation to the current theme icon */
-@keyframes pulse-theme {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
+/* Improved focus styles for dark mode */
+.dark *:focus-visible {
+  outline-color: hsl(var(--ring));
 }
 
-.theme-button-active-icon {
-  animation: pulse-theme 2s infinite ease-in-out;
+/* Theme-aware scrollbar (Webkit browsers) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--background));
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
 }

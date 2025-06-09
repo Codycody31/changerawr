@@ -1,14 +1,18 @@
 import { NextResponse } from 'next/server';
 import { validateAuthAndGetUser } from '@/lib/utils/changelog';
-import { createAuditLog } from '@/lib/utils/auditLog'; // Add this import
+import { createAuditLog } from '@/lib/utils/auditLog';
 import { db } from '@/lib/db';
 import { z } from 'zod';
 
+// Enhanced schema to handle both preset and custom URL configurations
 const providerSchema = z.object({
     name: z.string().min(1, 'Name is required'),
-    baseUrl: z.string().url('Base URL must be a valid URL'),
     clientId: z.string().min(1, 'Client ID is required'),
     clientSecret: z.string().min(1, 'Client Secret is required'),
+    // Direct URL fields - these will be provided regardless of preset/custom mode
+    authorizationUrl: z.string().url('Authorization URL must be valid'),
+    tokenUrl: z.string().url('Token URL must be valid'),
+    userInfoUrl: z.string().url('User Info URL must be valid'),
     scopes: z.array(z.string()).min(1, 'At least one scope is required'),
     enabled: z.boolean().default(true),
     isDefault: z.boolean().default(false)
@@ -74,7 +78,7 @@ export async function GET(request: Request) {
             await createAuditLog(
                 'VIEW_OAUTH_PROVIDERS',
                 user.id,
-                user.id, // Use admin's ID as target to avoid foreign key issues
+                user.id,
                 {
                     providerCount: providers.length,
                     includeAll: includeAll
@@ -82,7 +86,6 @@ export async function GET(request: Request) {
             );
         } catch (auditLogError) {
             console.error('Failed to create audit log:', auditLogError);
-            // Continue execution even if audit log creation fails
         }
 
         return NextResponse.json({ providers });
@@ -97,13 +100,15 @@ export async function GET(request: Request) {
 
 /**
  * @method POST
- * @description Creates a new OAuth provider
+ * @description Creates a new OAuth provider with support for custom URLs
  * @body {
  *   "type": "object",
- *   "required": ["name", "baseUrl", "clientId", "clientSecret", "scopes"],
+ *   "required": ["name", "authorizationUrl", "tokenUrl", "userInfoUrl", "clientId", "clientSecret", "scopes"],
  *   "properties": {
  *     "name": { "type": "string" },
- *     "baseUrl": { "type": "string", "format": "url" },
+ *     "authorizationUrl": { "type": "string", "format": "url" },
+ *     "tokenUrl": { "type": "string", "format": "url" },
+ *     "userInfoUrl": { "type": "string", "format": "url" },
  *     "clientId": { "type": "string" },
  *     "clientSecret": { "type": "string" },
  *     "scopes": { "type": "array", "items": { "type": "string" } },
@@ -139,11 +144,6 @@ export async function POST(request: Request) {
         const body = await request.json();
         const validatedData = providerSchema.parse(body);
 
-        // Normalize base URL (remove trailing slash)
-        const baseUrl = validatedData.baseUrl.endsWith('/')
-            ? validatedData.baseUrl.slice(0, -1)
-            : validatedData.baseUrl;
-
         // Get app URL for callback
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
@@ -166,16 +166,16 @@ export async function POST(request: Request) {
             }
         }
 
-        // Create the provider
+        // Create the provider with the provided URLs
         const provider = await db.oAuthProvider.create({
             data: {
                 name: validatedData.name,
                 clientId: validatedData.clientId,
                 clientSecret: validatedData.clientSecret,
-                authorizationUrl: `${baseUrl}/oauth/authorize`,
-                tokenUrl: `${baseUrl}/oauth/token`,
-                userInfoUrl: `${baseUrl}/oauth/userinfo`,
-                // Use provider name in callback URL
+                authorizationUrl: validatedData.authorizationUrl,
+                tokenUrl: validatedData.tokenUrl,
+                userInfoUrl: validatedData.userInfoUrl,
+                // Generate callback URL based on provider name
                 callbackUrl: `${appUrl}/api/auth/oauth/callback/${validatedData.name.toLowerCase().replace(/\s+/g, '-')}`,
                 scopes: validatedData.scopes,
                 enabled: validatedData.enabled,
@@ -188,11 +188,13 @@ export async function POST(request: Request) {
             await createAuditLog(
                 'CREATE_OAUTH_PROVIDER',
                 user.id,
-                user.id, // Use admin's ID as target to avoid foreign key issues
+                user.id,
                 {
                     providerId: provider.id,
                     providerName: provider.name,
-                    baseUrl: baseUrl,
+                    authorizationUrl: validatedData.authorizationUrl,
+                    tokenUrl: validatedData.tokenUrl,
+                    userInfoUrl: validatedData.userInfoUrl,
                     enabled: provider.enabled,
                     isDefault: provider.isDefault,
                     scopes: validatedData.scopes,
@@ -201,7 +203,6 @@ export async function POST(request: Request) {
             );
         } catch (auditLogError) {
             console.error('Failed to create audit log:', auditLogError);
-            // Continue execution even if audit log creation fails
         }
 
         return NextResponse.json(

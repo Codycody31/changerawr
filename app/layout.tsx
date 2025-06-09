@@ -1,13 +1,13 @@
-import type {Metadata} from 'next'
-import {Inter} from 'next/font/google'
-import {AuthProvider} from '@/context/auth'
+import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
+import { AuthProvider } from '@/context/auth'
 import './globals.css'
 import React from "react";
-import {ThemeProvider} from "@/components/theme-provider";
-import {Toaster} from "@/components/ui/toaster";
-import {Providers} from "@/app/dashboard/providers";
+import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "@/components/ui/toaster";
+import { Providers } from "@/app/dashboard/providers";
 
-const inter = Inter({subsets: ['latin']})
+const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
     title: 'Changerawr',
@@ -20,21 +20,17 @@ export default function RootLayout({
     children: React.ReactNode
 }) {
     return (
-        <Providers>
-            <html lang="en" suppressHydrationWarning>
-            <body className={inter.className}>
-            <AuthProvider>
-                <ThemeProvider
-                    attribute="class"
-                    defaultTheme="light"
-                    disableTransitionOnChange
-                >
+        <html lang="en" suppressHydrationWarning>
+        <body className={inter.className}>
+        <AuthProvider>
+            <ThemeProvider>
+                <Providers>
                     {children}
-                    <Toaster/>
-                </ThemeProvider>
-            </AuthProvider>
-            </body>
-            </html>
-        </Providers>
+                    <Toaster />
+                </Providers>
+            </ThemeProvider>
+        </AuthProvider>
+        </body>
+        </html>
     )
 }
