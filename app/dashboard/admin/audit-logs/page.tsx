@@ -43,6 +43,8 @@ import {
     Search,
     Copy,
     Check,
+    Pause,
+    Play,
 } from 'lucide-react'
 import { Progress } from '@/components/ui/progress'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -69,6 +71,11 @@ interface AuditLogsResponse {
     logs: AuditLog[]
     total: number
     nextCursor?: string | null
+}
+
+interface AuditAction {
+    action: string
+    count: number
 }
 
 interface FilterState {
@@ -122,6 +129,12 @@ export default function AuditLogsPage() {
     const [total, setTotal] = useState(0)
     const [loadProgress, setLoadProgress] = useState(0)
     const [tableHeight, setTableHeight] = useState(450)
+    const [isAutoLoading, setIsAutoLoading] = useState(true)
+    const [isPaused, setIsPaused] = useState(false)
+
+    // Available actions from API
+    const [availableActions, setAvailableActions] = useState<AuditAction[]>([])
+    const [isLoadingActions, setIsLoadingActions] = useState(false)
 
     // UI state
     const [searchInput, setSearchInput] = useState('')
@@ -145,6 +158,27 @@ export default function AuditLogsPage() {
 
     // Debounced search
     const debouncedSearch = useDebounce(searchInput)
+
+    // Fetch available actions for filter dropdown
+    const fetchAvailableActions = useCallback(async () => {
+        try {
+            setIsLoadingActions(true)
+            const response = await fetch('/api/admin/audit-logs/actions')
+            if (!response.ok) throw new Error('Failed to fetch actions')
+
+            const data = await response.json()
+            setAvailableActions(data.actions || [])
+        } catch (error) {
+            console.error('Error fetching available actions:', error)
+        } finally {
+            setIsLoadingActions(false)
+        }
+    }, [])
+
+    // Load available actions on mount
+    useEffect(() => {
+        fetchAvailableActions()
+    }, [fetchAvailableActions])
 
     // UseEffect to calculate available height for the table
     useEffect(() => {
@@ -178,6 +212,17 @@ export default function AuditLogsPage() {
         setActiveFilters(count);
     }, [filters]);
 
+    // Auto-load all data when filters change
+    useEffect(() => {
+        if (isAutoLoading && hasMore && !isLoadingMore && !isPaused && allLogs.length > 0) {
+            const timeoutId = setTimeout(() => {
+                loadMoreLogs()
+            }, 100) // Small delay to prevent overwhelming the API
+
+            return () => clearTimeout(timeoutId)
+        }
+    }, [allLogs, hasMore, isLoadingMore, isAutoLoading, isPaused])
+
     // Function to reset data
     const resetData = useCallback(() => {
         setAllLogs([]);
@@ -185,6 +230,7 @@ export default function AuditLogsPage() {
         setHasMore(true);
         setLoadProgress(0);
         setIsError(false);
+        setIsPaused(false);
         fetchInitialData();
     }, [filters]); // Added filters dependency
 
@@ -231,7 +277,7 @@ export default function AuditLogsPage() {
 
     // Function to load more data
     const loadMoreLogs = useCallback(async () => {
-        if (isLoadingMore || !hasMore || !nextCursor) return;
+        if (isLoadingMore || !hasMore || !nextCursor || isPaused) return;
 
         try {
             setIsLoadingMore(true);
@@ -274,7 +320,7 @@ export default function AuditLogsPage() {
         } finally {
             setIsLoadingMore(false);
         }
-    }, [allLogs, nextCursor, hasMore, isLoadingMore, filters, chunkSize]);
+    }, [allLogs, nextCursor, hasMore, isLoadingMore, filters, chunkSize, isPaused]);
 
     // Load initial data
     useEffect(() => {
@@ -337,6 +383,19 @@ export default function AuditLogsPage() {
         resetData();
     };
 
+    // Toggle auto-loading
+    const toggleAutoLoading = () => {
+        setIsAutoLoading(!isAutoLoading);
+        if (!isAutoLoading && hasMore) {
+            setIsPaused(false);
+        }
+    };
+
+    // Pause/resume loading
+    const togglePause = () => {
+        setIsPaused(!isPaused);
+    };
+
     // Action badge variant
     const getActionVariant = (action: string) => {
         if (action.includes('CREATE') || action.includes('ADD')) return 'success';
@@ -349,7 +408,7 @@ export default function AuditLogsPage() {
 
     // Handle scroll to bottom for loading more
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-        if (!hasMore || isLoadingMore) return;
+        if (!hasMore || isLoadingMore || !isAutoLoading || isPaused) return;
 
         const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
         if (scrollTop + clientHeight >= scrollHeight - 100) {
@@ -390,7 +449,7 @@ export default function AuditLogsPage() {
                 </CardHeader>
 
                 <CardContent className="p-6">
-                    {/* Progress indicator */}
+                    {/* Progress indicator with auto-loading controls */}
                     <div className="mb-4">
                         <div className="flex justify-between items-center text-sm mb-1.5">
                             <div className="flex items-center gap-1">
@@ -398,14 +457,36 @@ export default function AuditLogsPage() {
                                 <span className="text-muted-foreground">of</span>
                                 <span className="font-medium">{total}</span>
                                 <span className="text-muted-foreground">logs</span>
-                                {isLoading && (
+                                {(isLoading || isLoadingMore) && (
                                     <span className="inline-flex items-center gap-1 ml-2 text-muted-foreground">
                                         <Loader2 className="h-3 w-3 animate-spin" />
-                                        Loading...
+                                        {isLoading ? 'Loading...' : 'Loading more...'}
                                     </span>
                                 )}
                             </div>
-                            <span className="text-muted-foreground">{Math.floor(loadProgress)}% loaded</span>
+                            <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1">
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={toggleAutoLoading}
+                                        className="h-7 px-2"
+                                    >
+                                        {isAutoLoading ? 'Auto-load: ON' : 'Auto-load: OFF'}
+                                    </Button>
+                                    {hasMore && isAutoLoading && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={togglePause}
+                                            className="h-7 px-2"
+                                        >
+                                            {isPaused ? <Play className="h-3 w-3" /> : <Pause className="h-3 w-3" />}
+                                        </Button>
+                                    )}
+                                </div>
+                                <span className="text-muted-foreground">{Math.floor(loadProgress)}% loaded</span>
+                            </div>
                         </div>
                         <Progress value={loadProgress} className="h-2" />
                     </div>
@@ -448,18 +529,18 @@ export default function AuditLogsPage() {
                                                     action: value === 'all' ? '' : value
                                                 }));
                                             }}
+                                            disabled={isLoadingActions}
                                         >
                                             <SelectTrigger>
-                                                <SelectValue placeholder="Select action" />
+                                                <SelectValue placeholder={isLoadingActions ? "Loading actions..." : "Select action"} />
                                             </SelectTrigger>
-                                            {/* TODO: fetch all actions from changelog instead of hardcoding */}
                                             <SelectContent>
                                                 <SelectItem value="all">All Actions</SelectItem>
-                                                <SelectItem value="CREATE_USER">CREATE_USER</SelectItem>
-                                                <SelectItem value="DELETE_USER">DELETE_USER</SelectItem>
-                                                <SelectItem value="UPDATE_USER">UPDATE_USER</SelectItem>
-                                                <SelectItem value="LOGIN">LOGIN</SelectItem>
-                                                <SelectItem value="RENAME_API_KEY">RENAME_API_KEY</SelectItem>
+                                                {availableActions.map((actionItem) => (
+                                                    <SelectItem key={actionItem.action} value={actionItem.action}>
+                                                        {actionItem.action} ({actionItem.count})
+                                                    </SelectItem>
+                                                ))}
                                             </SelectContent>
                                         </Select>
                                     </div>
@@ -636,7 +717,7 @@ export default function AuditLogsPage() {
 
                                 {!hasMore && allLogs.length > 0 && (
                                     <div className="text-center py-3 text-sm text-muted-foreground bg-background bg-opacity-75 backdrop-blur-sm">
-                                        You&apos;ve reached the end of the logs ({allLogs.length} records)
+                                        All logs loaded ({allLogs.length} records)
                                     </div>
                                 )}
                             </div>

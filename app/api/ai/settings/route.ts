@@ -22,6 +22,7 @@ export async function GET() {
             select: {
                 enableAIAssistant: true,
                 aiApiKey: true,
+                aiDefaultModel: true
             }
         });
 
@@ -35,6 +36,7 @@ export async function GET() {
         return NextResponse.json({
             enableAIAssistant: config?.enableAIAssistant || false,
             aiApiKey: config?.aiApiKey || null,
+            aiDefaultModel: config?.aiDefaultModel || null,
         });
     } catch (error) {
         console.error('Error fetching AI system settings:', error)

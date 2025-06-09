@@ -329,7 +329,7 @@ export default function AISettingsPage() {
                                                 variant="default"
                                                 size="sm"
                                                 className="flex items-center gap-1"
-                                                onClick={() => window.open('https://platform.secton.org', '_blank')}
+                                                onClick={() => window.open('https://platform.secton.org/settings/organization/billing', '_blank')}
                                             >
                                                 <span>Get Credits</span>
                                                 <ExternalLink className="h-3.5 w-3.5" />
@@ -451,7 +451,7 @@ export default function AISettingsPage() {
                                     <p className="text-sm text-muted-foreground">
                                         Enter your Secton API key starting with &ldquo;sk_&rdquo;. Don&apos;t have one?
                                         <a
-                                            href="https://platform.secton.org"
+                                            href="https://platform.secton.org/settings/organization/api-keys"
                                             target="_blank"
                                             rel="noreferrer"
                                             className="text-primary hover:underline ml-1"

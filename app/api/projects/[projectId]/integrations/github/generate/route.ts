@@ -1,4 +1,4 @@
-// app/api/projects/[projectId]/integrations/github/generate/route.ts
+// app/api/projects/[projectId]/integrations/github/generate/route.ts (Enhanced version)
 import { NextResponse } from 'next/server';
 import { validateAuthAndGetUser } from '@/lib/utils/changelog';
 import { createAuditLog } from '@/lib/utils/auditLog';
@@ -8,7 +8,7 @@ import { createGitHubClient, GitHubError } from '@/lib/services/github/client';
 import { createGitHubChangelogGenerator } from '@/lib/services/github/changelog-generator';
 import { decryptToken } from '@/lib/utils/encryption';
 
-// Validation schema for generation options
+// Enhanced validation schema for generation options
 const generateSchema = z.object({
     // Generation method
     method: z.enum(['recent', 'between_tags', 'between_commits']),
@@ -20,8 +20,20 @@ const generateSchema = z.object({
     fromRef: z.string().optional(),
     toRef: z.string().optional(),
 
-    // Generation options
+    // Enhanced AI options
     useAI: z.boolean().default(false),
+    aiOptions: z.object({
+        style: z.enum(['professional', 'casual', 'technical', 'marketing']).default('professional'),
+        audience: z.enum(['developers', 'users', 'stakeholders', 'mixed']).default('mixed'),
+        includeImpact: z.boolean().default(true),
+        includeTechnicalDetails: z.boolean().default(false),
+        groupSimilarChanges: z.boolean().default(true),
+        prioritizeByImportance: z.boolean().default(true),
+        temperature: z.number().min(0).max(1).default(0.7),
+        model: z.string().default('copilot-zero')
+    }).optional(),
+
+    // Traditional generation options
     groupByType: z.boolean().default(true),
     includeCommitLinks: z.boolean().default(true),
 
@@ -35,7 +47,7 @@ const generateSchema = z.object({
 
 /**
  * @method POST
- * @description Generate changelog content from GitHub commits
+ * @description Generate enhanced changelog content from GitHub commits with AI rephrase and reorganization
  */
 export async function POST(
     request: Request,
@@ -45,7 +57,7 @@ export async function POST(
         const user = await validateAuthAndGetUser();
         const { projectId } = await context.params;
 
-        console.log('Starting GitHub changelog generation for project:', projectId);
+        console.log('Starting enhanced GitHub changelog generation for project:', projectId);
 
         // Get project with GitHub integration
         const project = await db.project.findUnique({
@@ -139,7 +151,7 @@ export async function POST(
             aiApiKey = systemConfig.aiApiKey;
         }
 
-        // Prepare generation options
+        // Prepare enhanced generation options
         const generationOptions = {
             includeBreakingChanges: validatedData.includeBreakingChanges ?? project.gitHubIntegration.includeBreakingChanges,
             includeFixes: validatedData.includeFixes ?? project.gitHubIntegration.includeFixes,
@@ -148,12 +160,16 @@ export async function POST(
             customCommitTypes: validatedData.customCommitTypes ?? project.gitHubIntegration.customCommitTypes,
             useAI: validatedData.useAI,
             aiApiKey,
+            aiOptions: validatedData.aiOptions,
             groupByType: validatedData.groupByType,
             includeCommitLinks: validatedData.includeCommitLinks,
             repositoryUrl: project.gitHubIntegration.repositoryUrl
         };
 
-        console.log('Generation options:', generationOptions);
+        console.log('Enhanced generation options:', {
+            ...generationOptions,
+            aiApiKey: generationOptions.aiApiKey ? '[REDACTED]' : undefined
+        });
 
         // Log generation attempt
         await createAuditLog(
@@ -168,6 +184,8 @@ export async function POST(
                 fromRef: validatedData.fromRef,
                 toRef: validatedData.toRef,
                 useAI: validatedData.useAI,
+                aiStyle: validatedData.aiOptions?.style,
+                aiAudience: validatedData.aiOptions?.audience,
                 repositoryUrl: project.gitHubIntegration.repositoryUrl,
                 timestamp: new Date().toISOString()
             }
@@ -217,6 +235,7 @@ export async function POST(
                     projectId,
                     method: validatedData.method,
                     repositoryUrl: project.gitHubIntegration.repositoryUrl,
+                    useAI: validatedData.useAI,
                     error: error instanceof Error ? error.message : 'Unknown error',
                     stack: error instanceof Error ? error.stack : undefined,
                     timestamp: new Date().toISOString()
@@ -300,11 +319,15 @@ export async function POST(
                 contentLength: changelog.content.length,
                 inferredVersion: changelog.version,
                 useAI: validatedData.useAI,
+                aiGenerated: changelog.metadata?.aiGenerated || false,
+                aiStyle: changelog.metadata?.style,
+                aiAudience: changelog.metadata?.audience,
                 timestamp: new Date().toISOString()
             }
         );
 
-        return NextResponse.json({
+        // Prepare response
+        const response = {
             success: true,
             changelog: {
                 content: changelog.content,
@@ -314,7 +337,14 @@ export async function POST(
                     title: section.title,
                     type: section.type,
                     emoji: section.emoji,
-                    commitsCount: section.commits.length
+                    description: section.description,
+                    commitsCount: section.commits.length,
+                    entries: section.entries ? section.entries.map(entry => ({
+                        title: entry.title,
+                        description: entry.description,
+                        impact: entry.impact,
+                        importance: entry.importance
+                    })) : undefined
                 }))
             },
             metadata: {
@@ -323,9 +353,19 @@ export async function POST(
                 repositoryUrl: project.gitHubIntegration.repositoryUrl,
                 fromRef: validatedData.fromRef,
                 toRef: validatedData.toRef,
-                daysBack: validatedData.daysBack
+                daysBack: validatedData.daysBack,
+                aiEnhanced: validatedData.useAI,
+                ...(changelog.metadata && {
+                    aiGenerated: changelog.metadata.aiGenerated,
+                    style: changelog.metadata.style,
+                    audience: changelog.metadata.audience,
+                    totalCommits: changelog.metadata.totalCommits,
+                    processedCommits: changelog.metadata.processedCommits
+                })
             }
-        });
+        };
+
+        return NextResponse.json(response);
 
     } catch (error) {
         console.error('Failed to generate changelog from GitHub:', error);
