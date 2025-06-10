@@ -6,6 +6,7 @@ import { WelcomeStep } from '@/components/setup/steps/welcome-step';
 import { AdminStep } from '@/components/setup/steps/admin-step';
 import { SettingsStep } from '@/components/setup/steps/settings-step';
 import { OAuthStep } from '@/components/setup/steps/oauth-step';
+import { TeamStep } from '@/components/setup/steps/team-step'; // New import
 import { CompletionStep } from '@/components/setup/steps/completion-step';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -15,7 +16,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 function StepIndicator() {
     const { currentStep } = useSetup();
-    const steps = ['welcome', 'admin', 'settings', 'oauth', 'complete'];
+    const steps = ['welcome', 'admin', 'settings', 'oauth', 'team', 'complete'];
     const currentIndex = steps.indexOf(currentStep);
 
     return (
@@ -37,7 +38,7 @@ function StepIndicator() {
 }
 
 function SetupContent() {
-    const { currentStep, goToNextStep, goToPreviousStep } = useSetup();
+    const { currentStep, goToNextStep, goToPreviousStep, skipCurrentStep } = useSetup();
 
     return (
         <div className="min-h-screen flex flex-col items-center justify-center p-4 space-y-6">
@@ -66,6 +67,14 @@ function SetupContent() {
 
                     {currentStep === 'oauth' && (
                         <OAuthStep onNext={goToNextStep} onBack={goToPreviousStep} />
+                    )}
+
+                    {currentStep === 'team' && (
+                        <TeamStep
+                            onNext={goToNextStep}
+                            onBack={goToPreviousStep}
+                            onSkip={skipCurrentStep}
+                        />
                     )}
 
                     {currentStep === 'complete' && (

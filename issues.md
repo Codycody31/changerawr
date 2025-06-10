@@ -3,3 +3,6 @@
 - [x] fix links in AI assistant settings
 - [x] fix theme switcher handling
 - [x] allow for setting custom URLs for SSO Providers
+- [ ] changelog analytics
+- [x] fix version compare issues ( better changelog editor UI by a little bit )
+- [x] allow for inviting team members in the setup wizard
