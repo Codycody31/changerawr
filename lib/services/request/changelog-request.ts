@@ -1,6 +1,5 @@
 import { db } from '@/lib/db';
-import { RequestDataType } from '@/lib/types/changelog';
-import type { Prisma, RequestStatus } from '@prisma/client';
+import type { RequestStatus } from '@prisma/client';
 import {sendNotificationEmail} from "@/lib/services/email/notification";
 
 // Types
@@ -16,19 +15,62 @@ interface ProcessRequestOptions {
 
 type PrismaTransaction = Omit<typeof db, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use'>;
 
+// Simplified type that works with our database structure
+interface DatabaseChangelogRequest {
+    id: string;
+    type: string;
+    status: string;
+    staffId: string | null;
+    adminId: string | null;
+    projectId: string;
+    targetId: string | null;
+    createdAt: Date;
+    reviewedAt: Date | null;
+    changelogEntryId: string | null;
+    changelogTagId: string | null;
+    project: {
+        id: string;
+        name: string;
+        createdAt: Date;
+        updatedAt: Date;
+        isPublic: boolean;
+        allowAutoPublish: boolean;
+        requireApproval: boolean;
+        defaultTags: string[];
+        changelog: {
+            id: string;
+            projectId: string;
+            createdAt: Date;
+            updatedAt: Date;
+        } | null;
+    };
+    ChangelogEntry: {
+        id: string;
+        title: string;
+        content: string;
+        version: string | null;
+        publishedAt: Date | null;
+        changelogId: string;
+        createdAt: Date;
+        updatedAt: Date;
+    } | null;
+    ChangelogTag: {
+        id: string;
+        name: string;
+        changelogId: string;
+        createdAt: Date;
+        updatedAt: Date;
+    } | null;
+    staff: {
+        id: string;
+        email: string;
+        name: string | null;
+    } | null;
+}
+
 interface RequestContext {
     tx: PrismaTransaction;
-    request: Prisma.ChangelogRequestGetPayload<{
-        include: {
-            project: {
-                include: {
-                    changelog: true;
-                };
-            };
-            ChangelogEntry: true;
-            ChangelogTag: true;
-        };
-    }>;
+    request: DatabaseChangelogRequest;
 }
 
 // Base interface for request processors
@@ -211,41 +253,47 @@ class ChangelogRequestService {
         });
 
         // After transaction completes successfully, send notification
-        try {
-            // Need to fetch staff with settings included since it's not in the transaction result
-            const staffWithSettings = await db.user.findUnique({
-                where: { id: result.data.staffId },
-                include: { settings: true }
-            });
-
-            // Only send notification if user has them enabled (or if no preference is set)
-            if (staffWithSettings && staffWithSettings.settings?.enableNotifications !== false) {
-                // Fetch admin name for the notification
-                const admin = result.data.adminId
-                    ? await db.user.findUnique({
-                        where: { id: result.data.adminId },
-                        select: { name: true }
-                    })
-                    : null;
-
-                const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-                const dashboardUrl = `${appUrl}/dashboard/projects/${result.data.projectId}`;
-
-                await sendNotificationEmail({
-                    userId: result.data.staffId,
-                    status: safeOptions.status,
-                    request: {
-                        type: result.data.type,
-                        projectName: result.data.project?.name || 'Unknown Project',
-                        entryTitle: result.data.ChangelogEntry?.title,
-                        adminName: admin?.name || 'an administrator'
-                    },
-                    dashboardUrl
+        // Only send if the staff user still exists (not deleted)
+        if (result.data.staffId) {
+            try {
+                // Need to fetch staff with settings included since it's not in the transaction result
+                const staffWithSettings = await db.user.findUnique({
+                    where: { id: result.data.staffId },
+                    include: { settings: true }
                 });
+
+                // Only send notification if user exists and has them enabled (or if no preference is set)
+                if (staffWithSettings && staffWithSettings.settings?.enableNotifications !== false) {
+                    // Fetch admin name for the notification
+                    const admin = result.data.adminId
+                        ? await db.user.findUnique({
+                            where: { id: result.data.adminId },
+                            select: { name: true }
+                        })
+                        : null;
+
+                    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+                    const dashboardUrl = `${appUrl}/dashboard/projects/${result.data.projectId}`;
+
+                    await sendNotificationEmail({
+                        userId: result.data.staffId,
+                        status: safeOptions.status,
+                        request: {
+                            type: result.data.type,
+                            projectName: result.data.project?.name || 'Unknown Project',
+                            entryTitle: result.data.ChangelogEntry?.title,
+                            adminName: admin?.name || 'an administrator'
+                        },
+                        dashboardUrl
+                    });
+                }
+            } catch (emailError) {
+                // Just log email errors, don't fail the request
+                console.error('Failed to send notification email:', emailError);
             }
-        } catch (emailError) {
-            // Just log email errors, don't fail the request
-            console.error('Failed to send notification email:', emailError);
+        } else {
+            // Log that notification was skipped due to deleted user
+            console.log(`Skipping notification for request ${options.requestId} - staff user was deleted`);
         }
 
         return result;
@@ -261,7 +309,7 @@ class ChangelogRequestService {
         };
     }
 
-    private async findRequest(tx: PrismaTransaction, requestId: string) {
+    private async findRequest(tx: PrismaTransaction, requestId: string): Promise<DatabaseChangelogRequest> {
         const request = await tx.changelogRequest.findUnique({
             where: { id: requestId },
             include: {
@@ -271,7 +319,14 @@ class ChangelogRequestService {
                     }
                 },
                 ChangelogEntry: true,
-                ChangelogTag: true
+                ChangelogTag: true,
+                staff: {
+                    select: {
+                        id: true,
+                        email: true,
+                        name: true
+                    }
+                }
             }
         });
 
@@ -279,11 +334,15 @@ class ChangelogRequestService {
             throw new Error('Request not found');
         }
 
-        return request;
+        return request as DatabaseChangelogRequest;
     }
 
-    private async updateRequestStatus(tx: PrismaTransaction, request: RequestDataType, options: ProcessRequestOptions) {
-        return tx.changelogRequest.update({
+    private async updateRequestStatus(
+        tx: PrismaTransaction,
+        request: DatabaseChangelogRequest,
+        options: ProcessRequestOptions
+    ): Promise<DatabaseChangelogRequest> {
+        const updatedRequest = await tx.changelogRequest.update({
             where: { id: options.requestId },
             data: {
                 status: options.status,
@@ -307,12 +366,13 @@ class ChangelogRequestService {
                 ChangelogEntry: true
             }
         });
+
+        return updatedRequest as DatabaseChangelogRequest;
     }
 
-    private async processApprovedRequest(tx: PrismaTransaction, request: RequestDataType) {
+    private async processApprovedRequest(tx: PrismaTransaction, request: DatabaseChangelogRequest) {
         try {
             const processor = RequestProcessorRegistry.getProcessor(request.type);
-            // @ts-expect-error request is not assignable to type
             await processor.processRequest({ tx, request });
         } catch (error) {
             console.error('Error processing request:', error);
@@ -320,19 +380,31 @@ class ChangelogRequestService {
         }
     }
 
-    private async createAuditLog(tx: PrismaTransaction, request: RequestDataType, options: ProcessRequestOptions) {
+    private async createAuditLog(
+        tx: PrismaTransaction,
+        request: DatabaseChangelogRequest,
+        options: ProcessRequestOptions
+    ) {
         await tx.auditLog.create({
             data: {
                 action: `REQUEST_${options.status}`,
                 userId: options.adminId,
-                targetUserId: request.staffId,
+                targetUserId: request.staffId, // This can now be null, which is fine
                 details: {
                     requestId: request.id,
                     status: options.status,
                     processedAt: options.metadata?.timestamp,
                     processedBy: options.metadata?.processedBy,
                     type: request.type,
-                    targetId: request.targetId
+                    targetId: request.targetId,
+                    // Include preserved staff info if the user was deleted
+                    staffInfo: request.staff ? {
+                        id: request.staff.id,
+                        name: request.staff.name,
+                        email: request.staff.email
+                    } : {
+                        note: 'Staff user was deleted'
+                    }
                 }
             }
         });
@@ -346,7 +418,8 @@ export const changelogRequestService = new ChangelogRequestService();
 export type {
     ProcessRequestOptions,
     RequestProcessor,
-    RequestContext
+    RequestContext,
+    DatabaseChangelogRequest
 };
 
 export { RequestProcessorRegistry };

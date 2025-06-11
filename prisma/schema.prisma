@@ -177,10 +177,10 @@ model ChangelogRequest {
   id               String          @id @default(cuid())
   type             String // DELETE_PROJECT, DELETE_TAG, DELETE_ENTRY
   status           String          @default("PENDING") // PENDING, APPROVED, REJECTED
-  staffId          String
-  staff            User            @relation("StaffRequests", fields: [staffId], references: [id])
+  staffId          String? // Made nullable to allow user deletion
+  staff            User?           @relation("StaffRequests", fields: [staffId], references: [id], onDelete: SetNull)
   adminId          String?
-  admin            User?           @relation("AdminResponses", fields: [adminId], references: [id])
+  admin            User?           @relation("AdminResponses", fields: [adminId], references: [id], onDelete: SetNull)
   projectId        String
   project          Project         @relation(fields: [projectId], references: [id])
   targetId         String? // For specific items being deleted (e.g., tag id)
@@ -216,12 +216,12 @@ model ApiKey {
 model AuditLog {
   id           String   @id @default(cuid())
   action       String
-  userId       String
+  userId       String? // Nullable to allow user deletion
   targetUserId String?
   details      Json?
   createdAt    DateTime @default(now())
-  user         User     @relation("AuditLogUser", fields: [userId], references: [id])
-  targetUser   User?    @relation("AuditLogTarget", fields: [targetUserId], references: [id])
+  user         User?    @relation("AuditLogUser", fields: [userId], references: [id], onDelete: SetNull)
+  targetUser   User?    @relation("AuditLogTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([targetUserId])

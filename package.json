@@ -10,7 +10,9 @@
     "build:widget": "tsx scripts/widget/build.ts",
     "generate-swagger": "tsx scripts/api/generateSwagger.ts",
     "start:prod": "NODE_ENV=production next start",
-    "start:prod:win": "set NODE_ENV=production&& next start"
+    "start:prod:win": "set NODE_ENV=production&& next start",
+    "maintenance": "node scripts/maintenance/server.js",
+    "start:with-maintenance": "bash docker-entrypoint.sh npm start"
   },
   "prisma": {
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"

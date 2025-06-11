@@ -84,7 +84,7 @@ export default function AboutPage() {
                         </div>
                     </div>
                     <CardTitle className="text-3xl font-bold">Changerawr</CardTitle>
-                    <CardDescription>Ship, Release, Rawr 🦖</CardDescription>
+                    <CardDescription>Ship, Change, Rawr 🦖</CardDescription>
                 </CardHeader>
                 <CardContent className="text-center">
                     <div className="flex justify-center gap-2 mb-4">

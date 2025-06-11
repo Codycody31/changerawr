@@ -6,3 +6,4 @@
 - [ ] changelog analytics
 - [x] fix version compare issues ( better changelog editor UI by a little bit )
 - [x] allow for inviting team members in the setup wizard
+- [x] fix user deletion
