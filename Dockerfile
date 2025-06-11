@@ -56,7 +56,7 @@ RUN apk add --no-cache bash
 COPY --from=builder /app .
 
 # Copy maintenance page and server script
-COPY scripts/maintenance/maintenance.html ./maintenance.html
+COPY scripts/maintenance/index.html ./index.html
 COPY scripts/maintenance/server.js ./scripts/maintenance/server.js
 
 # Ensure the entrypoint script is executable
