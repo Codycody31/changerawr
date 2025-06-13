@@ -464,7 +464,7 @@ export function ProjectSidebar({ projectId }: { projectId: string }) {
                             active={pathname.includes(`/dashboard/projects/${projectId}/integrations/github`)}
                         />
                         <NavItem
-                            href={`/dashboard/projects/${projectId}/integrations/analytics`}
+                            href={`/dashboard/projects/${projectId}/analytics`}
                             icon={ChartNoAxesCombined}
                             label="Analytics"
                             active={pathname.includes(`/dashboard/projects/${projectId}/analytics`)}
