@@ -15,6 +15,7 @@ export const DEFAULT_DOCKER_CONFIG: DockerImageConfig = {
 };
 
 // Debug configuration
+// TODO: set to FALSE before pushing out 1.0.0
 const DEBUG_MODE = true; // Set to false for production
 const DEBUG_IMAGE = 'traefik/whoami';
 
