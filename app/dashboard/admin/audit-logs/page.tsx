@@ -258,7 +258,7 @@ export default function AuditLogsPage() {
         search: '',
         action: '',
         dateRange: {
-            from: subDays(new Date(), 7),
+            from: subDays(new Date(), 31),
             to: new Date()
         }
     })
@@ -485,7 +485,7 @@ export default function AuditLogsPage() {
             search: '',
             action: '',
             dateRange: {
-                from: subDays(new Date(), 7),
+                from: subDays(new Date(), 31),
                 to: new Date()
             }
         });

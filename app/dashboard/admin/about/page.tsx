@@ -1,68 +1,64 @@
+// app/dashboard/admin/about/page.tsx (Redesigned)
+
 'use client'
 
-import React, { useEffect, useState } from 'react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { appInfo, getCopyrightYears } from '@/lib/app-info';
-import { Heart, History } from 'lucide-react';
+import React, {useEffect, useState} from 'react';
+import {Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle} from '@/components/ui/card';
+import {Badge} from '@/components/ui/badge';
+import {Button} from '@/components/ui/button';
+import {appInfo, getCopyrightYears} from '@/lib/app-info';
+import {Heart, History, Zap, Activity} from 'lucide-react';
 import UpdateStatus from '@/components/UpdateStatus';
-import { useWhatsNew } from '@/hooks/useWhatsNew';
+import {useWhatsNew} from '@/hooks/useWhatsNew';
 import WhatsNewModal from '@/components/dashboard/WhatsNewModal';
+import DinoGame from '@/components/DinoGame';
+import {UpdateStatus as UpdateStatusType} from '@/lib/types/easypanel';
 
 export default function AboutPage() {
     const [databaseInfo, setDatabaseInfo] = useState<{ databaseVersion?: string }>({});
+    const [updateStatus, setUpdateStatus] = useState<UpdateStatusType | null>(null);
+    const [showDinoGame, setShowDinoGame] = useState(false);
+    const [rawrClickCount, setRawrClickCount] = useState(0);
+
     const {
         showWhatsNew,
         whatsNewContent,
         closeWhatsNew,
         manuallyShowWhatsNew,
         isLoading,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        lastSeenVersion
     } = useWhatsNew();
 
-    // Function to check for updates by fetching from server
-    const checkForUpdates = async () => {
-        try {
-            const response = await fetch('https://dl.supers0ft.us/changerawr/');
-            if (!response.ok) {
-                throw new Error('Failed to fetch version');
+    const handleRawrClick = () => {
+        setRawrClickCount(prev => {
+            const newCount = prev + 1;
+            if (newCount >= 5) {
+                setShowDinoGame(true);
+                return 0; // Reset counter
             }
-            const data = await response.json();
-
-            // Assuming the PHP script returns { version: "1.0.0" }
-            return data.version || appInfo.version;
-        } catch (error) {
-            console.error('Error checking for updates:', error);
-            // Return current version if request fails
-            return appInfo.version;
-        }
-    }
-
-    // Mock function to simulate updating the app
-    const updateApp = async () => {
-        return new Promise<void>((resolve) => {
-            // Simulate update process
-            setTimeout(() => {
-                resolve()
-                // In a real app, you might trigger a page reload or show a success message
-                // window.location.reload()
-            }, 2000)
-        })
-    }
+            return newCount;
+        });
+    };
 
     useEffect(() => {
-        async function fetchDatabaseInfo() {
+        async function fetchSystemInfo() {
             try {
-                const response = await fetch('/api/system/version');
-                const data = await response.json();
-                setDatabaseInfo(data);
+                // Fetch database info
+                const versionResponse = await fetch('/api/system/version');
+                const versionData = await versionResponse.json();
+                setDatabaseInfo(versionData);
+
+                // Fetch update status (includes Easypanel info)
+                const updateResponse = await fetch('/api/system/update-status');
+                if (updateResponse.ok) {
+                    const updateData = await updateResponse.json();
+                    setUpdateStatus(updateData);
+                }
             } catch (error) {
-                console.error('Failed to fetch database info:', error);
+                console.error('Failed to fetch system info:', error);
             }
         }
-        fetchDatabaseInfo();
+
+        fetchSystemInfo();
     }, []);
 
     return (
@@ -75,6 +71,12 @@ export default function AboutPage() {
                     content={whatsNewContent}
                 />
             )}
+
+            {/* Dino Game Modal */}
+            <DinoGame
+                isOpen={showDinoGame}
+                onClose={() => setShowDinoGame(false)}
+            />
 
             <Card className="border-2 overflow-hidden">
                 <CardHeader className="text-center pb-2">
@@ -90,6 +92,12 @@ export default function AboutPage() {
                     <div className="flex justify-center gap-2 mb-4">
                         <Badge variant="outline" className="px-3 py-1">v{appInfo.version}</Badge>
                         <Badge variant="secondary" className="px-3 py-1">{appInfo.status}</Badge>
+                        {updateStatus?.easypanelConfigured && (
+                            <Badge variant="default" className="px-3 py-1 bg-blue-600 hover:bg-blue-700">
+                                <Zap className="h-3 w-3 mr-1"/>
+                                Easypanel
+                            </Badge>
+                        )}
                     </div>
 
                     {/* What's New Button */}
@@ -100,7 +108,7 @@ export default function AboutPage() {
                         className="mb-4"
                         disabled={isLoading}
                     >
-                        <History className="h-4 w-4 mr-2" />
+                        <History className="h-4 w-4 mr-2"/>
                         {isLoading ? "Loading..." : "What's New in This Version"}
                     </Button>
 
@@ -108,10 +116,9 @@ export default function AboutPage() {
                     <div className="pt-2">
                         <UpdateStatus
                             currentVersion={appInfo.version}
-                            onCheckUpdate={checkForUpdates}
-                            onUpdate={updateApp}
                             checkOnMount={true}
-                            autoCheckInterval={60 * 60 * 1000} // Check every hour
+                            autoCheckInterval={60 * 60 * 1000} // Check every hour - pretty useless unless you left the page open
+                            showEasypanelInfo={false} // We handle this above
                         />
                     </div>
 
@@ -124,9 +131,11 @@ export default function AboutPage() {
                 </CardContent>
                 <CardFooter className="flex flex-col items-center pt-2 pb-6">
                     <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-                        Made with <Heart className="h-4 w-4 text-red-500 fill-red-500" /> by <a href="https://superdev.one" className="hover:underline">Supernova3339</a>
+                        Made with <Heart className="h-4 w-4 text-red-500 fill-red-500"/> by <a
+                        href="https://superdev.one" className="hover:underline">Supernova3339</a>
                     </p>
-                    <p className="text-xs text-muted-foreground">© {getCopyrightYears()} {appInfo.name} • All rights reserved</p>
+                    <p className="text-xs text-muted-foreground">© {getCopyrightYears()} {appInfo.name} • All rights
+                        reserved</p>
                 </CardFooter>
             </Card>
 
@@ -137,19 +146,63 @@ export default function AboutPage() {
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-2 text-sm">
-                        <div className="flex justify-between py-1 border-b border-border/40"><span>Application</span><span>{appInfo.name}</span></div>
-                        <div className="flex justify-between py-1 border-b border-border/40"><span>Version</span><span>{appInfo.version} ({appInfo.status})</span></div>
-                        <div className="flex justify-between py-1 border-b border-border/40"><span>Framework</span><span>{appInfo.framework}</span></div>
-                        <div className="flex justify-between py-1 border-b border-border/40"><span>Database</span><span>PostgreSQL&nbsp;{databaseInfo?.databaseVersion || 'Unknown'}</span></div>
-                        <div className="flex justify-between py-1 border-b border-border/40"><span>Environment</span><span>{appInfo.environment}</span></div>
-                        <div className="flex justify-between py-1"><span>Released</span><span>{new Date(appInfo.releaseDate).toLocaleDateString()}</span></div>
+                        <div className="flex justify-between py-1 border-b border-border/40">
+                            <span>Application</span>
+                            <span>{appInfo.name}</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-border/40">
+                            <span>Version</span>
+                            <span>{appInfo.version} ({appInfo.status})</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-border/40">
+                            <span>Framework</span>
+                            <span>{appInfo.framework}</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-border/40">
+                            <span>Database</span>
+                            <span>PostgreSQL {databaseInfo?.databaseVersion || 'Unknown'}</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-border/40">
+                            <span>Environment</span>
+                            <span>{appInfo.environment}</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-border/40">
+                            <span>Released</span>
+                            <span>{new Date(appInfo.releaseDate).toLocaleDateString()}</span>
+                        </div>
+                        {updateStatus?.easypanelConfigured && (
+                            <>
+                                <div className="flex justify-between py-1 border-b border-border/40">
+                                    <span>Deployment</span>
+                                    <span className="flex items-center gap-1">
+                                        <Activity className="h-3 w-3 text-green-500"/>
+                                        Auto-managed
+                                    </span>
+                                </div>
+                                <div className="flex justify-between py-1">
+                                    <span>Updates</span>
+                                    <span className="text-blue-600">Automatic</span>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </CardContent>
             </Card>
 
-            {/* Easter egg */}
+            {/* Easter egg - Secret Dino Game */}
             <div className="text-center text-xs text-muted-foreground pt-2">
-                <span className="cursor-default hover:text-primary transition-colors">rawr~ ʕ•ᴥ•ʔ</span>
+                <span
+                    className="cursor-pointer hover:text-primary transition-colors select-none"
+                    onClick={handleRawrClick}
+                    title={rawrClickCount > 0 ? `${5 - rawrClickCount} more clicks...` : 'Click me!'}
+                >
+                    rawr~ ʕ•ᴥ•ʔ
+                </span>
+                {rawrClickCount > 0 && rawrClickCount < 5 && (
+                    <div className="mt-1 text-[10px] opacity-50">
+                        {5 - rawrClickCount} more...
+                    </div>
+                )}
             </div>
         </div>
     );

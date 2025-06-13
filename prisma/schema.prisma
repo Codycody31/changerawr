@@ -107,20 +107,21 @@ model InvitationLink {
 }
 
 model Project {
-  id                  String                @id @default(cuid())
+  id                  String                     @id @default(cuid())
   name                String
-  isPublic            Boolean               @default(false)
-  allowAutoPublish    Boolean               @default(false)
-  requireApproval     Boolean               @default(true)
-  defaultTags         String[]              @default([])
+  isPublic            Boolean                    @default(false)
+  allowAutoPublish    Boolean                    @default(false)
+  requireApproval     Boolean                    @default(true)
+  defaultTags         String[]                   @default([])
   changelog           Changelog?
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
   changelogRequests   ChangelogRequest[]
   emailConfig         EmailConfig?
   emailLogs           EmailLog[]
   ProjectSubscription ProjectSubscription[]
   gitHubIntegration   GitHubIntegration?
+  analyticsViews      PublicChangelogAnalytics[]
 }
 
 model Passkey {
@@ -149,17 +150,18 @@ model Changelog {
 }
 
 model ChangelogEntry {
-  id          String             @id @default(cuid())
-  title       String
-  content     String             @db.Text
-  version     String?
-  publishedAt DateTime?
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
-  tags        ChangelogTag[]
-  changelog   Changelog          @relation(fields: [changelogId], references: [id], onDelete: Cascade)
-  changelogId String
-  requests    ChangelogRequest[]
+  id             String                     @id @default(cuid())
+  title          String
+  content        String                     @db.Text
+  version        String?
+  publishedAt    DateTime?
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+  tags           ChangelogTag[]
+  changelog      Changelog                  @relation(fields: [changelogId], references: [id], onDelete: Cascade)
+  changelogId    String
+  requests       ChangelogRequest[]
+  analyticsViews PublicChangelogAnalytics[]
 
   @@index([changelogId])
 }
@@ -360,6 +362,28 @@ model GitHubIntegration {
 
   @@index([projectId])
   @@index([enabled])
+}
+
+model PublicChangelogAnalytics {
+  id               String   @id @default(cuid())
+  projectId        String
+  changelogEntryId String?
+  ipHash           String // Hashed IP for privacy
+  country          String? // Country from IP geolocation
+  userAgent        String? // Browser info
+  referrer         String? // Referring URL
+  viewedAt         DateTime @default(now())
+  sessionHash      String // Session identifier for unique visits
+
+  // Relations
+  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  changelogEntry ChangelogEntry? @relation(fields: [changelogEntryId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([changelogEntryId])
+  @@index([viewedAt])
+  @@index([country])
+  @@index([sessionHash])
 }
 
 enum Role {

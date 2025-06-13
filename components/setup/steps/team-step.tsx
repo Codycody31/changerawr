@@ -38,7 +38,7 @@ interface TeamInviteState {
     copiedLinks: Set<string>;
 }
 
-export function TeamStep({onNext, onBack, onSkip}: TeamInviteStepProps) {
+export function TeamStep({onNext, onSkip}: TeamInviteStepProps) {
     const [state, setState] = useState<TeamInviteState>({
         currentEmail: '',
         currentName: '',
@@ -483,16 +483,13 @@ export function TeamStep({onNext, onBack, onSkip}: TeamInviteStepProps) {
 
             {/* Navigation */}
             <div className="flex items-center justify-between pt-4">
-                <Button variant="outline" onClick={onBack}>
-                    ← Previous
-                </Button>
+                {onSkip && (
+                    <Button variant="ghost" onClick={onSkip}>
+                        Skip for Now
+                    </Button>
+                )}
 
                 <div className="flex gap-2">
-                    {onSkip && (
-                        <Button variant="ghost" onClick={onSkip}>
-                            Skip for Now
-                        </Button>
-                    )}
                     <Button onClick={onNext}>
                         Continue →
                     </Button>

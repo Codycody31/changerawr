@@ -5,7 +5,7 @@
 
 export const appInfo = {
     name: 'Changerawr',
-    version: '0.3.9',
+    version: '0.4.0',
     status: 'Alpha',
     environment: process.env.NODE_ENV || 'development',
     license: 'MIT',
