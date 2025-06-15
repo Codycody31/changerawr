@@ -1,5 +1,3 @@
-# .github/workflows/docker-build.yml
-
 name: Build and Push Docker Image
 
 on:
@@ -14,6 +12,11 @@ on:
         description: 'Override tag (optional)'
         required: false
         type: string
+      force_build:
+        description: 'Force build even if repository is private'
+        required: false
+        type: boolean
+        default: false
 
 env:
   REGISTRY: ghcr.io
@@ -24,6 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       is_public: ${{ steps.check.outputs.is_public }}
+      should_build: ${{ steps.check.outputs.should_build }}
     steps:
       - name: Check if repository is public
         id: check
@@ -34,15 +38,21 @@ jobs:
           
           if [ "$IS_PRIVATE" = "false" ]; then
             echo "is_public=true" >> $GITHUB_OUTPUT
+            echo "should_build=true" >> $GITHUB_OUTPUT
             echo "Repository is public - proceeding with Docker build"
+          elif [ "${{ github.event.inputs.force_build }}" = "true" ]; then
+            echo "is_public=false" >> $GITHUB_OUTPUT
+            echo "should_build=true" >> $GITHUB_OUTPUT
+            echo "Repository is private but force_build is enabled - proceeding with Docker build"
           else
             echo "is_public=false" >> $GITHUB_OUTPUT
+            echo "should_build=false" >> $GITHUB_OUTPUT
             echo "Repository is private - skipping Docker build"
           fi
 
   build-and-push:
     needs: check-repository-visibility
-    if: needs.check-repository-visibility.outputs.is_public == 'true'
+    if: needs.check-repository-visibility.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -111,6 +121,12 @@ jobs:
         run: |
           echo "## Docker Image Built Successfully! 🦖" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.check-repository-visibility.outputs.is_public }}" = "false" ]; then
+            echo "⚠️ **Note:** Build was forced for private repository" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
           echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
@@ -127,7 +143,7 @@ jobs:
 
   skip-build:
     needs: check-repository-visibility
-    if: needs.check-repository-visibility.outputs.is_public == 'false'
+    if: needs.check-repository-visibility.outputs.should_build == 'false'
     runs-on: ubuntu-latest
     steps:
       - name: Skip build notification
@@ -138,7 +154,8 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**To enable Docker builds:**" >> $GITHUB_STEP_SUMMARY
           echo "1. Make the repository public, or" >> $GITHUB_STEP_SUMMARY
-          echo "2. Modify the workflow to allow private builds" >> $GITHUB_STEP_SUMMARY
+          echo "2. Run workflow manually with 'Force build' option enabled, or" >> $GITHUB_STEP_SUMMARY
+          echo "3. Modify the workflow to allow private builds by default" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Repository:** \`${{ github.repository }}\`" >> $GITHUB_STEP_SUMMARY
           echo "**Trigger:** \`${{ github.event_name }}\`" >> $GITHUB_STEP_SUMMARY
