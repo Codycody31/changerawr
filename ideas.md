@@ -1,0 +1,2 @@
+- [ ] custom fields
+- [ ] tags can have a color assigned to them ( requires updating the SDKs )
