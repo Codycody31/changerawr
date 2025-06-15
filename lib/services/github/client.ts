@@ -634,21 +634,21 @@ export function shouldIncludeCommit(
 ): boolean {
     // Handle missing commit message
     if (!commit || !commit.message) {
-        console.log('Excluding commit: no message');
+        // console.log('Excluding commit: no message');
         return false;
     }
 
     const parsed = parseConventionalCommit(commit.message);
 
-    console.log('Checking commit:', {
-        message: commit.message.substring(0, 50) + '...',
-        parsed: parsed ? `${parsed.type}${parsed.scope ? `(${parsed.scope})` : ''}` : 'no-conventional-format',
-        breaking: parsed?.breaking ?? false
-    });
+    // console.log('Checking commit:', {
+    //     message: commit.message.substring(0, 50) + '...',
+    //     parsed: parsed ? `${parsed.type}${parsed.scope ? `(${parsed.scope})` : ''}` : 'no-conventional-format',
+    //     breaking: parsed?.breaking ?? false
+    // });
 
     // Always include breaking changes if enabled
     if (parsed?.breaking && settings.includeBreakingChanges) {
-        console.log('✓ Including: breaking change');
+        // console.log('✓ Including: breaking change');
         return true;
     }
 
@@ -658,26 +658,26 @@ export function shouldIncludeCommit(
             case 'feat':
             case 'feature':
                 if (settings.includeFeatures) {
-                    console.log('✓ Including: feature');
+                    // console.log('✓ Including: feature');
                     return true;
                 }
                 break;
             case 'fix':
                 if (settings.includeFixes) {
-                    console.log('✓ Including: fix');
+                    // console.log('✓ Including: fix');
                     return true;
                 }
                 break;
             case 'chore':
                 if (settings.includeChores) {
-                    console.log('✓ Including: chore');
+                    // console.log('✓ Including: chore');
                     return true;
                 }
                 break;
             default:
                 // Check custom commit types
                 if (settings.customCommitTypes.includes(parsed.type)) {
-                    console.log(`✓ Including: custom type (${parsed.type})`);
+                    // console.log(`✓ Including: custom type (${parsed.type})`);
                     return true;
                 }
                 break;
@@ -693,10 +693,10 @@ export function shouldIncludeCommit(
     const includesOther = settings.customCommitTypes.includes('other');
 
     if (hasBasicTypesEnabled || includesOther) {
-        console.log('✓ Including: non-conventional commit (basic types enabled or "other" included)');
+        // console.log('✓ Including: non-conventional commit (basic types enabled or "other" included)');
         return true;
     }
 
-    console.log('✗ Excluding: non-conventional commit and no basic types enabled');
+    // console.log('✗ Excluding: non-conventional commit and no basic types enabled');
     return false;
 }

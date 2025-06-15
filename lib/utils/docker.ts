@@ -1,5 +1,3 @@
-// lib/utils/docker.ts (Updated with debug mode)
-
 export interface DockerImageConfig {
     registry: string;
     namespace: string;
@@ -16,7 +14,7 @@ export const DEFAULT_DOCKER_CONFIG: DockerImageConfig = {
 
 // Debug configuration
 // TODO: set to FALSE before pushing out 1.0.0
-const DEBUG_MODE = true; // Set to false for production
+const DEBUG_MODE = false; // Set to false for production
 const DEBUG_IMAGE = 'traefik/whoami';
 
 /**

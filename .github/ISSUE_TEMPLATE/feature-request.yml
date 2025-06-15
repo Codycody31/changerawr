@@ -1,0 +1,150 @@
+name: 🦖 Feature Request
+description: Got an idea to make Changerawr even better? We'd love to hear it!
+title: "[Feature]: "
+labels: ["enhancement", "feature-request"]
+assignees:
+  - Supernova3339
+body:
+  - type: markdown
+    attributes:
+      value: |
+        # 🎉 Thanks for helping make Changerawr better!
+        
+        We built Changerawr because existing tools didn't cut it. Your ideas help us build exactly what developers and teams actually need.
+        
+        **Please search existing issues first** to avoid duplicates. If you find a similar request, give it a 👍 instead!
+
+  - type: input
+    id: contact
+    attributes:
+      label: 📧 Contact Details (Optional)
+      description: How can we reach you if we need to discuss this feature?
+      placeholder: email@example.com or @username
+    validations:
+      required: false
+
+  - type: textarea
+    id: feature-description
+    attributes:
+      label: 🚀 Feature Description
+      description: What feature would you like to see added to Changerawr?
+      placeholder: Be as detailed as you can! What should this feature do?
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem-solving
+    attributes:
+      label: 🎯 Problem This Solves
+      description: What problem or pain point would this feature address?
+      placeholder: Describe the current limitation or frustration this would solve
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: 📝 Use Case / User Story
+      description: How would you (or others) use this feature?
+      placeholder: "As a [type of user], I want [feature] so that [benefit]"
+      value: "As a , I want  so that "
+    validations:
+      required: true
+
+  - type: dropdown
+    id: user-type
+    attributes:
+      label: 👤 What best describes you?
+      description: This helps us understand our user base and prioritize features
+      options:
+        - Solo Developer
+        - Small Team (2-10 people)
+        - Medium Team (11-50 people)
+        - Large Team (50+ people)
+        - Open Source Project Maintainer
+        - Product Manager
+        - Other
+      default: 0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: ⚡ How important is this to you?
+      description: Help us understand the impact this would have
+      options:
+        - "Nice to have - would be cool but not urgent"
+        - "Useful - would improve my workflow"
+        - "Important - would solve a real problem I face"
+        - "Critical - blocking me from using Changerawr effectively"
+      default: 0
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 🔄 Current Workarounds
+      description: How are you currently handling this without the feature?
+      placeholder: Describe any workarounds you're using or tools you're missing
+    validations:
+      required: false
+
+  - type: textarea
+    id: implementation-ideas
+    attributes:
+      label: 💡 Implementation Ideas (Optional)
+      description: Any thoughts on how this could work? UI mockups, API endpoints, etc.
+      placeholder: Don't worry about technical details - but if you have ideas, we'd love to hear them!
+    validations:
+      required: false
+
+  - type: dropdown
+    id: feature-area
+    attributes:
+      label: 🎨 What area of Changerawr is this for?
+      description: Which part of the platform would this feature affect?
+      multiple: true
+      options:
+        - Dashboard / UI
+        - Content Editor
+        - API / Integrations
+        - Embeddable Widget
+        - Email Notifications
+        - Authentication / Users
+        - GitHub Integration
+        - Analytics / Reporting
+        - Mobile Experience
+        - Performance
+        - Other / Not Sure
+
+  - type: checkboxes
+    id: additional-info
+    attributes:
+      label: 📋 Additional Information
+      description: A few quick checks to help us out
+      options:
+        - label: I've searched existing issues and this isn't a duplicate
+          required: true
+        - label: I'd be willing to test this feature if implemented
+          required: false
+        - label: I'd be interested in contributing to this feature's development
+          required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        
+        ## 🙏 What happens next?
+        
+        1. **We'll review your request** - Usually within a few days
+        2. **Community feedback** - Others can vote with 👍 and add comments
+        3. **Discussion** - We might ask follow-up questions
+        4. **Prioritization** - Popular requests with clear use cases get priority
+        5. **Development** - If accepted, we'll add it to our roadmap
+        
+        **Remember**: Changerawr is built by developers for developers. The best feature requests come from real problems you're facing!
+        
+        Thanks for helping make Changerawr rawrsome! 🦖

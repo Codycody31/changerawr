@@ -34,7 +34,7 @@ export class SectonClient {
             ...config,
         };
 
-        console.log('🤖 SectonClient initialized:', {
+        console.log('SectonClient initialized:', {
             baseUrl: this.config.baseUrl,
             defaultModel: this.config.defaultModel,
             hasApiKey: !!this.config.apiKey,
@@ -46,11 +46,11 @@ export class SectonClient {
      * Get available models from the API
      */
     async getModels(): Promise<AIModel[]> {
-        console.log('🔍 Fetching available models...');
+        // console.log('Fetching available models...');
 
         try {
             const url = `${this.config.baseUrl}/models`;
-            console.log('📡 Models request URL:', url);
+            // console.log('Models request URL:', url);
 
             const response = await fetch(url, {
                 method: 'GET',
@@ -60,8 +60,8 @@ export class SectonClient {
                 },
             });
 
-            console.log('📡 Models response status:', response.status, response.statusText);
-            console.log('📡 Models response headers:', Object.fromEntries(response.headers.entries()));
+            // console.log('📡 Models response status:', response.status, response.statusText);
+            // console.log('📡 Models response headers:', Object.fromEntries(response.headers.entries()));
 
             if (!response.ok) {
                 const errorText = await response.text();
@@ -78,7 +78,7 @@ export class SectonClient {
             }
 
             const models = await response.json();
-            console.log('✅ Models fetched successfully:', models);
+            // console.log('✅ Models fetched successfully:', models);
             return models;
         } catch (error) {
             console.error('💥 Models fetch error:', error);
@@ -93,8 +93,8 @@ export class SectonClient {
      * Generate a completion using the chat API
      */
     async createCompletion(request: Partial<CompletionRequest>): Promise<CompletionResponse> {
-        console.log('🚀 Starting completion request...');
-        console.log('📝 Input request:', JSON.stringify(request, null, 2));
+        // console.log('🚀 Starting completion request...');
+        // console.log('📝 Input request:', JSON.stringify(request, null, 2));
 
         try {
             const completionRequest: CompletionRequest = {
@@ -104,8 +104,8 @@ export class SectonClient {
                 max_tokens: request.max_tokens ?? 1024,
             };
 
-            console.log('📋 Final completion request:', JSON.stringify(completionRequest, null, 2));
-            console.log('🔑 API Key being used:', this.config.apiKey ? this.config.apiKey.substring(0, 8) + '...' : 'none');
+            // console.log('📋 Final completion request:', JSON.stringify(completionRequest, null, 2));
+            // console.log('🔑 API Key being used:', this.config.apiKey ? this.config.apiKey.substring(0, 8) + '...' : 'none');
 
             const url = `${this.config.baseUrl}/chat/completions`;
             console.log('📡 Request URL:', url);
@@ -115,23 +115,23 @@ export class SectonClient {
                 'Authorization': `Bearer ${this.config.apiKey}`,
                 'User-Agent': 'Changerawr/1.0',
             };
-            console.log('📋 Request headers:', {
-                ...headers,
-                'Authorization': headers.Authorization ? headers.Authorization.substring(0, 20) + '...' : 'none'
-            });
+            // console.log('📋 Request headers:', {
+            //     ...headers,
+            //     'Authorization': headers.Authorization ? headers.Authorization.substring(0, 20) + '...' : 'none'
+            // });
 
             const requestBody = JSON.stringify(completionRequest);
-            console.log('📦 Request body size:', requestBody.length, 'characters');
+            // console.log('📦 Request body size:', requestBody.length, 'characters');
 
-            console.log('📡 Making fetch request...');
+            // console.log('📡 Making fetch request...');
             const response = await fetch(url, {
                 method: 'POST',
                 headers,
                 body: requestBody,
             });
 
-            console.log('📡 Response received - Status:', response.status, response.statusText);
-            console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
+            // console.log('📡 Response received - Status:', response.status, response.statusText);
+            // console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
 
             if (!response.ok) {
                 console.error('❌ Response not OK, reading error...');
@@ -150,23 +150,23 @@ export class SectonClient {
                 throw new AIError('Failed to create completion', response.status, error);
             }
 
-            console.log('📖 Reading response body...');
+            // console.log('📖 Reading response body...');
             const responseText = await response.text();
-            console.log('📄 Raw response text length:', responseText.length);
-            console.log('📄 Raw response preview (first 500 chars):', responseText.substring(0, 500));
+            // console.log('📄 Raw response text length:', responseText.length);
+            // console.log('📄 Raw response preview (first 500 chars):', responseText.substring(0, 500));
 
             let jsonResponse;
             try {
-                console.log('🔄 Parsing JSON response...');
+                // console.log('🔄 Parsing JSON response...');
                 jsonResponse = JSON.parse(responseText);
-                console.log('✅ JSON parsed successfully');
-                console.log('📋 Response structure:', {
-                    hasObject: 'object' in jsonResponse,
-                    hasModel: 'model' in jsonResponse,
-                    hasMessages: 'messages' in jsonResponse,
-                    hasUsage: 'usage' in jsonResponse,
-                    keys: Object.keys(jsonResponse)
-                });
+                // console.log('✅ JSON parsed successfully');
+                // console.log('📋 Response structure:', {
+                //     hasObject: 'object' in jsonResponse,
+                //     hasModel: 'model' in jsonResponse,
+                //     hasMessages: 'messages' in jsonResponse,
+                //     hasUsage: 'usage' in jsonResponse,
+                //     keys: Object.keys(jsonResponse)
+                // });
             } catch (parseError) {
                 console.error('💥 Failed to parse JSON response:', parseError);
                 console.error('💥 Response text that failed to parse:', responseText);
@@ -186,13 +186,13 @@ export class SectonClient {
                 throw new AIError('Invalid response structure from AI service', 500, jsonResponse);
             }
 
-            console.log('✅ Completion successful!');
-            console.log('📊 Response summary:', {
-                model: jsonResponse.model,
-                messageCount: jsonResponse.messages?.length,
-                hasUsage: !!jsonResponse.usage,
-                totalTokens: jsonResponse.usage?.total_tokens
-            });
+            // console.log('✅ Completion successful!');
+            // console.log('📊 Response summary:', {
+            //     model: jsonResponse.model,
+            //     messageCount: jsonResponse.messages?.length,
+            //     hasUsage: !!jsonResponse.usage,
+            //     totalTokens: jsonResponse.usage?.total_tokens
+            // });
 
             return jsonResponse as CompletionResponse;
         } catch (error) {
@@ -227,26 +227,26 @@ export class SectonClient {
      * Helper to quickly generate text from a prompt
      */
     async generateText(prompt: string, options: Partial<CompletionRequest> = {}): Promise<string> {
-        console.log('📝 generateText called with prompt length:', prompt.length);
-        console.log('📝 generateText options:', options);
+        // console.log('📝 generateText called with prompt length:', prompt.length);
+        // console.log('📝 generateText options:', options);
 
         const messages: AIMessage[] = [
             { role: 'user', content: prompt }
         ];
 
-        console.log('📝 Constructed messages:', messages);
+        // console.log('📝 Constructed messages:', messages);
 
         const completion = await this.createCompletion({
             ...options,
             messages,
         });
 
-        console.log('📝 Completion response received');
-        console.log('📝 Response messages:', completion.messages);
+        // console.log('📝 Completion response received');
+        // console.log('📝 Response messages:', completion.messages);
 
         // Find the assistant's response
         const assistantMessage = completion.messages.find(m => m.role === 'assistant');
-        console.log('📝 Assistant message found:', !!assistantMessage);
+        // console.log('📝 Assistant message found:', !!assistantMessage);
 
         if (!assistantMessage) {
             console.error('❌ No assistant message in response');
@@ -255,8 +255,8 @@ export class SectonClient {
         }
 
         const result = assistantMessage.content || '';
-        console.log('✅ generateText result length:', result.length);
-        console.log('✅ generateText result preview:', result.substring(0, 200) + (result.length > 200 ? '...' : ''));
+        // console.log('✅ generateText result length:', result.length);
+        // console.log('✅ generateText result preview:', result.substring(0, 200) + (result.length > 200 ? '...' : ''));
 
         return result;
     }
@@ -265,11 +265,11 @@ export class SectonClient {
      * Check if the API key is valid by fetching models
      */
     async validateApiKey(): Promise<boolean> {
-        console.log('🔑 Validating API key...');
+        // console.log('🔑 Validating API key...');
 
         try {
             await this.getModels();
-            console.log('✅ API key validation successful');
+            // console.log('✅ API key validation successful');
             return true;
         } catch (error) {
             console.error('❌ API key validation failed:', error);
@@ -282,7 +282,7 @@ export class SectonClient {
  * Create a new Secton client
  */
 export function createSectonClient(config: SectonConfig): SectonClient {
-    console.log('🏭 Creating new SectonClient with config:', {
+    console.log('Creating new SectonClient with config:', {
         ...config,
         apiKey: config.apiKey ? config.apiKey.substring(0, 8) + '...' : 'none'
     });

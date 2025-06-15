@@ -31,11 +31,11 @@ export interface AutoSetupOptions {
 export async function performAutoOAuthSetup(
     options: AutoSetupOptions = {}
 ): Promise<AutoSetupResult> {
-    console.log('🦖 performAutoOAuthSetup called with options:', options);
+    // console.log('🦖 performAutoOAuthSetup called with options:', options);
 
     // Check if auto setup is available
     if (!isAutoOAuthAvailable()) {
-        console.log('🦖 Auto setup not available - missing env vars');
+        // console.log('🦖 Auto setup not available - missing env vars');
         return {
             success: false,
             error: 'Auto OAuth setup not available',
@@ -43,9 +43,9 @@ export async function performAutoOAuthSetup(
         };
     }
 
-    console.log('🦖 Environment variables check passed');
-    console.log('🦖 Server URL:', process.env.CHR_EPOA2_SERV_URL);
-    console.log('🦖 API Key:', process.env.CHR_EPOA2_SERV_API_KEY ? 'SET' : 'NOT SET');
+    // console.log('🦖 Environment variables check passed');
+    // console.log('🦖 Server URL:', process.env.CHR_EPOA2_SERV_URL);
+    // console.log('🦖 API Key:', process.env.CHR_EPOA2_SERV_API_KEY ? 'SET' : 'NOT SET');
 
     const apiClient = createEasypanelApiClient();
     if (!apiClient) {
@@ -59,10 +59,10 @@ export async function performAutoOAuthSetup(
 
     try {
         // Step 1: Test connection to OAuth server
-        console.log('🦖 Testing connection to OAuth server...');
+        // console.log('🦖 Testing connection to OAuth server...');
         const connectionTest = await apiClient.testConnection();
         if (!connectionTest.success) {
-            console.log('🦖 Connection test failed:', connectionTest.error);
+            // console.log('🦖 Connection test failed:', connectionTest.error);
             return {
                 success: false,
                 error: 'Connection to OAuth server failed',
@@ -100,7 +100,7 @@ export async function performAutoOAuthSetup(
         });
 
         if (!createdClient.secret) {
-            console.log('🦖 No client secret in response');
+            // console.log('🦖 No client secret in response');
             return {
                 success: false,
                 error: 'Client created but no secret returned',
@@ -115,14 +115,14 @@ export async function performAutoOAuthSetup(
                 throw new Error('CHR_EPOA2_SERV_URL not configured');
             }
 
-            console.log('🦖 Setting up local OAuth provider...');
+            // console.log('🦖 Setting up local OAuth provider...');
             await setupEasypanelProvider({
                 baseUrl: serverUrl,
                 clientId: createdClient.id,
                 clientSecret: createdClient.secret
             });
 
-            console.log('🦖 Local OAuth provider setup complete');
+            // console.log('🦖 Local OAuth provider setup complete');
 
             return {
                 success: true,

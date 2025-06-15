@@ -299,7 +299,7 @@ export async function GET(request: Request): Promise<NextResponse<AuditLogsRespo
         const targetId = searchParams.get('targetId') || ''
         const isExport = searchParams.get('export') === 'true'
 
-        console.log(`🦖 Audit Logs API - Cursor: ${cursor ? cursor.substring(0, 10) + '...' : 'none'}, ChunkSize: ${chunkSize}, UseChunking: ${useChunking}`);
+        // console.log(`🦖 Audit Logs API - Cursor: ${cursor ? cursor.substring(0, 10) + '...' : 'none'}, ChunkSize: ${chunkSize}, UseChunking: ${useChunking}`);
 
         // Build where clause for filtering
         const where: WhereClause = {}
@@ -311,14 +311,14 @@ export async function GET(request: Request): Promise<NextResponse<AuditLogsRespo
                 const fromDate = new Date(from);
                 if (!isNaN(fromDate.getTime())) {
                     where.createdAt.gte = fromDate;
-                    console.log('🦖 Date filter FROM:', fromDate.toISOString());
+                    // console.log('🦖 Date filter FROM:', fromDate.toISOString());
                 }
             }
             if (to) {
                 const toDate = new Date(to);
                 if (!isNaN(toDate.getTime())) {
                     where.createdAt.lte = toDate;
-                    console.log('🦖 Date filter TO:', toDate.toISOString());
+                    // console.log('🦖 Date filter TO:', toDate.toISOString());
                 }
             }
         }
@@ -326,7 +326,7 @@ export async function GET(request: Request): Promise<NextResponse<AuditLogsRespo
         // Action filter
         if (action) {
             where.action = action
-            console.log('🦖 Action filter:', action);
+            // console.log('🦖 Action filter:', action);
         }
 
         // User ID filters
@@ -379,7 +379,7 @@ export async function GET(request: Request): Promise<NextResponse<AuditLogsRespo
                     }
                 }
             ]
-            console.log('🦖 Search filter applied:', search);
+            // console.log('🦖 Search filter applied:', search);
         }
 
         // If exporting, return all matching records as CSV
@@ -415,14 +415,14 @@ export async function GET(request: Request): Promise<NextResponse<AuditLogsRespo
 
         // Get total count for pagination
         const total = await db.auditLog.count({where})
-        console.log(`🦖 Total audit logs matching filters: ${total}`);
+        // console.log(`🦖 Total audit logs matching filters: ${total}`);
 
         // Determine fetching method: chunking or pagination
         if (useChunking) {
             let logs: DatabaseAuditLog[];
 
             if (cursor) {
-                console.log(`🦖 Using cursor-based fetch with cursor: ${cursor.substring(0, 10)}...`);
+                // console.log(`🦖 Using cursor-based fetch with cursor: ${cursor.substring(0, 10)}...`);
 
                 // Get the cursor record to understand its position
                 const cursorRecord = await db.auditLog.findUnique({
@@ -432,7 +432,7 @@ export async function GET(request: Request): Promise<NextResponse<AuditLogsRespo
 
                 if (!cursorRecord) {
                     // If cursor doesn't exist, fall back to initial fetch
-                    console.log('🦖 Cursor not found, falling back to initial fetch');
+                    // console.log('🦖 Cursor not found, falling back to initial fetch');
                     logs = await db.auditLog.findMany({
                         where,
                         take: chunkSize,
@@ -476,7 +476,7 @@ export async function GET(request: Request): Promise<NextResponse<AuditLogsRespo
                     }) as DatabaseAuditLog[]
                 }
             } else {
-                console.log(`🦖 Initial fetch without cursor`);
+                // console.log(`🦖 Initial fetch without cursor`);
                 // Initial fetch without cursor
                 logs = await db.auditLog.findMany({
                     where,
@@ -542,7 +542,7 @@ export async function GET(request: Request): Promise<NextResponse<AuditLogsRespo
             })
         }
     } catch (error) {
-        console.error('🦖 Audit logs fetch error:', error)
+        // console.error('🦖 Audit logs fetch error:', error)
         return NextResponse.json(
             {
                 error: 'Failed to fetch audit logs',
