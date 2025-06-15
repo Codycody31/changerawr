@@ -47,7 +47,6 @@ body:
       label: 📝 Use Case / User Story
       description: How would you (or others) use this feature?
       placeholder: "As a [type of user], I want [feature] so that [benefit]"
-      value: "As a , I want  so that "
     validations:
       required: true
 
