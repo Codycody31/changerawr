@@ -10,7 +10,8 @@
     "build:widget": "tsx scripts/widget/build.ts",
     "generate-swagger": "tsx scripts/api/generateSwagger.ts",
     "start:prod": "NODE_ENV=production next start",
-    "start:prod:win": "set NODE_ENV=production&& next start"
+    "start:prod:win": "set NODE_ENV=production&& next start",
+    "screenshots":  "tsx scripts/utils/scan.ts"
   },
   "prisma": {
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
@@ -126,6 +127,7 @@
     "@types/swagger-ui-react": "^5.18.0",
     "eslint": "^9",
     "eslint-config-next": "15.3.0",
+    "playwright": "^1.53.1",
     "postcss": "^8",
     "prisma": "^6.6.0",
     "tailwindcss": "^3.4.1",
