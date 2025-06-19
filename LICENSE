@@ -1,0 +1,78 @@
+# Changerawr Sponsorware License
+
+Copyright (c) 2025 Supernova3339
+
+## License Terms
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to use, copy, modify, merge, publish, and distribute copies of the Software, subject to the following conditions:
+
+### What You CAN Do
+
+✅ **Personal Use** - Use Changerawr for personal projects and internal business operations.
+
+✅ **Modification** - Modify the Software to fit your specific needs and requirements.
+
+✅ **Distribution** - Share copies of the original or modified Software with others.
+
+✅ **Self-Hosting** - Host your own instance of Changerawr for your organization or personal use.
+
+✅ **Contributions** - Contribute improvements, bug fixes, and new features back to the project.
+
+✅ **Fork and Extend** - Create your own versions with additional features for personal or internal use.
+
+### What You CANNOT Do
+
+❌ **Commercial Competition** - You may NOT create a competing commercial service based on this Software, including:
+- Building a SaaS business using this codebase
+- Adding billing systems and selling access to Changerawr
+- Offering hosted Changerawr as a paid service
+- Creating derivative products for commercial sale
+- Rebranding and commercializing the Software
+
+❌ **Direct Sales** - You may NOT sell copies of this Software or charge licensing fees for the Software itself.
+
+❌ **Trademark Usage** - You may NOT use the "Changerawr" name, logo, or branding for commercial purposes without permission.
+
+### Contribution Agreement
+
+When you contribute to this project, you agree that:
+
+1. **You retain ownership** of your intellectual property and contributed code
+2. **You grant Supernova3339 a perpetual, irrevocable, worldwide license** to use, modify, distribute, and commercialize your contributions as part of Changerawr
+3. **You confirm** you have the legal right to make such contributions
+4. **Your contributions** will be governed by the same license terms as the rest of the Software
+5. **You understand** that Supernova3339 may use your contributions in commercial versions of Changerawr
+
+### The Sponsorware Philosophy
+
+This project follows the **sponsorware** licensing model:
+
+- **Open Development** - All code is publicly available and transparently developed
+- **Free Usage** - Anyone can use, modify, and self-host the Software
+- **Fair Protection** - Prevents unfair commercial competition while encouraging innovation
+- **Community Driven** - Relies on sponsorship, donations, and community contributions
+- **Sustainable Creation** - Allows the original author to build a sustainable business
+
+### Legal Disclaimer
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+### Need Clarification?
+
+If you're unsure whether your intended use case complies with this license, please:
+- Open an issue on the GitHub repository
+- Reach out directly to discuss your specific situation
+- Review the examples above for guidance
+
+We're happy to clarify and work with you to find compliant solutions.
+
+### License Violations
+
+Violations of this license may result in:
+- Immediate termination of your license to use the Software
+- Legal action to protect intellectual property rights
+- Requirement to cease all prohibited activities
+
+---
+
+**TL;DR**: Use Changerawr freely for personal and business needs, contribute to make it better, but don't build a competing business with our code. Sound fair?
