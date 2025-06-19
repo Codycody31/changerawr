@@ -8,6 +8,15 @@
 [![Status](https://img.shields.io/badge/status-Production%20Ready-green.svg)](https://github.com/supernova3339/changerawr)
 [![License](https://img.shields.io/badge/license-Sponsorware-purple.svg)](LICENSE)
 
+# What is Changerawr?
+
+Changerawr can be thought of as the **after** part of the before-and-after on a todo list. When you get a bunch of things done, you write them down so you know what you accomplished! \
+
+Change refers to "what got done", and a todo list is a list of changes, known as a log. \
+change + log = changelog, which is what Changerawr aims to be!
+
+If you don't know what a changelog is, check out [betterauth](https://www.better-auth.com/changelogs) for an example!
+
 ## ✨ Why Changerawr?
 
 **Developer-focused.** Headless API, beautiful documentation, SDKs, and integrations.
