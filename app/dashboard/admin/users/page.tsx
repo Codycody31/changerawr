@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, {useState} from 'react';
+import {useQuery, useMutation, useQueryClient} from '@tanstack/react-query';
 import {
     Card,
     CardContent,
@@ -9,7 +9,7 @@ import {
     CardTitle,
     CardDescription,
 } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import {Button} from '@/components/ui/button';
 import {
     Table,
     TableBody,
@@ -50,18 +50,18 @@ import {
     AlertDialogHeader,
     AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Skeleton } from '@/components/ui/skeleton';
-import { toast } from '@/hooks/use-toast';
+import {Input} from '@/components/ui/input';
+import {Label} from '@/components/ui/label';
+import {Skeleton} from '@/components/ui/skeleton';
+import {toast} from '@/hooks/use-toast';
 import {
     User, UserPlus, Copy, MoreVertical, Pencil,
     Trash2, Search, X, Shield, Check
 } from 'lucide-react';
-import { format } from 'date-fns';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Role } from '@prisma/client';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {format} from 'date-fns';
+import {motion, AnimatePresence} from 'framer-motion';
+import {Role} from '@prisma/client';
+import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs';
 
 interface UserData {
     id: string;
@@ -95,7 +95,7 @@ export default function UsersPage() {
     const [editName, setEditName] = useState('');
     const [editRole, setEditRole] = useState<Role>('STAFF');
 
-    const { data: users, isLoading } = useQuery<UserData[]>({
+    const {data: users, isLoading} = useQuery<UserData[]>({
         queryKey: ['users'],
         queryFn: async () => {
             const response = await fetch('/api/admin/users');
@@ -104,7 +104,7 @@ export default function UsersPage() {
         },
     });
 
-    const { data: invitations } = useQuery<InvitationLink[]>({
+    const {data: invitations} = useQuery<InvitationLink[]>({
         queryKey: ['invitations'],
         queryFn: async () => {
             const response = await fetch('/api/admin/users/invitations');
@@ -118,10 +118,10 @@ export default function UsersPage() {
         Error,
         { userId: string; data: { name?: string; role?: Role } }
     >({
-        mutationFn: async ({ userId, data }: { userId: string; data: { name?: string; role?: Role } }) => {
+        mutationFn: async ({userId, data}: { userId: string; data: { name?: string; role?: Role } }) => {
             const response = await fetch(`/api/admin/users/${userId}`, {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(data),
             });
             if (!response.ok) {
@@ -131,7 +131,7 @@ export default function UsersPage() {
             return response.json();
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['users'] });
+            queryClient.invalidateQueries({queryKey: ['users']});
             toast({
                 title: 'User Updated',
                 description: 'The user has been updated successfully.',
@@ -163,7 +163,7 @@ export default function UsersPage() {
             return response.json();
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['users'] });
+            queryClient.invalidateQueries({queryKey: ['users']});
             toast({
                 title: 'User Deleted',
                 description: 'The user has been deleted successfully.',
@@ -187,7 +187,7 @@ export default function UsersPage() {
         mutationFn: async (data: { email: string; role: Role }) => {
             const response = await fetch('/api/admin/users', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(data),
             });
             if (!response.ok) {
@@ -198,7 +198,7 @@ export default function UsersPage() {
         },
         onSuccess: (data) => {
             setNewInvitationUrl(data.invitation.url);
-            queryClient.invalidateQueries({ queryKey: ['invitations'] });
+            queryClient.invalidateQueries({queryKey: ['invitations']});
             toast({
                 title: 'Invitation Created',
                 description: 'The invitation link has been created successfully.',
@@ -227,7 +227,7 @@ export default function UsersPage() {
             return response.json();
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['invitations'] });
+            queryClient.invalidateQueries({queryKey: ['invitations']});
             toast({
                 title: 'Invitation Revoked',
                 description: 'The invitation link has been revoked.',
@@ -267,7 +267,7 @@ export default function UsersPage() {
         if (editRole !== selectedUser.role) updates.role = editRole;
 
         if (Object.keys(updates).length > 0) {
-            await updateUser.mutate({ userId: selectedUser.id, data: updates });
+            await updateUser.mutate({userId: selectedUser.id, data: updates});
         }
     };
 
@@ -298,16 +298,16 @@ export default function UsersPage() {
     if (isLoading) {
         return (
             <div className="space-y-4">
-                <Skeleton className="h-8 w-[200px]" />
+                <Skeleton className="h-8 w-[200px]"/>
                 <Card>
                     <CardHeader>
-                        <Skeleton className="h-7 w-[150px]" />
-                        <Skeleton className="h-4 w-[250px] mt-2" />
+                        <Skeleton className="h-7 w-[150px]"/>
+                        <Skeleton className="h-4 w-[250px] mt-2"/>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
-                            {Array.from({ length: 5 }).map((_, i) => (
-                                <Skeleton key={i} className="h-16 w-full" />
+                            {Array.from({length: 5}).map((_, i) => (
+                                <Skeleton key={i} className="h-16 w-full"/>
                             ))}
                         </div>
                     </CardContent>
@@ -318,8 +318,8 @@ export default function UsersPage() {
 
     return (
         <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{opacity: 0, y: 20}}
+            animate={{opacity: 1, y: 0}}
             className="space-y-6"
         >
             {/* Edit User Dialog */}
@@ -348,7 +348,7 @@ export default function UsersPage() {
                                 onValueChange={(value) => setEditRole(value as Role)}
                             >
                                 <SelectTrigger>
-                                    <SelectValue placeholder="Select a role" />
+                                    <SelectValue placeholder="Select a role"/>
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="STAFF">Staff</SelectItem>
@@ -423,7 +423,7 @@ export default function UsersPage() {
                                     onValueChange={(value) => setInviteRole(value as Role)}
                                 >
                                     <SelectTrigger>
-                                        <SelectValue placeholder="Select a role" />
+                                        <SelectValue placeholder="Select a role"/>
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="STAFF">Staff</SelectItem>
@@ -452,7 +452,8 @@ export default function UsersPage() {
                             <AlertDialogHeader>
                                 <AlertDialogTitle>Invitation Link Created</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                    Copy this invitation link and share it with the user. The link will expire in 7 days.
+                                    Copy this invitation link and share it with the user. The link will expire in 7
+                                    days.
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
@@ -492,7 +493,7 @@ export default function UsersPage() {
             {/* Search Bar */}
             <div className="flex items-center gap-2">
                 <div className="relative flex-1">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground"/>
                     <Input
                         placeholder="Search users by name or email..."
                         value={searchTerm}
@@ -507,7 +508,7 @@ export default function UsersPage() {
                         onClick={() => setSearchTerm('')}
                         className="px-2"
                     >
-                        <X className="h-4 w-4" />
+                        <X className="h-4 w-4"/>
                     </Button>
                 )}
             </div>
@@ -557,7 +558,8 @@ export default function UsersPage() {
                                         <TableRow key={user.id}>
                                             <TableCell>
                                                 <div className="flex items-center gap-2">
-                                                    <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                                                    <div
+                                                        className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
                                                         <User className="h-4 w-4 text-muted-foreground"/>
                                                     </div>
                                                     <div>
@@ -576,7 +578,7 @@ export default function UsersPage() {
                                                             : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
                                                     }`}
                                                 >
-                                                    {user.role === 'ADMIN' && <Shield className="h-3 w-3" />}
+                                                    {user.role === 'ADMIN' && <Shield className="h-3 w-3"/>}
                                                     {user.role}
                                                 </span>
                                             </TableCell>
@@ -590,20 +592,20 @@ export default function UsersPage() {
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
                                                         <Button variant="ghost" size="sm">
-                                                            <MoreVertical className="h-4 w-4" />
+                                                            <MoreVertical className="h-4 w-4"/>
                                                         </Button>
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end">
                                                         <DropdownMenuItem onClick={() => handleEditUser(user)}>
-                                                            <Pencil className="h-4 w-4 mr-2" />
+                                                            <Pencil className="h-4 w-4 mr-2"/>
                                                             Edit User
                                                         </DropdownMenuItem>
-                                                        <DropdownMenuSeparator />
+                                                        <DropdownMenuSeparator/>
                                                         <DropdownMenuItem
                                                             className="text-red-600 dark:text-red-400"
                                                             onClick={() => handleDeleteUser(user)}
                                                         >
-                                                            <Trash2 className="h-4 w-4 mr-2" />
+                                                            <Trash2 className="h-4 w-4 mr-2"/>
                                                             Delete User
                                                         </DropdownMenuItem>
                                                     </DropdownMenuContent>
@@ -678,7 +680,7 @@ export default function UsersPage() {
                                                                 : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
                                                         }`}
                                                     >
-                                                        {invitation.role === 'ADMIN' && <Shield className="h-3 w-3" />}
+                                                        {invitation.role === 'ADMIN' && <Shield className="h-3 w-3"/>}
                                                         {invitation.role}
                                                     </span>
                                                 </TableCell>
@@ -694,7 +696,7 @@ export default function UsersPage() {
                                                                     : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                                                         }`}
                                                     >
-                                                        {isActive && <Check className="h-3 w-3" />}
+                                                        {isActive && <Check className="h-3 w-3"/>}
                                                         {isActive ? 'Active' : isUsed ? 'Used' : 'Expired'}
                                                     </span>
                                                 </TableCell>
@@ -723,9 +725,11 @@ export default function UsersPage() {
                                                                     </AlertDialogTrigger>
                                                                     <AlertDialogContent>
                                                                         <AlertDialogHeader>
-                                                                            <AlertDialogTitle>Revoke Invitation</AlertDialogTitle>
+                                                                            <AlertDialogTitle>Revoke
+                                                                                Invitation</AlertDialogTitle>
                                                                             <AlertDialogDescription>
-                                                                                This will invalidate the invitation link for {invitation.email}.
+                                                                                This will invalidate the invitation link
+                                                                                for {invitation.email}.
                                                                             </AlertDialogDescription>
                                                                         </AlertDialogHeader>
                                                                         <AlertDialogFooter>

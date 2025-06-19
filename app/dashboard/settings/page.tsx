@@ -1,9 +1,9 @@
 'use client'
 
 import React, { useState, useEffect } from 'react';
-import { useTheme } from 'next-themes';
 import { useAuth } from '@/context/auth';
 import { useRouter } from 'next/navigation';
+import { useThemeWithLoading } from '@/components/theme-provider';
 import {
     Card,
     CardContent,
@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Moon, Sun, Save, ArrowLeft, Bell, Lock } from 'lucide-react';
+import { Loader2, Moon, Sun, Save, Bell, Lock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { Switch } from '@/components/ui/switch';
@@ -28,17 +28,16 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import {PasskeysSection} from "@/components/settings/passkeys-section";
+import { PasskeysSection } from "@/components/settings/passkeys-section";
 
 interface FormState {
     name: string;
-    theme: string;
     enableNotifications: boolean;
 }
 
 export default function SettingsPage() {
     const { user } = useAuth();
-    const { theme, setTheme } = useTheme();
+    const { theme, setTheme, isLoading: themeLoading } = useThemeWithLoading();
     const router = useRouter();
     const { toast } = useToast();
     const [isLoading, setIsLoading] = useState(false);
@@ -53,7 +52,6 @@ export default function SettingsPage() {
     // Current form values that the user is editing
     const [formState, setFormState] = useState<FormState>({
         name: '',
-        theme: 'light',
         enableNotifications: true
     });
 
@@ -68,7 +66,6 @@ export default function SettingsPage() {
 
                     const initialValues = {
                         name: user?.name || '',
-                        theme: data.theme || theme || 'light',
                         enableNotifications: data.enableNotifications !== undefined
                             ? data.enableNotifications
                             : true
@@ -92,19 +89,16 @@ export default function SettingsPage() {
         if (user) {
             fetchSettings();
         }
-    }, [user, theme, toast]);
+    }, [user, toast]);
 
     // Check if there are unsaved changes
     const hasChanges = savedValues ? (
         formState.name !== savedValues.name ||
-        formState.theme !== savedValues.theme ||
         formState.enableNotifications !== savedValues.enableNotifications
     ) : false;
 
-    // Handle theme toggle with immediate UI update
+    // Handle theme toggle - now much simpler
     const handleThemeToggle = (newTheme: string) => {
-        setFormState(prev => ({ ...prev, theme: newTheme }));
-        // Apply theme immediately for preview
         setTheme(newTheme);
     };
 
@@ -181,11 +175,6 @@ export default function SettingsPage() {
                 description: error instanceof Error ? error.message : 'An error occurred',
                 variant: 'destructive',
             });
-
-            // Revert theme on error
-            if (savedValues && formState.theme !== savedValues.theme) {
-                setTheme(savedValues.theme);
-            }
         } finally {
             setIsLoading(false);
         }
@@ -195,14 +184,10 @@ export default function SettingsPage() {
     const handleCancel = () => {
         if (savedValues) {
             setFormState(savedValues);
-            // Revert theme if it was changed
-            if (formState.theme !== savedValues.theme) {
-                setTheme(savedValues.theme);
-            }
         }
     };
 
-    if (isFetching) {
+    if (isFetching || themeLoading) {
         return (
             <div className="flex items-center justify-center h-full">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -211,23 +196,15 @@ export default function SettingsPage() {
     }
 
     return (
-        <div className="pb-16 md:pb-0">
+        <div className="min-h-screen bg-background">
+
             <form
                 onSubmit={(e) => { e.preventDefault(); handleSave(); }}
-                className="container max-w-2xl px-4 md:px-6 space-y-6 md:space-y-8"
+                className="container max-w-2xl px-4 md:px-6 space-y-4 md:space-y-6 pb-20 md:pb-8"
             >
-                {/* Header section */}
-                <div className="sticky top-0 z-10 bg-background pt-4 pb-2 mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                {/* Desktop header */}
+                <div className="hidden md:flex sticky top-0 z-10 bg-background pt-4 pb-2 mb-4 flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div className="flex items-center">
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="mr-2 md:hidden"
-                            onClick={() => router.back()}
-                        >
-                            <ArrowLeft className="h-5 w-5" />
-                        </Button>
                         <div>
                             <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Settings</h1>
                             <p className="text-sm text-muted-foreground mt-1">
@@ -275,24 +252,26 @@ export default function SettingsPage() {
                 {/* Theme selection card */}
                 <Card className="border shadow-sm">
                     <CardHeader className="pb-3">
-                        <CardTitle className="text-xl">Appearance</CardTitle>
-                        <CardDescription>
-                            Choose your preferred theme.
+                        <CardTitle className="text-lg md:text-xl">Appearance</CardTitle>
+                        <CardDescription className="text-sm">
+                            Choose your preferred theme. Your selection is automatically saved.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div className="flex flex-col sm:flex-row gap-3">
+                        <div className="grid grid-cols-2 gap-3">
                             <ThemeButton
-                                isActive={formState.theme === 'light'}
+                                isActive={theme === 'light'}
                                 onClick={() => handleThemeToggle('light')}
-                                icon={<Sun className="h-5 w-5" />}
+                                icon={<Sun className="h-4 w-4 md:h-5 md:w-5" />}
                                 name="Light"
+                                disabled={themeLoading}
                             />
                             <ThemeButton
-                                isActive={formState.theme === 'dark'}
+                                isActive={theme === 'dark'}
                                 onClick={() => handleThemeToggle('dark')}
-                                icon={<Moon className="h-5 w-5" />}
+                                icon={<Moon className="h-4 w-4 md:h-5 md:w-5" />}
                                 name="Dark"
+                                disabled={themeLoading}
                             />
                         </div>
                     </CardContent>
@@ -301,18 +280,18 @@ export default function SettingsPage() {
                 {/* Notification settings card */}
                 <Card className="border shadow-sm">
                     <CardHeader className="pb-3">
-                        <CardTitle className="text-xl">Notifications</CardTitle>
-                        <CardDescription>
+                        <CardTitle className="text-lg md:text-xl">Notifications</CardTitle>
+                        <CardDescription className="text-sm">
                             Manage your notification preferences.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <div className="flex items-center justify-between space-x-2">
-                            <div className="flex items-center space-x-2">
-                                <Bell className="h-5 w-5 text-muted-foreground" />
-                                <div>
-                                    <p className="font-medium">Email Notifications</p>
-                                    <p className="text-sm text-muted-foreground">
+                        <div className="flex items-start justify-between space-x-3">
+                            <div className="flex items-start space-x-3 flex-1">
+                                <Bell className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
+                                <div className="min-w-0 flex-1">
+                                    <p className="font-medium text-sm md:text-base">Email Notifications</p>
+                                    <p className="text-xs md:text-sm text-muted-foreground mt-1">
                                         Receive email notifications for important events like request approvals.
                                     </p>
                                 </div>
@@ -320,6 +299,7 @@ export default function SettingsPage() {
                             <Switch
                                 checked={formState.enableNotifications}
                                 onCheckedChange={handleNotificationToggle}
+                                className="flex-shrink-0"
                             />
                         </div>
                     </CardContent>
@@ -328,12 +308,12 @@ export default function SettingsPage() {
                 {/* Profile card */}
                 <Card className="border shadow-sm">
                     <CardHeader className="pb-3">
-                        <CardTitle className="text-xl">Profile</CardTitle>
-                        <CardDescription>
+                        <CardTitle className="text-lg md:text-xl">Profile</CardTitle>
+                        <CardDescription className="text-sm">
                             Update your profile information.
                         </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-5">
+                    <CardContent className="space-y-4 md:space-y-5">
                         <div className="space-y-2">
                             <Label htmlFor="name" className="text-sm font-medium">Display Name</Label>
                             <Input
@@ -341,7 +321,7 @@ export default function SettingsPage() {
                                 value={formState.name}
                                 onChange={handleNameChange}
                                 placeholder="Enter your display name"
-                                className="h-10"
+                                className="h-10 md:h-11"
                             />
                         </div>
                         <div className="space-y-2">
@@ -350,7 +330,7 @@ export default function SettingsPage() {
                                 id="email"
                                 value={user?.email}
                                 disabled
-                                className="h-10 bg-muted cursor-not-allowed"
+                                className="h-10 md:h-11 bg-muted cursor-not-allowed"
                             />
                             <p className="text-xs text-muted-foreground mt-1">
                                 Your email address cannot be changed.
@@ -361,8 +341,8 @@ export default function SettingsPage() {
 
                         {/* Password Reset Section */}
                         <div className="pt-2">
-                            <div className="flex items-center justify-between">
-                                <div className="space-y-1">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <div className="space-y-1 flex-1">
                                     <h3 className="text-sm font-medium flex items-center">
                                         <Lock className="h-4 w-4 mr-1" />
                                         Password
@@ -375,6 +355,7 @@ export default function SettingsPage() {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => setIsResetDialogOpen(true)}
+                                    className="w-full sm:w-auto"
                                 >
                                     Reset Password
                                 </Button>
@@ -384,10 +365,7 @@ export default function SettingsPage() {
                 </Card>
 
                 {/* Passkeys Section */}
-                <PasskeysSection/>
-
-                {/* 2FA Mode Section */}
-                {/*<SecuritySettings/>*/}
+                <PasskeysSection />
 
                 {/* Password Reset Dialog */}
                 <Dialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
@@ -425,32 +403,37 @@ export default function SettingsPage() {
 
                 {/* Mobile fixed save button */}
                 {isMobile && hasChanges && (
-                    <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t z-10">
-                        <div className="flex gap-2">
+                    <motion.div
+                        initial={{ y: 100, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: 100, opacity: 0 }}
+                        className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur-sm border-t z-40"
+                    >
+                        <div className="flex gap-3 max-w-sm mx-auto">
                             <Button
                                 type="button"
                                 variant="outline"
                                 onClick={handleCancel}
-                                className="flex-1"
+                                className="flex-1 h-11"
                             >
                                 Cancel
                             </Button>
                             <Button
                                 type="submit"
                                 disabled={isLoading}
-                                className="flex-1"
+                                className="flex-1 h-11"
                             >
                                 {isLoading ? (
                                     <Loader2 className="h-4 w-4 animate-spin" />
                                 ) : (
                                     <>
                                         <Save className="mr-2 h-4 w-4" />
-                                        Save Changes
+                                        Save
                                     </>
                                 )}
                             </Button>
                         </div>
-                    </div>
+                    </motion.div>
                 )}
             </form>
         </div>
@@ -462,12 +445,14 @@ function ThemeButton({
                          isActive,
                          onClick,
                          icon,
-                         name
+                         name,
+                         disabled = false
                      }: {
     isActive: boolean;
     onClick: () => void;
     icon: React.ReactNode;
     name: string;
+    disabled?: boolean;
 }) {
     return (
         <Button
@@ -475,6 +460,7 @@ function ThemeButton({
             variant={isActive ? "default" : "outline"}
             className="w-full relative h-14 justify-start px-5"
             onClick={onClick}
+            disabled={disabled}
         >
             <div className="flex items-center">
                 <div className="mr-3">
@@ -484,9 +470,13 @@ function ThemeButton({
             </div>
 
             {isActive && (
-                <span className="absolute right-3 text-xs bg-primary-foreground text-primary px-2 py-1 rounded-full">
+                <motion.span
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="absolute right-3 text-xs bg-primary-foreground text-primary px-2 py-1 rounded-full"
+                >
                     Active
-                </span>
+                </motion.span>
             )}
         </Button>
     );

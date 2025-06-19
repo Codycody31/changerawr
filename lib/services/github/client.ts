@@ -24,11 +24,25 @@ export interface GitHubCommitStats {
     total: number;
 }
 
+export interface GitHubFile {
+    filename: string;
+    status: 'added' | 'modified' | 'removed' | 'renamed';
+    additions: number;
+    deletions: number;
+    changes: number;
+    patch?: string;
+    blob_url: string;
+    raw_url: string;
+    contents_url: string;
+    previous_filename?: string;
+}
+
 export interface GitHubCommitResponse {
     sha: string;
     commit: GitHubCommitData;
     html_url: string;
     stats?: GitHubCommitStats;
+    files?: GitHubFile[];
     repository?: {
         html_url: string;
     };
@@ -39,6 +53,7 @@ export interface GitHubCommit {
     commit: GitHubCommitData;
     html_url: string;
     stats?: GitHubCommitStats;
+    files?: GitHubFile[];
     // Flattened properties for easier access
     message: string;
     author: GitHubCommitAuthor;
@@ -154,18 +169,18 @@ export class GitHubClient {
 
         if (!response.ok) {
             let errorMessage = `GitHub API error: ${response.status} ${response.statusText}`;
-            let errorBody: GitHubErrorResponse | null = null;
+            let errorBody: GitHubErrorResponse | undefined;
 
             try {
                 const errorText = await response.text();
                 errorBody = JSON.parse(errorText) as GitHubErrorResponse;
-                errorMessage = errorBody.message || errorMessage;
+                errorMessage = errorBody.message ?? errorMessage;
             } catch {
                 // If we can't parse JSON, use the default message
                 errorMessage = errorMessage;
             }
 
-            throw new GitHubError(errorMessage, response.status, errorBody || undefined);
+            throw new GitHubError(errorMessage, response.status, errorBody);
         }
 
         return response.json() as Promise<T>;
@@ -197,18 +212,18 @@ export class GitHubClient {
      */
     private normalizeCommit(commit: GitHubCommitResponse): GitHubCommit {
         const { owner, repo } = this.parseRepositoryUrl(
-            commit.repository?.html_url || 'unknown/unknown'
+            commit.repository?.html_url ?? 'unknown/unknown'
         );
 
         return {
             ...commit,
-            message: commit.commit?.message || '',
-            author: commit.commit?.author || {
+            message: commit.commit?.message ?? '',
+            author: commit.commit?.author ?? {
                 name: 'Unknown',
                 email: '',
                 date: new Date().toISOString()
             },
-            url: commit.html_url || `https://github.com/${owner}/${repo}/commit/${commit.sha}`
+            url: commit.html_url ?? `https://github.com/${owner}/${repo}/commit/${commit.sha}`
         };
     }
 
@@ -256,7 +271,7 @@ export class GitHubClient {
         if (options.until) queryParams.append('until', options.until);
         if (options.sha) queryParams.append('sha', options.sha);
         if (options.path) queryParams.append('path', options.path);
-        queryParams.append('per_page', (options.per_page || 30).toString());
+        queryParams.append('per_page', (options.per_page ?? 30).toString());
         if (options.page) queryParams.append('page', options.page.toString());
 
         const endpoint = `/repos/${owner}/${repo}/commits${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
@@ -265,6 +280,43 @@ export class GitHubClient {
 
         // Normalize the commits to ensure consistent structure
         return commits.map(commit => this.normalizeCommit(commit));
+    }
+
+    /**
+     * Get commits with detailed file information
+     */
+    async getCommitsWithFiles(
+        repositoryUrl: string,
+        options: {
+            since?: string;
+            until?: string;
+            sha?: string;
+            path?: string;
+            per_page?: number;
+            page?: number;
+        } = {}
+    ): Promise<GitHubCommit[]> {
+        // First get the basic commits
+        const commits = await this.getCommits(repositoryUrl, options);
+
+        // Then fetch detailed info for each commit (with files)
+        const detailedCommits: GitHubCommit[] = [];
+
+        for (const commit of commits) {
+            try {
+                const detailedCommit = await this.getCommit(repositoryUrl, commit.sha);
+                detailedCommits.push(detailedCommit);
+
+                // Rate limiting - be nice to GitHub API
+                await this.delay(100);
+            } catch (error) {
+                console.warn(`Failed to get detailed info for commit ${commit.sha}:`, error);
+                // Use the basic commit info as fallback
+                detailedCommits.push(commit);
+            }
+        }
+
+        return detailedCommits;
     }
 
     /**
@@ -283,6 +335,37 @@ export class GitHubClient {
 
         // Normalize the commits
         return comparison.commits.map(commit => this.normalizeCommit(commit));
+    }
+
+    /**
+     * Get commits between two references with detailed file information
+     */
+    async getCommitsBetweenWithFiles(
+        repositoryUrl: string,
+        base: string,
+        head: string
+    ): Promise<GitHubCommit[]> {
+        // First get the basic commits
+        const commits = await this.getCommitsBetween(repositoryUrl, base, head);
+
+        // Then fetch detailed info for each commit (with files)
+        const detailedCommits: GitHubCommit[] = [];
+
+        for (const commit of commits) {
+            try {
+                const detailedCommit = await this.getCommit(repositoryUrl, commit.sha);
+                detailedCommits.push(detailedCommit);
+
+                // Rate limiting - be nice to GitHub API
+                await this.delay(100);
+            } catch (error) {
+                console.warn(`Failed to get detailed info for commit ${commit.sha}:`, error);
+                // Use the basic commit info as fallback
+                detailedCommits.push(commit);
+            }
+        }
+
+        return detailedCommits;
     }
 
     /**
@@ -330,7 +413,7 @@ export class GitHubClient {
     }
 
     /**
-     * Get detailed commit information including stats
+     * Get detailed commit information including stats and file changes
      */
     async getCommit(repositoryUrl: string, sha: string): Promise<GitHubCommit> {
         const { owner, repo } = this.parseRepositoryUrl(repositoryUrl);
@@ -351,6 +434,47 @@ export class GitHubClient {
      */
     async getUser(): Promise<GitHubUser> {
         return this.makeRequest<GitHubUser>('/user');
+    }
+
+    /**
+     * Get file content from repository
+     */
+    async getFileContent(
+        repositoryUrl: string,
+        path: string,
+        ref?: string
+    ): Promise<string> {
+        const { owner, repo } = this.parseRepositoryUrl(repositoryUrl);
+
+        const queryParams = new URLSearchParams();
+        if (ref) queryParams.append('ref', ref);
+
+        const endpoint = `/repos/${owner}/${repo}/contents/${path}${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+
+        interface GitHubContent {
+            content: string;
+            encoding: string;
+            type: string;
+        }
+
+        const response = await this.makeRequest<GitHubContent>(endpoint);
+
+        if (response.type !== 'file') {
+            throw new Error(`Path ${path} is not a file`);
+        }
+
+        if (response.encoding === 'base64') {
+            return Buffer.from(response.content, 'base64').toString('utf-8');
+        }
+
+        return response.content;
+    }
+
+    /**
+     * Utility delay function
+     */
+    private delay(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 }
 
@@ -374,10 +498,10 @@ export interface ConventionalCommit {
     raw: string;
 }
 
-export function parseConventionalCommit(message: string | undefined | null): ConventionalCommit | null {
+export function parseConventionalCommit(message: string | undefined): ConventionalCommit | undefined {
     // Handle undefined/null messages
     if (!message || typeof message !== 'string') {
-        return null;
+        return undefined;
     }
 
     // Try strict conventional commit format first
@@ -466,7 +590,7 @@ export function parseConventionalCommit(message: string | undefined | null): Con
         };
     }
 
-    return null;
+    return undefined;
 }
 
 /**
@@ -482,7 +606,7 @@ export function groupCommitsByType(commits: GitHubCommit[]): Record<string, GitH
         }
 
         const parsed = parseConventionalCommit(commit.message);
-        const type = parsed?.type || 'other';
+        const type = parsed?.type ?? 'other';
 
         if (!groups[type]) {
             groups[type] = [];
@@ -510,21 +634,21 @@ export function shouldIncludeCommit(
 ): boolean {
     // Handle missing commit message
     if (!commit || !commit.message) {
-        console.log('Excluding commit: no message');
+        // console.log('Excluding commit: no message');
         return false;
     }
 
     const parsed = parseConventionalCommit(commit.message);
 
-    console.log('Checking commit:', {
-        message: commit.message.substring(0, 50) + '...',
-        parsed: parsed ? `${parsed.type}${parsed.scope ? `(${parsed.scope})` : ''}` : 'no-conventional-format',
-        breaking: parsed?.breaking || false
-    });
+    // console.log('Checking commit:', {
+    //     message: commit.message.substring(0, 50) + '...',
+    //     parsed: parsed ? `${parsed.type}${parsed.scope ? `(${parsed.scope})` : ''}` : 'no-conventional-format',
+    //     breaking: parsed?.breaking ?? false
+    // });
 
     // Always include breaking changes if enabled
     if (parsed?.breaking && settings.includeBreakingChanges) {
-        console.log('✓ Including: breaking change');
+        // console.log('✓ Including: breaking change');
         return true;
     }
 
@@ -534,26 +658,26 @@ export function shouldIncludeCommit(
             case 'feat':
             case 'feature':
                 if (settings.includeFeatures) {
-                    console.log('✓ Including: feature');
+                    // console.log('✓ Including: feature');
                     return true;
                 }
                 break;
             case 'fix':
                 if (settings.includeFixes) {
-                    console.log('✓ Including: fix');
+                    // console.log('✓ Including: fix');
                     return true;
                 }
                 break;
             case 'chore':
                 if (settings.includeChores) {
-                    console.log('✓ Including: chore');
+                    // console.log('✓ Including: chore');
                     return true;
                 }
                 break;
             default:
                 // Check custom commit types
                 if (settings.customCommitTypes.includes(parsed.type)) {
-                    console.log(`✓ Including: custom type (${parsed.type})`);
+                    // console.log(`✓ Including: custom type (${parsed.type})`);
                     return true;
                 }
                 break;
@@ -569,10 +693,10 @@ export function shouldIncludeCommit(
     const includesOther = settings.customCommitTypes.includes('other');
 
     if (hasBasicTypesEnabled || includesOther) {
-        console.log('✓ Including: non-conventional commit (basic types enabled or "other" included)');
+        // console.log('✓ Including: non-conventional commit (basic types enabled or "other" included)');
         return true;
     }
 
-    console.log('✗ Excluding: non-conventional commit and no basic types enabled');
+    // console.log('✗ Excluding: non-conventional commit and no basic types enabled');
     return false;
 }

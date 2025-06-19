@@ -31,6 +31,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
     AlertDialog,
     AlertDialogAction,
     AlertDialogCancel,
@@ -52,7 +59,9 @@ import {
     Fingerprint,
     Copy,
     Settings,
-    ExternalLink
+    ExternalLink,
+    Globe,
+    Link2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { z } from 'zod';
@@ -61,11 +70,17 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuth } from '@/context/auth';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
 
-// Define the form schema for OAuth provider
+// Enhanced form schema with custom URL options
 const providerFormSchema = z.object({
     name: z.string().min(1, 'Name is required'),
-    baseUrl: z.string().url('Must be a valid URL'),
+    urlMode: z.enum(['preset', 'custom']).default('preset'),
+    preset: z.string().optional(),
+    baseUrl: z.string().optional(),
+    authorizationUrl: z.string().optional(),
+    tokenUrl: z.string().optional(),
+    userInfoUrl: z.string().optional(),
     clientId: z.string().min(1, 'Client ID is required'),
     clientSecret: z.string().min(1, 'Client Secret is required'),
     scopes: z.string().refine(value => {
@@ -76,20 +91,99 @@ const providerFormSchema = z.object({
     }),
     enabled: z.boolean().default(true),
     isDefault: z.boolean().default(false)
+}).refine((data) => {
+    if (data.urlMode === 'preset' && !data.preset) {
+        return false;
+    }
+    if (data.urlMode === 'custom') {
+        return data.authorizationUrl && data.tokenUrl && data.userInfoUrl;
+    }
+    return true;
+}, {
+    message: 'Please select a preset or provide all custom URLs',
+    path: ['urlMode']
 });
 
 type ProviderFormValues = z.infer<typeof providerFormSchema>;
+
+// Provider presets with accurate configurations
+const PROVIDER_PRESETS = {
+    microsoft: {
+        name: 'Microsoft',
+        authorizationUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
+        tokenUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
+        userInfoUrl: 'https://graph.microsoft.com/v1.0/me',
+        defaultScopes: 'openid,profile,email,User.Read'
+    },
+    google: {
+        name: 'Google',
+        authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+        tokenUrl: 'https://oauth2.googleapis.com/token',
+        userInfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo',
+        defaultScopes: 'openid,profile,email'
+    },
+    github: {
+        name: 'GitHub',
+        authorizationUrl: 'https://github.com/login/oauth/authorize',
+        tokenUrl: 'https://github.com/login/oauth/access_token',
+        userInfoUrl: 'https://api.github.com/user',
+        defaultScopes: 'user:email,read:user'
+    },
+    auth0: {
+        name: 'Auth0',
+        authorizationUrl: 'https://your-domain.auth0.com/authorize',
+        tokenUrl: 'https://your-domain.auth0.com/oauth/token',
+        userInfoUrl: 'https://your-domain.auth0.com/userinfo',
+        defaultScopes: 'openid,profile,email'
+    },
+    okta: {
+        name: 'Okta',
+        authorizationUrl: 'https://your-domain.okta.com/oauth2/default/v1/authorize',
+        tokenUrl: 'https://your-domain.okta.com/oauth2/default/v1/token',
+        userInfoUrl: 'https://your-domain.okta.com/oauth2/default/v1/userinfo',
+        defaultScopes: 'openid,profile,email'
+    },
+    easypanel: {
+        name: 'Easypanel',
+        authorizationUrl: 'https://your-easypanel-instance.com/oauth/authorize',
+        tokenUrl: 'https://your-easypanel-instance.com/oauth/token',
+        userInfoUrl: 'https://your-easypanel-instance.com/oauth/userinfo',
+        defaultScopes: 'openid,profile,email'
+    },
+    custom: {
+        name: 'Custom Provider',
+        authorizationUrl: '',
+        tokenUrl: '',
+        userInfoUrl: '',
+        defaultScopes: 'openid,profile,email'
+    }
+};
 
 // Add type for providers
 interface OAuthProvider {
     id: string;
     name: string;
     authorizationUrl: string;
+    tokenUrl: string;
+    userInfoUrl: string;
     clientId: string;
     clientSecret: string;
     scopes: string[];
     enabled: boolean;
     isDefault: boolean;
+}
+
+// Type for the API request body
+interface ProviderApiData {
+    name: string;
+    clientId: string;
+    clientSecret: string;
+    scopes: string[];
+    enabled: boolean;
+    isDefault: boolean;
+    authorizationUrl: string;
+    tokenUrl: string;
+    userInfoUrl: string;
 }
 
 // Provider logo component that handles placeholders
@@ -133,8 +227,15 @@ const ProviderLogo: React.FC<{ providerName: string }> = ({ providerName }) => {
         ),
         'google': (
             <div className="w-10 h-10 rounded-md bg-white border flex items-center justify-center">
-                <svg viewBox="0 0 24 24" width="20" height="20">
-                    <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z" fill="#4285F4" />
+                <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="100" height="100" viewBox="0 0 48 48">
+                    <path fill="#fbc02d" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12	s5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24s8.955,20,20,20	s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"></path><path fill="#e53935" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039	l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"></path><path fill="#4caf50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36	c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"></path><path fill="#1565c0" d="M43.611,20.083L43.595,20L42,20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571	c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"></path>
+                </svg>
+            </div>
+        ),
+        'microsoft': (
+            <div className="w-10 h-10 rounded-md bg-white border flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="100" height="100" viewBox="0 0 48 48">
+                    <path fill="#ff5722" d="M6 6H22V22H6z" transform="rotate(-180 14 14)"></path><path fill="#4caf50" d="M26 6H42V22H26z" transform="rotate(-180 34 14)"></path><path fill="#ffc107" d="M26 26H42V42H26z" transform="rotate(-180 34 34)"></path><path fill="#03a9f4" d="M6 26H22V42H6z" transform="rotate(-180 14 34)"></path>
                 </svg>
             </div>
         ),
@@ -188,7 +289,12 @@ export default function OAuthProvidersPage() {
         resolver: zodResolver(providerFormSchema),
         defaultValues: {
             name: '',
+            urlMode: 'preset',
+            preset: '',
             baseUrl: '',
+            authorizationUrl: '',
+            tokenUrl: '',
+            userInfoUrl: '',
             clientId: '',
             clientSecret: '',
             scopes: 'openid,profile,email',
@@ -202,7 +308,10 @@ export default function OAuthProvidersPage() {
         resolver: zodResolver(providerFormSchema),
         defaultValues: {
             name: '',
-            baseUrl: '',
+            urlMode: 'custom',
+            authorizationUrl: '',
+            tokenUrl: '',
+            userInfoUrl: '',
             clientId: '',
             clientSecret: '',
             scopes: '',
@@ -211,21 +320,63 @@ export default function OAuthProvidersPage() {
         }
     });
 
+    // Watch form values for dynamic updates
+    const watchCreateUrlMode = createForm.watch('urlMode');
+    const watchCreatePreset = createForm.watch('preset');
+    const watchEditUrlMode = editForm.watch('urlMode');
+    const watchEditPreset = editForm.watch('preset');
+
+    // Update URLs when preset changes (create form)
+    React.useEffect(() => {
+        if (watchCreateUrlMode === 'preset' && watchCreatePreset && PROVIDER_PRESETS[watchCreatePreset as keyof typeof PROVIDER_PRESETS]) {
+            const preset = PROVIDER_PRESETS[watchCreatePreset as keyof typeof PROVIDER_PRESETS];
+            createForm.setValue('name', preset.name);
+            createForm.setValue('scopes', preset.defaultScopes);
+        }
+    }, [watchCreateUrlMode, watchCreatePreset, createForm]);
+
+    // Update URLs when preset changes (edit form)
+    React.useEffect(() => {
+        if (watchEditUrlMode === 'preset' && watchEditPreset && PROVIDER_PRESETS[watchEditPreset as keyof typeof PROVIDER_PRESETS]) {
+            const preset = PROVIDER_PRESETS[watchEditPreset as keyof typeof PROVIDER_PRESETS];
+            editForm.setValue('name', preset.name);
+            editForm.setValue('authorizationUrl', preset.authorizationUrl);
+            editForm.setValue('tokenUrl', preset.tokenUrl);
+            editForm.setValue('userInfoUrl', preset.userInfoUrl);
+            editForm.setValue('scopes', preset.defaultScopes);
+        }
+    }, [watchEditUrlMode, watchEditPreset, editForm]);
+
     // Add provider mutation
     const addProvider = useMutation({
         mutationFn: async (data: ProviderFormValues) => {
+            const finalData: ProviderApiData = {
+                name: data.name,
+                clientId: data.clientId,
+                clientSecret: data.clientSecret,
+                scopes: data.scopes.split(',').map(s => s.trim()).filter(Boolean),
+                enabled: data.enabled,
+                isDefault: data.isDefault,
+                authorizationUrl: '',
+                tokenUrl: '',
+                userInfoUrl: ''
+            };
+
+            if (data.urlMode === 'preset' && data.preset) {
+                const preset = PROVIDER_PRESETS[data.preset as keyof typeof PROVIDER_PRESETS];
+                finalData.authorizationUrl = preset.authorizationUrl;
+                finalData.tokenUrl = preset.tokenUrl;
+                finalData.userInfoUrl = preset.userInfoUrl;
+            } else if (data.urlMode === 'custom') {
+                finalData.authorizationUrl = data.authorizationUrl || '';
+                finalData.tokenUrl = data.tokenUrl || '';
+                finalData.userInfoUrl = data.userInfoUrl || '';
+            }
+
             const response = await fetch('/api/admin/oauth/providers', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: data.name,
-                    baseUrl: data.baseUrl,
-                    clientId: data.clientId,
-                    clientSecret: data.clientSecret,
-                    scopes: data.scopes.split(',').map(s => s.trim()).filter(Boolean),
-                    enabled: data.enabled,
-                    isDefault: data.isDefault
-                })
+                body: JSON.stringify(finalData)
             });
 
             if (!response.ok) {
@@ -256,18 +407,33 @@ export default function OAuthProvidersPage() {
     // Edit provider mutation
     const updateProvider = useMutation({
         mutationFn: async (data: ProviderFormValues & { id: string }) => {
+            const updateData: ProviderApiData = {
+                name: data.name,
+                clientId: data.clientId,
+                clientSecret: data.clientSecret,
+                scopes: data.scopes.split(',').map(s => s.trim()).filter(Boolean),
+                enabled: data.enabled,
+                isDefault: data.isDefault,
+                authorizationUrl: '',
+                tokenUrl: '',
+                userInfoUrl: ''
+            };
+
+            if (data.urlMode === 'preset' && data.preset) {
+                const preset = PROVIDER_PRESETS[data.preset as keyof typeof PROVIDER_PRESETS];
+                updateData.authorizationUrl = preset.authorizationUrl;
+                updateData.tokenUrl = preset.tokenUrl;
+                updateData.userInfoUrl = preset.userInfoUrl;
+            } else if (data.urlMode === 'custom') {
+                updateData.authorizationUrl = data.authorizationUrl || '';
+                updateData.tokenUrl = data.tokenUrl || '';
+                updateData.userInfoUrl = data.userInfoUrl || '';
+            }
+
             const response = await fetch(`/api/admin/oauth/providers/${data.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: data.name,
-                    baseUrl: data.baseUrl,
-                    clientId: data.clientId,
-                    clientSecret: data.clientSecret,
-                    scopes: data.scopes.split(',').map(s => s.trim()).filter(Boolean),
-                    enabled: data.enabled,
-                    isDefault: data.isDefault
-                })
+                body: JSON.stringify(updateData)
             });
 
             if (!response.ok) {
@@ -340,13 +506,30 @@ export default function OAuthProvidersPage() {
     // Handle edit provider
     const handleEditProvider = (provider: OAuthProvider) => {
         setSelectedProvider(provider);
-        // Extract base URL from auth URL
-        const baseUrl = provider.authorizationUrl.split('/oauth/authorize')[0];
 
-        // Initialize form with provider values
+        // Check if this matches a preset
+        let matchedPreset = '';
+        let urlMode: 'preset' | 'custom' = 'custom';
+
+        for (const [key, preset] of Object.entries(PROVIDER_PRESETS)) {
+            if (
+                provider.authorizationUrl === preset.authorizationUrl &&
+                provider.tokenUrl === preset.tokenUrl &&
+                provider.userInfoUrl === preset.userInfoUrl
+            ) {
+                matchedPreset = key;
+                urlMode = 'preset';
+                break;
+            }
+        }
+
         editForm.reset({
             name: provider.name,
-            baseUrl,
+            urlMode,
+            preset: matchedPreset || '',
+            authorizationUrl: provider.authorizationUrl,
+            tokenUrl: provider.tokenUrl,
+            userInfoUrl: provider.userInfoUrl,
             clientId: provider.clientId,
             clientSecret: provider.clientSecret,
             scopes: provider.scopes.join(','),
@@ -391,7 +574,7 @@ export default function OAuthProvidersPage() {
         >
             {/* Add Provider Dialog */}
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                <DialogContent className="sm:max-w-lg">
+                <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <Plus className="h-5 w-5" />
@@ -402,161 +585,307 @@ export default function OAuthProvidersPage() {
                         </DialogDescription>
                     </DialogHeader>
                     <Form {...createForm}>
-                        <form onSubmit={createForm.handleSubmit(onCreateSubmit)} className="space-y-4">
-                            <FormField
-                                control={createForm.control}
-                                name="name"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Provider Name</FormLabel>
-                                        <FormControl>
-                                            <Input placeholder="Custom Provider" {...field} />
-                                        </FormControl>
-                                        <FormDescription>
-                                            A descriptive name for the OAuth provider.
-                                        </FormDescription>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
+                        <form onSubmit={createForm.handleSubmit(onCreateSubmit)} className="space-y-6">
+                            {/* Basic Information */}
+                            <div className="space-y-4">
+                                <h3 className="text-lg font-medium">Basic Information</h3>
 
-                            <FormField
-                                control={createForm.control}
-                                name="baseUrl"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Base URL</FormLabel>
-                                        <FormControl>
-                                            <Input placeholder="https://auth.example.com" {...field} />
-                                        </FormControl>
-                                        <FormDescription>
-                                            The base URL of the authentication server.
-                                        </FormDescription>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
+                                <FormField
+                                    control={createForm.control}
+                                    name="name"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Provider Name</FormLabel>
+                                            <FormControl>
+                                                <Input placeholder="Custom Provider" {...field} />
+                                            </FormControl>
+                                            <FormDescription>
+                                                A descriptive name for the OAuth provider.
+                                            </FormDescription>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                {/* URL Configuration */}
+                                <FormField
+                                    control={createForm.control}
+                                    name="urlMode"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>URL Configuration</FormLabel>
+                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Choose configuration method" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    <SelectItem value="preset">
+                                                        <div className="flex items-center gap-2">
+                                                            <Globe className="h-4 w-4" />
+                                                            Use Provider Preset
+                                                        </div>
+                                                    </SelectItem>
+                                                    <SelectItem value="custom">
+                                                        <div className="flex items-center gap-2">
+                                                            <Link2 className="h-4 w-4" />
+                                                            Custom URLs
+                                                        </div>
+                                                    </SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <FormDescription>
+                                                Choose whether to use a predefined provider or configure custom URLs.
+                                            </FormDescription>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
 
-                            {/* Callback URL section with improved styling */}
-                            <div className="space-y-2 border rounded-md p-4 bg-muted/30">
-                                <div className="flex items-center justify-between">
-                                    <FormLabel className="text-sm font-medium">Callback URL</FormLabel>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => {
-                                            const url = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/oauth/callback/${createForm.watch('name')?.toLowerCase() || 'provider'}`;
-                                            navigator.clipboard.writeText(url);
-                                            toast({
-                                                title: 'Copied to clipboard',
-                                                description: 'Callback URL has been copied to your clipboard.'
-                                            });
-                                        }}
+                                {/* Preset Selection */}
+                                {watchCreateUrlMode === 'preset' && (
+                                    <motion.div
+                                        initial={{ opacity: 0, height: 0 }}
+                                        animate={{ opacity: 1, height: 'auto' }}
+                                        exit={{ opacity: 0, height: 0 }}
+                                        className="space-y-4"
                                     >
-                                        <Copy className="h-4 w-4 mr-1" />
-                                        Copy
-                                    </Button>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <code className="flex-1 p-2 text-xs bg-background rounded border overflow-x-auto text-muted-foreground">
-                                        {`${process.env.NEXT_PUBLIC_APP_URL}/api/auth/oauth/callback/${createForm.watch('name')?.toLowerCase() || 'provider'}`}
-                                    </code>
-                                </div>
-                                <FormDescription>
-                                    Use this URL as the callback URL (redirect URI) in your OAuth provider configuration.
-                                </FormDescription>
-                            </div>
+                                        <FormField
+                                            control={createForm.control}
+                                            name="preset"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Select Provider</FormLabel>
+                                                    <Select onValueChange={field.onChange} value={field.value}>
+                                                        <FormControl>
+                                                            <SelectTrigger>
+                                                                <SelectValue placeholder="Choose a provider preset" />
+                                                            </SelectTrigger>
+                                                        </FormControl>
+                                                        <SelectContent>
+                                                            {Object.entries(PROVIDER_PRESETS).map(([key, preset]) => (
+                                                                <SelectItem key={key} value={key}>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <ProviderLogo providerName={preset.name} />
+                                                                        <span>{preset.name}</span>
+                                                                    </div>
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <FormDescription>
+                                                        Select from common OAuth providers with preconfigured URLs.
+                                                    </FormDescription>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <FormField
-                                    control={createForm.control}
-                                    name="clientId"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Client ID</FormLabel>
-                                            <FormControl>
-                                                <Input placeholder="client_id" {...field} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-
-                                <FormField
-                                    control={createForm.control}
-                                    name="clientSecret"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Client Secret</FormLabel>
-                                            <FormControl>
-                                                <Input placeholder="client_secret" type="password" {...field} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                            </div>
-
-                            <FormField
-                                control={createForm.control}
-                                name="scopes"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Scopes</FormLabel>
-                                        <FormControl>
-                                            <Input placeholder="openid,profile,email" {...field} />
-                                        </FormControl>
-                                        <FormDescription>
-                                            Comma-separated list of OAuth scopes.
-                                        </FormDescription>
-                                        <FormMessage />
-                                    </FormItem>
+                                        {/* Show preset URLs preview */}
+                                        {watchCreatePreset && PROVIDER_PRESETS[watchCreatePreset as keyof typeof PROVIDER_PRESETS] && (
+                                            <div className="space-y-2 p-4 bg-muted/30 rounded-md border">
+                                                <h4 className="text-sm font-medium">Provider URLs (Auto-configured)</h4>
+                                                <div className="space-y-1 text-xs">
+                                                    <div><strong>Authorization:</strong> {PROVIDER_PRESETS[watchCreatePreset as keyof typeof PROVIDER_PRESETS].authorizationUrl}</div>
+                                                    <div><strong>Token:</strong> {PROVIDER_PRESETS[watchCreatePreset as keyof typeof PROVIDER_PRESETS].tokenUrl}</div>
+                                                    <div><strong>User Info:</strong> {PROVIDER_PRESETS[watchCreatePreset as keyof typeof PROVIDER_PRESETS].userInfoUrl}</div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </motion.div>
                                 )}
-                            />
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Custom URLs */}
+                                {watchCreateUrlMode === 'custom' && (
+                                    <motion.div
+                                        initial={{ opacity: 0, height: 0 }}
+                                        animate={{ opacity: 1, height: 'auto' }}
+                                        exit={{ opacity: 0, height: 0 }}
+                                        className="space-y-4"
+                                    >
+                                        <div className="grid grid-cols-1 gap-4">
+                                            <FormField
+                                                control={createForm.control}
+                                                name="authorizationUrl"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>Authorization URL</FormLabel>
+                                                        <FormControl>
+                                                            <Input placeholder="https://provider.com/oauth/authorize" {...field} />
+                                                        </FormControl>
+                                                        <FormDescription>
+                                                            The OAuth authorization endpoint URL.
+                                                        </FormDescription>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+
+                                            <FormField
+                                                control={createForm.control}
+                                                name="tokenUrl"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>Token URL</FormLabel>
+                                                        <FormControl>
+                                                            <Input placeholder="https://provider.com/oauth/token" {...field} />
+                                                        </FormControl>
+                                                        <FormDescription>
+                                                            The OAuth token exchange endpoint URL.
+                                                        </FormDescription>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+
+                                            <FormField
+                                                control={createForm.control}
+                                                name="userInfoUrl"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>User Info URL</FormLabel>
+                                                        <FormControl>
+                                                            <Input placeholder="https://provider.com/oauth/userinfo" {...field} />
+                                                        </FormControl>
+                                                        <FormDescription>
+                                                            The endpoint to fetch user information.
+                                                        </FormDescription>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </div>
+
+                            <Separator />
+
+                            {/* OAuth Configuration */}
+                            <div className="space-y-4">
+                                <h3 className="text-lg font-medium">OAuth Configuration</h3>
+
+                                {/* Callback URL section */}
+                                <div className="space-y-2 border rounded-md p-4 bg-muted/30">
+                                    <div className="flex items-center justify-between">
+                                        <FormLabel className="text-sm font-medium">Callback URL</FormLabel>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                                const url = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/oauth/callback/${createForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`;
+                                                navigator.clipboard.writeText(url);
+                                                toast({
+                                                    title: 'Copied to clipboard',
+                                                    description: 'Callback URL has been copied to your clipboard.'
+                                                });
+                                            }}
+                                        >
+                                            <Copy className="h-4 w-4 mr-1" />
+                                            Copy
+                                        </Button>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <code className="flex-1 p-2 text-xs bg-background rounded border overflow-x-auto text-muted-foreground">
+                                            {`${process.env.NEXT_PUBLIC_APP_URL}/api/auth/oauth/callback/${createForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`}
+                                        </code>
+                                    </div>
+                                    <FormDescription>
+                                        Use this URL as the callback URL (redirect URI) in your OAuth provider configuration.
+                                    </FormDescription>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FormField
+                                        control={createForm.control}
+                                        name="clientId"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Client ID</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="client_id" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+
+                                    <FormField
+                                        control={createForm.control}
+                                        name="clientSecret"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Client Secret</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="client_secret" type="password" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
+
                                 <FormField
                                     control={createForm.control}
-                                    name="enabled"
+                                    name="scopes"
                                     render={({ field }) => (
-                                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 h-full">
-                                            <div className="space-y-0.5">
-                                                <FormLabel>Enabled</FormLabel>
-                                                <FormDescription>
-                                                    Allow users to sign in with this provider.
-                                                </FormDescription>
-                                            </div>
+                                        <FormItem>
+                                            <FormLabel>Scopes</FormLabel>
                                             <FormControl>
-                                                <Switch
-                                                    checked={field.value}
-                                                    onCheckedChange={field.onChange}
-                                                />
+                                                <Input placeholder="openid,profile,email" {...field} />
                                             </FormControl>
+                                            <FormDescription>
+                                                Comma-separated list of OAuth scopes.
+                                            </FormDescription>
+                                            <FormMessage />
                                         </FormItem>
                                     )}
                                 />
 
-                                <FormField
-                                    control={createForm.control}
-                                    name="isDefault"
-                                    render={({ field }) => (
-                                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 h-full">
-                                            <div className="space-y-0.5">
-                                                <FormLabel>Default Provider</FormLabel>
-                                                <FormDescription>
-                                                    Make this the default sign-in option.
-                                                </FormDescription>
-                                            </div>
-                                            <FormControl>
-                                                <Switch
-                                                    checked={field.value}
-                                                    onCheckedChange={field.onChange}
-                                                />
-                                            </FormControl>
-                                        </FormItem>
-                                    )}
-                                />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FormField
+                                        control={createForm.control}
+                                        name="enabled"
+                                        render={({ field }) => (
+                                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 h-full">
+                                                <div className="space-y-0.5">
+                                                    <FormLabel>Enabled</FormLabel>
+                                                    <FormDescription>
+                                                        Allow users to sign in with this provider.
+                                                    </FormDescription>
+                                                </div>
+                                                <FormControl>
+                                                    <Switch
+                                                        checked={field.value}
+                                                        onCheckedChange={field.onChange}
+                                                    />
+                                                </FormControl>
+                                            </FormItem>
+                                        )}
+                                    />
+
+                                    <FormField
+                                        control={createForm.control}
+                                        name="isDefault"
+                                        render={({ field }) => (
+                                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 h-full">
+                                                <div className="space-y-0.5">
+                                                    <FormLabel>Default Provider</FormLabel>
+                                                    <FormDescription>
+                                                        Make this the default sign-in option.
+                                                    </FormDescription>
+                                                </div>
+                                                <FormControl>
+                                                    <Switch
+                                                        checked={field.value}
+                                                        onCheckedChange={field.onChange}
+                                                    />
+                                                </FormControl>
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
                             </div>
 
                             <DialogFooter>
@@ -585,7 +914,7 @@ export default function OAuthProvidersPage() {
 
             {/* Edit Provider Dialog */}
             <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-                <DialogContent className="sm:max-w-lg">
+                <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <Pencil className="h-5 w-5" />
@@ -596,161 +925,308 @@ export default function OAuthProvidersPage() {
                         </DialogDescription>
                     </DialogHeader>
                     <Form {...editForm}>
-                        <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
-                            <FormField
-                                control={editForm.control}
-                                name="name"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Provider Name</FormLabel>
-                                        <FormControl>
-                                            <Input placeholder="Custom Provider" {...field} />
-                                        </FormControl>
-                                        <FormDescription>
-                                            A descriptive name for the OAuth provider.
-                                        </FormDescription>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
+                        <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-6">
+                            {/* Basic Information */}
+                            <div className="space-y-4">
+                                <h3 className="text-lg font-medium">Basic Information</h3>
 
-                            <FormField
-                                control={editForm.control}
-                                name="baseUrl"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Base URL</FormLabel>
-                                        <FormControl>
-                                            <Input placeholder="https://auth.example.com" {...field} />
-                                        </FormControl>
-                                        <FormDescription>
-                                            The base URL of the authentication server.
-                                        </FormDescription>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
+                                <FormField
+                                    control={editForm.control}
+                                    name="name"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Provider Name</FormLabel>
+                                            <FormControl>
+                                                <Input placeholder="Custom Provider" {...field} />
+                                            </FormControl>
+                                            <FormDescription>
+                                                A descriptive name for the OAuth provider.
+                                            </FormDescription>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
 
-                            {/* Callback URL section similar to add dialog */}
-                            <div className="space-y-2 border rounded-md p-4 bg-muted/30">
-                                <div className="flex items-center justify-between">
-                                    <FormLabel className="text-sm font-medium">Callback URL</FormLabel>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => {
-                                            const url = `${window.location.origin}/api/auth/oauth/callback/${editForm.watch('name')?.toLowerCase() || 'provider'}`;
-                                            navigator.clipboard.writeText(url);
-                                            toast({
-                                                title: 'Copied to clipboard',
-                                                description: 'Callback URL has been copied to your clipboard.'
-                                            });
-                                        }}
+                                {/* URL Configuration */}
+                                <FormField
+                                    control={editForm.control}
+                                    name="urlMode"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>URL Configuration</FormLabel>
+                                            <Select onValueChange={field.onChange} value={field.value}>
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Choose configuration method" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    <SelectItem value="preset">
+                                                        <div className="flex items-center gap-2">
+                                                            <Globe className="h-4 w-4" />
+                                                            Use Provider Preset
+                                                        </div>
+                                                    </SelectItem>
+                                                    <SelectItem value="custom">
+                                                        <div className="flex items-center gap-2">
+                                                            <Link2 className="h-4 w-4" />
+                                                            Custom URLs
+                                                        </div>
+                                                    </SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <FormDescription>
+                                                Choose whether to use a predefined provider or configure custom URLs.
+                                            </FormDescription>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                {/* Preset Selection */}
+                                {watchEditUrlMode === 'preset' && (
+                                    <motion.div
+                                        initial={{ opacity: 0, height: 0 }}
+                                        animate={{ opacity: 1, height: 'auto' }}
+                                        exit={{ opacity: 0, height: 0 }}
+                                        className="space-y-4"
                                     >
-                                        <Copy className="h-4 w-4 mr-1" />
-                                        Copy
-                                    </Button>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <code className="flex-1 p-2 text-xs bg-background rounded border overflow-x-auto text-muted-foreground">
-                                        {`${window.location.origin}/api/auth/oauth/callback/${editForm.watch('name')?.toLowerCase() || 'provider'}`}
-                                    </code>
-                                </div>
-                                <FormDescription>
-                                    Use this URL as the callback URL (redirect URI) in your OAuth provider configuration.
-                                </FormDescription>
-                            </div>
+                                        <FormField
+                                            control={editForm.control}
+                                            name="preset"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Select Provider</FormLabel>
+                                                    <Select onValueChange={field.onChange} value={field.value}>
+                                                        <FormControl>
+                                                            <SelectTrigger>
+                                                                <SelectValue placeholder="Choose a provider preset" />
+                                                            </SelectTrigger>
+                                                        </FormControl>
+                                                        <SelectContent>
+                                                            {Object.entries(PROVIDER_PRESETS).map(([key, preset]) => (
+                                                                <SelectItem key={key} value={key}>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <ProviderLogo providerName={preset.name} />
+                                                                        <span>{preset.name}</span>
+                                                                    </div>
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <FormDescription>
+                                                        Select from common OAuth providers with preconfigured URLs.
+                                                    </FormDescription>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <FormField
-                                    control={editForm.control}
-                                    name="clientId"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Client ID</FormLabel>
-                                            <FormControl>
-                                                <Input placeholder="client_id" {...field} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-
-                                <FormField
-                                    control={editForm.control}
-                                    name="clientSecret"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Client Secret</FormLabel>
-                                            <FormControl>
-                                                <Input placeholder="client_secret" type="password" {...field} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                            </div>
-
-                            <FormField
-                                control={editForm.control}
-                                name="scopes"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Scopes</FormLabel>
-                                        <FormControl>
-                                            <Input placeholder="openid,profile,email" {...field} />
-                                        </FormControl>
-                                        <FormDescription>
-                                            Comma-separated list of OAuth scopes.
-                                        </FormDescription>
-                                        <FormMessage />
-                                    </FormItem>
+                                        {/* Show preset URLs preview */}
+                                        {watchEditPreset && PROVIDER_PRESETS[watchEditPreset as keyof typeof PROVIDER_PRESETS] && (
+                                            <div className="space-y-2 p-4 bg-muted/30 rounded-md border">
+                                                <h4 className="text-sm font-medium">Provider URLs (Auto-configured)</h4>
+                                                <div className="space-y-1 text-xs">
+                                                    <div><strong>Authorization:</strong> {PROVIDER_PRESETS[watchEditPreset as keyof typeof PROVIDER_PRESETS].authorizationUrl}</div>
+                                                    <div><strong>Token:</strong> {PROVIDER_PRESETS[watchEditPreset as keyof typeof PROVIDER_PRESETS].tokenUrl}</div>
+                                                    <div><strong>User Info:</strong> {PROVIDER_PRESETS[watchEditPreset as keyof typeof PROVIDER_PRESETS].userInfoUrl}</div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </motion.div>
                                 )}
-                            />
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Custom URLs */}
+                                {watchEditUrlMode === 'custom' && (
+                                    <motion.div
+                                        initial={{ opacity: 0, height: 0 }}
+                                        animate={{ opacity: 1, height: 'auto' }}
+                                        exit={{ opacity: 0, height: 0 }}
+                                        className="space-y-4"
+                                    >
+                                        <div className="grid grid-cols-1 gap-4">
+                                            <FormField
+                                                control={editForm.control}
+                                                name="authorizationUrl"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>Authorization URL</FormLabel>
+                                                        <FormControl>
+                                                            <Input placeholder="https://provider.com/oauth/authorize" {...field} />
+                                                        </FormControl>
+                                                        <FormDescription>
+                                                            The OAuth authorization endpoint URL.
+                                                        </FormDescription>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+
+                                            <FormField
+                                                control={editForm.control}
+                                                name="tokenUrl"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>Token URL</FormLabel>
+                                                        <FormControl>
+                                                            <Input placeholder="https://provider.com/oauth/token" {...field} />
+                                                        </FormControl>
+                                                        <FormDescription>
+                                                            The OAuth token exchange endpoint URL.
+                                                        </FormDescription>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+
+                                            <FormField
+                                                control={editForm.control}
+                                                name="userInfoUrl"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>User Info URL</FormLabel>
+                                                        <FormControl>
+                                                            <Input placeholder="https://provider.com/oauth/userinfo" {...field} />
+                                                        </FormControl>
+                                                        <FormDescription>
+                                                            The endpoint to fetch user information.
+                                                        </FormDescription>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </div>
+
+                            <Separator />
+
+                            {/* OAuth Configuration */}
+                            <div className="space-y-4">
+                                <h3 className="text-lg font-medium">OAuth Configuration</h3>
+
+                                {/* Callback URL section */}
+                                <div className="space-y-2 border rounded-md p-4 bg-muted/30">
+                                    <div className="flex items-center justify-between">
+                                        <FormLabel className="text-sm font-medium">Callback URL</FormLabel>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                                const url = `${window.location.origin}/api/auth/oauth/callback/${editForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`;
+                                                navigator.clipboard.writeText(url);
+                                                toast({
+                                                    title: 'Copied to clipboard',
+                                                    description: 'Callback URL has been copied to your clipboard.'
+                                                });
+                                            }}
+                                        >
+                                            <Copy className="h-4 w-4 mr-1" />
+                                            Copy
+                                        </Button>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <code className="flex-1 p-2 text-xs bg-background rounded border overflow-x-auto text-muted-foreground">
+                                            {`${window.location.origin}/api/auth/oauth/callback/${editForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`}
+                                        </code>
+                                    </div>
+                                    <FormDescription>
+                                        Use this URL as the callback URL (redirect URI) in your OAuth provider configuration.
+                                    </FormDescription>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FormField
+                                        control={editForm.control}
+                                        name="clientId"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Client ID</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="client_id" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+
+                                    <FormField
+                                        control={editForm.control}
+                                        name="clientSecret"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Client Secret</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="client_secret" type="password" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
+
                                 <FormField
                                     control={editForm.control}
-                                    name="enabled"
+                                    name="scopes"
                                     render={({ field }) => (
-                                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 h-full">
-                                            <div className="space-y-0.5">
-                                                <FormLabel>Enabled</FormLabel>
-                                                <FormDescription>
-                                                    Allow users to sign in with this provider.
-                                                </FormDescription>
-                                            </div>
+                                        <FormItem>
+                                            <FormLabel>Scopes</FormLabel>
                                             <FormControl>
-                                                <Switch
-                                                    checked={field.value}
-                                                    onCheckedChange={field.onChange}
-                                                />
+                                                <Input placeholder="openid,profile,email" {...field} />
                                             </FormControl>
+                                            <FormDescription>
+                                                Comma-separated list of OAuth scopes.
+                                            </FormDescription>
+                                            <FormMessage />
                                         </FormItem>
                                     )}
                                 />
 
-                                <FormField
-                                    control={editForm.control}
-                                    name="isDefault"
-                                    render={({ field }) => (
-                                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 h-full">
-                                            <div className="space-y-0.5">
-                                                <FormLabel>Default Provider</FormLabel>
-                                                <FormDescription>
-                                                    Make this the default sign-in option.
-                                                </FormDescription>
-                                            </div>
-                                            <FormControl>
-                                                <Switch
-                                                    checked={field.value}
-                                                    onCheckedChange={field.onChange}
-                                                />
-                                            </FormControl>
-                                        </FormItem>
-                                    )}
-                                />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FormField
+                                        control={editForm.control}
+                                        name="enabled"
+                                        render={({ field }) => (
+                                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 h-full">
+                                                <div className="space-y-0.5">
+                                                    <FormLabel>Enabled</FormLabel>
+                                                    <FormDescription>
+                                                        Allow users to sign in with this provider.
+                                                    </FormDescription>
+                                                </div>
+                                                <FormControl>
+                                                    <Switch
+                                                        checked={field.value}
+                                                        onCheckedChange={field.onChange}
+                                                    />
+                                                </FormControl>
+                                            </FormItem>
+                                        )}
+                                    />
+
+                                    <FormField
+                                        control={editForm.control}
+                                        name="isDefault"
+                                        render={({ field }) => (
+                                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 h-full">
+                                                <div className="space-y-0.5">
+                                                    <FormLabel>Default Provider</FormLabel>
+                                                    <FormDescription>
+                                                        Make this the default sign-in option.
+                                                    </FormDescription>
+                                                </div>
+                                                <FormControl>
+                                                    <Switch
+                                                        checked={field.value}
+                                                        onCheckedChange={field.onChange}
+                                                    />
+                                                </FormControl>
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
                             </div>
 
                             <DialogFooter>
@@ -776,7 +1252,6 @@ export default function OAuthProvidersPage() {
                     </Form>
                 </DialogContent>
             </Dialog>
-
             {/* Delete Provider Dialog */}
             <AlertDialog open={!!providerToDelete} onOpenChange={(isOpen) => !isOpen && setProviderToDelete(null)}>
                 <AlertDialogContent>
@@ -812,7 +1287,7 @@ export default function OAuthProvidersPage() {
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">OAuth Providers</h1>
                     <p className="text-muted-foreground mt-2">
-                        Manage single sign-on providers for Changerawr
+                        Manage single sign-on providers for Changerawr with custom URLs support
                     </p>
                 </div>
                 <Button onClick={() => setIsAddDialogOpen(true)} className="sm:self-start">
@@ -936,14 +1411,14 @@ const ProvidersList: React.FC<ProvidersListProps> = ({
                 <CardHeader>
                     <CardTitle>No OAuth Providers</CardTitle>
                     <CardDescription>
-                        Add an OAuth provider to enable single sign-on for your users.
+                        Add an OAuth provider to enable single sign-on for your users with custom URL support.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="flex justify-center py-8">
                     <div className="text-center">
                         <Fingerprint className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
                         <p className="text-sm text-muted-foreground max-w-md mb-6">
-                            OAuth providers allow your users to sign in using their existing accounts from services like Google, GitHub, or custom identity providers.
+                            OAuth providers allow your users to sign in using their existing accounts from services like Microsoft, Google, GitHub, or any custom identity provider with configurable URLs.
                         </p>
                     </div>
                 </CardContent>
@@ -1009,6 +1484,38 @@ const ProvidersList: React.FC<ProvidersListProps> = ({
                                             {provider.clientId.substring(0, 12)}...
                                         </span>
                                     </div>
+
+                                    {/* Debug URL Display */}
+                                    {/*<div className="space-y-1">*/}
+                                    {/*    <div className="flex items-start">*/}
+                                    {/*        <Globe className="h-4 w-4 mr-2 text-muted-foreground mt-0.5" />*/}
+                                    {/*        <div className="flex-1 min-w-0">*/}
+                                    {/*            <div className="text-xs text-muted-foreground">Authorization URL:</div>*/}
+                                    {/*            <div className="text-xs font-mono bg-muted px-1 py-0.5 rounded truncate">*/}
+                                    {/*                {provider.authorizationUrl}*/}
+                                    {/*            </div>*/}
+                                    {/*        </div>*/}
+                                    {/*    </div>*/}
+
+                                    {/*    <div className="flex items-start ml-6">*/}
+                                    {/*        <div className="flex-1 min-w-0">*/}
+                                    {/*            <div className="text-xs text-muted-foreground">Token URL:</div>*/}
+                                    {/*            <div className="text-xs font-mono bg-muted px-1 py-0.5 rounded truncate">*/}
+                                    {/*                {provider.tokenUrl}*/}
+                                    {/*            </div>*/}
+                                    {/*        </div>*/}
+                                    {/*    </div>*/}
+
+                                    {/*    <div className="flex items-start ml-6">*/}
+                                    {/*        <div className="flex-1 min-w-0">*/}
+                                    {/*            <div className="text-xs text-muted-foreground">User Info URL:</div>*/}
+                                    {/*            <div className="text-xs font-mono bg-muted px-1 py-0.5 rounded truncate">*/}
+                                    {/*                {provider.userInfoUrl}*/}
+                                    {/*            </div>*/}
+                                    {/*        </div>*/}
+                                    {/*    </div>*/}
+                                    {/*</div>*/}
+
                                     <div className="flex flex-wrap gap-1">
                                         {provider.scopes.map((scope, index) => (
                                             <Badge key={index} variant="outline" className="text-xs font-normal">
@@ -1016,16 +1523,23 @@ const ProvidersList: React.FC<ProvidersListProps> = ({
                                             </Badge>
                                         ))}
                                     </div>
+
                                     <div className="pt-2">
-                                        <a
-                                            href={provider.authorizationUrl.split('/oauth/authorize')[0]}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
+                                        <button
+                                            onClick={() => {
+                                                try {
+                                                    const url = new URL(provider.authorizationUrl);
+                                                    window.open(url.origin, '_blank', 'noopener,noreferrer');
+                                                } catch {
+                                                    // Fallback if URL parsing fails
+                                                    window.open(provider.authorizationUrl, '_blank', 'noopener,noreferrer');
+                                                }
+                                            }}
                                             className="inline-flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
                                         >
                                             <ExternalLink className="h-3 w-3 mr-1" />
                                             View Provider
-                                        </a>
+                                        </button>
                                     </div>
                                 </div>
                             </CardContent>

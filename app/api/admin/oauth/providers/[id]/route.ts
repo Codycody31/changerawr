@@ -3,10 +3,13 @@ import { validateAuthAndGetUser } from '@/lib/utils/changelog';
 import { db } from '@/lib/db';
 import { z } from 'zod';
 import { OAuthProviderUpdateData } from '@/lib/types/oauth';
+import { createAuditLog } from '@/lib/utils/auditLog';
 
 const updateProviderSchema = z.object({
     name: z.string().min(1, 'Name is required').optional(),
-    baseUrl: z.string().url('Base URL must be a valid URL').optional(),
+    authorizationUrl: z.string().url('Authorization URL must be valid').optional(),
+    tokenUrl: z.string().url('Token URL must be valid').optional(),
+    userInfoUrl: z.string().url('User Info URL must be valid').optional(),
     clientId: z.string().min(1, 'Client ID is required').optional(),
     clientSecret: z.string().min(1, 'Client Secret is required').optional(),
     scopes: z.array(z.string()).min(1, 'At least one scope is required').optional(),
@@ -16,13 +19,15 @@ const updateProviderSchema = z.object({
 
 /**
  * @method PATCH
- * @description Updates an existing OAuth provider
+ * @description Updates an existing OAuth provider with support for custom URLs
  * @param {string} id - The ID of the OAuth provider to update
  * @body {
  *   "type": "object",
  *   "properties": {
  *     "name": { "type": "string" },
- *     "baseUrl": { "type": "string", "format": "url" },
+ *     "authorizationUrl": { "type": "string", "format": "url" },
+ *     "tokenUrl": { "type": "string", "format": "url" },
+ *     "userInfoUrl": { "type": "string", "format": "url" },
  *     "clientId": { "type": "string" },
  *     "clientSecret": { "type": "string" },
  *     "scopes": { "type": "array", "items": { "type": "string" } },
@@ -87,15 +92,6 @@ export async function PATCH(
             updateData.clientId = validatedData.clientId;
         }
 
-        // When updating provider, update the callback URL if name changes
-        if (validatedData.name !== undefined) {
-            updateData.name = validatedData.name;
-
-            // Update callback URL to match new name
-            const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-            updateData.callbackUrl = `${appUrl}/api/auth/oauth/callback/${validatedData.name.toLowerCase().replace(/\s+/g, '-')}`;
-        }
-
         if (validatedData.clientSecret !== undefined) {
             updateData.clientSecret = validatedData.clientSecret;
         }
@@ -120,16 +116,63 @@ export async function PATCH(
             }
         }
 
-        // Update URLs if baseUrl is provided
-        if (validatedData.baseUrl) {
-            // Normalize base URL (remove trailing slash)
-            const baseUrl = validatedData.baseUrl.endsWith('/')
-                ? validatedData.baseUrl.slice(0, -1)
-                : validatedData.baseUrl;
+        // Handle custom URL updates
+        if (validatedData.authorizationUrl !== undefined) {
+            updateData.authorizationUrl = validatedData.authorizationUrl;
+        }
 
-            updateData.authorizationUrl = `${baseUrl}/oauth/authorize`;
-            updateData.tokenUrl = `${baseUrl}/oauth/token`;
-            updateData.userInfoUrl = `${baseUrl}/oauth/userinfo`;
+        if (validatedData.tokenUrl !== undefined) {
+            updateData.tokenUrl = validatedData.tokenUrl;
+        }
+
+        if (validatedData.userInfoUrl !== undefined) {
+            updateData.userInfoUrl = validatedData.userInfoUrl;
+        }
+
+        // Update callback URL if name changes
+        if (validatedData.name !== undefined) {
+            const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+            updateData.callbackUrl = `${appUrl}/api/auth/oauth/callback/${validatedData.name.toLowerCase().replace(/\s+/g, '-')}`;
+        }
+
+        // Track changes for audit log
+        const changes: Record<string, { from: unknown; to: unknown }> = {};
+
+        if (validatedData.name && validatedData.name !== provider.name) {
+            changes.name = { from: provider.name, to: validatedData.name };
+        }
+
+        if (validatedData.authorizationUrl && validatedData.authorizationUrl !== provider.authorizationUrl) {
+            changes.authorizationUrl = { from: provider.authorizationUrl, to: validatedData.authorizationUrl };
+        }
+
+        if (validatedData.tokenUrl && validatedData.tokenUrl !== provider.tokenUrl) {
+            changes.tokenUrl = { from: provider.tokenUrl, to: validatedData.tokenUrl };
+        }
+
+        if (validatedData.userInfoUrl && validatedData.userInfoUrl !== provider.userInfoUrl) {
+            changes.userInfoUrl = { from: provider.userInfoUrl, to: validatedData.userInfoUrl };
+        }
+
+        if (validatedData.clientId && validatedData.clientId !== provider.clientId) {
+            changes.clientId = { from: provider.clientId, to: validatedData.clientId };
+        }
+
+        if (validatedData.enabled !== undefined && validatedData.enabled !== provider.enabled) {
+            changes.enabled = { from: provider.enabled, to: validatedData.enabled };
+        }
+
+        if (validatedData.isDefault !== undefined && validatedData.isDefault !== provider.isDefault) {
+            changes.isDefault = { from: provider.isDefault, to: validatedData.isDefault };
+        }
+
+        if (validatedData.scopes) {
+            const currentScopes = provider.scopes || [];
+            const newScopes = validatedData.scopes;
+
+            if (JSON.stringify(currentScopes.sort()) !== JSON.stringify(newScopes.sort())) {
+                changes.scopes = { from: currentScopes, to: newScopes };
+            }
         }
 
         // Update the provider
@@ -137,6 +180,24 @@ export async function PATCH(
             where: { id },
             data: updateData
         });
+
+        // Create audit log for the update
+        try {
+            await createAuditLog(
+                'UPDATE_OAUTH_PROVIDER',
+                user.id,
+                user.id,
+                {
+                    providerId: updatedProvider.id,
+                    providerName: updatedProvider.name,
+                    changes,
+                    changeCount: Object.keys(changes).length,
+                    timestamp: new Date().toISOString()
+                }
+            );
+        } catch (auditLogError) {
+            console.error('Failed to create audit log:', auditLogError);
+        }
 
         return NextResponse.json({
             id: updatedProvider.id,
@@ -205,12 +266,39 @@ export async function DELETE(
             );
         }
 
+        // Store provider details for audit log before deletion
+        const providerDetails = {
+            id: provider.id,
+            name: provider.name,
+            authorizationUrl: provider.authorizationUrl,
+            tokenUrl: provider.tokenUrl,
+            userInfoUrl: provider.userInfoUrl,
+            enabled: provider.enabled,
+            isDefault: provider.isDefault
+        };
+
         // Delete the provider
         await db.oAuthProvider.delete({
             where: { id }
         });
 
+        // Create audit log for the deletion
+        try {
+            await createAuditLog(
+                'DELETE_OAUTH_PROVIDER',
+                user.id,
+                user.id,
+                {
+                    deletedProvider: providerDetails,
+                    timestamp: new Date().toISOString()
+                }
+            );
+        } catch (auditLogError) {
+            console.error('Failed to create audit log:', auditLogError);
+        }
+
         return NextResponse.json({ success: true });
+
     } catch (error) {
         console.error('Failed to delete OAuth provider:', error);
         return NextResponse.json(

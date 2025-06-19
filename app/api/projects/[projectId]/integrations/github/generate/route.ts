@@ -1,11 +1,11 @@
-// app/api/projects/[projectId]/integrations/github/generate/route.ts (Enhanced version)
+// app/api/projects/[projectId]/integrations/github/generate/route.ts
 import { NextResponse } from 'next/server';
 import { validateAuthAndGetUser } from '@/lib/utils/changelog';
 import { createAuditLog } from '@/lib/utils/auditLog';
 import { db } from '@/lib/db';
 import { z } from 'zod';
 import { createGitHubClient, GitHubError } from '@/lib/services/github/client';
-import { createGitHubChangelogGenerator } from '@/lib/services/github/changelog-generator';
+import { createGitHubChangelogGenerator, ChangelogGenerationOptions } from '@/lib/services/github/changelog-generator';
 import { decryptToken } from '@/lib/utils/encryption';
 
 // Enhanced validation schema for generation options
@@ -20,18 +20,13 @@ const generateSchema = z.object({
     fromRef: z.string().optional(),
     toRef: z.string().optional(),
 
-    // Enhanced AI options
+    // AI options
     useAI: z.boolean().default(false),
-    aiOptions: z.object({
-        style: z.enum(['professional', 'casual', 'technical', 'marketing']).default('professional'),
-        audience: z.enum(['developers', 'users', 'stakeholders', 'mixed']).default('mixed'),
-        includeImpact: z.boolean().default(true),
-        includeTechnicalDetails: z.boolean().default(false),
-        groupSimilarChanges: z.boolean().default(true),
-        prioritizeByImportance: z.boolean().default(true),
-        temperature: z.number().min(0).max(1).default(0.7),
-        model: z.string().default('copilot-zero')
-    }).optional(),
+    aiModel: z.string().optional(),
+
+    // Code analysis options
+    includeCodeAnalysis: z.boolean().default(false),
+    maxCommitsToAnalyze: z.number().min(1).max(100).default(50),
 
     // Traditional generation options
     groupByType: z.boolean().default(true),
@@ -47,7 +42,7 @@ const generateSchema = z.object({
 
 /**
  * @method POST
- * @description Generate enhanced changelog content from GitHub commits with AI rephrase and reorganization
+ * @description Generate changelog content from GitHub commits with optional AI analysis
  */
 export async function POST(
     request: Request,
@@ -57,7 +52,7 @@ export async function POST(
         const user = await validateAuthAndGetUser();
         const { projectId } = await context.params;
 
-        console.log('Starting enhanced GitHub changelog generation for project:', projectId);
+        console.log('Starting GitHub changelog generation for project:', projectId);
 
         // Get project with GitHub integration
         const project = await db.project.findUnique({
@@ -133,12 +128,17 @@ export async function POST(
 
         const generator = createGitHubChangelogGenerator(githubClient);
 
-        // Get AI API key if needed
+        // Get AI settings if needed
         let aiApiKey: string | undefined;
+        let aiModel: string | undefined;
         if (validatedData.useAI) {
             const systemConfig = await db.systemConfig.findFirst({
                 where: { id: 1 },
-                select: { aiApiKey: true, enableAIAssistant: true }
+                select: {
+                    aiApiKey: true,
+                    enableAIAssistant: true,
+                    aiDefaultModel: true
+                }
             });
 
             if (!systemConfig?.enableAIAssistant || !systemConfig.aiApiKey) {
@@ -149,10 +149,11 @@ export async function POST(
             }
 
             aiApiKey = systemConfig.aiApiKey;
+            aiModel = validatedData.aiModel || systemConfig.aiDefaultModel || 'copilot-zero';
         }
 
-        // Prepare enhanced generation options
-        const generationOptions = {
+        // Prepare generation options
+        const generationOptions: ChangelogGenerationOptions = {
             includeBreakingChanges: validatedData.includeBreakingChanges ?? project.gitHubIntegration.includeBreakingChanges,
             includeFixes: validatedData.includeFixes ?? project.gitHubIntegration.includeFixes,
             includeFeatures: validatedData.includeFeatures ?? project.gitHubIntegration.includeFeatures,
@@ -160,13 +161,15 @@ export async function POST(
             customCommitTypes: validatedData.customCommitTypes ?? project.gitHubIntegration.customCommitTypes,
             useAI: validatedData.useAI,
             aiApiKey,
-            aiOptions: validatedData.aiOptions,
+            aiModel,
             groupByType: validatedData.groupByType,
             includeCommitLinks: validatedData.includeCommitLinks,
-            repositoryUrl: project.gitHubIntegration.repositoryUrl
+            repositoryUrl: project.gitHubIntegration.repositoryUrl,
+            includeCodeAnalysis: validatedData.includeCodeAnalysis,
+            maxCommitsToAnalyze: validatedData.maxCommitsToAnalyze
         };
 
-        console.log('Enhanced generation options:', {
+        console.log('Generation options:', {
             ...generationOptions,
             aiApiKey: generationOptions.aiApiKey ? '[REDACTED]' : undefined
         });
@@ -184,8 +187,8 @@ export async function POST(
                 fromRef: validatedData.fromRef,
                 toRef: validatedData.toRef,
                 useAI: validatedData.useAI,
-                aiStyle: validatedData.aiOptions?.style,
-                aiAudience: validatedData.aiOptions?.audience,
+                includeCodeAnalysis: validatedData.includeCodeAnalysis,
+                maxCommitsToAnalyze: validatedData.maxCommitsToAnalyze,
                 repositoryUrl: project.gitHubIntegration.repositoryUrl,
                 timestamp: new Date().toISOString()
             }
@@ -236,6 +239,7 @@ export async function POST(
                     method: validatedData.method,
                     repositoryUrl: project.gitHubIntegration.repositoryUrl,
                     useAI: validatedData.useAI,
+                    includeCodeAnalysis: validatedData.includeCodeAnalysis,
                     error: error instanceof Error ? error.message : 'Unknown error',
                     stack: error instanceof Error ? error.stack : undefined,
                     timestamp: new Date().toISOString()
@@ -305,6 +309,9 @@ export async function POST(
             }
         });
 
+        // Get current timestamp for logging
+        const currentTimestamp = new Date().toISOString();
+
         // Log successful generation
         await createAuditLog(
             'GITHUB_CHANGELOG_GENERATION_SUCCESS',
@@ -315,14 +322,14 @@ export async function POST(
                 projectName: project.name,
                 method: validatedData.method,
                 commitsProcessed: changelog.commits.length,
-                sectionsGenerated: changelog.sections.length,
+                entriesGenerated: changelog.entries.length,
                 contentLength: changelog.content.length,
                 inferredVersion: changelog.version,
                 useAI: validatedData.useAI,
-                aiGenerated: changelog.metadata?.aiGenerated || false,
-                aiStyle: changelog.metadata?.style,
-                aiAudience: changelog.metadata?.audience,
-                timestamp: new Date().toISOString()
+                aiGenerated: changelog.metadata.aiGenerated,
+                hasCodeAnalysis: changelog.metadata.hasCodeAnalysis,
+                model: changelog.metadata.model,
+                timestamp: currentTimestamp
             }
         );
 
@@ -333,35 +340,30 @@ export async function POST(
                 content: changelog.content,
                 version: changelog.version,
                 commitsCount: changelog.commits.length,
-                sections: changelog.sections.map(section => ({
-                    title: section.title,
-                    type: section.type,
-                    emoji: section.emoji,
-                    description: section.description,
-                    commitsCount: section.commits.length,
-                    entries: section.entries ? section.entries.map(entry => ({
-                        title: entry.title,
-                        description: entry.description,
-                        impact: entry.impact,
-                        importance: entry.importance
-                    })) : undefined
+                entriesCount: changelog.entries.length,
+                entries: changelog.entries.map(entry => ({
+                    category: entry.category,
+                    description: entry.description,
+                    impact: entry.impact,
+                    technicalDetails: entry.technicalDetails,
+                    files: entry.files,
+                    commit: entry.commit.substring(0, 7)
                 }))
             },
             metadata: {
                 method: validatedData.method,
-                generatedAt: new Date().toISOString(),
+                generatedAt: currentTimestamp,
                 repositoryUrl: project.gitHubIntegration.repositoryUrl,
                 fromRef: validatedData.fromRef,
                 toRef: validatedData.toRef,
                 daysBack: validatedData.daysBack,
                 aiEnhanced: validatedData.useAI,
-                ...(changelog.metadata && {
-                    aiGenerated: changelog.metadata.aiGenerated,
-                    style: changelog.metadata.style,
-                    audience: changelog.metadata.audience,
-                    totalCommits: changelog.metadata.totalCommits,
-                    processedCommits: changelog.metadata.processedCommits
-                })
+                codeAnalysis: validatedData.includeCodeAnalysis,
+                totalCommits: changelog.metadata.totalCommits,
+                analyzedCommits: changelog.metadata.analyzedCommits,
+                aiGenerated: changelog.metadata.aiGenerated,
+                hasCodeAnalysis: changelog.metadata.hasCodeAnalysis,
+                model: changelog.metadata.model
             }
         };
 

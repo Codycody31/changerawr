@@ -55,6 +55,10 @@ RUN apk add --no-cache bash
 # Copy the entire project from the builder stage
 COPY --from=builder /app .
 
+# Copy maintenance page and server script
+COPY scripts/maintenance/index.html ./index.html
+COPY scripts/maintenance/server.js ./scripts/maintenance/server.js
+
 # Ensure the entrypoint script is executable
 RUN chmod +x ./docker-entrypoint.sh
 

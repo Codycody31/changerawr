@@ -5,6 +5,7 @@ export const setupSteps = [
     'admin',
     'settings',
     'oauth',
+    'team',
     'complete'
 ] as const;
 

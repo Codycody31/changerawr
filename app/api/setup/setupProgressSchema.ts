@@ -7,5 +7,6 @@ export const setupProgressSchema = z.object({
     adminCreated: z.boolean().default(false),
     settingsConfigured: z.boolean().default(false),
     oauthConfigured: z.boolean().optional(),
+    teamInvitesSent: z.boolean().default(false),
     isComplete: z.boolean().default(false)
 });

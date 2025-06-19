@@ -103,16 +103,39 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({
                                                                 previousVersions = []
                                                             }) => {
     const [activeTab, setActiveTab] = useState('current')
+    const [canClose, setCanClose] = useState(false)
+    const [countdown, setCountdown] = useState(3)
     const mainRef = useRef(null)
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const isInView = useInView(mainRef, { once: true })
 
-    // Reset to current tab when opening the modal
+    // Reset to current tab when opening the modal and start countdown
     useEffect(() => {
         if (isOpen) {
             setActiveTab('current')
+            setCanClose(false)
+            setCountdown(3)
+
+            const timer = setInterval(() => {
+                setCountdown((prev) => {
+                    if (prev <= 1) {
+                        setCanClose(true)
+                        clearInterval(timer)
+                        return 0
+                    }
+                    return prev - 1
+                })
+            }, 1000)
+
+            return () => clearInterval(timer)
         }
     }, [isOpen])
+
+    const handleClose = () => {
+        if (canClose) {
+            onClose()
+        }
+    }
 
     if (!content) return null
 
@@ -124,9 +147,21 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({
     }, {} as Record<string, number>)
 
     return (
-        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="sm:max-w-xl max-h-[90vh] p-0 overflow-hidden flex flex-col gap-0 border-none bg-background/95 backdrop-blur-sm shadow-2xl">
+        <Dialog
+            open={isOpen}
+            onOpenChange={() => {}} // Prevent closing from outside clicks or escape
+        >
+            <DialogContent
+                className="sm:max-w-xl max-h-[90vh] p-0 overflow-hidden flex flex-col gap-0 border-none bg-background/95 backdrop-blur-sm shadow-2xl"
+                onPointerDownOutside={(e) => e.preventDefault()} // Prevent outside clicks
+                onEscapeKeyDown={(e) => e.preventDefault()} // Prevent escape key
+            >
                 <div className="absolute inset-0 bg-gradient-to-tr from-primary/5 via-background to-background/95 -z-10" />
+
+                {/* Remove the default close button by overriding it */}
+                <div className="absolute right-4 top-4 z-10">
+                    {/* Empty div to occupy space where close button would be */}
+                </div>
 
                 <DialogHeader className="p-6 pb-4 border-b">
                     <div className="flex items-start gap-4">
@@ -153,131 +188,107 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({
                             {content.description && (
                                 <p className="text-sm text-muted-foreground pt-2">{content.description}</p>
                             )}
-
-                            {/*<div className="pt-2 flex flex-wrap gap-2">*/}
-                            {/*    {itemsByType.feature > 0 && (*/}
-                            {/*        <div className="flex items-center gap-1.5 text-xs">*/}
-                            {/*            <Badge variant="outline" className={typeColors.feature}>*/}
-                            {/*                {itemsByType.feature} {itemsByType.feature === 1 ? 'Feature' : 'Features'}*/}
-                            {/*            </Badge>*/}
-                            {/*        </div>*/}
-                            {/*    )}*/}
-
-                            {/*    {itemsByType.improvement > 0 && (*/}
-                            {/*        <div className="flex items-center gap-1.5 text-xs">*/}
-                            {/*            <Badge variant="outline" className={typeColors.improvement}>*/}
-                            {/*                {itemsByType.improvement} {itemsByType.improvement === 1 ? 'Improvement' : 'Improvements'}*/}
-                            {/*            </Badge>*/}
-                            {/*        </div>*/}
-                            {/*    )}*/}
-
-                            {/*    {itemsByType.bugfix > 0 && (*/}
-                            {/*        <div className="flex items-center gap-1.5 text-xs">*/}
-                            {/*            <Badge variant="outline" className={typeColors.bugfix}>*/}
-                            {/*                {itemsByType.bugfix} {itemsByType.bugfix === 1 ? 'Bug Fix' : 'Bug Fixes'}*/}
-                            {/*            </Badge>*/}
-                            {/*        </div>*/}
-                            {/*    )}*/}
-
-                            {/*    {itemsByType.other > 0 && (*/}
-                            {/*        <div className="flex items-center gap-1.5 text-xs">*/}
-                            {/*            <Badge variant="outline" className={typeColors.other}>*/}
-                            {/*                {itemsByType.other} Other*/}
-                            {/*            </Badge>*/}
-                            {/*        </div>*/}
-                            {/*    )}*/}
-                            {/*</div>*/}
                         </div>
                     </div>
                 </DialogHeader>
 
-                {previousVersions.length > 0 ? (
-                    <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-grow flex flex-col">
-                        <div className="border-b px-6">
-                            <TabsList className="bg-transparent h-auto p-0">
-                                <TabsTrigger
-                                    value="current"
-                                    className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2.5 px-3"
-                                >
-                                    Current
-                                </TabsTrigger>
-                                <TabsTrigger
-                                    value="history"
-                                    className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2.5 px-3"
-                                >
-                                    Previous Updates
-                                </TabsTrigger>
-                            </TabsList>
-                        </div>
+                <div className="flex-1 min-h-0">
+                    {previousVersions.length > 0 ? (
+                        <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
+                            <div className="border-b px-6 flex-shrink-0">
+                                <TabsList className="bg-transparent h-auto p-0">
+                                    <TabsTrigger
+                                        value="current"
+                                        className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2.5 px-3"
+                                    >
+                                        Current
+                                    </TabsTrigger>
+                                    <TabsTrigger
+                                        value="history"
+                                        className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-2.5 px-3"
+                                    >
+                                        Previous Updates
+                                    </TabsTrigger>
+                                </TabsList>
+                            </div>
 
-                        <TabsContent value="current" className="flex-grow p-0 m-0">
-                            <ScrollArea className="flex-grow pr-4 max-h-[50vh]">
-                                <div className="px-6 py-4" ref={mainRef}>
-                                    <div className="space-y-0">
-                                        {content.items.map((item, index) => (
-                                            <ItemCard key={index} item={item} index={index} />
-                                        ))}
+                            <TabsContent value="current" className="flex-1 min-h-0 p-0 m-0">
+                                <ScrollArea className="h-full">
+                                    <div className="px-6 py-4" ref={mainRef}>
+                                        <div className="space-y-0">
+                                            {content.items.map((item, index) => (
+                                                <ItemCard key={index} item={item} index={index} />
+                                            ))}
+                                        </div>
                                     </div>
-                                </div>
-                            </ScrollArea>
-                        </TabsContent>
+                                </ScrollArea>
+                            </TabsContent>
 
-                        <TabsContent value="history" className="flex-grow p-0 m-0">
-                            <ScrollArea className="flex-grow pr-4 max-h-[50vh]">
-                                <div className="px-6 py-4">
-                                    <div className="space-y-6">
-                                        {previousVersions.map((version, versionIndex) => (
-                                            <div key={version.version} className="pb-6 last:pb-0">
-                                                <div className="mb-3 border-b pb-1">
-                                                    <h3 className="font-medium">v{version.version} - {version.title}</h3>
-                                                    <div className="flex items-center text-xs text-muted-foreground">
-                                                        <Calendar className="h-3 w-3 mr-1" />
-                                                        <time dateTime={version.releaseDate}>
-                                                            {new Date(version.releaseDate).toLocaleDateString()}
-                                                        </time>
+                            <TabsContent value="history" className="flex-1 min-h-0 p-0 m-0">
+                                <ScrollArea className="h-full">
+                                    <div className="px-6 py-4">
+                                        <div className="space-y-6">
+                                            {previousVersions.map((version, versionIndex) => (
+                                                <div key={version.version} className="pb-6 last:pb-0">
+                                                    <div className="mb-3 border-b pb-1">
+                                                        <h3 className="font-medium">v{version.version} - {version.title}</h3>
+                                                        <div className="flex items-center text-xs text-muted-foreground">
+                                                            <Calendar className="h-3 w-3 mr-1" />
+                                                            <time dateTime={version.releaseDate}>
+                                                                {new Date(version.releaseDate).toLocaleDateString()}
+                                                            </time>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="space-y-0 text-sm">
+                                                        {version.items.slice(0, 3).map((item, index) => (
+                                                            <ItemCard
+                                                                key={`${version.version}-${index}`}
+                                                                item={item}
+                                                                index={index + versionIndex}
+                                                            />
+                                                        ))}
+
+                                                        {version.items.length > 3 && (
+                                                            <div className="pl-6 text-muted-foreground text-sm">
+                                                                + {version.items.length - 3} more changes
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
-
-                                                <div className="space-y-0 text-sm">
-                                                    {version.items.slice(0, 3).map((item, index) => (
-                                                        <ItemCard
-                                                            key={`${version.version}-${index}`}
-                                                            item={item}
-                                                            index={index + versionIndex}
-                                                        />
-                                                    ))}
-
-                                                    {version.items.length > 3 && (
-                                                        <div className="pl-6 text-muted-foreground text-sm">
-                                                            + {version.items.length - 3} more changes
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
+                                            ))}
+                                        </div>
                                     </div>
+                                </ScrollArea>
+                            </TabsContent>
+                        </Tabs>
+                    ) : (
+                        <ScrollArea className="h-full">
+                            <div className="px-6 py-4" ref={mainRef}>
+                                <div className="space-y-0">
+                                    {content.items.map((item, index) => (
+                                        <ItemCard key={index} item={item} index={index} />
+                                    ))}
                                 </div>
-                            </ScrollArea>
-                        </TabsContent>
-                    </Tabs>
-                ) : (
-                    <ScrollArea className="flex-grow max-h-[50vh]">
-                        <div className="px-6 py-4" ref={mainRef}>
-                            <div className="space-y-0">
-                                {content.items.map((item, index) => (
-                                    <ItemCard key={index} item={item} index={index} />
-                                ))}
                             </div>
-                        </div>
-                    </ScrollArea>
-                )}
+                        </ScrollArea>
+                    )}
+                </div>
 
-                <DialogFooter className="flex sm:justify-between items-center border-t p-4">
+                <DialogFooter className="flex sm:justify-between items-center border-t p-4 flex-shrink-0">
                     <div className="hidden sm:block text-xs text-muted-foreground">
                         Thanks for using Changerawr! We hope you enjoy our latest release :)
                     </div>
-                    <Button onClick={onClose} className="w-full sm:w-auto">
-                        Got it <ArrowRight className="ml-2 h-4 w-4" />
+                    <Button
+                        onClick={handleClose}
+                        className="w-full sm:w-auto"
+                        disabled={!canClose}
+                    >
+                        {canClose ? (
+                            <>Got it <ArrowRight className="ml-2 h-4 w-4" /></>
+                        ) : (
+                            <>Wait {countdown}s <ArrowRight className="ml-2 h-4 w-4" /></>
+                        )}
                     </Button>
                 </DialogFooter>
             </DialogContent>

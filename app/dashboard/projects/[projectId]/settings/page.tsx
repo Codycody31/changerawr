@@ -161,7 +161,7 @@ export default function ProjectSettingsPage({params}: ProjectSettingsPageProps) 
             name: 'GitHub Integration',
             description: 'Use your GitHub data with changelogs',
             icon: Github,
-            status: 'beta',
+            status: 'stable',
             requiresPublic: false,
             action: {
                 type: 'navigate',

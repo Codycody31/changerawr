@@ -45,26 +45,48 @@ import {
     Check,
     Pause,
     Play,
+    User,
+    UserX,
 } from 'lucide-react'
 import { Progress } from '@/components/ui/progress'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { cn } from '@/lib/utils'
 
-// Types
+// Type definitions
+interface PreservedUserData {
+    id: string;
+    email: string;
+    name: string | null;
+    role: string;
+    deletedAt: string;
+    deletedBy: string;
+}
+
+interface AuditLogDetails {
+    [key: string]: unknown;
+    _preservedUser?: PreservedUserData;
+    _preservedTargetUser?: PreservedUserData;
+}
+
+interface UserInfo {
+    name?: string | null
+    email?: string | null
+    isDeleted?: boolean
+}
+
 interface AuditLog {
     id: string
     action: string
-    userId: string
+    userId: string | null
     targetUserId?: string | null
-    details?: Record<string, unknown> | string
+    details?: AuditLogDetails | string
     createdAt: string
-    user: {
-        name?: string | null
-        email: string
-    }
-    targetUser?: {
-        name?: string | null
-        email?: string
-    } | null
+    user?: UserInfo | null
+    targetUser?: UserInfo | null
+    performer?: UserInfo | null
+    target?: UserInfo | null
+    performer_email?: string | null
+    target_email?: string | null
 }
 
 interface AuditLogsResponse {
@@ -89,8 +111,67 @@ interface FilterState {
     targetId?: string
 }
 
+// User Display Component
+interface UserDisplayProps {
+    user: UserInfo | null
+    showEmail?: boolean
+    className?: string
+    size?: 'sm' | 'md'
+}
+
+function UserDisplay({ user, showEmail = true, className, size = 'sm' }: UserDisplayProps) {
+    if (!user) {
+        return (
+            <div className={cn("flex items-center gap-2 text-muted-foreground", className)}>
+                <User className="h-4 w-4 flex-shrink-0" />
+                <span className="text-sm">Unknown User</span>
+            </div>
+        );
+    }
+
+    const displayName = user.name || user.email || 'Unknown User';
+    const isDeleted = user.isDeleted;
+
+    return (
+        <div className={cn("flex items-center gap-2", className)}>
+            {isDeleted ? (
+                <UserX className="h-4 w-4 text-red-500 flex-shrink-0" />
+            ) : (
+                <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            )}
+
+            <div className="flex flex-col min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                    <span className={cn(
+                        "font-medium truncate",
+                        size === 'sm' ? 'text-sm' : 'text-base',
+                        isDeleted && "text-red-600 dark:text-red-400"
+                    )}>
+                        {displayName}
+                    </span>
+
+                    {isDeleted && (
+                        <Badge variant="destructive" className="text-xs flex-shrink-0">
+                            Deleted
+                        </Badge>
+                    )}
+                </div>
+
+                {showEmail && user.email && user.name && (
+                    <span className={cn(
+                        "text-xs text-muted-foreground truncate",
+                        isDeleted && "text-red-500 dark:text-red-400"
+                    )}>
+                        {user.email}
+                    </span>
+                )}
+            </div>
+        </div>
+    );
+}
+
 // Utility functions
-const formatLogDetails = (details?: string | Record<string, unknown>): string => {
+const formatLogDetails = (details?: string | AuditLogDetails): string => {
     if (!details) return 'No additional details'
 
     try {
@@ -99,6 +180,35 @@ const formatLogDetails = (details?: string | Record<string, unknown>): string =>
     } catch {
         return typeof details === 'string' ? details : 'Unable to parse log details'
     }
+}
+
+// Get user info with fallback to preserved data
+const getUserInfo = (log: AuditLog, isTarget = false): UserInfo | null => {
+    // Try new API format first
+    if (isTarget && log.target) {
+        return log.target;
+    }
+    if (!isTarget && log.performer) {
+        return log.performer;
+    }
+
+    // Fallback to old format
+    const user = isTarget ? log.targetUser : log.user;
+    return user || null;
+}
+
+// Helper function to safely access preserved user data
+const getPreservedUserData = (details: AuditLogDetails | string | undefined, key: '_preservedUser' | '_preservedTargetUser'): PreservedUserData | null => {
+    if (!details || typeof details === 'string') {
+        return null;
+    }
+
+    const preservedData = details[key];
+    if (!preservedData || typeof preservedData !== 'object') {
+        return null;
+    }
+
+    return preservedData as PreservedUserData;
 }
 
 // Custom debounce hook
@@ -148,7 +258,7 @@ export default function AuditLogsPage() {
         search: '',
         action: '',
         dateRange: {
-            from: subDays(new Date(), 7),
+            from: subDays(new Date(), 31),
             to: new Date()
         }
     })
@@ -375,7 +485,7 @@ export default function AuditLogsPage() {
             search: '',
             action: '',
             dateRange: {
-                from: subDays(new Date(), 7),
+                from: subDays(new Date(), 31),
                 to: new Date()
             }
         });
@@ -496,7 +606,7 @@ export default function AuditLogsPage() {
                         <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
-                                placeholder="Search logs..."
+                                placeholder="Search logs, users, actions..."
                                 value={searchInput}
                                 onChange={e => setSearchInput(e.target.value)}
                                 className="pl-9"
@@ -657,52 +767,67 @@ export default function AuditLogsPage() {
                                     <tr className="border-b">
                                         <th className="text-left p-3 font-medium text-muted-foreground text-sm">Timestamp</th>
                                         <th className="text-left p-3 font-medium text-muted-foreground text-sm">Action</th>
-                                        <th className="text-left p-3 font-medium text-muted-foreground text-sm">Performer</th>
-                                        <th className="text-left p-3 font-medium text-muted-foreground text-sm">Target</th>
+                                        <th className="text-left p-3 font-medium text-muted-foreground text-sm w-48">Performer</th>
+                                        <th className="text-left p-3 font-medium text-muted-foreground text-sm w-48">Target</th>
                                         <th className="text-right p-3 font-medium text-muted-foreground text-sm w-20">Details</th>
                                     </tr>
                                     </thead>
                                     <tbody>
-                                    {allLogs.map((log, index) => (
-                                        <motion.tr
-                                            key={log.id}
-                                            className={`${index % 2 === 0 ? 'bg-background' : 'bg-muted/5'} hover:bg-muted/20 cursor-pointer`}
-                                            onClick={() => setSelectedLog(log)}
-                                            initial={{ opacity: 0 }}
-                                            animate={{ opacity: 1 }}
-                                            transition={{ duration: 0.2, delay: index * 0.01 }}
-                                        >
-                                            <td className="p-3 text-sm whitespace-nowrap">
-                                                {format(parseISO(log.createdAt), 'yyyy-MM-dd HH:mm:ss')}
-                                            </td>
-                                            <td className="p-3">
-                                                <Badge variant={getActionVariant(log.action)} className="font-medium">
-                                                    {log.action}
-                                                </Badge>
-                                            </td>
-                                            <td className="p-3 text-sm">
-                                                {log.user.name || log.user.email}
-                                            </td>
-                                            <td className="p-3 text-sm">
-                                                {log.targetUser
-                                                    ? (log.targetUser.name || log.targetUser.email)
-                                                    : "—"}
-                                            </td>
-                                            <td className="p-3 text-right">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="ml-auto h-8 w-8"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setSelectedLog(log);
-                                                    }}
-                                                >
-                                                    <Info className="h-4 w-4" />
-                                                </Button>
-                                            </td>
-                                        </motion.tr>
-                                    ))}
+                                    {allLogs.map((log, index) => {
+                                        const performer = getUserInfo(log, false);
+                                        const target = getUserInfo(log, true);
+
+                                        return (
+                                            <motion.tr
+                                                key={log.id}
+                                                className={`${index % 2 === 0 ? 'bg-background' : 'bg-muted/5'} hover:bg-muted/20 cursor-pointer`}
+                                                onClick={() => setSelectedLog(log)}
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                transition={{ duration: 0.2, delay: index * 0.01 }}
+                                            >
+                                                <td className="p-3 text-sm whitespace-nowrap">
+                                                    {format(parseISO(log.createdAt), 'yyyy-MM-dd HH:mm:ss')}
+                                                </td>
+                                                <td className="p-3">
+                                                    <Badge variant={getActionVariant(log.action)} className="font-medium">
+                                                        {log.action}
+                                                    </Badge>
+                                                </td>
+                                                <td className="p-3 max-w-48">
+                                                    <UserDisplay
+                                                        user={performer}
+                                                        showEmail={false}
+                                                        className="max-w-full"
+                                                    />
+                                                </td>
+                                                <td className="p-3 max-w-48">
+                                                    {target ? (
+                                                        <UserDisplay
+                                                            user={target}
+                                                            showEmail={false}
+                                                            className="max-w-full"
+                                                        />
+                                                    ) : (
+                                                        <span className="text-muted-foreground text-sm">—</span>
+                                                    )}
+                                                </td>
+                                                <td className="p-3 text-right">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="ml-auto h-8 w-8"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedLog(log);
+                                                        }}
+                                                    >
+                                                        <Info className="h-4 w-4" />
+                                                    </Button>
+                                                </td>
+                                            </motion.tr>
+                                        );
+                                    })}
                                     </tbody>
                                 </table>
 
@@ -752,33 +877,29 @@ export default function AuditLogsPage() {
                     {selectedLog && (
                         <ScrollArea className="max-h-[60vh]">
                             <div className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 gap-4">
+                                    {/* Performer */}
                                     <div>
-                                        <h4 className="text-sm font-medium text-muted-foreground mb-1">Performer</h4>
+                                        <h4 className="text-sm font-medium text-muted-foreground mb-2">Performer</h4>
                                         <div className="bg-muted p-3 rounded-md">
-                                            <p className="font-medium">
-                                                {selectedLog.user.name || selectedLog.user.email}
-                                            </p>
-                                            {selectedLog.user.name && (
-                                                <p className="text-sm text-muted-foreground mt-1">
-                                                    {selectedLog.user.email}
-                                                </p>
-                                            )}
+                                            <UserDisplay
+                                                user={getUserInfo(selectedLog, false)}
+                                                showEmail={true}
+                                                size="md"
+                                            />
                                         </div>
                                     </div>
 
-                                    {selectedLog.targetUser && (
+                                    {/* Target (if exists) */}
+                                    {getUserInfo(selectedLog, true) && (
                                         <div>
-                                            <h4 className="text-sm font-medium text-muted-foreground mb-1">Target</h4>
+                                            <h4 className="text-sm font-medium text-muted-foreground mb-2">Target</h4>
                                             <div className="bg-muted p-3 rounded-md">
-                                                <p className="font-medium">
-                                                    {selectedLog.targetUser.name || selectedLog.targetUser.email}
-                                                </p>
-                                                {selectedLog.targetUser.name && (
-                                                    <p className="text-sm text-muted-foreground mt-1">
-                                                        {selectedLog.targetUser.email}
-                                                    </p>
-                                                )}
+                                                <UserDisplay
+                                                    user={getUserInfo(selectedLog, true)}
+                                                    showEmail={true}
+                                                    size="md"
+                                                />
                                             </div>
                                         </div>
                                     )}
@@ -809,7 +930,7 @@ export default function AuditLogsPage() {
                                         </div>
 
                                         <div className="bg-muted/50 rounded-md overflow-hidden">
-                                            <pre className="p-3 text-sm whitespace-pre-wrap font-mono overflow-auto">
+                                            <pre className="p-3 text-sm whitespace-pre-wrap font-mono overflow-auto max-h-64">
                                                 {formatLogDetails(selectedLog.details)}
                                             </pre>
                                         </div>
@@ -818,21 +939,64 @@ export default function AuditLogsPage() {
 
                                 <div>
                                     <h4 className="text-sm font-medium text-muted-foreground mb-2">System Information</h4>
-                                    <div className="grid grid-cols-2 gap-3 text-sm">
+                                    <div className="grid grid-cols-1 gap-3 text-sm">
                                         <div className="bg-muted/50 p-3 rounded-md">
                                             <p className="text-muted-foreground mb-1">Log ID</p>
                                             <p className="font-mono break-all">{selectedLog.id}</p>
                                         </div>
-                                        <div className="bg-muted/50 p-3 rounded-md">
-                                            <p className="text-muted-foreground mb-1">User ID</p>
-                                            <p className="font-mono break-all">{selectedLog.userId}</p>
-                                        </div>
+
+                                        {selectedLog.userId && (
+                                            <div className="bg-muted/50 p-3 rounded-md">
+                                                <p className="text-muted-foreground mb-1">User ID</p>
+                                                <p className="font-mono break-all">{selectedLog.userId}</p>
+                                            </div>
+                                        )}
+
                                         {selectedLog.targetUserId && (
                                             <div className="bg-muted/50 p-3 rounded-md">
                                                 <p className="text-muted-foreground mb-1">Target User ID</p>
                                                 <p className="font-mono break-all">{selectedLog.targetUserId}</p>
                                             </div>
                                         )}
+
+                                        {/* Show preserved user info if available */}
+                                        {(() => {
+                                            const preservedUser = getPreservedUserData(selectedLog.details, '_preservedUser');
+                                            if (!preservedUser) return null;
+
+                                            return (
+                                                <div className="bg-red-50 dark:bg-red-950/20 p-3 rounded-md border border-red-200 dark:border-red-800">
+                                                    <p className="text-red-600 dark:text-red-400 mb-1 text-xs font-medium">
+                                                        Preserved User Data (Account Deleted)
+                                                    </p>
+                                                    <div className="text-xs space-y-1">
+                                                        <p><span className="font-medium">Email:</span> {preservedUser.email}</p>
+                                                        <p><span className="font-medium">Name:</span> {preservedUser.name || 'N/A'}</p>
+                                                        <p><span className="font-medium">Role:</span> {preservedUser.role}</p>
+                                                        <p><span className="font-medium">Deleted:</span> {format(parseISO(preservedUser.deletedAt), 'PPpp')}</p>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
+
+                                        {(() => {
+                                            const preservedTargetUser = getPreservedUserData(selectedLog.details, '_preservedTargetUser');
+                                            if (!preservedTargetUser) return null;
+
+                                            return (
+                                                <div className="bg-red-50 dark:bg-red-950/20 p-3 rounded-md border border-red-200 dark:border-red-800">
+                                                    <p className="text-red-600 dark:text-red-400 mb-1 text-xs font-medium">
+                                                        Preserved Target User Data (Account Deleted)
+                                                    </p>
+                                                    <div className="text-xs space-y-1">
+                                                        <p><span className="font-medium">Email:</span> {preservedTargetUser.email}</p>
+                                                        <p><span className="font-medium">Name:</span> {preservedTargetUser.name || 'N/A'}</p>
+                                                        <p><span className="font-medium">Role:</span> {preservedTargetUser.role}</p>
+                                                        <p><span className="font-medium">Deleted:</span> {format(parseISO(preservedTargetUser.deletedAt), 'PPpp')}</p>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                             </div>

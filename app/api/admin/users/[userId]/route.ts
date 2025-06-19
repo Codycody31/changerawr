@@ -1,23 +1,42 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { validateAuthAndGetUser } from '@/lib/utils/changelog';
-import { createAuditLog } from '@/lib/utils/auditLog'; // Add import
-import { db } from '@/lib/db';
-import { z } from 'zod';
+import {NextRequest, NextResponse} from 'next/server';
+import {validateAuthAndGetUser} from '@/lib/utils/changelog';
+import {createAuditLog} from '@/lib/utils/auditLog';
+import {db} from '@/lib/db';
+import {z} from 'zod';
+import {Role} from '@prisma/client';
 
-// Validation schema for role update
-const updateRoleSchema = z.object({
-    role: z.enum(['ADMIN', 'STAFF'] as const),
+// Type definitions
+interface PreservedUserData {
+    [key: string]: string | null; // Index signature for Prisma JSON compatibility
+    id: string;
+    email: string;
+    name: string | null;
+    role: string; // Use string instead of Role enum for JSON storage
+    deletedAt: string;
+    deletedBy: string;
+}
+
+interface AuditLogDetails {
+    [key: string]: unknown;
+    _preservedUser?: PreservedUserData;
+    _preservedTargetUser?: PreservedUserData;
+}
+
+// Validation schemas
+const updateUserSchema = z.object({
+    name: z.string().optional(),
+    role: z.enum(['ADMIN', 'STAFF'] as const).optional(),
 });
 
 /**
- * Update a user's role
+ * Update a user's details
  * @method PATCH
- * @description Updates a user's role to either 'ADMIN' or 'STAFF'. Only admins can perform this action. Requires user authentication.
- * @queryParams None
+ * @description Updates a user's name and/or role. Only admins can perform this action.
  * @requestBody {
  *   "type": "object",
  *   "properties": {
- *     "role": { "type": "enum", "enum": ["ADMIN", "STAFF"] },
+ *     "name": { "type": "string", "description": "User's display name" },
+ *     "role": { "type": "string", "enum": ["ADMIN", "STAFF"], "description": "User's role" }
  *   }
  * }
  * @response 200 {
@@ -37,34 +56,10 @@ const updateRoleSchema = z.object({
  *     }
  *   }
  * }
- * @error 403 {
- *   "type": "object",
- *   "properties": {
- *     "error": { "type": "string" }
- *   }
- * }
- * @error 400 {
- *   "type": "object",
- *   "properties": {
- *     "error": { "type": "string" },
- *     "details": {
- *       "type": "array",
- *       "items": {
- *         "type": "object",
- *         "properties": {
- *           "message": { "type": "string" },
- *           "path": { "type": "string" }
- *         }
- *       }
- *     }
- *   }
- * }
- * @error 500 {
- *   "type": "object",
- *   "properties": {
- *     "error": { "type": "string" }
- *   }
- * }
+ * @error 403 Unauthorized - Only admins can update users
+ * @error 400 Invalid request data or cannot modify own role
+ * @error 404 User not found
+ * @error 500 Failed to update user
  */
 export async function PATCH(
     request: NextRequest,
@@ -73,14 +68,13 @@ export async function PATCH(
     try {
         const currentUser = await validateAuthAndGetUser();
 
-        // Only admins can update roles
+        // Only admins can update users
         if (currentUser.role !== 'ADMIN') {
-            // Log unauthorized attempt to update role
             try {
                 await createAuditLog(
-                    'UNAUTHORIZED_ROLE_UPDATE_ATTEMPT',
+                    'UNAUTHORIZED_USER_UPDATE_ATTEMPT',
                     currentUser.id,
-                    currentUser.id, // Use user's own ID to avoid foreign key issues
+                    currentUser.id,
                     {
                         userRole: currentUser.role,
                         targetUserId: (await context.params).userId,
@@ -92,50 +86,34 @@ export async function PATCH(
             }
 
             return NextResponse.json(
-                { error: 'Unauthorized - Only admins can update roles' },
-                { status: 403 }
+                {error: 'Unauthorized - Only admins can update users'},
+                {status: 403}
             );
         }
 
-        // Validate user ID
-        const { userId } = await context.params;
-        if (!userId) {
-            // Log missing user ID error
-            try {
-                await createAuditLog(
-                    'INVALID_ROLE_UPDATE_REQUEST',
-                    currentUser.id,
-                    currentUser.id, // Use admin's own ID to avoid foreign key issues
-                    {
-                        reason: 'Missing user ID',
-                        timestamp: new Date().toISOString()
-                    }
-                );
-            } catch (auditLogError) {
-                console.error('Failed to create audit log:', auditLogError);
-            }
+        const {userId} = await context.params;
 
+        if (!userId) {
             return NextResponse.json(
-                { error: 'User ID is required' },
-                { status: 400 }
+                {error: 'User ID is required'},
+                {status: 400}
             );
         }
 
         // Check if user exists
         const targetUser = await db.user.findUnique({
-            where: { id: userId },
-            select: { id: true, email: true, role: true, name: true },
+            where: {id: userId},
+            select: {id: true, email: true, role: true, name: true},
         });
 
         if (!targetUser) {
-            // Log user not found error
             try {
                 await createAuditLog(
-                    'USER_NOT_FOUND',
+                    'USER_UPDATE_NOT_FOUND',
                     currentUser.id,
-                    currentUser.id, // Use admin's own ID to avoid foreign key issues
+                    currentUser.id,
                     {
-                        action: 'ROLE_UPDATE',
+                        action: 'UPDATE_USER',
                         requestedUserId: userId,
                         timestamp: new Date().toISOString()
                     }
@@ -145,21 +123,25 @@ export async function PATCH(
             }
 
             return NextResponse.json(
-                { error: 'User not found' },
-                { status: 404 }
+                {error: 'User not found'},
+                {status: 404}
             );
         }
 
+        // Parse and validate request body
+        const body = await request.json();
+        const validatedData = updateUserSchema.parse(body);
+
         // Prevent self-role modification
-        if (targetUser.id === currentUser.id) {
-            // Log self-role modification attempt
+        if (validatedData.role && targetUser.id === currentUser.id) {
             try {
                 await createAuditLog(
                     'SELF_ROLE_MODIFICATION_ATTEMPT',
                     currentUser.id,
-                    currentUser.id, // Use admin's own ID to avoid foreign key issues
+                    currentUser.id,
                     {
                         currentRole: currentUser.role,
+                        requestedRole: validatedData.role,
                         timestamp: new Date().toISOString()
                     }
                 );
@@ -168,25 +150,35 @@ export async function PATCH(
             }
 
             return NextResponse.json(
-                { error: 'Cannot modify your own role' },
-                { status: 400 }
+                {error: 'Cannot modify your own role'},
+                {status: 400}
             );
         }
 
-        // Parse and validate request body
-        const body = await request.json();
+        // Build update data with proper typing
+        const updateData: { name?: string; role?: Role } = {};
+        if (validatedData.name !== undefined) updateData.name = validatedData.name;
+        if (validatedData.role !== undefined) updateData.role = validatedData.role as Role;
 
-        // Log role update attempt
+        // Check if there are actually changes to make
+        if (Object.keys(updateData).length === 0) {
+            return NextResponse.json({
+                message: 'No changes specified',
+                user: targetUser,
+            });
+        }
+
+        // Log update attempt
         try {
             await createAuditLog(
-                'ROLE_UPDATE_ATTEMPT',
+                'USER_UPDATE_ATTEMPT',
                 currentUser.id,
-                targetUser.id, // This is a valid user ID, so it's safe to use
+                targetUser.id,
                 {
                     targetUserEmail: targetUser.email,
                     targetUserName: targetUser.name,
                     currentRole: targetUser.role,
-                    requestedRole: body.role,
+                    updates: updateData,
                     timestamp: new Date().toISOString()
                 }
             );
@@ -194,36 +186,10 @@ export async function PATCH(
             console.error('Failed to create audit log:', auditLogError);
         }
 
-        const { role } = updateRoleSchema.parse(body);
-
-        // No change in role
-        if (role === targetUser.role) {
-            // Log no-change role update
-            try {
-                await createAuditLog(
-                    'ROLE_UPDATE_NO_CHANGE',
-                    currentUser.id,
-                    targetUser.id,
-                    {
-                        role: role,
-                        message: 'Role update requested but role is already set to the requested value',
-                        timestamp: new Date().toISOString()
-                    }
-                );
-            } catch (auditLogError) {
-                console.error('Failed to create audit log:', auditLogError);
-            }
-
-            return NextResponse.json({
-                message: 'Role already set to ' + role,
-                user: targetUser,
-            });
-        }
-
-        // Update user role
+        // Update user
         const updatedUser = await db.user.update({
-            where: { id: userId },
-            data: { role },
+            where: {id: userId},
+            data: updateData,
             select: {
                 id: true,
                 email: true,
@@ -234,41 +200,45 @@ export async function PATCH(
             },
         });
 
-        // Log the role change for audit purposes
+        // Log successful update
         try {
             await createAuditLog(
-                'UPDATE_ROLE',
+                'UPDATE_USER',
                 currentUser.id,
                 userId,
                 {
-                    previousRole: targetUser.role,
-                    newRole: role,
+                    previousData: {
+                        name: targetUser.name,
+                        role: targetUser.role
+                    },
+                    newData: {
+                        name: updatedUser.name,
+                        role: updatedUser.role
+                    },
                     adminEmail: currentUser.email,
                     targetUserEmail: targetUser.email,
-                    targetUserName: targetUser.name,
                     timestamp: new Date().toISOString()
                 }
             );
         } catch (auditLogError) {
             console.error('Failed to create audit log:', auditLogError);
-            // Continue execution even if audit log creation fails
         }
 
         return NextResponse.json({
-            message: 'Role updated successfully',
+            message: 'User updated successfully',
             user: updatedUser,
         });
+
     } catch (error) {
-        console.error('Role update error:', error);
+        console.error('User update error:', error);
 
         if (error instanceof z.ZodError) {
-            // Log validation error
             try {
                 const currentUser = await validateAuthAndGetUser();
                 await createAuditLog(
-                    'ROLE_UPDATE_VALIDATION_ERROR',
+                    'USER_UPDATE_VALIDATION_ERROR',
                     currentUser.id,
-                    currentUser.id, // Use admin's own ID to avoid foreign key issues
+                    currentUser.id,
                     {
                         targetUserId: (await context.params).userId,
                         validationErrors: error.errors,
@@ -281,20 +251,19 @@ export async function PATCH(
 
             return NextResponse.json(
                 {
-                    error: 'Invalid role value',
+                    error: 'Invalid request data',
                     details: error.errors,
                 },
-                { status: 400 }
+                {status: 400}
             );
         }
 
-        // Log general role update error
         try {
             const currentUser = await validateAuthAndGetUser();
             await createAuditLog(
-                'ROLE_UPDATE_ERROR',
+                'USER_UPDATE_ERROR',
                 currentUser.id,
-                currentUser.id, // Use admin's own ID to avoid foreign key issues
+                currentUser.id,
                 {
                     targetUserId: (await context.params).userId,
                     error: error instanceof Error ? error.message : 'Unknown error',
@@ -307,8 +276,333 @@ export async function PATCH(
         }
 
         return NextResponse.json(
-            { error: 'Failed to update user role' },
-            { status: 500 }
+            {error: 'Failed to update user'},
+            {status: 500}
+        );
+    }
+}
+
+/**
+ * Delete a user account while preserving their data
+ * @method DELETE
+ * @description Safely deletes a user account by setting their references to NULL in related data.
+ * This preserves data integrity while removing the user from the system.
+ * Only admins can perform this action.
+ * @response 200 {
+ *   "type": "object",
+ *   "properties": {
+ *     "message": { "type": "string" },
+ *     "preservedData": {
+ *       "type": "object",
+ *       "properties": {
+ *         "auditLogs": { "type": "number" },
+ *         "changelogRequests": { "type": "number" },
+ *         "apiKeys": { "type": "number" },
+ *         "invitations": { "type": "number" }
+ *       }
+ *     }
+ *   }
+ * }
+ * @error 403 Unauthorized - Only admins can delete users
+ * @error 404 User not found
+ * @error 400 Cannot delete own account or last admin
+ * @error 500 Failed to delete user
+ */
+export async function DELETE(
+    request: NextRequest,
+    context: { params: Promise<{ userId: string }> }
+) {
+    try {
+        const currentUser = await validateAuthAndGetUser();
+
+        // Only admins can delete users
+        if (currentUser.role !== 'ADMIN') {
+            try {
+                await createAuditLog(
+                    'UNAUTHORIZED_USER_DELETE_ATTEMPT',
+                    currentUser.id,
+                    currentUser.id,
+                    {
+                        userRole: currentUser.role,
+                        targetUserId: (await context.params).userId,
+                        timestamp: new Date().toISOString()
+                    }
+                );
+            } catch (auditLogError) {
+                console.error('Failed to create audit log:', auditLogError);
+            }
+
+            return NextResponse.json(
+                {error: 'Unauthorized - Only admins can delete users'},
+                {status: 403}
+            );
+        }
+
+        const {userId} = await context.params;
+
+        if (!userId) {
+            return NextResponse.json(
+                {error: 'User ID is required'},
+                {status: 400}
+            );
+        }
+
+        // Check if user exists
+        const targetUser = await db.user.findUnique({
+            where: {id: userId},
+            select: {
+                id: true,
+                email: true,
+                role: true,
+                name: true,
+                createdAt: true
+            },
+        });
+
+        if (!targetUser) {
+            try {
+                await createAuditLog(
+                    'USER_DELETE_NOT_FOUND',
+                    currentUser.id,
+                    currentUser.id,
+                    {
+                        action: 'DELETE_USER',
+                        requestedUserId: userId,
+                        timestamp: new Date().toISOString()
+                    }
+                );
+            } catch (auditLogError) {
+                console.error('Failed to create audit log:', auditLogError);
+            }
+
+            return NextResponse.json(
+                {error: 'User not found'},
+                {status: 404}
+            );
+        }
+
+        // Prevent self-deletion
+        if (targetUser.id === currentUser.id) {
+            try {
+                await createAuditLog(
+                    'SELF_DELETE_ATTEMPT',
+                    currentUser.id,
+                    currentUser.id,
+                    {
+                        timestamp: new Date().toISOString()
+                    }
+                );
+            } catch (auditLogError) {
+                console.error('Failed to create audit log:', auditLogError);
+            }
+
+            return NextResponse.json(
+                {error: 'Cannot delete your own account'},
+                {status: 400}
+            );
+        }
+
+        // Check if this is the last admin
+        if (targetUser.role === 'ADMIN') {
+            const adminCount = await db.user.count({
+                where: {role: 'ADMIN'}
+            });
+
+            if (adminCount <= 1) {
+                try {
+                    await createAuditLog(
+                        'LAST_ADMIN_DELETE_ATTEMPT',
+                        currentUser.id,
+                        targetUser.id,
+                        {
+                            targetUserEmail: targetUser.email,
+                            adminCount,
+                            timestamp: new Date().toISOString()
+                        }
+                    );
+                } catch (auditLogError) {
+                    console.error('Failed to create audit log:', auditLogError);
+                }
+
+                return NextResponse.json(
+                    {error: 'Cannot delete the last admin user'},
+                    {status: 400}
+                );
+            }
+        }
+
+        // Log deletion attempt
+        try {
+            await createAuditLog(
+                'USER_DELETE_ATTEMPT',
+                currentUser.id,
+                targetUser.id,
+                {
+                    targetUserEmail: targetUser.email,
+                    targetUserName: targetUser.name,
+                    targetUserRole: targetUser.role,
+                    targetUserCreatedAt: targetUser.createdAt.toISOString(),
+                    adminEmail: currentUser.email,
+                    timestamp: new Date().toISOString()
+                }
+            );
+        } catch (auditLogError) {
+            console.error('Failed to create audit log:', auditLogError);
+        }
+
+        // Create preserved user data object
+        const preservedUserData: PreservedUserData = {
+            id: targetUser.id,
+            email: targetUser.email,
+            name: targetUser.name,
+            role: targetUser.role, // This will be automatically converted to string
+            deletedAt: new Date().toISOString(),
+            deletedBy: currentUser.id
+        };
+
+        // Perform the deletion in a transaction to ensure data consistency
+        const result = await db.$transaction(async (tx) => {
+            // Count existing data for reporting
+            const [
+                auditLogCount,
+                changelogRequestCount,
+                apiKeyCount,
+                invitationCount
+            ] = await Promise.all([
+                tx.auditLog.count({where: {OR: [{userId}, {targetUserId: userId}]}}),
+                tx.changelogRequest.count({where: {OR: [{staffId: userId}, {adminId: userId}]}}),
+                tx.apiKey.count({where: {userId}}),
+                tx.invitationLink.count({where: {createdBy: userId}})
+            ]);
+
+            // Step 1: Preserve user info in audit logs before deletion
+            if (auditLogCount > 0) {
+                // Get audit logs where user is the performer
+                const userAuditLogs = await tx.auditLog.findMany({
+                    where: {userId},
+                    select: {id: true, details: true}
+                });
+
+                // Update each audit log to preserve user info in details
+                for (const log of userAuditLogs) {
+                    const currentDetails = (log.details as AuditLogDetails) || {};
+                    await tx.auditLog.update({
+                        where: {id: log.id},
+                        data: {
+                            details: {
+                                ...currentDetails,
+                                _preservedUser: preservedUserData
+                            }
+                        }
+                    });
+                }
+
+                // Get audit logs where user is the target
+                const targetAuditLogs = await tx.auditLog.findMany({
+                    where: {targetUserId: userId},
+                    select: {id: true, details: true}
+                });
+
+                // Update each audit log to preserve target user info in details
+                for (const log of targetAuditLogs) {
+                    const currentDetails = (log.details as AuditLogDetails) || {};
+                    await tx.auditLog.update({
+                        where: {id: log.id},
+                        data: {
+                            details: {
+                                ...currentDetails,
+                                _preservedTargetUser: preservedUserData
+                            }
+                        }
+                    });
+                }
+            }
+
+            // Step 2: Revoke all API keys (mark as revoked to preserve audit trail)
+            if (apiKeyCount > 0) {
+                await tx.apiKey.updateMany({
+                    where: {userId},
+                    data: {isRevoked: true}
+                });
+            }
+
+            // Step 3: Mark unused invitations as used/expired (preserve for audit trail)
+            if (invitationCount > 0) {
+                await tx.invitationLink.updateMany({
+                    where: {
+                        createdBy: userId,
+                        usedAt: null
+                    },
+                    data: {usedAt: new Date()}
+                });
+            }
+
+            // Step 4: Delete the user account
+            // Foreign key constraints will automatically SET NULL on related records
+            // But we've already preserved the user info in the audit log details
+            await tx.user.delete({
+                where: {id: userId}
+            });
+
+            return {
+                preservedData: {
+                    auditLogs: auditLogCount,
+                    changelogRequests: changelogRequestCount,
+                    apiKeys: apiKeyCount,
+                    invitations: invitationCount
+                }
+            };
+        });
+
+        // Log successful deletion
+        try {
+            await createAuditLog(
+                'DELETE_USER',
+                currentUser.id,
+                currentUser.id, // Use admin's ID since target user no longer exists
+                {
+                    deletedUserId: targetUser.id,
+                    deletedUserEmail: targetUser.email,
+                    deletedUserName: targetUser.name,
+                    deletedUserRole: targetUser.role,
+                    deletedAt: new Date().toISOString(),
+                    adminEmail: currentUser.email,
+                    preservedDataCounts: result.preservedData
+                }
+            );
+        } catch (auditLogError) {
+            console.error('Failed to create audit log:', auditLogError);
+        }
+
+        return NextResponse.json({
+            message: 'User deleted successfully',
+            preservedData: result.preservedData
+        });
+
+    } catch (error) {
+        console.error('User deletion error:', error);
+
+        // Log deletion error
+        try {
+            const currentUser = await validateAuthAndGetUser();
+            await createAuditLog(
+                'USER_DELETE_ERROR',
+                currentUser.id,
+                currentUser.id,
+                {
+                    targetUserId: (await context.params).userId,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                    stack: error instanceof Error ? error.stack : undefined,
+                    timestamp: new Date().toISOString()
+                }
+            );
+        } catch (auditLogError) {
+            console.error('Failed to create audit log:', auditLogError);
+        }
+
+        return NextResponse.json(
+            {error: 'Failed to delete user'},
+            {status: 500}
         );
     }
 }

@@ -5,11 +5,11 @@
 
 export const appInfo = {
     name: 'Changerawr',
-    version: '0.3.6',
-    status: 'Alpha',
+    version: '1.0.0',
+    status: 'Stable',
     environment: process.env.NODE_ENV || 'development',
-    license: 'MIT',
-    releaseDate: '2025-03-19',
+    license: 'Sponsorware',
+    releaseDate: '2025-06-15',
 
     framework: 'Next.js App Router',
     database: 'PostgreSQL with Prisma ORM',

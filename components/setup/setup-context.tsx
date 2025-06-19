@@ -1,10 +1,10 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/hooks/use-toast';
 
-export type SetupStep = 'welcome' | 'admin' | 'settings' | 'oauth' | 'complete';
+export type SetupStep = 'welcome' | 'admin' | 'settings' | 'oauth' | 'team' | 'complete';
 
 interface SetupContextType {
     currentStep: SetupStep;
@@ -13,6 +13,7 @@ interface SetupContextType {
     isLoading: boolean;
     goToNextStep: () => void;
     goToPreviousStep: () => void;
+    skipCurrentStep: () => void;
     isStepCompleted: (step: SetupStep) => boolean;
     markStepCompleted: (step: SetupStep) => void;
     checkSetupStatus: () => Promise<void>;
@@ -20,7 +21,7 @@ interface SetupContextType {
 
 const SetupContext = createContext<SetupContextType | undefined>(undefined);
 
-const stepOrder: SetupStep[] = ['welcome', 'admin', 'settings', 'oauth', 'complete'];
+const stepOrder: SetupStep[] = ['welcome', 'admin', 'settings', 'oauth', 'team', 'complete'];
 
 export const SetupProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
     const [currentStep, setCurrentStep] = useState<SetupStep>('welcome');
@@ -88,6 +89,11 @@ export const SetupProvider: React.FC<{children: React.ReactNode}> = ({ children 
         }
     };
 
+    const skipCurrentStep = useCallback(() => {
+        // Same as goToNextStep, but semantically different for skippable steps
+        goToNextStep();
+    }, [goToNextStep]);
+
     const isStepCompleted = (step: SetupStep) => {
         return completedSteps.includes(step);
     };
@@ -107,6 +113,7 @@ export const SetupProvider: React.FC<{children: React.ReactNode}> = ({ children 
                 isLoading,
                 goToNextStep,
                 goToPreviousStep,
+                skipCurrentStep,
                 isStepCompleted,
                 markStepCompleted,
                 checkSetupStatus

@@ -11,7 +11,8 @@
     "generate-swagger": "tsx scripts/api/generateSwagger.ts",
     "start:prod": "NODE_ENV=production next start",
     "start:prod:win": "set NODE_ENV=production&& next start",
-    "screenshots":  "tsx scripts/utils/scan.ts"
+    "maintenance": "node scripts/maintenance/server.js",
+    "start:with-maintenance": "bash docker-entrypoint.sh npm start"
   },
   "prisma": {
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
@@ -96,6 +97,7 @@
     "react-hook-form": "^7.54.2",
     "react-markdown": "^9.0.3",
     "react-syntax-highlighter": "^15.6.1",
+    "recharts": "^2.15.3",
     "rehype-highlight": "^7.0.2",
     "rehype-katex": "^7.0.1",
     "rehype-raw": "^7.0.0",
@@ -127,7 +129,6 @@
     "@types/swagger-ui-react": "^5.18.0",
     "eslint": "^9",
     "eslint-config-next": "15.3.0",
-    "playwright": "^1.53.1",
     "postcss": "^8",
     "prisma": "^6.6.0",
     "tailwindcss": "^3.4.1",

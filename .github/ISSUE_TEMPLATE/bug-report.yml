@@ -1,0 +1,220 @@
+name: 🐛 Bug Report
+description: Found a bug? Help us squash it! Every bug report makes Changerawr better.
+title: "[Bug]: "
+labels: ["bug", "triage"]
+assignees:
+  - Supernova3339
+body:
+  - type: markdown
+    attributes:
+      value: |
+        # 🐛 Thanks for reporting a bug!
+        
+        Bug reports are super valuable - they help us make Changerawr rock solid for everyone. The more details you provide, the faster we can track down and fix the issue.
+        
+        **Please search existing issues first** to see if this bug has already been reported. If you find it, give it a 👍!
+
+  - type: input
+    id: contact
+    attributes:
+      label: 📧 Contact Details (Optional)
+      description: How can we reach you if we need more info about this bug?
+      placeholder: email@example.com or @username
+    validations:
+      required: false
+
+  - type: textarea
+    id: bug-description
+    attributes:
+      label: 🐛 What happened?
+      description: Describe the bug clearly and concisely
+      placeholder: Tell us what went wrong...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: ✅ What should have happened?
+      description: What did you expect to happen instead?
+      placeholder: Describe what you thought would happen...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction-steps
+    attributes:
+      label: 🔄 Steps to Reproduce
+      description: How can we reproduce this bug? Be as specific as possible!
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. Scroll down to '...'
+        4. See error
+      value: |
+        1. 
+        2. 
+        3. 
+        4.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: 📊 How often does this happen?
+      description: Is this bug consistent or intermittent?
+      options:
+        - "Every time (100%)"
+        - "Most of the time (75%+)"
+        - "Sometimes (25-75%)"
+        - "Rarely (less than 25%)"
+        - "Only happened once"
+      default: 0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: browser
+    attributes:
+      label: 🌐 Browser
+      description: Which browser are you using?
+      multiple: true
+      options:
+        - Chrome
+        - Firefox
+        - Safari
+        - Microsoft Edge
+        - Opera
+        - Other
+
+  - type: dropdown
+    id: device-type
+    attributes:
+      label: 📱 Device Type
+      description: What device were you using?
+      options:
+        - Desktop (Windows)
+        - Desktop (macOS)
+        - Desktop (Linux)
+        - Mobile (iOS)
+        - Mobile (Android)
+        - Tablet (iOS)
+        - Tablet (Android)
+      default: 0
+    validations:
+      required: true
+
+  - type: input
+    id: screen-resolution
+    attributes:
+      label: 🖥️ Screen Resolution (Optional)
+      description: What's your screen resolution? Helpful for UI bugs
+      placeholder: "e.g., 1920x1080, 1366x768"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: changerawr-area
+    attributes:
+      label: 🎯 Which part of Changerawr?
+      description: Where in the app did this bug occur?
+      options:
+        - Dashboard / Home
+        - Changelog Editor
+        - Project Settings
+        - User Settings / Profile
+        - Authentication / Login
+        - Embeddable Widget
+        - API / Integrations
+        - Email Notifications
+        - GitHub Integration
+        - Mobile Interface
+        - Other / Not Sure
+      default: 10
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: ⚡ Bug Severity
+      description: How much does this impact your use of Changerawr?
+      options:
+        - "Low - Minor annoyance, doesn't block my work"
+        - "Medium - Inconvenient but I can work around it"
+        - "High - Significantly impacts my workflow"
+        - "Critical - Completely blocks me from using Changerawr"
+      default: 0
+    validations:
+      required: true
+
+  - type: textarea
+    id: error-messages
+    attributes:
+      label: ❌ Error Messages
+      description: Any error messages, console errors, or warnings you saw?
+      placeholder: Copy and paste any error messages here...
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: console-logs
+    attributes:
+      label: 🔍 Console Output (For Developers)
+      description: If you're comfortable with dev tools, paste any relevant console output
+      placeholder: Right-click → Inspect → Console tab → copy any red errors
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: 📝 Additional Context
+      description: Anything else that might be relevant? Screenshots, network conditions, etc.
+      placeholder: Any other details that might help us understand this bug...
+    validations:
+      required: false
+
+  - type: input
+    id: changerawr-version
+    attributes:
+      label: 🦖 Changerawr Version (Optional)
+      description: If you know the version, it helps! Check the about page in administration settings, or your lib/app-info.ts
+      placeholder: "e.g., v0.3.9"
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: bug-checklist
+    attributes:
+      label: 📋 Bug Report Checklist
+      description: Quick checks to help us process your report
+      options:
+        - label: I've searched existing issues and this isn't a duplicate
+          required: true
+        - label: I can reproduce this bug consistently
+          required: false
+        - label: I've included steps to reproduce the issue
+          required: true
+        - label: I'd be willing to test a fix if provided
+          required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        
+        ## 🛠️ What happens next?
+        
+        1. **We'll investigate** - Usually within 24-72 hours
+        2. **Reproduce the bug** - We'll try to recreate the issue
+        3. **Ask questions** - We might need more details
+        4. **Fix it** - Once confirmed, we'll work on a solution
+        5. **Test & Release** - Fix gets tested and deployed
+        
+        **Pro tip**: The best bug reports include clear steps to reproduce the issue. If we can reproduce it, we can fix it! 
+        
+        Thanks for helping make Changerawr more stable! 🦖💪

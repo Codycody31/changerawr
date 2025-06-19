@@ -14,6 +14,8 @@ import {
 import Link from 'next/link';
 import { Metadata } from 'next';
 import SubscriptionForm from "@/components/subscription-form";
+import {trackChangelogView} from "@/lib/middleware/analytics";
+import {headers} from "next/headers";
 
 interface ChangelogResponse {
     project: {
@@ -112,6 +114,23 @@ export default async function ChangelogPage({ params }: ChangelogPageProps) {
 
     if (!data) {
         notFound();
+    }
+
+    // Track the changelog view asynchronously (don't block rendering)
+    try {
+        const headersList = await headers();
+        const request = new Request('http://localhost', {
+            headers: headersList
+        });
+
+        // Track the main changelog page view
+        await trackChangelogView(request, {
+            projectId: data.project.id,
+            // No specific entry ID for main page view
+        });
+    } catch (error) {
+        // Don't let analytics tracking errors break the page
+        console.error('Failed to track changelog view:', error);
     }
 
     const stats = {
