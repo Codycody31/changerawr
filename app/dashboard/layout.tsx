@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useAuth } from '@/context/auth'
 import {
     ClipboardCheck,
@@ -25,6 +25,7 @@ import WhatsNewModal from '@/components/dashboard/WhatsNewModal'
 import { useWhatsNew } from '@/hooks/useWhatsNew'
 import { Sidebar, NavSection, SidebarUser } from '@/components/ui/sidebar'
 import { getGravatarUrl } from '@/lib/utils/gravatar'
+import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 
 // Navigation Configuration
 const NAV_SECTIONS: NavSection[] = [
@@ -148,6 +149,7 @@ export default function DashboardLayout({
     children: React.ReactNode
 }) {
     const router = useRouter()
+    const pathname = usePathname()
     const { user, isLoading, logout } = useAuth()
     const [sidebarExpanded, setSidebarExpanded] = useState(true)
     const isMobile = useMediaQuery('(max-width: 768px)')
@@ -218,6 +220,23 @@ export default function DashboardLayout({
     // Redirect to login if no user
     if (!user || !sidebarUser) {
         return null
+    }
+
+    // Access control for admin routes
+    const isAdminRoute = pathname?.startsWith('/dashboard/admin')
+    if (isAdminRoute && user.role !== 'ADMIN') {
+        return (
+            <div className="container mx-auto p-8">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Access Denied</CardTitle>
+                        <CardDescription>
+                            You need administrator privileges to access this section.
+                        </CardDescription>
+                    </CardHeader>
+                </Card>
+            </div>
+        )
     }
 
     return (
