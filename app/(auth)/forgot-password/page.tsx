@@ -45,6 +45,7 @@ const emailProviders = {
     'yahoo.com': 'https://mail.yahoo.com',
     'icloud.com': 'https://www.icloud.com/mail',
     'protonmail.com': 'https://mail.proton.me',
+    'naver.com': 'https://mail.naver.com/'
 };
 
 // Smart confetti function

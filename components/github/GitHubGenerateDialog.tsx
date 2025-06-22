@@ -198,16 +198,42 @@ export default function GitHubGenerateDialog({
 
     const loadAISettings = async () => {
         try {
+            // Fetch encrypted settings
             const response = await fetch('/api/ai/settings');
             if (response.ok) {
                 const data = await response.json();
+
+                let decryptedApiKey: string | null = null;
+
+                // If AI is enabled and we have an encrypted API key, decrypt it
+                if (data.enableAIAssistant && data.aiApiKey) {
+                    try {
+                        const decryptResponse = await fetch('/api/ai/decrypt', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ encryptedToken: data.aiApiKey }),
+                        });
+
+                        if (decryptResponse.ok) {
+                            const decryptData = await decryptResponse.json();
+                            decryptedApiKey = decryptData.decryptedKey;
+                        } else {
+                            console.error('Failed to decrypt API key:', decryptResponse.statusText);
+                        }
+                    } catch (decryptError) {
+                        console.error('Error decrypting API key:', decryptError);
+                    }
+                }
+
                 setAiSettings({
                     enableAIAssistant: data.enableAIAssistant || false,
-                    aiApiKey: data.aiApiKey || null,
+                    aiApiKey: decryptedApiKey,
                     aiModel: data.aiDefaultModel || 'copilot-zero'
                 });
 
-                if (!data.enableAIAssistant || !data.aiApiKey) {
+                if (!data.enableAIAssistant || !decryptedApiKey) {
                     setOptions(prev => ({...prev, useAI: false}));
                 }
             }
@@ -953,7 +979,8 @@ export default function GitHubGenerateDialog({
                                                                     </div>
                                                                     <p className="text-sm text-muted-foreground">
                                                                         Use commit SHAs (full or short) or branch names.
-                                                                        Leave &ldquo;To&rdquo; as &ldquo;main&rdquo; or &ldquo;HEAD&rdquo; for latest.
+                                                                        Leave &ldquo;To&rdquo; as &ldquo;main&rdquo; or &ldquo;HEAD&rdquo; for
+                                                                        latest.
                                                                     </p>
                                                                 </CardContent>
                                                             </Card>
@@ -1174,7 +1201,7 @@ export default function GitHubGenerateDialog({
                                         </motion.div>
                                     )}
 
-                                    {/* Step 3: Results */}
+                                    {/* Step 3: Results - THE FIXED SCROLLING SECTION */}
                                     {currentStep === 3 && result && (
                                         <motion.div
                                             key="step3"
@@ -1189,10 +1216,10 @@ export default function GitHubGenerateDialog({
                                                     use</p>
                                             </div>
 
-                                            <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                            <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0">
                                                 {/* Content Preview */}
-                                                <Card className="lg:col-span-2 flex flex-col">
-                                                    <CardHeader>
+                                                <Card className="lg:col-span-2 flex flex-col min-h-0">
+                                                    <CardHeader className="flex-shrink-0">
                                                         <div className="flex items-center justify-between">
                                                             <CardTitle>Changelog Content</CardTitle>
                                                             <div className="flex gap-2">
@@ -1222,8 +1249,8 @@ export default function GitHubGenerateDialog({
                                                             </div>
                                                         </div>
                                                     </CardHeader>
-                                                    <CardContent className="p-0 flex-1 flex flex-col">
-                                                        <div className="relative flex-1">
+                                                    <CardContent className="p-0 flex-1 flex flex-col min-h-0">
+                                                        <div className="relative flex-1 min-h-0">
                                                             <Textarea
                                                                 value={result.changelog?.content || ''}
                                                                 readOnly
@@ -1239,20 +1266,20 @@ export default function GitHubGenerateDialog({
                                                     </CardContent>
                                                 </Card>
 
-                                                {/* Entries Preview */}
-                                                <Card className="flex flex-col">
-                                                    <CardHeader>
+                                                {/* Entries Preview - FIXED SCROLLING SECTION */}
+                                                <Card className="flex flex-col min-h-0">
+                                                    <CardHeader className="flex-shrink-0">
                                                         <CardTitle className="text-lg">Entry Breakdown</CardTitle>
                                                         <CardDescription>
                                                             Overview of generated entries
                                                         </CardDescription>
                                                     </CardHeader>
-                                                    <CardContent className="flex-1 flex flex-col">
+                                                    <CardContent className="flex-1 flex flex-col min-h-0 p-0">
                                                         {result.changelog?.entries && result.changelog.entries.length > 0 ? (
-                                                            <div className="space-y-3 flex-1 overflow-auto">
+                                                            <div className="flex-1 overflow-y-auto p-6 pt-0 space-y-3">
                                                                 {result.changelog.entries.map((entry, index) => (
                                                                     <div key={index}
-                                                                         className="p-3 border rounded-lg space-y-2">
+                                                                         className="p-3 border rounded-lg space-y-2 flex-shrink-0">
                                                                         <div
                                                                             className="flex items-center justify-between">
                                                                             <Badge variant="outline"
@@ -1266,13 +1293,33 @@ export default function GitHubGenerateDialog({
                                                                                 {entry.impact}
                                                                             </p>
                                                                         )}
+                                                                        {entry.files && entry.files.length > 0 && (
+                                                                            <div className="flex flex-wrap gap-1 mt-2">
+                                                                                {entry.files.slice(0, 3).map((file, fileIndex) => (
+                                                                                    <Badge key={fileIndex}
+                                                                                           variant="secondary"
+                                                                                           className="text-xs px-1 py-0">
+                                                                                        {file.split('/').pop()}
+                                                                                    </Badge>
+                                                                                ))}
+                                                                                {entry.files.length > 3 && (
+                                                                                    <Badge variant="secondary"
+                                                                                           className="text-xs px-1 py-0">
+                                                                                        +{entry.files.length - 3} more
+                                                                                    </Badge>
+                                                                                )}
+                                                                            </div>
+                                                                        )}
                                                                     </div>
                                                                 ))}
                                                             </div>
                                                         ) : (
-                                                            <p className="text-sm text-muted-foreground text-center py-8">
-                                                                No detailed entries available
-                                                            </p>
+                                                            <div
+                                                                className="flex-1 flex items-center justify-center p-6">
+                                                                <p className="text-sm text-muted-foreground text-center">
+                                                                    No detailed entries available
+                                                                </p>
+                                                            </div>
                                                         )}
                                                     </CardContent>
                                                 </Card>

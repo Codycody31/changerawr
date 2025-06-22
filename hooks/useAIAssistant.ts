@@ -217,7 +217,7 @@ export default function useAIAssistant({
         };
 
         // Log outgoing request for debugging
-        console.log('AI Request:', JSON.stringify(completionRequest, null, 2));
+        // console.log('AI Request:', JSON.stringify(completionRequest, null, 2));
 
         const response = await fetch(`${baseUrl}/chat/completions`, {
             method: 'POST',
@@ -238,7 +238,7 @@ export default function useAIAssistant({
         const jsonResponse = await response.json();
 
         // Log the response for debugging
-        console.log('AI Response:', JSON.stringify(jsonResponse, null, 2));
+        // console.log('AI Response:', JSON.stringify(jsonResponse, null, 2));
 
         return jsonResponse as CompletionResponse;
     }, [baseUrl, model, state.temperature]);

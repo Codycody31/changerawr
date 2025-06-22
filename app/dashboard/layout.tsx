@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { useAuth } from '@/context/auth'
+import React, {useEffect, useState} from 'react'
+import {useRouter} from 'next/navigation'
+import {useAuth} from '@/context/auth'
 import {
     ClipboardCheck,
     FileText,
@@ -17,14 +17,16 @@ import {
     Users,
     Info,
     Sparkles,
-    Clock, ChartNoAxesCombined,
+    Clock,
+    ChartNoAxesCombined,
+    PanelRightClose
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { useMediaQuery } from '@/hooks/use-media-query'
+import {cn} from '@/lib/utils'
+import {useMediaQuery} from '@/hooks/use-media-query'
 import WhatsNewModal from '@/components/dashboard/WhatsNewModal'
-import { useWhatsNew } from '@/hooks/useWhatsNew'
-import { Sidebar, NavSection, SidebarUser } from '@/components/ui/sidebar'
-import { getGravatarUrl } from '@/lib/utils/gravatar'
+import {useWhatsNew} from '@/hooks/useWhatsNew'
+import {Sidebar, NavSection, SidebarUser} from '@/components/ui/sidebar'
+import {getGravatarUrl} from '@/lib/utils/gravatar'
 
 // Navigation Configuration
 const NAV_SECTIONS: NavSection[] = [
@@ -134,7 +136,7 @@ function LoadingScreen() {
     return (
         <div className="flex items-center justify-center min-h-screen">
             <div className="text-center">
-                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4"/>
                 <p className="text-sm text-muted-foreground">Loading...</p>
             </div>
         </div>
@@ -148,8 +150,9 @@ export default function DashboardLayout({
     children: React.ReactNode
 }) {
     const router = useRouter()
-    const { user, isLoading, logout } = useAuth()
+    const {user, isLoading, logout} = useAuth()
     const [sidebarExpanded, setSidebarExpanded] = useState(true)
+    const [sidebarVisible, setSidebarVisible] = useState(true)
     const isMobile = useMediaQuery('(max-width: 768px)')
     const isTablet = useMediaQuery('(max-width: 1024px)')
 
@@ -190,19 +193,24 @@ export default function DashboardLayout({
         if (!isTablet && !isMobile) {
             try {
                 localStorage.setItem('sidebarExpanded', String(sidebarExpanded))
+                localStorage.setItem('sidebarVisible', String(sidebarVisible))
             } catch (error) {
                 console.error('Error saving sidebar state:', error)
             }
         }
-    }, [sidebarExpanded, isTablet, isMobile])
+    }, [sidebarExpanded, sidebarVisible, isTablet, isMobile])
 
     // Load sidebar state from localStorage on initial load
     useEffect(() => {
         if (!isTablet && !isMobile) {
             try {
-                const savedState = localStorage.getItem('sidebarExpanded')
-                if (savedState !== null) {
-                    setSidebarExpanded(savedState === 'true')
+                const savedExpandedState = localStorage.getItem('sidebarExpanded')
+                const savedVisibleState = localStorage.getItem('sidebarVisible')
+                if (savedExpandedState !== null) {
+                    setSidebarExpanded(savedExpandedState === 'true')
+                }
+                if (savedVisibleState !== null) {
+                    setSidebarVisible(savedVisibleState === 'true')
                 }
             } catch (error) {
                 console.error('Error loading sidebar state:', error)
@@ -212,7 +220,7 @@ export default function DashboardLayout({
 
     // Show loading screen while checking auth
     if (isLoading) {
-        return <LoadingScreen />
+        return <LoadingScreen/>
     }
 
     // Redirect to login if no user
@@ -230,19 +238,47 @@ export default function DashboardLayout({
                 brandHref="/dashboard"
                 isExpanded={sidebarExpanded}
                 setIsExpanded={setSidebarExpanded}
+                isVisible={sidebarVisible}
+                // setIsVisible={setSidebarVisible}
             />
 
+            {/* Main content area with proper responsive behavior */}
             <main
                 className={cn(
                     "min-h-screen transition-all duration-300 ease-in-out",
                     // Mobile: always full width with top padding for mobile header
                     "pt-16 md:pt-0",
                     // Desktop: adjust margin based on sidebar state
-                    !isMobile && (sidebarExpanded ? "md:ml-64" : "md:ml-16")
+                    !isMobile && (
+                        sidebarVisible
+                            ? (sidebarExpanded ? "md:ml-64" : "md:ml-16")
+                            : "md:ml-0"
+                    )
                 )}
             >
+                {/* Show sidebar toggle when hidden */}
+                {!sidebarVisible && !isMobile && (
+                    <div className="fixed top-4 left-4 z-50 group">
+                        {/* Larger invisible hover trigger area */}
+                        <div className="absolute -inset-4 w-16 h-16"/>
+                        <button
+                            onClick={() => setSidebarVisible(true)}
+                            className="relative p-2 bg-background border border-border rounded-md shadow-sm hover:bg-secondary transition-all duration-200 opacity-0 group-hover:opacity-100"
+                            aria-label="Show sidebar"
+                        >
+                            <PanelRightClose className="h-5 w-5"/>
+                        </button>
+                    </div>
+                )}
+
                 <div className="h-full p-4 md:p-6 lg:p-8">
-                    <div className="mx-auto max-w-7xl">
+                    <div
+                        className={cn(
+                            "mx-auto",
+                            // When sidebar is hidden, use much wider container
+                            sidebarVisible ? "max-w-7xl" : "max-w-none"
+                        )}
+                    >
                         {children}
                     </div>
                 </div>

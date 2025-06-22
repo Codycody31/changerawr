@@ -2,41 +2,55 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
+    container_name: changerawr_postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: changerawr
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U postgres -d changerawr"]
+      interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   app:
     build:
       context: .
-      dockerfile: Dockerfile
-    environment:
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/changerawr?schema=public
-      - JWT_ACCESS_SECRET=your_secure_access_token_secret
-      - NEXT_PUBLIC_APP_URL=http://localhost:3000
-      - NODE_ENV=production
-    ports:
-      - "3000:3000"
+      dockerfile: Dockerfile.compose
+    container_name: changerawr_app
     depends_on:
       postgres:
         condition: service_healthy
-    restart: unless-stopped
+    environment:
+      DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/changerawr?schema=public"
+      JWT_ACCESS_SECRET: "your_jwt_secret_key_here_change_me"
+      NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+      GITHUB_ENCRYPTION_KEY: "abcdef1234567890abcdef1234567890"
+      ANALYTICS_SALT: "your_secure_analytics_salt_here"
+      NODE_ENV: "production"
+    ports:
+      - "3000:3000"
     volumes:
-      # For development, you might want to mount the codebase
-      # - .:/app
-      # But for production, we just use the built image and share the prisma migrations
-      - ./prisma:/app/prisma
+      - app_uploads:/app/uploads
+      - app_public:/app/public/generated
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
 
 volumes:
-  postgres-data:
+  postgres_data:
+    driver: local
+  app_uploads:
+    driver: local
+  app_public:
+    driver: local

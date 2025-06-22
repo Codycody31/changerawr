@@ -18,7 +18,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -33,7 +33,11 @@ import {
     Loader2,
     Lock,
     Mail,
-    CheckCircle2
+    CheckCircle2,
+    AlertTriangle,
+    Shield,
+    RefreshCw,
+    ArrowRight
 } from 'lucide-react'
 
 const emailSchema = z.object({
@@ -58,6 +62,11 @@ interface OAuthProvider {
     name: string
     enabled: boolean
     isDefault: boolean
+}
+
+interface PasswordBreachData {
+    breachCount: number
+    resetUrl: string
 }
 
 interface ProviderLogoProps {
@@ -216,8 +225,9 @@ const fireConfetti = () => {
 export default function LoginPage() {
     const { user, isLoading: authLoading } = useAuth()
     const [error, setError] = useState('')
-    const [step, setStep] = useState<'email' | 'password'>('email')
+    const [step, setStep] = useState<'email' | 'password' | 'breach-warning'>('email')
     const [userPreview, setUserPreview] = useState<UserPreview | null>(null)
+    const [passwordBreach, setPasswordBreach] = useState<PasswordBreachData | null>(null)
     const [supportsWebAuthn, setSupportsWebAuthn] = useState(false)
     const [isAuthenticating, setIsAuthenticating] = useState(false)
     const [showPassword, setShowPassword] = useState(false)
@@ -310,6 +320,15 @@ export default function LoginPage() {
         }
     }, [user, authLoading, redirectTo])
 
+    const formatBreachCount = (count: number): string => {
+        if (count >= 1000000) {
+            return `${(count / 1000000).toFixed(1)}M`;
+        } else if (count >= 1000) {
+            return `${(count / 1000).toFixed(1)}K`;
+        }
+        return count.toLocaleString();
+    };
+
     const onEmailSubmit = async (data: EmailForm) => {
         try {
             setError('')
@@ -342,16 +361,26 @@ export default function LoginPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     email: userPreview.email,
-                    password: data.password
+                    password: data.password,
+                    bypassBreachWarning: false // Initial attempt without bypass
                 }),
                 credentials: 'include'
             })
 
             const responseData = await response.json()
 
+            // Handle password breach warning
+            if (response.status === 422 && responseData.error === 'password_breached') {
+                setPasswordBreach({
+                    breachCount: responseData.breachCount,
+                    resetUrl: responseData.resetUrl
+                });
+                setStep('breach-warning')
+                return;
+            }
+
             // Handle 2FA requirement
             if (response.status === 403 && responseData.requiresSecondFactor) {
-                // Store the session token and redirect to 2FA page
                 sessionStorage.setItem('2faSessionToken', responseData.sessionToken)
                 sessionStorage.setItem('2faType', responseData.secondFactorType)
                 window.location.href = '/two-factor'
@@ -378,12 +407,72 @@ export default function LoginPage() {
         }
     }
 
+    // Handle continuing despite breach warning
+    const handleContinueWithBreachedPassword = async () => {
+        try {
+            setError('')
+            if (!userPreview) return
+
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: userPreview.email,
+                    password: passwordForm.getValues('password'),
+                    bypassBreachWarning: true // Bypass the breach warning
+                }),
+                credentials: 'include'
+            })
+
+            const responseData = await response.json()
+
+            // Handle 2FA requirement
+            if (response.status === 403 && responseData.requiresSecondFactor) {
+                sessionStorage.setItem('2faSessionToken', responseData.sessionToken)
+                sessionStorage.setItem('2faType', responseData.secondFactorType)
+                window.location.href = '/two-factor'
+                return
+            }
+
+            if (!response.ok) {
+                throw new Error(responseData.error || 'Authentication failed')
+            }
+
+            // Success state with confetti
+            setIsSuccess(true)
+            setTimeout(() => {
+                fireConfetti()
+            }, 300)
+
+            // Redirect with window.location
+            setTimeout(() => {
+                window.location.href = redirectTo
+            }, 1500)
+        } catch (error) {
+            setError(error instanceof Error ? error.message : 'Authentication failed')
+            setStep('password') // Go back to password form
+            setPasswordBreach(null)
+        }
+    }
+
+    // Handle password reset
+    const handlePasswordReset = () => {
+        if (passwordBreach?.resetUrl && userPreview?.email) {
+            window.location.href = `${passwordBreach.resetUrl}?email=${encodeURIComponent(userPreview.email)}`;
+        }
+    }
+
     const handleBack = () => {
-        setStep('email')
-        setError('')
-        passwordForm.reset()
-        emailForm.reset()
-        setUserPreview(null)
+        if (step === 'breach-warning') {
+            setStep('password')
+            setPasswordBreach(null)
+        } else {
+            setStep('email')
+            setError('')
+            passwordForm.reset()
+            emailForm.reset()
+            setUserPreview(null)
+        }
     }
 
     const handleOAuthLogin = (provider: OAuthProvider) => {
@@ -622,7 +711,7 @@ export default function LoginPage() {
                                                 </div>
                                             )}
                                         </motion.div>
-                                    ) : (
+                                    ) : step === 'password' ? (
                                         <motion.div
                                             key="password"
                                             initial={{ opacity: 0 }}
@@ -757,7 +846,109 @@ export default function LoginPage() {
                                                 </div>
                                             )}
                                         </motion.div>
-                                    )}
+                                    ) : step === 'breach-warning' ? (
+                                        <motion.div
+                                            key="breach-warning"
+                                            initial={{ opacity: 0, scale: 0.95 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            exit={{ opacity: 0, scale: 0.95 }}
+                                            className="space-y-6"
+                                        >
+                                            <Button
+                                                variant="ghost"
+                                                className="p-0 h-auto text-muted-foreground hover:text-foreground mb-2"
+                                                onClick={handleBack}
+                                            >
+                                                <ArrowLeft size={16} className="mr-2" />
+                                                Back
+                                            </Button>
+
+                                            <div className="text-center space-y-4">
+                                                <div className="w-16 h-16 bg-gradient-to-br from-amber-100 to-red-100 dark:from-amber-900/30 dark:to-red-900/30 rounded-full flex items-center justify-center mx-auto">
+                                                    <AlertTriangle className="h-8 w-8 text-amber-600 dark:text-amber-400" />
+                                                </div>
+                                                <div>
+                                                    <h2 className="text-xl font-bold text-amber-900 dark:text-amber-100">
+                                                        Password Security Alert
+                                                    </h2>
+                                                    <p className="text-sm text-muted-foreground mt-2">
+                                                        Your password was found in a data breach
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <Alert
+                                                variant="warning"
+                                                icon={<Shield className="h-4 w-4" />}
+                                                className="border-amber-200 dark:border-amber-800"
+                                            >
+                                                <AlertTitle>Security Notice</AlertTitle>
+                                                <AlertDescription>
+                                                    This password has appeared in{' '}
+                                                    <span className="font-semibold text-red-600 dark:text-red-400">
+                                                        {passwordBreach ? formatBreachCount(passwordBreach.breachCount) : '0'} known data breach{passwordBreach && passwordBreach.breachCount === 1 ? '' : 'es'}
+                                                    </span>
+                                                    . Using it puts your account at risk.
+                                                </AlertDescription>
+                                            </Alert>
+
+                                            <div className="space-y-3">
+                                                <h4 className="font-medium text-sm">What does this mean?</h4>
+                                                <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                                                    <li>Your password has been compromised in past security incidents</li>
+                                                    <li>Attackers may have access to this password</li>
+                                                    <li>Your account security could be at risk</li>
+                                                </ul>
+                                            </div>
+
+                                            <div className="grid gap-3">
+                                                <Button
+                                                    onClick={handlePasswordReset}
+                                                    className="w-full h-11 bg-green-600 hover:bg-green-700 text-white"
+                                                    disabled={passwordForm.formState.isSubmitting}
+                                                >
+                                                    <RefreshCw className="mr-2 h-4 w-4" />
+                                                    Reset Password (Recommended)
+                                                </Button>
+
+                                                <div className="relative">
+                                                    <div className="absolute inset-0 flex items-center">
+                                                        <span className="w-full border-t border-muted-foreground/20" />
+                                                    </div>
+                                                    <div className="relative flex justify-center text-xs uppercase">
+                                                        <span className="bg-background px-2 text-muted-foreground">
+                                                            Or
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                <Button
+                                                    onClick={handleContinueWithBreachedPassword}
+                                                    variant="outline"
+                                                    className="w-full h-11 border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-900/20"
+                                                    disabled={passwordForm.formState.isSubmitting}
+                                                >
+                                                    <ArrowRight className="mr-2 h-4 w-4" />
+                                                    Continue Anyway (Not Recommended)
+                                                </Button>
+                                            </div>
+
+                                            <div className="text-xs text-muted-foreground text-center space-y-1">
+                                                <p>
+                                                    Password checking powered by{' '}
+                                                    <a
+                                                        href="https://haveibeenpwned.com/Passwords"
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-primary hover:underline"
+                                                    >
+                                                        HaveIBeenPwned
+                                                    </a>
+                                                </p>
+                                                <p>Your password is never transmitted - only a secure hash is checked.</p>
+                                            </div>
+                                        </motion.div>
+                                    ) : null}
                                 </AnimatePresence>
                             </CardContent>
 

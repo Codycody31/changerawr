@@ -71,7 +71,7 @@ export class SectonClient {
                 try {
                     error = JSON.parse(errorText);
                 } catch {
-                    error = { message: errorText };
+                    error = {message: errorText};
                 }
 
                 throw new AIError('Failed to fetch models', response.status, error);
@@ -144,7 +144,7 @@ export class SectonClient {
                     console.error('❌ Parsed error object:', error);
                 } catch (parseError) {
                     console.error('❌ Failed to parse error as JSON:', parseError);
-                    error = { message: errorText };
+                    error = {message: errorText};
                 }
 
                 throw new AIError('Failed to create completion', response.status, error);
@@ -231,7 +231,7 @@ export class SectonClient {
         // console.log('📝 generateText options:', options);
 
         const messages: AIMessage[] = [
-            { role: 'user', content: prompt }
+            {role: 'user', content: prompt}
         ];
 
         // console.log('📝 Constructed messages:', messages);
@@ -250,7 +250,10 @@ export class SectonClient {
 
         if (!assistantMessage) {
             console.error('❌ No assistant message in response');
-            console.error('❌ Available messages:', completion.messages.map(m => ({ role: m.role, contentLength: m.content?.length })));
+            console.error('❌ Available messages:', completion.messages.map(m => ({
+                role: m.role,
+                contentLength: m.content?.length
+            })));
             throw new AIError('No assistant response found', 500, completion);
         }
 

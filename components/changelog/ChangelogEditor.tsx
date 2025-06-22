@@ -1,17 +1,17 @@
-import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { useMutation, useQuery, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import React, {useEffect, useMemo, useState, useCallback, useRef} from 'react';
+import {useRouter} from 'next/navigation';
+import {useMutation, useQuery, useInfiniteQuery, useQueryClient} from '@tanstack/react-query';
+import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
+import {Input} from '@/components/ui/input';
+import {Button} from '@/components/ui/button';
 import MarkdownEditor from '@/components/markdown-editor/MarkdownEditor';
-import { useDebounce } from 'use-debounce';
-import { toast } from "@/hooks/use-toast";
+import {useDebounce} from 'use-debounce';
+import {toast} from "@/hooks/use-toast";
 import EditorHeader from '@/components/changelog/editor/EditorHeader';
-import { Loader2, AlertTriangle, RefreshCw, Save, AlertCircle } from 'lucide-react';
-import { Alert, AlertDescription, AlertActions, AlertTitle } from '@/components/ui/alert';
-import { motion, AnimatePresence } from 'framer-motion';
-import { cn } from '@/lib/utils';
+import {Loader2, AlertTriangle, RefreshCw, Save, AlertCircle} from 'lucide-react';
+import {Alert, AlertDescription, AlertActions, AlertTitle} from '@/components/ui/alert';
+import {motion, AnimatePresence} from 'framer-motion';
+import {cn} from '@/lib/utils';
 
 // ===== Type Definitions =====
 
@@ -130,7 +130,7 @@ const EnhancedEditorHeader: React.FC<EnhancedEditorHeaderProps> = ({
                     onLoadMoreTags();
                 }
             },
-            { threshold: 0.5 }
+            {threshold: 0.5}
         );
 
         observer.observe(containerElement);
@@ -151,7 +151,7 @@ const EnhancedEditorHeader: React.FC<EnhancedEditorHeaderProps> = ({
                 hasVersionConflict={hasVersionConflict}
             />
             {/* Hidden container to trigger infinite loading */}
-            {onLoadMoreTags && <div ref={tagsContainerRef} style={{ height: 1, opacity: 0 }} />}
+            {onLoadMoreTags && <div ref={tagsContainerRef} style={{height: 1, opacity: 0}}/>}
         </>
     );
 };
@@ -214,19 +214,60 @@ export function ChangelogEditor({
     const { data: aiSystemSettings, isLoading: isAISettingsLoading } = useQuery<AISystemSettings>({
         queryKey: ['ai-system-settings'],
         queryFn: async (): Promise<AISystemSettings> => {
-            const response = await fetch('/api/ai/settings');
-            if (!response.ok) {
-                console.warn('Failed to fetch AI settings:', response.statusText);
+            try {
+                // Fetch encrypted settings
+                const response = await fetch('/api/ai/settings');
+                if (!response.ok) {
+                    console.warn('Failed to fetch AI settings:', response.statusText);
+                    return { enableAIAssistant: false, aiApiKey: null, aiDefaultModel: null };
+                }
+
+                const encryptedData = await response.json();
+
+                // If no API key or AI disabled, return as-is
+                if (!encryptedData.enableAIAssistant || !encryptedData.aiApiKey) {
+                    return {
+                        enableAIAssistant: encryptedData.enableAIAssistant || false,
+                        aiApiKey: null,
+                        aiDefaultModel: encryptedData.aiDefaultModel || null
+                    };
+                }
+
+                // Decrypt the API key
+                const decryptResponse = await fetch('/api/ai/decrypt', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ encryptedToken: encryptedData.aiApiKey }),
+                });
+
+                let decryptedApiKey: string | null = null;
+
+                if (decryptResponse.ok) {
+                    const decryptData = await decryptResponse.json();
+                    decryptedApiKey = decryptData.decryptedKey;
+                } else {
+                    console.error('Failed to decrypt API key:', decryptResponse.statusText);
+                }
+
+                return {
+                    enableAIAssistant: encryptedData.enableAIAssistant || false,
+                    aiApiKey: decryptedApiKey,
+                    aiDefaultModel: encryptedData.aiDefaultModel || null
+                };
+
+            } catch (error) {
+                console.error('Error in AI settings query:', error);
                 return { enableAIAssistant: false, aiApiKey: null, aiDefaultModel: null };
             }
-            return response.json();
         },
         staleTime: CACHE_TIME,
         retry: 1,
     });
 
     // Fetch initial data (project and entry)
-    const { data: initialData, isLoading: isInitialDataLoading, error: initialDataError } = useQuery({
+    const {data: initialData, isLoading: isInitialDataLoading, error: initialDataError} = useQuery({
         queryKey: ['changelog-init', projectId, entryId],
         queryFn: async () => {
             const [projectResponse, entryResponse] = await Promise.all([
@@ -248,7 +289,7 @@ export function ChangelogEditor({
                 entry = await entryResponse.json();
             }
 
-            return { project, entry };
+            return {project, entry};
         },
         staleTime: CACHE_TIME,
         retry: 2,
@@ -263,7 +304,7 @@ export function ChangelogEditor({
         error: tagsError
     } = useInfiniteQuery<TagsResponse>({
         queryKey: ['changelog-tags', projectId],
-        queryFn: async ({ pageParam = 1 }) => {
+        queryFn: async ({pageParam = 1}) => {
             const response = await fetch(
                 `/api/projects/${projectId}/changelog/tags?page=${pageParam}&limit=${ITEMS_PER_PAGE}`
             );
@@ -284,13 +325,13 @@ export function ChangelogEditor({
     const aiEnabled = aiSystemSettings?.enableAIAssistant || false;
     const sectonApiKey = aiSystemSettings?.aiApiKey || '';
 
-    const { availableTags, mappedDefaultTags } = useMemo(() => {
+    const {availableTags, mappedDefaultTags} = useMemo(() => {
         if (!initialData || !tagsData?.pages) {
-            return { availableTags: [], mappedDefaultTags: [] };
+            return {availableTags: [], mappedDefaultTags: []};
         }
 
         const allTags = tagsData.pages.flatMap(page => page.tags);
-        const { project } = initialData;
+        const {project} = initialData;
         const defaultTags = project.defaultTags || [];
 
         const tagMap = new Map<string, Tag>();
@@ -337,8 +378,8 @@ export function ChangelogEditor({
 
             const tagData = data.tags.map(tag =>
                 tag.id.startsWith('default-')
-                    ? { name: tag.name }
-                    : { id: tag.id, name: tag.name }
+                    ? {name: tag.name}
+                    : {id: tag.id, name: tag.name}
             );
 
             const response = await fetch(url, {
@@ -423,7 +464,7 @@ export function ChangelogEditor({
                 timestamp: new Date(),
                 retryable: false
             };
-            setStatus(prev => ({ ...prev, lastSaveError: error }));
+            setStatus(prev => ({...prev, lastSaveError: error}));
             return false;
         }
 
@@ -433,7 +474,7 @@ export function ChangelogEditor({
                 timestamp: new Date(),
                 retryable: false
             };
-            setStatus(prev => ({ ...prev, lastSaveError: error }));
+            setStatus(prev => ({...prev, lastSaveError: error}));
             return false;
         }
 
@@ -443,7 +484,7 @@ export function ChangelogEditor({
                 timestamp: new Date(),
                 retryable: false
             };
-            setStatus(prev => ({ ...prev, lastSaveError: error }));
+            setStatus(prev => ({...prev, lastSaveError: error}));
             return false;
         }
 
@@ -453,7 +494,7 @@ export function ChangelogEditor({
                 timestamp: new Date(),
                 retryable: false
             };
-            setStatus(prev => ({ ...prev, lastSaveError: error }));
+            setStatus(prev => ({...prev, lastSaveError: error}));
             return false;
         }
 
@@ -500,7 +541,7 @@ export function ChangelogEditor({
             }));
 
             // Invalidate relevant queries
-            queryClient.invalidateQueries({ queryKey: ['project-versions', projectId] });
+            queryClient.invalidateQueries({queryKey: ['project-versions', projectId]});
 
             if (isManual) {
                 toast({
@@ -550,7 +591,7 @@ export function ChangelogEditor({
 
     const handleRetryAutosave = useCallback(async () => {
         if (status.canRetry) {
-            setStatus(prev => ({ ...prev, lastSaveError: null }));
+            setStatus(prev => ({...prev, lastSaveError: null}));
             await performSave(false);
         }
     }, [performSave, status.canRetry]);
@@ -602,7 +643,7 @@ export function ChangelogEditor({
     useEffect(() => {
         if (!initialData) return;
 
-        const { entry } = initialData;
+        const {entry} = initialData;
 
         if (entry) {
             // Load existing entry data
@@ -654,7 +695,7 @@ export function ChangelogEditor({
         if (!editorState.content) return;
 
         const element = document.createElement('a');
-        const file = new Blob([editorState.content], { type: 'text/markdown' });
+        const file = new Blob([editorState.content], {type: 'text/markdown'});
         element.href = URL.createObjectURL(file);
 
         const safeTitle = editorState.title
@@ -676,7 +717,7 @@ export function ChangelogEditor({
         return (
             <div className="flex items-center justify-center min-h-screen">
                 <div className="flex flex-col items-center gap-4">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <Loader2 className="h-8 w-8 animate-spin text-primary"/>
                     <p className="text-muted-foreground">Loading editor...</p>
                 </div>
             </div>
@@ -688,7 +729,7 @@ export function ChangelogEditor({
         return (
             <div className="flex items-center justify-center min-h-screen p-6">
                 <Alert variant="destructive" className="max-w-md">
-                    <AlertCircle className="h-4 w-4" />
+                    <AlertCircle className="h-4 w-4"/>
                     <AlertTitle>Failed to load editor</AlertTitle>
                     <AlertDescription className="mt-2">
                         {(initialDataError as Error)?.message || (tagsError as Error)?.message || 'An unexpected error occurred'}
@@ -698,7 +739,7 @@ export function ChangelogEditor({
                             onClick={() => window.location.reload()}
                             size="sm"
                         >
-                            <RefreshCw className="h-4 w-4 mr-2" />
+                            <RefreshCw className="h-4 w-4 mr-2"/>
                             Retry
                         </Button>
                         <Button
@@ -747,15 +788,15 @@ export function ChangelogEditor({
                 <AnimatePresence>
                     {status.lastSaveError && !status.isSaving && (
                         <motion.div
-                            initial={{ opacity: 0, y: -20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -20 }}
-                            transition={{ duration: 0.3 }}
+                            initial={{opacity: 0, y: -20}}
+                            animate={{opacity: 1, y: 0}}
+                            exit={{opacity: 0, y: -20}}
+                            transition={{duration: 0.3}}
                         >
                             <Alert
                                 variant={status.lastSaveError.retryable ? "warning" : "destructive"}
                             >
-                                <AlertTriangle className="h-4 w-4" />
+                                <AlertTriangle className="h-4 w-4"/>
                                 <AlertTitle>
                                     {status.lastSaveError.retryable ? 'Save Failed' : 'Validation Error'}
                                 </AlertTitle>
@@ -777,12 +818,12 @@ export function ChangelogEditor({
                                             >
                                                 {status.isSaving ? (
                                                     <>
-                                                        <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                                                        <Loader2 className="h-3 w-3 mr-2 animate-spin"/>
                                                         Retrying...
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <RefreshCw className="h-3 w-3 mr-2" />
+                                                        <RefreshCw className="h-3 w-3 mr-2"/>
                                                         Retry Now
                                                     </>
                                                 )}
@@ -790,7 +831,7 @@ export function ChangelogEditor({
                                         )}
                                         <Button
                                             variant="outline"
-                                            onClick={() => setStatus(prev => ({ ...prev, lastSaveError: null }))}
+                                            onClick={() => setStatus(prev => ({...prev, lastSaveError: null}))}
                                             size="sm"
                                         >
                                             Dismiss
@@ -806,13 +847,13 @@ export function ChangelogEditor({
                 <AnimatePresence>
                     {editorState.hasVersionConflict && (
                         <motion.div
-                            initial={{ opacity: 0, y: -20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -20 }}
-                            transition={{ duration: 0.3 }}
+                            initial={{opacity: 0, y: -20}}
+                            animate={{opacity: 1, y: 0}}
+                            exit={{opacity: 0, y: -20}}
+                            transition={{duration: 0.3}}
                         >
                             <Alert variant="warning">
-                                <AlertTriangle className="h-4 w-4" />
+                                <AlertTriangle className="h-4 w-4"/>
                                 <AlertTitle>Version Conflict</AlertTitle>
                                 <AlertDescription>
                                     The selected version already exists. Please choose a different version to continue.
@@ -829,7 +870,7 @@ export function ChangelogEditor({
                             Entry Details
                             {status.isAutoSaving && (
                                 <div className="flex items-center text-sm text-muted-foreground">
-                                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                    <Loader2 className="h-3 w-3 mr-1 animate-spin"/>
                                     Auto-saving...
                                 </div>
                             )}
@@ -870,7 +911,7 @@ export function ChangelogEditor({
                     />
                 ) : (
                     <div className="flex items-center justify-center p-12 border rounded-md bg-muted/10">
-                        <Loader2 className="w-6 h-6 mr-2 animate-spin" />
+                        <Loader2 className="w-6 h-6 mr-2 animate-spin"/>
                         <span>Loading editor...</span>
                     </div>
                 )}
@@ -883,22 +924,22 @@ export function ChangelogEditor({
                 <AnimatePresence>
                     {(status.lastSavedTime || status.isSaving) && (
                         <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
+                            initial={{opacity: 0}}
+                            animate={{opacity: 1}}
+                            exit={{opacity: 0}}
                             className="flex items-center justify-between p-4 bg-muted/30 rounded-lg border"
                         >
                             <div className="flex items-center space-x-3">
                                 {status.isSaving ? (
                                     <>
-                                        <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                                        <Loader2 className="h-4 w-4 animate-spin text-blue-600"/>
                                         <span className="text-sm text-muted-foreground">
                                             {status.isAutoSaving ? 'Auto-saving...' : 'Saving...'}
                                         </span>
                                     </>
                                 ) : status.lastSavedTime ? (
                                     <>
-                                        <div className="h-2 w-2 bg-green-500 rounded-full" />
+                                        <div className="h-2 w-2 bg-green-500 rounded-full"/>
                                         <span className="text-sm text-muted-foreground">
                                             Last saved {status.lastSavedTime.toLocaleTimeString()}
                                         </span>
@@ -912,7 +953,7 @@ export function ChangelogEditor({
                                     size="sm"
                                     disabled={editorState.hasVersionConflict || !editorState.title.trim() || !editorState.content.trim()}
                                 >
-                                    <Save className="h-3 w-3 mr-2" />
+                                    <Save className="h-3 w-3 mr-2"/>
                                     Save Now
                                 </Button>
                             )}
