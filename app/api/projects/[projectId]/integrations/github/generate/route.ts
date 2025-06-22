@@ -131,7 +131,7 @@ export async function POST(
         // Get AI settings if needed
         let aiApiKey: string | undefined;
         let aiModel: string | undefined;
-        let aiApiProvider: string | undefined;
+        let aiApiProvider: 'secton' | 'openai' | undefined;
         let aiApiBaseUrl: string | null | undefined;
         if (validatedData.useAI) {
             const systemConfig = await db.systemConfig.findFirst({
@@ -154,9 +154,7 @@ export async function POST(
 
             aiApiKey = systemConfig.aiApiKey;
             aiModel = validatedData.aiModel || systemConfig.aiDefaultModel || 'copilot-zero';
-            // @ts-ignore
             aiApiProvider = (systemConfig.aiApiProvider as 'secton' | 'openai') || 'secton';
-            // @ts-ignore
             aiApiBaseUrl = systemConfig.aiApiBaseUrl || null;
         }
 

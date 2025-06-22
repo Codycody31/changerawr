@@ -62,8 +62,8 @@ export class OpenAIClient {
             let errorJson: unknown = undefined
             try {
                 errorJson = await response.json()
-            } catch (_) {
-                /* ignore */
+            } catch (e) {
+                console.error('Failed to parse error response from OpenAI:', e)
             }
             throw new AIError('Failed to create completion', response.status, errorJson)
         }

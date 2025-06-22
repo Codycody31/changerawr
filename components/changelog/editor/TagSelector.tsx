@@ -48,8 +48,6 @@ export default function TagSelector({
                                         availableTags,
                                         onTagsChange,
                                         content = '',
-                                        aiApiKey: _aiApiKey,
-                                        aiApiProvider: _aiApiProvider = 'secton',
                                         projectId
                                     }: TagSelectorProps) {
     const [search, setSearch] = useState('');

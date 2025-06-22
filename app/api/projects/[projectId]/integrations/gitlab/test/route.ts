@@ -10,12 +10,10 @@ const testSchema = z.object({
 
 export async function POST(
     request: Request,
-    context: { params: Promise<{ projectId: string }> }
 ) {
     try {
         await validateAuthAndGetUser();
-        const { projectId } = await context.params;
-
+        
         const body = await request.json();
         const data = testSchema.parse(body);
 

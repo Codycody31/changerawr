@@ -35,7 +35,6 @@ export async function POST(request: Request) {
         aiApiKey: true,
         aiDefaultModel: true,
         aiApiProvider: true,
-        // @ts-ignore pending prisma types
         aiApiBaseUrl: true,
       },
     })

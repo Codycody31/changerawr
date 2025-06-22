@@ -22,7 +22,6 @@ export async function GET(request: Request) {
       select: {
         aiApiKey: true,
         aiApiProvider: true,
-        // @ts-ignore prisma types pending migration
         aiApiBaseUrl: true,
       }
     })
@@ -32,11 +31,8 @@ export async function GET(request: Request) {
     const apiKey = config?.aiApiKey
     if (!apiKey) return NextResponse.json({ error: 'AI API key not configured' }, { status: 400 })
 
-    // @ts-ignore pending prisma types
     const baseUrl = (provider === 'openai'
-      // @ts-ignore pending prisma types
       ? (config?.aiApiBaseUrl || 'https://api.openai.com/v1')
-      // @ts-ignore pending prisma types
       : (config?.aiApiBaseUrl || 'https://api.secton.org/v1'))
 
     try {

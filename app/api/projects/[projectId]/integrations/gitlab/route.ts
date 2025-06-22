@@ -121,7 +121,7 @@ export async function POST(
             timestamp: new Date().toISOString()
         });
 
-        const { accessToken, ...safe } = integration;
+        const { ...safe } = integration;
         return NextResponse.json({ ...safe, hasAccessToken: true });
     } catch (err) {
         console.error('Failed to configure GitLab integration:', err);

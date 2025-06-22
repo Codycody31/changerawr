@@ -36,7 +36,6 @@ export async function GET() {
                 enableAIAssistant: true,
                 aiDefaultModel: true,
                 aiApiProvider: true,
-                // @ts-ignore
                 aiApiBaseUrl: true
             }
         });
@@ -46,7 +45,6 @@ export async function GET() {
             enableAIAssistant: config?.enableAIAssistant || false,
             aiDefaultModel: config?.aiDefaultModel || null,
             aiApiProvider: config?.aiApiProvider || 'secton',
-            // @ts-ignore
             aiApiBaseUrl: (config as any)?.aiApiBaseUrl || null,
         });
     } catch (error) {

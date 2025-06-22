@@ -406,7 +406,6 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
                                     content={content}
                                     aiApiKey={aiApiKey}
                                     aiApiProvider={aiApiProvider}
-                                    aiApiBaseUrl={aiApiBaseUrl}
                                     projectId={projectId}
                                 />
 

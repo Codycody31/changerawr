@@ -22,10 +22,8 @@ import {
     Save,
     CheckCircle,
     XCircle,
-    Copy,
     Lock,
     Loader2,
-    ExternalLink
 } from 'lucide-react'
 import {
     Tooltip,
@@ -38,7 +36,6 @@ import {
     AlertDescription,
     AlertTitle,
 } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Separator } from '@/components/ui/separator'
 
@@ -68,9 +65,6 @@ export default function AISettingsPage() {
 
     // Track if the API key has been changed
     const [apiKeyChanged, setApiKeyChanged] = useState(false)
-
-    // Track the copied state for the promo code
-    const [promoCodeCopied, setPromoCodeCopied] = useState(false)
 
     // Validation state
     const [keyValidated, setKeyValidated] = useState<boolean | null>(null)
@@ -269,18 +263,6 @@ export default function AISettingsPage() {
                 duration: 3000,
             })
         }
-    }
-
-    const handleCopyPromoCode = () => {
-        navigator.clipboard.writeText('CHANGERAWR')
-        setPromoCodeCopied(true)
-        setTimeout(() => setPromoCodeCopied(false), 2000)
-
-        toast({
-            title: 'Promo Code Copied',
-            description: 'Use CHANGERAWR at checkout for 30% off your first purchase',
-            duration: 3000,
-        })
     }
 
     if (isLoading) {

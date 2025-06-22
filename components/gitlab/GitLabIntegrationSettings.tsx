@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Gitlab,
-    Settings,
     TestTube,
     CheckCircle,
     XCircle,
@@ -112,6 +111,7 @@ export default function GitLabIntegrationSettings({ projectId }: Props) {
             }
             setSettings({ ...DEFAULT_SETTINGS, ...data });
         } catch (err) {
+            console.error('Failed to load GitLab settings:', err);
             setError('Failed to load settings');
             setSettings(DEFAULT_SETTINGS);
         } finally {
@@ -139,6 +139,7 @@ export default function GitLabIntegrationSettings({ projectId }: Props) {
                 setSettings((prev) => ({ ...prev, defaultBranch: result.repository.defaultBranch }));
             }
         } catch (err) {
+            console.error('Test connection failed:', err);
             setTestResult({ success: false, error: 'Test failed' });
         } finally {
             setIsTesting(false);

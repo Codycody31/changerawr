@@ -74,7 +74,6 @@ export async function GET() {
                 aiApiKey: true,
                 aiDefaultModel: true,
                 aiApiProvider: true,
-                // @ts-ignore - field added via migration
                 aiApiBaseUrl: true,
             }
         }) || {
@@ -82,7 +81,6 @@ export async function GET() {
             aiApiKey: null,
             aiDefaultModel: 'copilot-zero',
             aiApiProvider: null,
-            // @ts-ignore
             aiApiBaseUrl: null,
         }
 
@@ -92,7 +90,6 @@ export async function GET() {
             aiApiKey: config.aiApiKey ? true : null, // Only return boolean for security
             aiDefaultModel: config.aiDefaultModel,
             aiApiProvider: config.aiApiProvider || 'secton',
-            // @ts-ignore
             aiApiBaseUrl: (config as any).aiApiBaseUrl || null,
         };
 
@@ -200,7 +197,6 @@ export async function POST(request: Request) {
                 enableNotifications: true,
                 enablePasswordReset: false,
                 updatedAt: new Date(),
-                // @ts-ignore
                 aiApiBaseUrl: updateData.aiApiBaseUrl || null,
             }
         })

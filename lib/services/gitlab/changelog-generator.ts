@@ -5,12 +5,9 @@ import {
 import {
     parseConventionalCommit,
     shouldIncludeCommit,
-    groupCommitsByType,
     CommitFilterSettings,
     ConventionalCommit
 } from '@/lib/services/github/client';
-
-import { createSectonClient } from '@/lib/utils/ai/secton';
 
 export interface FileChange {
     filename: string;
@@ -240,4 +237,4 @@ export class GitLabChangelogGenerator {
 
 export function createGitLabChangelogGenerator(client: GitLabClient): GitLabChangelogGenerator {
     return new GitLabChangelogGenerator(client);
-} 
+}

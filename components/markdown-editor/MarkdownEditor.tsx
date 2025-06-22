@@ -44,9 +44,6 @@ export default function MarkdownEditor({
                                            autoFocus = false,
                                            readOnly = false,
                                            enableAI = false,
-                                           aiApiKey: _aiApiKey,
-                                           aiApiProvider: _aiApiProvider = 'secton',
-                                           aiApiBaseUrl: _aiApiBaseUrl = null,
                                        }: MarkdownEditorProps) {
     // Main state
     const [content, setContent] = useState(initialValue);
