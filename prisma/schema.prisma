@@ -244,6 +244,7 @@ model SystemConfig {
   aiApiKey                      String? // Global API key for AI service
   aiApiProvider                 String?  @default("secton") // AI provider
   aiDefaultModel                String?  @default("copilot-zero") // Default model to use
+  aiApiBaseUrl                  String?
   smtpHost                      String?
   smtpPort                      Int?
   smtpUser                      String?

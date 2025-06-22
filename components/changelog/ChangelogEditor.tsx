@@ -52,6 +52,8 @@ interface AISystemSettings {
     enableAIAssistant: boolean;
     aiApiKey: string | null;
     aiDefaultModel: string | null;
+    aiApiProvider: 'secton' | 'openai';
+    aiApiBaseUrl: string | null;
 }
 
 interface SaveErrorDetails {
@@ -100,6 +102,7 @@ interface EnhancedEditorHeaderProps extends React.ComponentProps<typeof EditorHe
     onLoadMoreTags?: () => Promise<void>;
     onVersionConflict?: (hasConflict: boolean) => void;
     hasVersionConflict?: boolean;
+    aiApiProvider?: 'secton' | 'openai';
 }
 
 const EnhancedEditorHeader: React.FC<EnhancedEditorHeaderProps> = ({
@@ -217,7 +220,7 @@ export function ChangelogEditor({
             const response = await fetch('/api/ai/settings');
             if (!response.ok) {
                 console.warn('Failed to fetch AI settings:', response.statusText);
-                return { enableAIAssistant: false, aiApiKey: null, aiDefaultModel: null };
+                return { enableAIAssistant: false, aiApiKey: null, aiDefaultModel: null, aiApiProvider: 'secton', aiApiBaseUrl: null };
             }
             return response.json();
         },
@@ -282,7 +285,9 @@ export function ChangelogEditor({
 
     // ===== Computed Values =====
     const aiEnabled = aiSystemSettings?.enableAIAssistant || false;
-    const sectonApiKey = aiSystemSettings?.aiApiKey || '';
+    const apiKey = aiSystemSettings?.aiApiKey || '';
+    const apiProvider = aiSystemSettings?.aiApiProvider || 'secton';
+    const apiBaseUrl = aiSystemSettings?.aiApiBaseUrl || null;
 
     const { availableTags, mappedDefaultTags } = useMemo(() => {
         if (!initialData || !tagsData?.pages) {
@@ -736,7 +741,9 @@ export function ChangelogEditor({
                 onTagsChange={handleTagsChange}
                 onTitleChange={handleTitleChange}
                 content={editorState.content}
-                aiApiKey={sectonApiKey}
+                aiApiKey={apiKey}
+                aiApiProvider={apiProvider}
+                aiApiBaseUrl={apiBaseUrl}
                 onLoadMoreTags={hasNextPage ? async () => {
                     await fetchNextPage();
                 } : undefined}
@@ -864,8 +871,10 @@ export function ChangelogEditor({
                             "min-h-[500px]",
                             !editorState.content.trim() && status.lastSaveError && "border-red-500"
                         )}
-                        enableAI={aiEnabled && !!sectonApiKey}
-                        aiApiKey={sectonApiKey}
+                        enableAI={aiEnabled && !!apiKey}
+                        aiApiKey={apiKey}
+                        aiApiProvider={apiProvider}
+                        aiApiBaseUrl={apiBaseUrl}
                         autoFocus={isNewChangelog && !initialContent}
                     />
                 ) : (

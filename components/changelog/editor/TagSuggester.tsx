@@ -21,6 +21,7 @@ interface TagSuggesterProps {
     selectedTags: Tag[];
     onTagsChange: (tags: Tag[]) => void;
     apiKey?: string;
+    aiApiProvider?: 'secton' | 'openai';
 }
 
 // AI prompt parameters
@@ -33,7 +34,8 @@ export default function TagSuggester({
                                          availableTags,
                                          selectedTags,
                                          onTagsChange,
-                                         apiKey
+                                         apiKey,
+                                         aiApiProvider = 'secton'
                                      }: TagSuggesterProps) {
     const [isLoading, setIsLoading] = useState(false);
     const [suggestions, setSuggestions] = useState<Tag[]>([]);
@@ -172,14 +174,15 @@ ${formattedSections}
       `.trim();
 
             // Call AI API
-            const response = await fetch('https://api.secton.org/v1/chat/completions', {
+            const baseUrl = aiApiProvider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.secton.org/v1';
+            const response = await fetch(`${baseUrl}/chat/completions`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${apiKey}`
                 },
                 body: JSON.stringify({
-                    model: 'copilot-zero',
+                    model: aiApiProvider === 'openai' ? 'gpt-3.5-turbo' : 'copilot-zero',
                     messages: [
                         {
                             role: 'system',
@@ -197,7 +200,12 @@ ${formattedSections}
             }
 
             const result = await response.json();
-            const suggestedTagsText = result.messages[result.messages.length - 1]?.content || '';
+            let suggestedTagsText = '';
+            if (result.messages && Array.isArray(result.messages)) {
+                suggestedTagsText = result.messages[result.messages.length - 1]?.content || '';
+            } else if (result.choices && Array.isArray(result.choices)) {
+                suggestedTagsText = result.choices[0]?.message?.content || '';
+            }
 
             // Process the AI's response
             const suggestedTagNames = suggestedTagsText

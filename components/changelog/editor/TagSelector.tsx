@@ -34,6 +34,7 @@ interface TagSelectorProps {
     onTagsChange: (tags: Tag[]) => void;
     content?: string; // For AI-powered tag suggestions
     aiApiKey?: string; // API key for AI features
+    aiApiProvider?: 'secton' | 'openai';
     projectId: string; // Needed for creating new tags
 }
 
@@ -47,7 +48,8 @@ export default function TagSelector({
                                         availableTags,
                                         onTagsChange,
                                         content = '',
-                                        aiApiKey,
+                                        aiApiKey: _aiApiKey,
+                                        aiApiProvider: _aiApiProvider = 'secton',
                                         projectId
                                     }: TagSelectorProps) {
     const [search, setSearch] = useState('');
@@ -207,7 +209,7 @@ export default function TagSelector({
 
     // Handle AI tag suggestions
     const generateTagSuggestions = useCallback(async () => {
-        if (!content || !aiApiKey || !availableTags.length) {
+        if (!content || !availableTags.length) {
             setSuggestionError('Cannot generate suggestions without content or available tags');
             return;
         }
@@ -246,24 +248,16 @@ Do not add any explanations, just return the tag names.
 ${formattedSections}
             `.trim();
 
-            // Call AI API
-            const response = await fetch('https://api.secton.org/v1/chat/completions', {
+            const response = await fetch('/api/ai/completions', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${aiApiKey}`
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    model: 'copilot-zero',
                     messages: [
-                        {
-                            role: 'system',
-                            content: 'You are a skilled content tagger for a changelog system. Your job is to select the most appropriate tags for content.'
-                        },
+                        { role: 'system', content: 'You are a skilled content tagger for a changelog system. Your job is to select the most appropriate tags for content.' },
                         { role: 'user', content: prompt }
                     ],
                     temperature: 0.3,
-                    max_tokens: 30 // Reduced to save tokens
+                    max_tokens: 30,
                 })
             });
 
@@ -272,7 +266,12 @@ ${formattedSections}
             }
 
             const result = await response.json();
-            const suggestedTagsText = result.messages[result.messages.length - 1]?.content || '';
+            let suggestedTagsText = '';
+            if (result.messages && Array.isArray(result.messages)) {
+                suggestedTagsText = result.messages[result.messages.length - 1]?.content || '';
+            } else if (result.choices && Array.isArray(result.choices)) {
+                suggestedTagsText = result.choices[0]?.message?.content || '';
+            }
 
             // Process the AI's response
             const suggestedTagNames = suggestedTagsText
@@ -302,7 +301,7 @@ ${formattedSections}
         } finally {
             setIsGenerating(false);
         }
-    }, [content, aiApiKey, availableTags]);
+    }, [content, availableTags]);
 
     // Toggle tag selection
     const toggleTag = useCallback((tag: Tag) => {
@@ -380,7 +379,7 @@ ${formattedSections}
                                 onValueChange={setSearch}
                                 className="flex-1"
                             />
-                            {aiApiKey && content.length > 20 && (
+                            {content.length > 20 && (
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <Button

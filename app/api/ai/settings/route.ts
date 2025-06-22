@@ -10,7 +10,10 @@ const prisma = new PrismaClient()
  *   "type": "object",
  *   "properties": {
  *     "enableAIAssistant": { "type": "boolean" },
- *     "aiApiKey": { "type": "string", "nullable": true }
+ *     "aiApiKey": { "type": "string", "nullable": true },
+ *     "aiDefaultModel": { "type": "string", "nullable": true },
+ *     "aiApiProvider": { "type": "string" },
+ *     "aiApiBaseUrl": { "type": "string", "nullable": true }
  *   }
  * }
  */
@@ -22,7 +25,10 @@ export async function GET() {
             select: {
                 enableAIAssistant: true,
                 aiApiKey: true,
-                aiDefaultModel: true
+                aiDefaultModel: true,
+                aiApiProvider: true,
+                // @ts-ignore
+                aiApiBaseUrl: true
             }
         });
 
@@ -37,6 +43,9 @@ export async function GET() {
             enableAIAssistant: config?.enableAIAssistant || false,
             aiApiKey: config?.aiApiKey || null,
             aiDefaultModel: config?.aiDefaultModel || null,
+            aiApiProvider: config?.aiApiProvider || 'secton',
+            // @ts-ignore
+            aiApiBaseUrl: (config as any)?.aiApiBaseUrl || null,
         });
     } catch (error) {
         console.error('Error fetching AI system settings:', error)

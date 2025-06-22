@@ -29,6 +29,8 @@ export interface MarkdownEditorProps {
     readOnly?: boolean;
     enableAI?: boolean;
     aiApiKey?: string;
+    aiApiProvider?: 'secton' | 'openai';
+    aiApiBaseUrl?: string | null;
 }
 
 export default function MarkdownEditor({
@@ -42,7 +44,9 @@ export default function MarkdownEditor({
                                            autoFocus = false,
                                            readOnly = false,
                                            enableAI = false,
-                                           aiApiKey,
+                                           aiApiKey: _aiApiKey,
+                                           aiApiProvider: _aiApiProvider = 'secton',
+                                           aiApiBaseUrl: _aiApiBaseUrl = null,
                                        }: MarkdownEditorProps) {
     // Main state
     const [content, setContent] = useState(initialValue);
@@ -70,14 +74,13 @@ export default function MarkdownEditor({
     // Track if initial value is changed externally (controlled component behavior)
     const initialValueRef = useRef(initialValue);
 
-    // Initialize AI assistant (always call the hook, but conditionally use its methods)
+    // Initialize AI assistant – now handled entirely server-side, no key/baseUrl exposed
     const ai = useAIAssistant({
-        apiKey: aiApiKey,
         onGenerated: () => {
             // Show success message
             setStatusMessage('AI content generated');
             setTimeout(() => setStatusMessage(null), 3000);
-        }
+        },
     });
 
     // Only enable AI features if the prop is true

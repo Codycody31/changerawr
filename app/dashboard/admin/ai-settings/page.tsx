@@ -46,7 +46,12 @@ interface AISettings {
     enableAIAssistant: boolean
     aiApiKey: string | null
     aiDefaultModel: string | null
+    aiApiProvider: 'secton' | 'openai'
+    aiApiBaseUrl?: string | null
 }
+
+// List of models is now fetched dynamically from the backend depending on the provider
+// via /api/admin/ai-settings/models. No hard-coded options anymore.
 
 export default function AISettingsPage() {
     const { toast } = useToast()
@@ -56,7 +61,9 @@ export default function AISettingsPage() {
     const [formData, setFormData] = useState<AISettings>({
         enableAIAssistant: false,
         aiApiKey: '',
-        aiDefaultModel: 'copilot-zero',
+        aiDefaultModel: '',
+        aiApiProvider: 'secton',
+        aiApiBaseUrl: '',
     })
 
     // Track if the API key has been changed
@@ -67,6 +74,32 @@ export default function AISettingsPage() {
 
     // Validation state
     const [keyValidated, setKeyValidated] = useState<boolean | null>(null)
+
+    // Dynamically fetched models based on selected provider
+    const {
+        data: models,
+        isLoading: isModelsLoading,
+    } = useQuery<string[]>({
+        queryKey: ['ai-models', formData.aiApiProvider],
+        queryFn: async () => {
+            const response = await fetch(`/api/admin/ai-settings/models?provider=${formData.aiApiProvider}`)
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}))
+                throw new Error(err.error || 'Failed to fetch models')
+            }
+            const data = (await response.json()) as { models: string[] }
+            return data.models
+        },
+        enabled: !!formData.aiApiProvider,
+        staleTime: 1000 * 60 * 5, // 5 minutes
+    })
+
+    // When model list loads, ensure we have a default selection
+    useEffect(() => {
+        if (!isModelsLoading && models && models.length > 0 && !formData.aiDefaultModel) {
+            setFormData(prev => ({ ...prev, aiDefaultModel: models[0] }))
+        }
+    }, [isModelsLoading, models])
 
     // Fetch current settings
     const { data: settings, isLoading } = useQuery<AISettings>({
@@ -81,7 +114,9 @@ export default function AISettingsPage() {
             setFormData({
                 enableAIAssistant: data.enableAIAssistant,
                 aiApiKey: data.aiApiKey ? '••••••••••••••••' : '', // Mask the API key
-                aiDefaultModel: data.aiDefaultModel || 'copilot-zero',
+                aiDefaultModel: data.aiDefaultModel || '',
+                aiApiProvider: data.aiApiProvider || 'secton',
+                aiApiBaseUrl: data.aiApiBaseUrl || '',
             })
 
             return data
@@ -99,8 +134,8 @@ export default function AISettingsPage() {
                 },
                 body: JSON.stringify({
                     ...data,
-                    // Always set the provider to Secton
-                    aiApiProvider: 'secton',
+                    aiApiProvider: formData.aiApiProvider,
+                    aiApiBaseUrl: formData.aiApiBaseUrl,
                 }),
             })
 
@@ -144,7 +179,8 @@ export default function AISettingsPage() {
                 },
                 body: JSON.stringify({
                     apiKey,
-                    provider: 'secton'
+                    provider: formData.aiApiProvider,
+                    baseUrl: formData.aiApiBaseUrl || undefined
                 }),
             })
 
@@ -193,6 +229,12 @@ export default function AISettingsPage() {
         if (key === 'aiApiKey') {
             setApiKeyChanged(true)
         }
+
+        // If provider changes, refetch model list and reset default model once loaded
+        if (key === 'aiApiProvider') {
+            // Reset default model until we have fetched the list
+            setFormData(prev => ({ ...prev, aiDefaultModel: '' }))
+        }
     }
 
     // Handle form submission
@@ -203,6 +245,8 @@ export default function AISettingsPage() {
         const dataToSubmit: Partial<AISettings> = {
             enableAIAssistant: formData.enableAIAssistant,
             aiDefaultModel: formData.aiDefaultModel,
+            aiApiProvider: formData.aiApiProvider,
+            aiApiBaseUrl: formData.aiApiBaseUrl,
         }
 
         // Only include API key if it was changed and isn't masked
@@ -294,50 +338,6 @@ export default function AISettingsPage() {
                                     {/*</Badge>*/}
                                 </div>
                             </CardHeader>
-
-                            <CardContent className="relative z-10">
-                                <div className="p-4 my-2 rounded-lg bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border border-primary/20">
-                                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                                        <div>
-                                            <h3 className="text-base font-medium flex items-center">
-                                                <Badge variant="default" className="mr-2">Exclusive Offer</Badge>
-                                                <span>30% OFF Your First Purchase</span>
-                                            </h3>
-                                            <p className="text-sm text-muted-foreground mt-1">
-                                                Use code CHANGERAWR at checkout for a complimentary discount
-                                            </p>
-                                        </div>
-
-                                        <div className="flex items-center space-x-2">
-                                            <div className="flex items-center border rounded-md px-3 py-1.5 bg-background">
-                                                <code className="font-mono font-semibold text-base">CHANGERAWR</code>
-                                                <Button
-                                                    size="icon"
-                                                    variant="ghost"
-                                                    className="ml-2 h-6 w-6"
-                                                    onClick={handleCopyPromoCode}
-                                                >
-                                                    {promoCodeCopied ? (
-                                                        <CheckCircle className="h-4 w-4 text-green-500" />
-                                                    ) : (
-                                                        <Copy className="h-4 w-4" />
-                                                    )}
-                                                </Button>
-                                            </div>
-
-                                            <Button
-                                                variant="default"
-                                                size="sm"
-                                                className="flex items-center gap-1"
-                                                onClick={() => window.open('https://platform.secton.org/settings/organization/billing', '_blank')}
-                                            >
-                                                <span>Get Credits</span>
-                                                <ExternalLink className="h-3.5 w-3.5" />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </CardContent>
                         </div>
                     </Card>
 
@@ -372,28 +372,76 @@ export default function AISettingsPage() {
                                 <div className="space-y-3">
                                     <Label htmlFor="aiDefaultModel" className="text-base">Default AI Model</Label>
                                     <Select
-                                        value={formData.aiDefaultModel || 'copilot-zero'}
+                                        value={formData.aiDefaultModel || models?.[0] || ''}
                                         onValueChange={(value) => handleChange('aiDefaultModel', value)}
                                     >
                                         <SelectTrigger id="aiDefaultModel" className="w-full">
                                             <SelectValue placeholder="Select default model" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="copilot-zero">Copilot Zero (Fast & Efficient)</SelectItem>
-                                            {/*<SelectItem value="copilot-xl">Copilot XL (Advanced Capabilities)</SelectItem>*/}
+                                            {isModelsLoading && (
+                                                <div className="p-4 text-sm text-muted-foreground">Loading models...</div>
+                                            )}
+                                            {!isModelsLoading && models?.length === 0 && (
+                                                <div className="p-4 text-sm text-muted-foreground">No models available</div>
+                                            )}
+                                            {models?.map((m) => (
+                                                <SelectItem key={m} value={m}>{m}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <div className="flex items-start gap-3">
+                                        <p className="text-sm text-muted-foreground flex-1">
+                                            Choose the default AI model for all users.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <Separator />
+
+                                {/* AI Provider Selection */}
+                                <div className="space-y-3">
+                                    <Label htmlFor="aiApiProvider" className="text-base">AI Provider</Label>
+                                    <Select
+                                        value={formData.aiApiProvider}
+                                        onValueChange={(value) => handleChange('aiApiProvider', value as 'secton' | 'openai')}
+                                    >
+                                        <SelectTrigger id="aiApiProvider" className="w-full">
+                                            <SelectValue placeholder="Select provider" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="secton">Secton</SelectItem>
+                                            <SelectItem value="openai">OpenAI</SelectItem>
                                         </SelectContent>
                                     </Select>
                                     <p className="text-sm text-muted-foreground">
-                                        Choose the default AI model for all users. More capable models typically consume more credits.
+                                        Choose which AI provider to use for completions.
                                     </p>
                                 </div>
+
+                                {/* After AI Provider Selection, add Base URL input (only for openai) */}
+                                {formData.aiApiProvider === 'openai' && (
+                                    <>
+                                        <Separator />
+                                        <div className="space-y-3">
+                                            <Label htmlFor="aiApiBaseUrl" className="text-base">OpenAI Base URL (optional)</Label>
+                                            <Input
+                                                id="aiApiBaseUrl"
+                                                placeholder="https://api.openai.com/v1"
+                                                value={formData.aiApiBaseUrl || ''}
+                                                onChange={(e) => handleChange('aiApiBaseUrl', e.target.value)}
+                                            />
+                                            <p className="text-sm text-muted-foreground">Use this to point to Azure/OpenAI-compatible proxies.</p>
+                                        </div>
+                                    </>
+                                )}
 
                                 <Separator />
 
                                 {/* API Key Input */}
                                 <div className="space-y-3">
                                     <div className="flex items-center space-x-2">
-                                        <Label htmlFor="aiApiKey" className="text-base">Secton API Key</Label>
+                                        <Label htmlFor="aiApiKey" className="text-base">{formData.aiApiProvider === 'openai' ? 'OpenAI API Key' : 'Secton API Key'}</Label>
                                         <TooltipProvider>
                                             <Tooltip>
                                                 <TooltipTrigger asChild>
@@ -411,7 +459,7 @@ export default function AISettingsPage() {
                                             <Input
                                                 id="aiApiKey"
                                                 type="password"
-                                                placeholder={settings?.aiApiKey ? "••••••••••••••••" : "Enter Secton API key (starts with sk_)"}
+                                                placeholder={settings?.aiApiKey ? "••••••••••••••••" : (formData.aiApiProvider === 'openai' ? 'Enter OpenAI key (starts with sk-)' : 'Enter Secton API key (starts with sk_)')}
                                                 value={formData.aiApiKey || ''}
                                                 onChange={(e) => handleChange('aiApiKey', e.target.value)}
                                                 autoComplete="off"
@@ -448,7 +496,22 @@ export default function AISettingsPage() {
                                         </Button>
                                     </div>
 
-                                    <p className="text-sm text-muted-foreground">
+                                    {formData.aiApiProvider === 'openai' && (
+                                        <p className="text-sm text-muted-foreground">
+                                            Enter your OpenAI API key starting with &ldquo;sk-&rdquo;. Don&apos;t have one?
+                                            <a
+                                                href="https://platform.openai.com/account/api-keys"
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="text-primary hover:underline ml-1"
+                                            >
+                                                Get one here
+                                            </a>
+                                        </p>
+                                    )}
+
+                                    {formData.aiApiProvider === 'secton' && (
+                                        <p className="text-sm text-muted-foreground">
                                         Enter your Secton API key starting with &ldquo;sk_&rdquo;. Don&apos;t have one?
                                         <a
                                             href="https://platform.secton.org/settings/organization/api-keys"
@@ -459,6 +522,7 @@ export default function AISettingsPage() {
                                             Get one here
                                         </a>
                                     </p>
+                                    )}
 
                                     <AnimatePresence>
                                         {keyValidated === true && (
@@ -513,7 +577,9 @@ export default function AISettingsPage() {
                                             setFormData({
                                                 enableAIAssistant: settings.enableAIAssistant,
                                                 aiApiKey: settings.aiApiKey ? '••••••••••••••••' : '',
-                                                aiDefaultModel: settings.aiDefaultModel || 'copilot-zero',
+                                                aiDefaultModel: settings.aiDefaultModel || '',
+                                                aiApiProvider: settings.aiApiProvider || 'secton',
+                                                aiApiBaseUrl: settings.aiApiBaseUrl || '',
                                             })
                                             setApiKeyChanged(false)
                                             setKeyValidated(null)

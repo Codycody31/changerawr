@@ -40,7 +40,7 @@ export default function ProjectLayout({
             ) : (
                 <ProjectSidebar projectId={projectId} />
             )}
-            <div className="flex-1 overflow-auto">
+            <div className="flex-1 overflow-auto md:ml-64">
                 {children}
             </div>
         </div>

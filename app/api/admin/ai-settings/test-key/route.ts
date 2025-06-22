@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server'
 import { validateAuthAndGetUser } from '@/lib/utils/changelog'
 import { createSectonClient } from '@/lib/utils/ai/secton'
+import { createOpenAIClient } from '@/lib/utils/ai/openai'
 
 // Define proper types for our data structures
 interface APIKeyRequest {
     apiKey: string;
+    provider?: 'secton' | 'openai';
+    baseUrl?: string;
 }
 
 interface APIKeyResponse {
@@ -65,24 +68,34 @@ export async function POST(request: Request) {
             )
         }
 
-        // Basic validation - check if it starts with sk_
-        if (!body.apiKey.startsWith('sk_')) {
+        const provider = body.provider || 'secton'
+
+        // Optional basic validation for key format
+        if (provider === 'secton' && !body.apiKey.startsWith('sk_')) {
             const response: APIKeyResponse = {
                 valid: false,
-                message: 'Invalid API key format. Secton API keys should start with "sk-_.'
+                message: 'Invalid API key format. Secton API keys should start with "sk_".'
             };
 
             return NextResponse.json(response, { status: 400 });
         }
 
-        // Test the API key using the Secton client
         try {
-            const client = createSectonClient({
-                apiKey: body.apiKey,
-            });
+            let isValid = false;
 
-            // Try to validate the API key
-            const isValid = await client.validateApiKey();
+            if (provider === 'openai') {
+                const client = createOpenAIClient({
+                    apiKey: body.apiKey,
+                    baseUrl: body.baseUrl || 'https://api.openai.com/v1',
+                });
+                isValid = await client.validateApiKey();
+            } else {
+                const client = createSectonClient({
+                    apiKey: body.apiKey,
+                    baseUrl: body.baseUrl || 'https://api.secton.org/v1',
+                });
+                isValid = await client.validateApiKey();
+            }
 
             if (isValid) {
                 const response: APIKeyResponse = {
@@ -94,13 +107,13 @@ export async function POST(request: Request) {
             } else {
                 const response: APIKeyResponse = {
                     valid: false,
-                    message: 'Invalid API key. Please check your Secton API key and try again.',
+                    message: 'Invalid API key. Please check your API key and try again.',
                 };
 
                 return NextResponse.json(response, { status: 400 });
             }
         } catch (error) {
-            console.error('Error validating Secton API key:', error);
+            console.error('Error validating API key:', error);
 
             const response: APIKeyResponse = {
                 valid: false,

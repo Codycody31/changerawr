@@ -47,6 +47,8 @@ export interface ChangelogGenerationOptions {
     useAI: boolean;
     aiApiKey?: string;
     aiModel?: string;
+    aiApiProvider?: 'secton' | 'openai';
+    aiApiBaseUrl?: string | null;
     groupByType: boolean;
     includeCommitLinks: boolean;
     repositoryUrl: string;

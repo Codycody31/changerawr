@@ -131,13 +131,17 @@ export async function POST(
         // Get AI settings if needed
         let aiApiKey: string | undefined;
         let aiModel: string | undefined;
+        let aiApiProvider: string | undefined;
+        let aiApiBaseUrl: string | null | undefined;
         if (validatedData.useAI) {
             const systemConfig = await db.systemConfig.findFirst({
                 where: { id: 1 },
                 select: {
                     aiApiKey: true,
                     enableAIAssistant: true,
-                    aiDefaultModel: true
+                    aiDefaultModel: true,
+                    aiApiProvider: true,
+                    aiApiBaseUrl: true
                 }
             });
 
@@ -150,6 +154,10 @@ export async function POST(
 
             aiApiKey = systemConfig.aiApiKey;
             aiModel = validatedData.aiModel || systemConfig.aiDefaultModel || 'copilot-zero';
+            // @ts-ignore
+            aiApiProvider = (systemConfig.aiApiProvider as 'secton' | 'openai') || 'secton';
+            // @ts-ignore
+            aiApiBaseUrl = systemConfig.aiApiBaseUrl || null;
         }
 
         // Prepare generation options
@@ -162,6 +170,8 @@ export async function POST(
             useAI: validatedData.useAI,
             aiApiKey,
             aiModel,
+            aiApiProvider,
+            aiApiBaseUrl,
             groupByType: validatedData.groupByType,
             includeCommitLinks: validatedData.includeCommitLinks,
             repositoryUrl: project.gitHubIntegration.repositoryUrl,

@@ -41,6 +41,8 @@ export interface ChangelogGenerationOptions {
     useAI: boolean;
     aiApiKey?: string;
     aiModel?: string;
+    aiApiProvider?: 'secton' | 'openai';
+    aiApiBaseUrl?: string | null;
     groupByType: boolean;
     includeCommitLinks: boolean;
     repositoryUrl: string;
@@ -278,10 +280,21 @@ export class GitHubChangelogGenerator {
             throw new Error('AI API key is required for AI analysis');
         }
 
-        const aiClient = createSectonClient({
-            apiKey: options.aiApiKey,
-            defaultModel: options.aiModel ?? 'copilot-zero'
-        });
+        let aiClient: any;
+        if (options.aiApiProvider === 'openai') {
+            const { createOpenAIClient } = await import('@/lib/utils/ai/openai');
+            aiClient = createOpenAIClient({
+                apiKey: options.aiApiKey,
+                defaultModel: options.aiModel ?? 'gpt-3.5-turbo',
+                baseUrl: options.aiApiBaseUrl || 'https://api.openai.com/v1'
+            });
+        } else {
+            aiClient = createSectonClient({
+                apiKey: options.aiApiKey,
+                defaultModel: options.aiModel ?? 'copilot-zero',
+                baseUrl: options.aiApiBaseUrl || 'https://api.secton.org/v1'
+            });
+        }
 
         const entries: ChangelogEntry[] = [];
 

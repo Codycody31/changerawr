@@ -3,7 +3,6 @@ import {
     AICompletionType,
     AIEditorRequest,
     AIEditorResult,
-    CompletionRequest,
     CompletionResponse,
     AIMessage
 } from '@/lib/utils/ai/types';
@@ -22,8 +21,8 @@ export interface AIAssistantState {
 
 export interface UseAIAssistantOptions {
     apiKey?: string;
-    model?: string;
-    baseUrl?: string;
+    model?: string; // optional override; if omitted server default model is used
+    _baseUrl?: string; // deprecated
     onGenerated?: (result: AIEditorResult) => void;
 }
 
@@ -32,8 +31,8 @@ export interface UseAIAssistantOptions {
  */
 export default function useAIAssistant({
                                            apiKey,
-                                           model = 'copilot-zero',
-                                           baseUrl = 'https://api.secton.org/v1',
+                                           model,
+                                           _baseUrl,
                                            onGenerated
                                        }: UseAIAssistantOptions = {}) {
     // Panel state
@@ -48,17 +47,15 @@ export default function useAIAssistant({
         apiKeyValid: apiKey ? true : null,
     });
 
-    // API key ref
-    const apiKeyRef = useRef<string | undefined>(apiKey);
+    // No client-side API key required anymore.
 
-    // Update key ref if provided in options
+    // API key ref kept for backward compatibility but no longer used for requests
+    const apiKeyRef = useRef<string | undefined>(undefined);
+
     useEffect(() => {
+        // If consumer still passes apiKey we just store it locally but do NOT send to server/provider
         if (apiKey) {
             apiKeyRef.current = apiKey;
-            setState(prev => ({
-                ...prev,
-                apiKeyValid: true
-            }));
         }
     }, [apiKey]);
 
@@ -143,7 +140,7 @@ export default function useAIAssistant({
             apiKeyRef.current = key;
 
             // Test API key by making a simple request
-            const isValid = await validateApiKey(key);
+            const isValid = await validateApiKey();
 
             setState(prev => ({
                 ...prev,
@@ -164,34 +161,8 @@ export default function useAIAssistant({
         }
     }, []);
 
-    /**
-     * Validate the API key
-     */
-    const validateApiKey = async (key: string): Promise<boolean> => {
-        try {
-            // Make a small test request to validate the key
-            const response = await fetch(`${baseUrl}/chat/completions`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${key}`
-                },
-                body: JSON.stringify({
-                    model,
-                    messages: [
-                        { role: 'system', content: 'You are a helpful assistant.' },
-                        { role: 'user', content: 'Test' }
-                    ],
-                    max_tokens: 1
-                })
-            });
-
-            return response.ok;
-        } catch (error) {
-            console.error('Error validating API key:', error);
-            return false;
-        }
-    };
+    // Stubbed key validation – always returns true since key is managed server-side
+    const validateApiKey = async () => true;
 
     /**
      * Create a completion request
@@ -203,29 +174,21 @@ export default function useAIAssistant({
             max_tokens?: number;
         } = {}
     ): Promise<CompletionResponse> => {
-        const key = apiKeyRef.current;
-
-        if (!key) {
-            throw new Error('API key not set');
-        }
-
-        const completionRequest: CompletionRequest = {
-            model,
+        const payload: Record<string, unknown> = {
             messages,
             temperature: options.temperature ?? state.temperature,
-            max_tokens: options.max_tokens ?? 1024
-        };
+            max_tokens: options.max_tokens ?? 1024,
+        }
+        if (model) {
+            payload.model = model
+        }
 
-        // Log outgoing request for debugging
-        console.log('AI Request:', JSON.stringify(completionRequest, null, 2));
-
-        const response = await fetch(`${baseUrl}/chat/completions`, {
+        const response = await fetch('/api/ai/completions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${key}`
             },
-            body: JSON.stringify(completionRequest)
+            body: JSON.stringify(payload)
         });
 
         if (!response.ok) {
@@ -241,21 +204,13 @@ export default function useAIAssistant({
         console.log('AI Response:', JSON.stringify(jsonResponse, null, 2));
 
         return jsonResponse as CompletionResponse;
-    }, [baseUrl, model, state.temperature]);
+    }, [model, state.temperature]);
 
     /**
      * Generate content with the AI assistant
      */
     const generateCompletion = useCallback(async (request: AIEditorRequest): Promise<AIEditorResult | null> => {
-        // Validate API key
-        if (!apiKeyRef.current) {
-            setState(prev => ({
-                ...prev,
-                error: new Error('API key not set'),
-                isLoading: false
-            }));
-            return null;
-        }
+        // No API key validation necessary on client side
 
         // Validate content
         if (!request.content?.trim() && request.type !== AICompletionType.CUSTOM) {

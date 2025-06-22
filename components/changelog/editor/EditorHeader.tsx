@@ -47,6 +47,8 @@ interface EditorHeaderProps {
     onTitleChange: (title: string) => void;
     content: string;
     aiApiKey?: string;
+    aiApiProvider?: 'secton' | 'openai';
+    aiApiBaseUrl?: string | null;
 }
 
 // ===== Main Component =====
@@ -71,6 +73,8 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
                                                        onTitleChange,
                                                        content,
                                                        aiApiKey,
+                                                       aiApiProvider = 'secton',
+                                                       aiApiBaseUrl = null,
                                                    }) => {
     const queryClient = useQueryClient();
 
@@ -401,6 +405,8 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
                                     onTagsChange={handleTagsChange}
                                     content={content}
                                     aiApiKey={aiApiKey}
+                                    aiApiProvider={aiApiProvider}
+                                    aiApiBaseUrl={aiApiBaseUrl}
                                     projectId={projectId}
                                 />
 

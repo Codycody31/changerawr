@@ -12,6 +12,7 @@ interface AITitleGeneratorProps {
     content: string;
     onSelectTitle: (title: string) => void;
     apiKey?: string;
+    aiApiProvider?: 'secton' | 'openai';
     initialTitle?: string;
 }
 
@@ -78,7 +79,7 @@ STYLE: [style]
 SCORE: [score]`;
 };
 
-export default function AITitleGenerator({ content, onSelectTitle, apiKey, initialTitle }: AITitleGeneratorProps) {
+export default function AITitleGenerator({ content, onSelectTitle, apiKey, initialTitle, aiApiProvider = 'secton' }: AITitleGeneratorProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<Error | null>(null);
@@ -229,11 +230,10 @@ export default function AITitleGenerator({ content, onSelectTitle, apiKey, initi
         setError(null);
 
         try {
-            // Create a Secton client instance
-            const sectonClient = createSectonClient({
-                apiKey,
-                defaultModel: 'copilot-zero',
-            });
+            // Create client instance depending on provider
+            const client = aiApiProvider === 'openai'
+                ? (await import('@/lib/utils/ai/openai')).createOpenAIClient({ apiKey: apiKey!, defaultModel: 'gpt-3.5-turbo' })
+                : createSectonClient({ apiKey: apiKey!, defaultModel: 'copilot-zero' });
 
             // Process content to extract the most important parts
             const processedContent = extractImportantContent(content);
@@ -243,7 +243,7 @@ export default function AITitleGenerator({ content, onSelectTitle, apiKey, initi
 
             // Generate titles
             const prompt = getTitleGenerationPrompt(processedContent, lockedTitles);
-            const generatedText = await sectonClient.generateText(prompt, {
+            const generatedText = await client.generateText(prompt, {
                 temperature: 0.8,
                 max_tokens: 200,
             });

@@ -9,19 +9,24 @@ interface AISettingsResponse {
     enableAIAssistant: boolean;
     aiApiKey: boolean | null;
     aiDefaultModel: string | null;
+    aiApiProvider: string | null;
+    aiApiBaseUrl: string | null;
 }
 
 interface AISettingsUpdateRequest {
     enableAIAssistant?: boolean;
     aiApiKey?: string | null;
     aiDefaultModel?: string;
+    aiApiProvider?: string;
+    aiApiBaseUrl?: string | null;
 }
 
 interface SystemConfigUpdate {
-    aiApiProvider: string;
+    aiApiProvider?: string;
     enableAIAssistant?: boolean;
     aiApiKey?: string | null;
     aiDefaultModel?: string;
+    aiApiBaseUrl?: string | null;
 }
 
 /**
@@ -32,7 +37,9 @@ interface SystemConfigUpdate {
  *   "properties": {
  *     "enableAIAssistant": { "type": "boolean" },
  *     "aiApiKey": { "type": "boolean" },
- *     "aiDefaultModel": { "type": "string", "nullable": true }
+ *     "aiDefaultModel": { "type": "string", "nullable": true },
+ *     "aiApiProvider": { "type": "string", "nullable": true },
+ *     "aiApiBaseUrl": { "type": "string", "nullable": true }
  *   }
  * }
  * @error 401 Unauthorized - You must be logged in as an admin
@@ -66,11 +73,17 @@ export async function GET() {
                 enableAIAssistant: true,
                 aiApiKey: true,
                 aiDefaultModel: true,
+                aiApiProvider: true,
+                // @ts-ignore - field added via migration
+                aiApiBaseUrl: true,
             }
         }) || {
             enableAIAssistant: false,
             aiApiKey: null,
             aiDefaultModel: 'copilot-zero',
+            aiApiProvider: null,
+            // @ts-ignore
+            aiApiBaseUrl: null,
         }
 
         // Return the settings
@@ -78,6 +91,9 @@ export async function GET() {
             enableAIAssistant: config.enableAIAssistant,
             aiApiKey: config.aiApiKey ? true : null, // Only return boolean for security
             aiDefaultModel: config.aiDefaultModel,
+            aiApiProvider: config.aiApiProvider || 'secton',
+            // @ts-ignore
+            aiApiBaseUrl: (config as any).aiApiBaseUrl || null,
         };
 
         return NextResponse.json(response);
@@ -98,7 +114,9 @@ export async function GET() {
  *   "properties": {
  *     "enableAIAssistant": { "type": "boolean", "nullable": true },
  *     "aiApiKey": { "type": "string", "nullable": true },
- *     "aiDefaultModel": { "type": "string", "nullable": true }
+ *     "aiDefaultModel": { "type": "string", "nullable": true },
+ *     "aiApiProvider": { "type": "string", "nullable": true },
+ *     "aiApiBaseUrl": { "type": "string", "nullable": true }
  *   }
  * }
  * @response 200 {
@@ -145,10 +163,7 @@ export async function POST(request: Request) {
         }
 
         // Extract fields with validation and create properly typed update data object
-        const updateData: SystemConfigUpdate = {
-            // Always set provider to Secton
-            aiApiProvider: 'secton',
-        }
+        const updateData: SystemConfigUpdate = {}
 
         if (typeof body.enableAIAssistant === 'boolean') {
             updateData.enableAIAssistant = body.enableAIAssistant
@@ -160,6 +175,14 @@ export async function POST(request: Request) {
 
         if (body.aiDefaultModel) {
             updateData.aiDefaultModel = body.aiDefaultModel
+        }
+
+        if (body.aiApiProvider) {
+            updateData.aiApiProvider = body.aiApiProvider
+        }
+
+        if (body.aiApiBaseUrl !== undefined) {
+            updateData.aiApiBaseUrl = body.aiApiBaseUrl
         }
 
         // Update the system configuration
@@ -177,6 +200,8 @@ export async function POST(request: Request) {
                 enableNotifications: true,
                 enablePasswordReset: false,
                 updatedAt: new Date(),
+                // @ts-ignore
+                aiApiBaseUrl: updateData.aiApiBaseUrl || null,
             }
         })
 
