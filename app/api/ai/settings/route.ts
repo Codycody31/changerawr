@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
+import { validateAuthAndGetUser } from '@/lib/utils/changelog'
 
 const prisma = new PrismaClient()
 
@@ -10,7 +11,6 @@ const prisma = new PrismaClient()
  *   "type": "object",
  *   "properties": {
  *     "enableAIAssistant": { "type": "boolean" },
- *     "aiApiKey": { "type": "string", "nullable": true },
  *     "aiDefaultModel": { "type": "string", "nullable": true },
  *     "aiApiProvider": { "type": "string" },
  *     "aiApiBaseUrl": { "type": "string", "nullable": true }
@@ -19,12 +19,21 @@ const prisma = new PrismaClient()
  */
 export async function GET() {
     try {
+        // Validate user authentication and permissions
+        const user = await validateAuthAndGetUser()
+
+        if (!user) {
+            return new NextResponse(
+                JSON.stringify({ error: 'Unauthorized' }),
+                { status: 401 }
+            )
+        }
+                
         // Get the system configuration
         const config = await prisma.systemConfig.findFirst({
             where: { id: 1 },
             select: {
                 enableAIAssistant: true,
-                aiApiKey: true,
                 aiDefaultModel: true,
                 aiApiProvider: true,
                 // @ts-ignore
@@ -32,16 +41,9 @@ export async function GET() {
             }
         });
 
-        // Log retrieved settings for debugging
-        // console.log('Retrieved AI settings:', {
-        //     enabled: config?.enableAIAssistant,
-        //     hasKey: !!config?.aiApiKey
-        // });
-
         // Return the settings with the actual API key for use in the editor
         return NextResponse.json({
             enableAIAssistant: config?.enableAIAssistant || false,
-            aiApiKey: config?.aiApiKey || null,
             aiDefaultModel: config?.aiDefaultModel || null,
             aiApiProvider: config?.aiApiProvider || 'secton',
             // @ts-ignore
@@ -53,7 +55,6 @@ export async function GET() {
             JSON.stringify({
                 error: 'Failed to fetch AI settings',
                 enableAIAssistant: false,
-                aiApiKey: null,
             }),
             { status: 500 }
         )
