@@ -21,7 +21,7 @@ import {
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import {useToast} from '@/hooks/use-toast'
-import {AlertTriangle, Loader2, Plus, Puzzle, Settings, Shield, Tag, X, Lock, ExternalLink, Rss, Code, Mail, Github, ArrowRight, CheckCircle, Clock} from 'lucide-react'
+import {AlertTriangle, Loader2, Plus, Puzzle, Settings, Shield, Tag, X, Lock, ExternalLink, Rss, Code, Mail, Github, ArrowRight, CheckCircle, Clock, Gitlab} from 'lucide-react'
 import {DestructiveActionRequest} from '@/components/changelog/RequestHandler'
 import {useAuth} from '@/context/auth'
 import {Alert, AlertDescription} from '@/components/ui/alert'
@@ -167,6 +167,19 @@ export default function ProjectSettingsPage({params}: ProjectSettingsPageProps) 
                 type: 'navigate',
                 label: 'Configure',
                 path: `/dashboard/projects/${projectId}/integrations/github`
+            }
+        },
+        {
+            id: 'gitlab',
+            name: 'GitLab Integration',
+            description: 'Use your GitLab data with changelogs',
+            icon: Gitlab,
+            status: 'beta',
+            requiresPublic: false,
+            action: {
+                type: 'navigate',
+                label: 'Configure',
+                path: `/dashboard/projects/${projectId}/integrations/gitlab`
             }
         },
         {

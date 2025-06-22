@@ -26,8 +26,8 @@ export default function NewChangelogEntryPage({ params }: NewChangelogPageProps)
 
         if (contentParam) {
             try {
-                // Decode the URL-encoded content
-                const decodedContent = decodeURIComponent(contentParam)
+                const decodedContent = decodeURIComponent(escape(atob(contentParam)))
+                console.log('decodedContent', decodedContent)
                 setInitialContent(decodedContent)
 
                 // If no title is provided, try to extract one from the content

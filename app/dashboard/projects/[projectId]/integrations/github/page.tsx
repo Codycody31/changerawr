@@ -159,8 +159,9 @@ export default function GitHubIntegrationPage() {
 
     const handleChangelogGenerated = (content: string, version?: string) => {
         // Redirect to changelog creation with pre-filled content
+        const encoded = btoa(unescape(encodeURIComponent(content)));
         const searchParams = new URLSearchParams({
-            content,
+            content: encoded,
             ...(version && { version })
         });
         router.push(`/dashboard/projects/${projectId}/changelog/new?${searchParams}`);

@@ -9,6 +9,6 @@ interface Props {
     trigger?: React.ReactNode;
 }
 
-export default function GitHubGenerateDialog(props: Props) {
-    return <GitProviderGenerateDialog {...props} integration="github" />;
+export default function GitLabGenerateDialog(props: Props) {
+    return <GitProviderGenerateDialog {...props} integration="gitlab" />;
 } 
