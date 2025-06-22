@@ -74,7 +74,6 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
                                                        content,
                                                        aiApiKey,
                                                        aiApiProvider = 'secton',
-                                                       aiApiBaseUrl = null,
                                                    }) => {
     const queryClient = useQueryClient();
 
