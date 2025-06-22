@@ -32,7 +32,8 @@ export class OpenAIClient {
                 },
             })
             return res.ok
-        } catch (_) {
+        } catch (e) {
+            console.error('Error validating OpenAI API key:', e)
             return false
         }
     }
