@@ -127,6 +127,27 @@ export async function PATCH(
                 {status: 404}
             );
         }
+        
+        // If the target user is the current user, do-not proceed with role modification
+        if (targetUser.id === currentUser.id) {
+            try {
+                await createAuditLog(
+                    'USER_UPDATE_SELF_ATTEMPT',
+                    currentUser.id,
+                    currentUser.id,
+                    {
+                        timestamp: new Date().toISOString()
+                    }
+                );
+            } catch (auditLogError) {
+                console.error('Failed to create audit log:', auditLogError);
+            }
+
+            return NextResponse.json(
+                {error: 'Cannot update your own account'},
+                {status: 400}
+            );
+        }
 
         // Parse and validate request body
         const body = await request.json();

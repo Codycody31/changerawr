@@ -236,6 +236,18 @@ export default function UsersPage() {
     });
 
     const handleEditUser = (user: UserData) => {
+        // Get current user's ID from the auth context
+        const currentUserEmail = users?.find(u => u.role === 'ADMIN')?.email;
+  
+        if (user.email === currentUserEmail) {
+            toast({
+                title: "Cannot Edit User",
+                description: "You cannot edit your own account via this interface.",
+                variant: "destructive",
+            });
+            return;
+        }
+      
         setSelectedUser(user);
         setEditName(user.name || '');
         setEditRole(user.role);
