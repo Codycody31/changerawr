@@ -106,16 +106,6 @@ export async function GET() {
             changelogCount: project.changelog?._count.entries || 0
         }))
 
-        // If we don't have 3 projects, add placeholder data
-        while (projectPreviews.length < 3) {
-            projectPreviews.push({
-                id: `placeholder-${projectPreviews.length}`,
-                name: 'Sample Project',
-                lastUpdated: new Date().toISOString(),
-                changelogCount: 0
-            })
-        }
-
         // Get total counts
         const [totalProjects, totalChangelogs] = await Promise.all([
             db.project.count({
