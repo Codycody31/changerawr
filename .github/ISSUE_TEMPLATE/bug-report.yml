@@ -203,6 +203,8 @@ body:
           required: false
         - label: I am able to prodvide a reproduction video in the event that I can not provide reproduction steps ( youtube, loom, etc )
           required: true
+        - label: I have all required ENV variables configured.
+          required: true
 
   - type: markdown
     attributes:
