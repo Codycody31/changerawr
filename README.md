@@ -10,10 +10,7 @@
 
 # What is Changerawr?
 
-Changerawr can be thought of as the **after** part of the before-and-after on a todo list. When you get a bunch of things done, you write them down so you know what you accomplished! \
-
-Change refers to "what got done", and a todo list is a list of changes, known as a log. \
-change + log = changelog, which is what Changerawr aims to be!
+Changerawr lets you write down what you changed, then share those changes with people. You write entries about updates you made, and Changerawr gives you ways to display them - like widgets for your website, public pages people can visit, or APIs to use however you want.
 
 If you don't know what a changelog is, check out [betterauth](https://www.better-auth.com/changelogs) for an example!
 
