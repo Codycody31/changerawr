@@ -1,3 +1,4 @@
 - [ ] custom fields
-- [ ] tags can have a color assigned to them ( requires updating the SDKs )
+- [ ] tags can have a color assigned to them (requires updating the SDKs)
 - [x] pwnedpasswords password check
+- [x] custom domains (what a headache to implement!)

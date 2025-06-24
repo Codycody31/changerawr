@@ -19,7 +19,8 @@ import {
     Sparkles,
     Clock,
     ChartNoAxesCombined,
-    PanelRightClose
+    PanelRightClose,
+    Globe
 } from 'lucide-react'
 import {cn} from '@/lib/utils'
 import {useMediaQuery} from '@/hooks/use-media-query'
@@ -78,6 +79,12 @@ const NAV_SECTIONS: NavSection[] = [
                 href: "/dashboard/admin/oauth",
                 label: "OAuth Providers",
                 icon: Fingerprint,
+                requiredRole: ['ADMIN']
+            },
+            {
+                href: "/dashboard/admin/domains",
+                label: "Domains",
+                icon: Globe,
                 requiredRole: ['ADMIN']
             },
             {

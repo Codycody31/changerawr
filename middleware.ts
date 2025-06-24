@@ -2,112 +2,149 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { verifyAccessToken } from '@/lib/auth/tokens'
+import { getAppDomain } from '@/lib/custom-domains/utils'
 
-// Routes that don't require authentication
-const PUBLIC_PATHS = [
-    '/login',
-    '/register',
-    '/forgot-password',
-    '/two-factor',
-    '/api/auth/login',
-    '/api/auth/refresh',
-    '/api/auth/preview',
-    '/api/auth/oauth/providers',
-    '/api/auth/oauth/authorize',
-    '/api/auth/oauth/callback',
-    '/api/setup/status',
-    '/api/check-setup', // Dedicated route for setup checks
-    '/_next',
+const ALWAYS_PUBLIC_PATHS = [
+    '/_next/',
     '/favicon.ico',
-    '/public',
+    '/public/',
+    '/static/',
+    '/_chrverify/',
+    '/changerawr-domain-verification/',
     '/widget.css',
     '/widget-bundle.js'
 ]
 
-// Routes that should redirect to /dashboard if authenticated
+const PUBLIC_API_PATHS = [
+    '/api/auth/',
+    '/api/setup/',
+    '/api/check-setup',
+    '/api/auth/oauth/',
+]
+
 const AUTH_ROUTES = ['/login', '/register', '/setup']
 
-// Separate setup check function
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function isSetupComplete(request: NextRequest): Promise<boolean> {
-    // Use a special header to prevent circular requests
-    const headers = new Headers({
-        'x-middleware-check': 'true'
-    });
+const PUBLIC_CONTENT_PATHS = [
+    '/reset-password/',
+    '/changelog/',
+    '/unsubscribed',
+    '/experiments/',
+    '/forgot-password',
+    '/two-factor'
+]
 
+function isAlwaysPublicPath(pathname: string): boolean {
+    return ALWAYS_PUBLIC_PATHS.some(path => pathname.startsWith(path)) ||
+        pathname.includes('.')
+}
+
+function isPublicApiPath(pathname: string): boolean {
+    return PUBLIC_API_PATHS.some(path => pathname.startsWith(path))
+}
+
+function isPublicContentPath(pathname: string): boolean {
+    return PUBLIC_CONTENT_PATHS.some(path => pathname.startsWith(path))
+}
+
+function isCustomDomain(hostname: string): boolean {
     try {
-        // Use absolute URL to ensure we're hitting the correct endpoint
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL
-        const response = await fetch(`${baseUrl}/api/check-setup`, { headers });
+        const appDomain = getAppDomain()
 
-        if (!response.ok) {
-            return false;
+        if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
+            return false
         }
 
-        const data = await response.json();
-        return !!data.isComplete;
-    } catch (error) {
-        console.error('Setup check failed:', error);
-        return false; // Default to showing setup page on error
+        return hostname !== appDomain && !hostname.endsWith(`.${appDomain}`)
+    } catch {
+        return false
+    }
+}
+
+function handleCustomDomain(request: NextRequest, hostname: string, pathname: string): NextResponse {
+    const url = request.nextUrl.clone()
+    url.pathname = `/changelog/custom-domain/${encodeURIComponent(hostname)}${pathname === '/' ? '' : pathname}`
+    return NextResponse.rewrite(url)
+}
+
+async function isSetupComplete(): Promise<boolean> {
+    const headers = new Headers({ 'x-middleware-check': 'true' })
+    try {
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL
+        const response = await fetch(`${baseUrl}/api/check-setup`, { headers })
+        if (!response.ok) return false
+        const data = await response.json()
+        return !!data.isComplete
+    } catch {
+        return false
     }
 }
 
 export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl
+    const hostname = request.headers.get('host') || ''
 
-    // Skip middleware for the setup check endpoint to avoid recursion
-    if (pathname === '/api/check-setup') {
-        return NextResponse.next();
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const isApiRequest = pathname.startsWith('/api/')
+
+    if (isCustomDomain(hostname) && pathname === '/rss.xml') {
+        const url = request.nextUrl.clone()
+        url.pathname = `/changelog/custom-domain/${encodeURIComponent(hostname)}/rss.xml`
+        return NextResponse.rewrite(url)
     }
 
-    // Always allow API routes
+    if (isAlwaysPublicPath(pathname)) {
+        return NextResponse.next()
+    }
+
+    if (isCustomDomain(hostname)) {
+        if (pathname.startsWith('/api/')) {
+            if (pathname.startsWith('/api/changelog/')) {
+                return NextResponse.next()
+            }
+            return new NextResponse(null, { status: 404 })
+        }
+
+        if (pathname === '/rss.xml') {
+            const url = request.nextUrl.clone()
+            url.pathname = `/changelog/custom-domain/${encodeURIComponent(hostname)}/rss.xml`
+            return NextResponse.rewrite(url)
+        }
+
+        return handleCustomDomain(request, hostname, pathname)
+    }
+
+    if (pathname === '/api/check-setup') {
+        return NextResponse.next()
+    }
+
+    if (isPublicApiPath(pathname)) {
+        return NextResponse.next()
+    }
+
     if (pathname.startsWith('/api/')) {
         return NextResponse.next()
     }
 
-    // Always allow password-reset routes
-    if (pathname.startsWith('/reset-password/')) {
+    if (isPublicContentPath(pathname)) {
         return NextResponse.next()
     }
 
-    // Always allow public changelog routes
-    if (pathname.startsWith('/changelog/')) {
-        return NextResponse.next()
-    }
-
-    // Always allow public email routes
-    if (pathname.startsWith('/unsubscribed')) {
-        return NextResponse.next()
-    }
-
-    // Always allow public experiment routes
-    if (pathname.startsWith('/experiments/')) {
-        return NextResponse.next()
-    }
-
-    // Check if the path is public
-    if (PUBLIC_PATHS.some(path => pathname.startsWith(path))) {
-        return NextResponse.next()
-    }
-
-    // Special handling for setup route
     if (pathname === '/setup') {
-        const setupComplete = await isSetupComplete(request);
-
+        const setupComplete = await isSetupComplete()
         if (setupComplete) {
-            // If setup is complete, redirect to login
             return NextResponse.redirect(new URL('/login', request.url))
         }
-
-        // Allow access to setup if not complete
         return NextResponse.next()
     }
 
-    // Check for authentication token in cookies
+    const setupComplete = await isSetupComplete()
+    if (!setupComplete) {
+        return NextResponse.redirect(new URL('/setup', request.url))
+    }
+
     const accessToken = request.cookies.get('accessToken')?.value
     const refreshToken = request.cookies.get('refreshToken')?.value
 
-    // Handle authentication routes
     if (AUTH_ROUTES.includes(pathname)) {
         if (accessToken) {
             try {
@@ -115,63 +152,38 @@ export async function middleware(request: NextRequest) {
                 if (userId) {
                     return NextResponse.redirect(new URL('/dashboard', request.url))
                 }
-            } catch (error) {
-                console.error('Access Token verification failed:', error)
-            }
+            } catch {}
         }
         return NextResponse.next()
     }
 
-    // For non-setup routes, check if setup is complete
-    if (pathname !== '/setup') {
-        const setupComplete = await isSetupComplete(request);
-
-        if (!setupComplete) {
-            // Redirect to setup if system is not initialized
-            return NextResponse.redirect(new URL('/setup', request.url))
-        }
-    }
-
-    // Protect other routes
     if (!accessToken) {
-        // If refresh token exists, allow continuation to potentially refresh
         if (refreshToken) {
             return NextResponse.next()
         }
-
-        // Redirect to login with original path
         const url = new URL('/login', request.url)
         url.searchParams.set('from', pathname)
         return NextResponse.redirect(url)
     }
 
-    // Verify access token
     try {
         const userId = await verifyAccessToken(accessToken)
         if (!userId) {
-            // If refresh token exists, allow request to potentially refresh
             if (refreshToken) {
                 return NextResponse.next()
             }
-
-            // Redirect to login
             const url = new URL('/login', request.url)
             url.searchParams.set('from', pathname)
             return NextResponse.redirect(url)
         }
 
-        // Add user ID to request for downstream use
         const response = NextResponse.next()
         response.headers.set('x-user-id', userId)
         return response
-    } catch (error: unknown) {
-        console.error((error as Error).stack);
-        // If refresh token exists, allow request to potentially refresh
+    } catch {
         if (refreshToken) {
             return NextResponse.next()
         }
-
-        // Redirect to login
         const url = new URL('/login', request.url)
         url.searchParams.set('from', pathname)
         return NextResponse.redirect(url)
@@ -180,13 +192,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
     matcher: [
-        /*
-         * Match all request paths except for the ones starting with:
-         * - _next/static (static files)
-         * - _next/image (image optimization files)
-         * - favicon.ico (favicon file)
-         * - public folder
-         */
         '/((?!_next/static|_next/image|favicon.ico).*)',
     ],
 }
