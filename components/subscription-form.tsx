@@ -1,16 +1,16 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, Check, AlertCircle, Mail, Clock, Zap, CheckCircle2, Bell } from 'lucide-react';
-import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { cn } from '@/lib/utils';
+import {useState, useRef} from 'react';
+import {useForm} from 'react-hook-form';
+import {zodResolver} from '@hookform/resolvers/zod';
+import {z} from 'zod';
+import {motion, AnimatePresence} from 'framer-motion';
+import {ArrowRight, Check, AlertCircle, Mail, Clock, Zap, CheckCircle2, Bell} from 'lucide-react';
+import {Form, FormControl, FormField, FormItem, FormMessage} from '@/components/ui/form';
+import {Input} from '@/components/ui/input';
+import {Button} from '@/components/ui/button';
+import {Alert, AlertDescription} from '@/components/ui/alert';
+import {cn} from '@/lib/utils';
 import confetti from 'canvas-confetti';
 
 const formSchema = z.object({
@@ -42,6 +42,32 @@ export default function SubscriptionForm({
     const [error, setError] = useState<string | null>(null);
     const successRef = useRef<HTMLDivElement>(null);
 
+    // Detect if we're on a custom domain
+    const getCustomDomain = (): string | null => {
+        if (typeof window === 'undefined') return null;
+
+        const hostname = window.location.hostname;
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || '';
+
+        try {
+            const appDomain = new URL(appUrl).hostname;
+
+            // Skip localhost and development domains
+            if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
+                return null;
+            }
+
+            // If hostname is different from app domain and not a subdomain, it's a custom domain
+            if (hostname !== appDomain && !hostname.endsWith(`.${appDomain}`)) {
+                return hostname;
+            }
+        } catch (error) {
+            console.error('Error parsing app URL:', error);
+        }
+
+        return null;
+    };
+
     const form = useForm<SubscriptionFormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: {
@@ -67,7 +93,7 @@ export default function SubscriptionForm({
             confetti({
                 particleCount: 100,
                 spread: 70,
-                origin: { x: xRelative, y: yRelative },
+                origin: {x: xRelative, y: yRelative},
                 colors: ['#818cf8', '#c4b5fd', '#a78bfa', '#8b5cf6', '#7c3aed'],
                 disableForReducedMotion: true,
             });
@@ -76,7 +102,7 @@ export default function SubscriptionForm({
             confetti({
                 particleCount: 100,
                 spread: 70,
-                origin: { x: 0.5, y: 0.4 },
+                origin: {x: 0.5, y: 0.4},
                 colors: ['#818cf8', '#c4b5fd', '#a78bfa', '#8b5cf6', '#7c3aed'],
                 disableForReducedMotion: true,
             });
@@ -88,14 +114,17 @@ export default function SubscriptionForm({
         setError(null);
 
         try {
-            const response = await fetch('/api/subscribe', {
+            const customDomain = getCustomDomain();
+
+            const response = await fetch('/api/changelog/subscribe', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
                     email: values.email,
                     name: values.name,
                     projectId: projectId,
-                    subscriptionType: values.subscriptionType
+                    subscriptionType: values.subscriptionType,
+                    customDomain
                 }),
             });
 
@@ -138,6 +167,9 @@ export default function SubscriptionForm({
         setCurrentStep('email');
     };
 
+    // Get the domain name for display
+    const displayDomain = getCustomDomain();
+
     return (
         <div
             className={cn(
@@ -147,13 +179,28 @@ export default function SubscriptionForm({
         >
             {/* More subtle and integrated notification section */}
             <div className="flex items-center justify-center gap-3 mb-8">
-                <div className="h-px flex-1 bg-border/40" />
+                <div className="h-px flex-1 bg-border/40"/>
                 <div className="flex items-center gap-2 text-muted-foreground">
-                    <Bell className="h-4 w-4" />
-                    <span className="text-sm font-medium">Get Updates</span>
+                    <Bell className="h-4 w-4"/>
+                    <span className="text-sm font-medium">
+                        {displayDomain ? 'Get Updates' : 'Subscribe for Updates'}
+                    </span>
                 </div>
-                <div className="h-px flex-1 bg-border/40" />
+                <div className="h-px flex-1 bg-border/40"/>
             </div>
+
+            {/* Show custom domain indicator if present */}
+            {displayDomain && (
+                <div className="text-center mb-6">
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full text-sm">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                        <span className="font-medium">{displayDomain}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                        Subscribing to updates from this changelog
+                    </p>
+                </div>
+            )}
 
             <div className="relative">
                 <Form {...form}>
@@ -162,15 +209,15 @@ export default function SubscriptionForm({
                             {currentStep === 'email' && (
                                 <motion.div
                                     key="email-step"
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -10 }}
-                                    transition={{ duration: 0.2 }}
+                                    initial={{opacity: 0, y: 10}}
+                                    animate={{opacity: 1, y: 0}}
+                                    exit={{opacity: 0, y: -10}}
+                                    transition={{duration: 0.2}}
                                     className="space-y-3"
                                 >
                                     {error && (
                                         <Alert variant="destructive" className="mb-3">
-                                            <AlertCircle className="h-4 w-4" />
+                                            <AlertCircle className="h-4 w-4"/>
                                             <AlertDescription>{error}</AlertDescription>
                                         </Alert>
                                     )}
@@ -178,11 +225,12 @@ export default function SubscriptionForm({
                                     <FormField
                                         control={form.control}
                                         name="email"
-                                        render={({ field }) => (
+                                        render={({field}) => (
                                             <FormItem>
                                                 <FormControl>
                                                     <div className="relative">
-                                                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
+                                                        <Mail
+                                                            className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60"/>
                                                         <Input
                                                             placeholder="your@email.com"
                                                             className="pl-10 h-10 bg-background/50 border-border/50 placeholder:text-muted-foreground/50"
@@ -190,7 +238,7 @@ export default function SubscriptionForm({
                                                         />
                                                     </div>
                                                 </FormControl>
-                                                <FormMessage className="text-xs" />
+                                                <FormMessage className="text-xs"/>
                                             </FormItem>
                                         )}
                                     />
@@ -202,7 +250,7 @@ export default function SubscriptionForm({
                                         variant="secondary"
                                     >
                                         Continue
-                                        <ArrowRight className="ml-2 h-4 w-4" />
+                                        <ArrowRight className="ml-2 h-4 w-4"/>
                                     </Button>
                                 </motion.div>
                             )}
@@ -210,10 +258,10 @@ export default function SubscriptionForm({
                             {currentStep === 'name' && (
                                 <motion.div
                                     key="name-step"
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -10 }}
-                                    transition={{ duration: 0.2 }}
+                                    initial={{opacity: 0, y: 10}}
+                                    animate={{opacity: 1, y: 0}}
+                                    exit={{opacity: 0, y: -10}}
+                                    transition={{duration: 0.2}}
                                     className="space-y-3"
                                 >
                                     <div className="text-center mb-4">
@@ -225,7 +273,7 @@ export default function SubscriptionForm({
                                     <FormField
                                         control={form.control}
                                         name="name"
-                                        render={({ field }) => (
+                                        render={({field}) => (
                                             <FormItem>
                                                 <FormControl>
                                                     <Input
@@ -234,7 +282,7 @@ export default function SubscriptionForm({
                                                         {...field}
                                                     />
                                                 </FormControl>
-                                                <FormMessage className="text-xs" />
+                                                <FormMessage className="text-xs"/>
                                             </FormItem>
                                         )}
                                     />
@@ -263,10 +311,10 @@ export default function SubscriptionForm({
                             {currentStep === 'preferences' && (
                                 <motion.div
                                     key="preferences-step"
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -10 }}
-                                    transition={{ duration: 0.2 }}
+                                    initial={{opacity: 0, y: 10}}
+                                    animate={{opacity: 1, y: 0}}
+                                    exit={{opacity: 0, y: -10}}
+                                    transition={{duration: 0.2}}
                                     className="space-y-3"
                                 >
                                     <div className="text-center mb-4">
@@ -278,7 +326,7 @@ export default function SubscriptionForm({
                                     <FormField
                                         control={form.control}
                                         name="subscriptionType"
-                                        render={({ field }) => (
+                                        render={({field}) => (
                                             <FormItem>
                                                 <FormControl>
                                                     <div className="grid gap-2">
@@ -316,19 +364,19 @@ export default function SubscriptionForm({
                                                                 <option.icon className={cn(
                                                                     "h-4 w-4 mr-3",
                                                                     field.value === option.value ? "text-primary" : "text-muted-foreground"
-                                                                )} />
+                                                                )}/>
                                                                 <div className="flex-1">
                                                                     <p className="font-medium">{option.title}</p>
                                                                     <p className="text-xs">{option.description}</p>
                                                                 </div>
                                                                 {field.value === option.value && (
-                                                                    <Check className="h-4 w-4 text-primary" />
+                                                                    <Check className="h-4 w-4 text-primary"/>
                                                                 )}
                                                             </button>
                                                         ))}
                                                     </div>
                                                 </FormControl>
-                                                <FormMessage className="text-xs" />
+                                                <FormMessage className="text-xs"/>
                                             </FormItem>
                                         )}
                                     />
@@ -340,7 +388,8 @@ export default function SubscriptionForm({
                                     >
                                         {isSubmitting ? (
                                             <>
-                                                <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                                <div
+                                                    className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"/>
                                                 Subscribing...
                                             </>
                                         ) : (
@@ -354,24 +403,30 @@ export default function SubscriptionForm({
                                 <motion.div
                                     key="success-step"
                                     ref={successRef}
-                                    initial={{ opacity: 0, scale: 0.95 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    transition={{ duration: 0.2 }}
+                                    initial={{opacity: 0, scale: 0.95}}
+                                    animate={{opacity: 1, scale: 1}}
+                                    transition={{duration: 0.2}}
                                     className="text-center py-6"
                                 >
                                     <motion.div
-                                        initial={{ scale: 0.8 }}
-                                        animate={{ scale: 1 }}
-                                        transition={{ type: "spring", stiffness: 200, damping: 15 }}
+                                        initial={{scale: 0.8}}
+                                        animate={{scale: 1}}
+                                        transition={{type: "spring", stiffness: 200, damping: 15}}
                                         className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-4"
                                     >
-                                        <Check className="h-6 w-6 text-primary" />
+                                        <Check className="h-6 w-6 text-primary"/>
                                     </motion.div>
 
                                     <h3 className="text-lg font-medium mb-1">You&apos;re all set!</h3>
-                                    <p className="text-sm text-muted-foreground mb-6">
+                                    <p className="text-sm text-muted-foreground mb-2">
                                         We&apos;ll notify you about updates.
                                     </p>
+
+                                    {displayDomain && (
+                                        <p className="text-xs text-muted-foreground mb-6">
+                                            Unsubscribe links will redirect to <span className="font-medium">{displayDomain}</span>
+                                        </p>
+                                    )}
 
                                     <Button
                                         type="button"

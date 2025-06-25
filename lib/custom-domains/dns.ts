@@ -1,6 +1,6 @@
 import dns from 'dns/promises'
-import type { DNSVerificationResult } from '@/lib/types/custom-domains'
-import { DOMAIN_CONSTANTS } from '@/lib/custom-domains/constants'
+import type {DNSVerificationResult} from '@/lib/types/custom-domains'
+import {DOMAIN_CONSTANTS} from './constants'
 
 export async function verifyDNSRecords(
     domain: string,
@@ -14,11 +14,25 @@ export async function verifyDNSRecords(
     }
 
     try {
-        // Verify CNAME record
+        // First, try standard DNS verification
         await verifyCNAME(domain, expectedCnameTarget, result)
+        await verifyTXTRecord(domain, verificationToken, result, false) // set to true if testing UI locally,
+        // we aren't able to get TXT records.
 
-        // Verify TXT record for domain ownership
-        await verifyTXTRecord(domain, verificationToken, result)
+        // If CNAME verification failed, try HTTP fallback
+        if (!result.cnameValid) {
+            console.log(`CNAME verification failed for ${domain}, attempting HTTP fallback...`)
+            const httpVerification = await verifyDomainViaHTTP(domain, verificationToken)
+
+            if (httpVerification.success) {
+                result.cnameValid = true
+                // Remove CNAME-related errors since HTTP verification succeeded
+                result.errors = result.errors?.filter(error => !error.includes('CNAME')) || []
+                console.log(`HTTP fallback verification successful for ${domain}`)
+            } else {
+                result.errors?.push('HTTP fallback verification failed - domain may not be pointing to our servers')
+            }
+        }
 
     } catch (error) {
         result.errors?.push(`DNS verification error: ${error instanceof Error ? error.message : 'Unknown error'}`)
@@ -55,8 +69,15 @@ async function verifyCNAME(
 async function verifyTXTRecord(
     domain: string,
     verificationToken: string,
-    result: DNSVerificationResult
+    result: DNSVerificationResult,
+    debug = false
 ): Promise<void> {
+    if (debug) {
+        result.txtRecord = `${DOMAIN_CONSTANTS.VERIFICATION_PREFIX}=${verificationToken}`
+        result.txtValid = true
+        return
+    }
+
     try {
         const verificationDomain = `${DOMAIN_CONSTANTS.VERIFICATION_SUBDOMAIN}.${domain}`
         const txtRecords = await dns.resolveTxt(verificationDomain)
@@ -77,6 +98,52 @@ async function verifyTXTRecord(
         result.errors?.push(
             `TXT verification failed: ${error instanceof Error ? error.message : 'No TXT record found'}`
         )
+    }
+}
+
+
+async function verifyDomainViaHTTP(
+    domain: string,
+    verificationToken: string
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        // Make HTTP request to the domain's verification endpoint
+        const verificationUrl = `https://${domain}/api/changelog/verify-domain?domain=${encodeURIComponent(domain)}&token=${encodeURIComponent(verificationToken)}`
+
+        console.log(`Attempting HTTP verification: ${verificationUrl}`)
+
+        const response = await fetch(verificationUrl, {
+            method: 'GET',
+            headers: {
+                'User-Agent': 'ChangeRawr-Domain-Verification/1.0',
+            },
+            // Set a reasonable timeout
+            signal: AbortSignal.timeout(10000) // 10 seconds
+        })
+
+        if (!response.ok) {
+            return {
+                success: false,
+                error: `HTTP verification failed: ${response.status} ${response.statusText}`
+            }
+        }
+
+        const data = await response.json()
+
+        if (data.success && data.verified) {
+            return {success: true}
+        } else {
+            return {
+                success: false,
+                error: data.error || 'HTTP verification endpoint returned unsuccessful response'
+            }
+        }
+
+    } catch (error) {
+        return {
+            success: false,
+            error: `HTTP verification error: ${error instanceof Error ? error.message : 'Unknown error'}`
+        }
     }
 }
 

@@ -1,7 +1,6 @@
-// app/project/[projectId]/settings/domains/page.tsx
 'use client'
 
-import {useState, useEffect} from 'react'
+import {useState, useEffect, useCallback} from 'react'
 import {use} from 'react'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
@@ -17,15 +16,160 @@ import {
     Globe,
     Copy,
     CheckCircle,
-    Clock
+    Clock,
+    Zap,
+    Shield,
+    Sparkles,
+    ArrowRight,
+    Link,
+    Settings,
+    Rocket,
+    Check,
+    ChevronDown,
+    ChevronUp,
+    MoreHorizontal
 } from 'lucide-react'
 import {motion, AnimatePresence} from 'framer-motion'
-import type {CustomDomain, DNSInstructions} from '@/lib/types/custom-domains'
+
+interface CustomDomain {
+    id: string
+    domain: string
+    projectId: string
+    verified: boolean
+    createdAt: string
+    verifiedAt?: string
+    dnsInstructions?: DNSInstructions
+}
+
+interface DNSInstructions {
+    cname: { name: string; value: string }
+    txt: { name: string; value: string }
+}
 
 interface ProjectDomainSettingsProps {
     params: Promise<{
         projectId: string
     }>
+}
+
+// Confetti component
+const ConfettiAnimation = ({show}: { show: boolean }) => {
+    if (!show) return null
+
+    const confettiPieces = Array.from({length: 50}, (_, i) => (
+        <motion.div
+            key={i}
+            className="absolute w-2 h-2 rounded-full"
+            style={{
+                backgroundColor: ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'][i % 7],
+                left: `${Math.random() * 100}%`,
+                top: '-10px'
+            }}
+            initial={{y: -10, rotate: 0, scale: 0}}
+            animate={{
+                y: window.innerHeight + 100,
+                rotate: Math.random() * 360,
+                scale: [0, 1, 0.8, 0],
+                x: Math.random() * 200 - 100
+            }}
+            transition={{
+                duration: 3 + Math.random() * 2,
+                ease: "easeOut",
+                delay: Math.random() * 0.5
+            }}
+        />
+    ))
+
+    return (
+        <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
+            {confettiPieces}
+        </div>
+    )
+}
+
+// Mobile-optimized DNS Record component
+const DNSRecord = ({type, data, onCopy}: {
+    type: 'CNAME' | 'TXT'
+    data: { name: string; value: string }
+    onCopy: (text: string) => void
+}) => {
+    const [isExpanded, setIsExpanded] = useState(false)
+
+    return (
+        <Card className="bg-background border">
+            <CardContent className="p-3 sm:p-4">
+                {/* Mobile Header */}
+                <div className="flex items-center justify-between mb-3 sm:hidden">
+                    <div className="flex items-center gap-2">
+                        <div
+                            className="w-6 h-6 bg-primary rounded-full flex items-center justify-center text-xs font-bold text-primary-foreground">
+                            {type === 'CNAME' ? '1' : '2'}
+                        </div>
+                        <h4 className="font-semibold text-sm">{type} Record</h4>
+                    </div>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setIsExpanded(!isExpanded)}
+                        className="p-1"
+                    >
+                        {isExpanded ? <ChevronUp className="w-4 h-4"/> : <ChevronDown className="w-4 h-4"/>}
+                    </Button>
+                </div>
+
+                {/* Desktop/Expanded Mobile Content */}
+                <div className={`space-y-3 ${!isExpanded ? 'hidden sm:block' : 'block'}`}>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 text-sm">
+                        <div className="space-y-1">
+                            <span className="text-muted-foreground text-xs uppercase tracking-wide">Type</span>
+                            <div className="font-mono bg-muted px-2 py-1 rounded text-xs">{type}</div>
+                        </div>
+                        {type === 'CNAME' && (
+                            <div className="space-y-1">
+                                <span className="text-muted-foreground text-xs uppercase tracking-wide">TTL</span>
+                                <div className="font-mono bg-muted px-2 py-1 rounded text-xs">3600</div>
+                            </div>
+                        )}
+                        <div className="space-y-1 col-span-2 sm:col-span-1">
+                            <span className="text-muted-foreground text-xs uppercase tracking-wide">Name</span>
+                            <div className="font-mono bg-muted px-2 py-1 rounded break-all text-xs">{data.name}</div>
+                        </div>
+                        <div className="space-y-1 col-span-2 sm:col-span-1">
+                            <span className="text-muted-foreground text-xs uppercase tracking-wide">Value</span>
+                            <div className="font-mono bg-muted px-2 py-1 rounded break-all text-xs">{data.value}</div>
+                        </div>
+                    </div>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-2 w-full sm:w-auto"
+                        onClick={() => onCopy(`${data.name} ${type} ${data.value}`)}
+                    >
+                        <Copy className="w-3 h-3"/>
+                        Copy Record
+                    </Button>
+                </div>
+
+                {/* Mobile Summary */}
+                {!isExpanded && (
+                    <div className="sm:hidden space-y-2">
+                        <div className="text-xs text-muted-foreground truncate">
+                            <span className="font-mono">{data.name}</span>
+                        </div>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="gap-2 w-full"
+                            onClick={() => onCopy(`${data.name} ${type} ${data.value}`)}
+                        >
+                            <Copy className="w-3 h-3"/>
+                            Copy
+                        </Button>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    )
 }
 
 export default function ProjectDomainSettings({params}: ProjectDomainSettingsProps) {
@@ -38,10 +182,27 @@ export default function ProjectDomainSettings({params}: ProjectDomainSettingsPro
     const [verifyingDomain, setVerifyingDomain] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [success, setSuccess] = useState<string | null>(null)
+    const [showConfetti, setShowConfetti] = useState(false)
+    const [expandedDomains, setExpandedDomains] = useState<Set<string>>(new Set())
 
     useEffect(() => {
         loadDomains()
     }, [projectId])
+
+    const triggerConfetti = useCallback(() => {
+        setShowConfetti(true)
+        setTimeout(() => setShowConfetti(false), 4000)
+    }, [])
+
+    const toggleDomainExpansion = (domainId: string) => {
+        const newExpanded = new Set(expandedDomains)
+        if (newExpanded.has(domainId)) {
+            newExpanded.delete(domainId)
+        } else {
+            newExpanded.add(domainId)
+        }
+        setExpandedDomains(newExpanded)
+    }
 
     const loadDomains = async (): Promise<void> => {
         try {
@@ -84,7 +245,7 @@ export default function ProjectDomainSettings({params}: ProjectDomainSettingsPro
             if (result.success) {
                 setNewDomain('')
                 setDnsInstructions(result.domain.dnsInstructions)
-                setSuccess(`Domain ${newDomain} added successfully!`)
+                setSuccess(`Domain ${newDomain} added successfully! Follow the DNS instructions below.`)
                 await loadDomains()
             } else {
                 setError(result.error || 'Failed to add domain')
@@ -112,7 +273,8 @@ export default function ProjectDomainSettings({params}: ProjectDomainSettingsPro
             if (result.success) {
                 await loadDomains()
                 if (result.verification.verified) {
-                    setSuccess(`Domain ${domain} verified successfully! Your changelog is now live.`)
+                    setSuccess(`🎉 Domain ${domain} verified successfully! Your changelog is now live.`)
+                    triggerConfetti()
                 } else {
                     setError(`Verification failed: ${result.verification.errors?.join(', ') || 'DNS records not found'}`)
                 }
@@ -171,10 +333,9 @@ export default function ProjectDomainSettings({params}: ProjectDomainSettingsPro
 
     const getVerificationProgress = (domain: CustomDomain): number => {
         if (domain.verified) return 100
-        return 33 // Initial setup completed, DNS pending
+        return 40 // DNS setup initiated
     }
 
-    // Auto-clear success/error messages
     useEffect(() => {
         if (success || error) {
             const timer = setTimeout(() => {
@@ -187,272 +348,488 @@ export default function ProjectDomainSettings({params}: ProjectDomainSettingsPro
 
     if (isLoading) {
         return (
-            <div className="max-w-4xl mx-auto p-6">
-                <div className="text-center py-12">
-                    <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-gray-400"/>
-                    <p className="text-gray-600">Loading domain settings...</p>
+            <div className="max-w-4xl mx-auto p-4 sm:p-6">
+                <div className="flex items-center justify-center min-h-[40vh]">
+                    <div className="text-center space-y-4">
+                        <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+                            <RefreshCw className="w-6 h-6 animate-spin text-primary"/>
+                        </div>
+                        <div>
+                            <h3 className="font-semibold text-foreground">Loading domain settings</h3>
+                            <p className="text-sm text-muted-foreground px-4">Setting up your custom domain
+                                configuration...</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         )
     }
 
     return (
-        <div className="max-w-4xl mx-auto p-6 space-y-8">
-            {/* Header */}
-            <div className="flex items-center space-x-3">
-                <Globe className="w-8 h-8 text-blue-600"/>
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Custom Domains</h1>
-                    <p className="text-gray-600 mt-1">
-                        Make your changelog available at your own domain
-                    </p>
+        <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-6 sm:space-y-8">
+            <ConfettiAnimation show={showConfetti}/>
+
+            {/* Enhanced Header */}
+            <motion.div
+                initial={{opacity: 0, y: 20}}
+                animate={{opacity: 1, y: 0}}
+                className="space-y-2"
+            >
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div
+                        className="w-10 h-10 bg-gradient-to-br from-primary to-primary/70 rounded-xl flex items-center justify-center">
+                        <Globe className="w-5 h-5 text-primary-foreground"/>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Custom
+                            Domains</h1>
+                        <p className="text-sm sm:text-base text-muted-foreground">
+                            Connect your own domain to create a professional changelog experience
+                        </p>
+                    </div>
                 </div>
-            </div>
+            </motion.div>
 
             {/* Alerts */}
             <AnimatePresence>
                 {error && (
                     <motion.div
-                        initial={{opacity: 0, y: -20}}
-                        animate={{opacity: 1, y: 0}}
-                        exit={{opacity: 0, y: -20}}
+                        initial={{opacity: 0, scale: 0.95, y: -10}}
+                        animate={{opacity: 1, scale: 1, y: 0}}
+                        exit={{opacity: 0, scale: 0.95, y: -10}}
                     >
-                        <Alert variant="destructive">
-                            <AlertDescription>{error}</AlertDescription>
+                        <Alert variant="destructive" className="border-destructive/20">
+                            <AlertDescription className="font-medium text-sm">{error}</AlertDescription>
                         </Alert>
                     </motion.div>
                 )}
                 {success && (
                     <motion.div
-                        initial={{opacity: 0, y: -20}}
-                        animate={{opacity: 1, y: 0}}
-                        exit={{opacity: 0, y: -20}}
+                        initial={{opacity: 0, scale: 0.95, y: -10}}
+                        animate={{opacity: 1, scale: 1, y: 0}}
+                        exit={{opacity: 0, scale: 0.95, y: -10}}
                     >
-                        <Alert>
-                            <AlertDescription>{success}</AlertDescription>
+                        <Alert variant="success">
+                            <AlertDescription className="text-green-800 dark:text-green-200 font-medium text-sm">
+                                {success}
+                            </AlertDescription>
                         </Alert>
                     </motion.div>
                 )}
             </AnimatePresence>
 
             {/* Add Domain Card */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>Add Custom Domain</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <form onSubmit={handleAddDomain} className="space-y-4">
-                        <div>
-                            <Label htmlFor="domain">Domain Name</Label>
-                            <Input
-                                id="domain"
-                                type="text"
-                                value={newDomain}
-                                onChange={(e) => setNewDomain(e.target.value)}
-                                placeholder="changelog.yourcompany.com"
-                                required
-                            />
-                            <p className="text-sm text-gray-500 mt-1">
-                                Enter the custom domain you want to use for your changelog
-                            </p>
+            <motion.div
+                initial={{opacity: 0, y: 20}}
+                animate={{opacity: 1, y: 0}}
+                transition={{delay: 0.1}}
+            >
+                <Card
+                    className="border-2 border-dashed border-muted-foreground/20 hover:border-primary/30 transition-colors">
+                    <CardHeader className="pb-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                            <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+                                <Zap className="w-4 h-4 text-primary"/>
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <CardTitle className="text-lg">Add Custom Domain</CardTitle>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                    Connect your domain to make your changelog accessible at your URL
+                                </p>
+                            </div>
                         </div>
-                        <Button type="submit" disabled={isAddingDomain}>
-                            {isAddingDomain ? 'Adding Domain...' : 'Add Domain'}
-                        </Button>
-                    </form>
-                </CardContent>
-            </Card>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={handleAddDomain} className="space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="domain" className="text-sm font-medium">Domain Name</Label>
+                                <div className="relative">
+                                    <Link
+                                        className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground"/>
+                                    <Input
+                                        id="domain"
+                                        type="text"
+                                        value={newDomain}
+                                        onChange={(e) => setNewDomain(e.target.value)}
+                                        placeholder="changelog.yourcompany.com"
+                                        className="pl-10"
+                                        required
+                                    />
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    Use a subdomain like{' '}
+                                    <code className="bg-muted px-1 py-0.5 rounded text-xs">changelog.yoursite.com</code>
+                                    {' '}or{' '}
+                                    <code className="bg-muted px-1 py-0.5 rounded text-xs">updates.yoursite.com</code>
+                                </p>
+                            </div>
+                            <Button type="submit" disabled={isAddingDomain} className="w-full">
+                                {isAddingDomain ? (
+                                    <>
+                                        <RefreshCw className="w-4 h-4 mr-2 animate-spin"/>
+                                        Adding Domain...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Sparkles className="w-4 h-4 mr-2"/>
+                                        Add Domain
+                                    </>
+                                )}
+                            </Button>
+                        </form>
+                    </CardContent>
+                </Card>
+            </motion.div>
 
             {/* DNS Instructions */}
             {dnsInstructions && (
-                <Card className="border-blue-200 bg-blue-50">
-                    <CardHeader>
-                        <CardTitle className="text-blue-800">DNS Configuration Required</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <p className="text-blue-700">
-                            Add these DNS records to your domain provider to complete the setup:
-                        </p>
-
-                        <div className="space-y-4">
-                            <div>
-                                <h4 className="font-semibold text-blue-800 mb-2">1. CNAME Record</h4>
-                                <div className="bg-white p-4 rounded border relative">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                                        <div><strong>Type:</strong> CNAME</div>
-                                        <div><strong>Name:</strong> <code>{dnsInstructions.cname.name}</code></div>
-                                        <div><strong>Value:</strong> <code>{dnsInstructions.cname.value}</code></div>
-                                        <div><strong>TTL:</strong> 3600 (or Auto)</div>
-                                    </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="absolute top-2 right-2"
-                                        onClick={() => copyToClipboard(`${dnsInstructions.cname.name} CNAME ${dnsInstructions.cname.value}`)}
-                                    >
-                                        <Copy className="w-4 h-4"/>
-                                    </Button>
+                <motion.div
+                    initial={{opacity: 0, scale: 0.98}}
+                    animate={{opacity: 1, scale: 1}}
+                    className="relative"
+                >
+                    <Card className="border-primary/20 bg-primary/5">
+                        <CardHeader className="pb-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                                <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+                                    <Shield className="w-4 h-4 text-primary"/>
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <CardTitle className="text-primary flex flex-col sm:flex-row sm:items-center gap-2">
+                                        <span>DNS Configuration Required</span>
+                                        <Badge variant="secondary" className="text-xs w-fit">Step 2 of 3</Badge>
+                                    </CardTitle>
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                        Add these DNS records to your domain provider
+                                    </p>
                                 </div>
                             </div>
-
-                            <div>
-                                <h4 className="font-semibold text-blue-800 mb-2">2. TXT Record (for verification)</h4>
-                                <div className="bg-white p-4 rounded border relative">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                                        <div><strong>Type:</strong> TXT</div>
-                                        <div><strong>Name:</strong> <code>{dnsInstructions.txt.name}</code></div>
-                                        <div className="md:col-span-2">
-                                            <strong>Value:</strong>
-                                            <code className="block mt-1 break-all">{dnsInstructions.txt.value}</code>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="space-y-4">
+                                {/* CNAME Record */}
+                                <div className="space-y-3">
+                                    <div className="hidden sm:flex items-center gap-2">
+                                        <div
+                                            className="w-6 h-6 bg-primary rounded-full flex items-center justify-center text-xs font-bold text-primary-foreground">
+                                            1
                                         </div>
+                                        <h4 className="font-semibold text-foreground">CNAME Record</h4>
                                     </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="absolute top-2 right-2"
-                                        onClick={() => copyToClipboard(`${dnsInstructions.txt.name} TXT ${dnsInstructions.txt.value}`)}
-                                    >
-                                        <Copy className="w-4 h-4"/>
-                                    </Button>
+                                    <DNSRecord
+                                        type="CNAME"
+                                        data={dnsInstructions.cname}
+                                        onCopy={copyToClipboard}
+                                    />
+                                </div>
+
+                                {/* TXT Record */}
+                                <div className="space-y-3">
+                                    <div className="hidden sm:flex items-center gap-2">
+                                        <div
+                                            className="w-6 h-6 bg-primary rounded-full flex items-center justify-center text-xs font-bold text-primary-foreground">
+                                            2
+                                        </div>
+                                        <h4 className="font-semibold text-foreground">TXT Record (Verification)</h4>
+                                    </div>
+                                    <DNSRecord
+                                        type="TXT"
+                                        data={dnsInstructions.txt}
+                                        onCopy={copyToClipboard}
+                                    />
                                 </div>
                             </div>
-                        </div>
 
-                        <Alert>
-                            <AlertDescription>
-                                After adding these DNS records, it may take up to 48 hours for changes to propagate.
-                                You can check verification status using the &ldquo;Verify&rdquo; button below.
-                            </AlertDescription>
-                        </Alert>
+                            <Alert className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
+                                <AlertDescription className="text-blue-800 dark:text-blue-200 text-sm">
+                                    DNS changes can take up to 48 hours to propagate. You can verify your setup using
+                                    the &ldquo;Verify&rdquo; button once the records are added.
+                                </AlertDescription>
+                            </Alert>
 
-                        <Button
-                            variant="outline"
-                            onClick={() => setDnsInstructions(null)}
-                        >
-                            Close Instructions
-                        </Button>
-                    </CardContent>
-                </Card>
+                            <div className="flex flex-col gap-3">
+                                <Button variant="outline" onClick={() => setDnsInstructions(null)}
+                                        className="gap-2 w-full sm:w-auto">
+                                    <Check className="w-4 h-4"/>
+                                    I&apos;ve Added These Records
+                                </Button>
+                                <Button variant="ghost" size="sm" asChild className="w-full sm:w-auto">
+                                    <a
+                                        href="https://www.cloudways.com/blog/dns-record/"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="gap-2"
+                                    >
+                                        <ExternalLink className="w-4 h-4" />
+                                        DNS Setup Guide
+                                    </a>
+                                </Button>
+
+                            </div>
+                        </CardContent>
+                    </Card>
+                </motion.div>
             )}
 
             {/* Current Domains */}
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center justify-between">
-                        <CardTitle>Your Custom Domains</CardTitle>
-                        <Button onClick={loadDomains} variant="outline" size="sm">
-                            <RefreshCw className="w-4 h-4 mr-2"/>
-                            Refresh
-                        </Button>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    {domains.length === 0 ? (
-                        <div className="text-center py-8">
-                            <Globe className="w-12 h-12 text-gray-300 mx-auto mb-4"/>
-                            <h3 className="text-lg font-semibold text-gray-900 mb-2">No custom domains yet</h3>
-                            <p className="text-gray-600">
-                                Add a custom domain to make your changelog available at your own URL
-                            </p>
+            <motion.div
+                initial={{opacity: 0, y: 20}}
+                animate={{opacity: 1, y: 0}}
+                transition={{delay: 0.2}}
+            >
+                <Card>
+                    <CardHeader className="pb-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 bg-muted rounded-lg flex items-center justify-center">
+                                    <Settings className="w-4 h-4 text-muted-foreground"/>
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <CardTitle className="text-lg">Your Domains</CardTitle>
+                                    <p className="text-sm text-muted-foreground">
+                                        Manage your connected custom domains
+                                    </p>
+                                </div>
+                            </div>
+                            <Button onClick={loadDomains} variant="outline" size="sm"
+                                    className="gap-2 w-full sm:w-auto">
+                                <RefreshCw className="w-4 h-4"/>
+                                Refresh
+                            </Button>
                         </div>
-                    ) : (
-                        <div className="space-y-4">
-                            {domains.map((domain) => (
-                                <motion.div
-                                    key={domain.id}
-                                    layout
-                                    className="border rounded-lg p-6 hover:bg-gray-50 transition-colors"
-                                >
-                                    <div className="flex items-start justify-between">
-                                        <div className="flex-1">
-                                            <div className="flex items-center space-x-3 mb-3">
-                                                <h3 className="font-semibold text-xl">{domain.domain}</h3>
-                                                <Badge variant={domain.verified ? "default" : "secondary"}>
-                                                    {domain.verified ? 'Active' : 'Pending Verification'}
-                                                </Badge>
-                                                {domain.verified && (
-                                                    <a
-                                                        href={`https://${domain.domain}`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-600 hover:text-blue-800 transition-colors"
+                    </CardHeader>
+                    <CardContent>
+                        {domains.length === 0 ? (
+                            <div className="text-center py-12">
+                                <div
+                                    className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <Globe className="w-8 h-8 text-muted-foreground"/>
+                                </div>
+                                <h3 className="text-lg font-semibold text-foreground mb-2">No domains connected yet</h3>
+                                <p className="text-muted-foreground text-sm max-w-md mx-auto px-4">
+                                    Add your first custom domain to create a professional changelog experience for your
+                                    users.
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {domains.map((domain, index) => (
+                                    <motion.div
+                                        key={domain.id}
+                                        layout
+                                        initial={{opacity: 0, y: 20}}
+                                        animate={{opacity: 1, y: 0}}
+                                        transition={{delay: index * 0.1}}
+                                        className="border border-border rounded-xl p-4 sm:p-6 hover:bg-muted/30 transition-all duration-200"
+                                    >
+                                        {/* Mobile-first domain header */}
+                                        <div className="space-y-4">
+                                            {/* Top row - always visible */}
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <Rocket
+                                                            className="w-4 h-4 text-muted-foreground flex-shrink-0"/>
+                                                        <h3 className="font-semibold text-lg text-foreground truncate">{domain.domain}</h3>
+                                                    </div>
+                                                    <Badge variant={domain.verified ? "default" : "secondary"}
+                                                           className="gap-1 text-xs">
+                                                        {domain.verified ? (
+                                                            <>
+                                                                <CheckCircle className="w-3 h-3"/>
+                                                                Live & Active
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Clock className="w-3 h-3"/>
+                                                                Pending
+                                                            </>
+                                                        )}
+                                                    </Badge>
+                                                </div>
+
+                                                {/* Mobile actions */}
+                                                <div className="flex items-center gap-1 sm:hidden">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => toggleDomainExpansion(domain.id)}
+                                                        className="p-2"
                                                     >
-                                                        <ExternalLink className="w-4 h-4"/>
-                                                    </a>
-                                                )}
+                                                        <MoreHorizontal className="w-4 h-4"/>
+                                                    </Button>
+                                                </div>
+
+                                                {/* Desktop actions */}
+                                                <div className="hidden sm:flex items-center gap-2">
+                                                    {domain.verified && (
+                                                        <Button variant="ghost" size="sm" asChild
+                                                                className="gap-2 text-primary">
+                                                            <a
+                                                                href={`https://${domain.domain}`}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                            >
+                                                                <ExternalLink className="w-4 h-4"/>
+                                                                Visit
+                                                            </a>
+                                                        </Button>
+                                                    )}
+                                                    {!domain.verified && (
+                                                        <Button
+                                                            onClick={() => handleVerifyDomain(domain.domain)}
+                                                            disabled={verifyingDomain === domain.domain}
+                                                            size="sm"
+                                                            className="gap-2"
+                                                        >
+                                                            {verifyingDomain === domain.domain ? (
+                                                                <>
+                                                                    <RefreshCw className="w-4 h-4 animate-spin"/>
+                                                                    Verifying...
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <CheckCircle className="w-4 h-4"/>
+                                                                    Verify
+                                                                </>
+                                                            )}
+                                                        </Button>
+                                                    )}
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => handleDeleteDomain(domain.domain)}
+                                                        className="text-destructive hover:text-destructive hover:bg-destructive/10 p-2"
+                                                    >
+                                                        <Trash2 className="w-4 h-4"/>
+                                                    </Button>
+                                                </div>
                                             </div>
 
-                                            {/* Progress Bar */}
-                                            <div className="mb-3">
-                                                <div className="flex items-center justify-between text-sm mb-1">
-                                                    <span className="text-gray-600">Setup Progress</span>
+                                            {/* Progress - visible on mobile and desktop */}
+                                            <div className="space-y-2">
+                                                <div className="flex items-center justify-between text-sm">
                                                     <span
-                                                        className="text-gray-600">{getVerificationProgress(domain)}%</span>
+                                                        className="text-muted-foreground font-medium">Setup Progress</span>
+                                                    <span
+                                                        className="text-muted-foreground">{getVerificationProgress(domain)}%</span>
                                                 </div>
                                                 <Progress value={getVerificationProgress(domain)} className="h-2"/>
                                             </div>
 
-                                            <div className="flex items-center space-x-6 text-sm text-gray-500">
-                                                <div className="flex items-center space-x-1">
-                                                    <Clock className="w-4 h-4"/>
-                                                    <span>Added {formatDate(domain.createdAt)}</span>
-                                                </div>
-                                                {domain.verifiedAt && (
-                                                    <div className="flex items-center space-x-1">
-                                                        <CheckCircle className="w-4 h-4 text-green-600"/>
-                                                        <span>Verified {formatDate(domain.verifiedAt)}</span>
-                                                    </div>
+                                            {/* Expandable content for mobile */}
+                                            <AnimatePresence>
+                                                {(expandedDomains.has(domain.id) || window.innerWidth >= 640) && (
+                                                    <motion.div
+                                                        initial={{opacity: 0, height: 0}}
+                                                        animate={{opacity: 1, height: 'auto'}}
+                                                        exit={{opacity: 0, height: 0}}
+                                                        transition={{duration: 0.2}}
+                                                        className="space-y-4 sm:space-y-0"
+                                                    >
+                                                        {/* Metadata */}
+                                                        <div
+                                                            className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 text-sm text-muted-foreground">
+                                                            <div className="flex items-center gap-2">
+                                                                <Clock className="w-4 h-4"/>
+                                                                <span>Added {formatDate(domain.createdAt)}</span>
+                                                            </div>
+                                                            {domain.verifiedAt && (
+                                                                <div className="flex items-center gap-2">
+                                                                    <CheckCircle className="w-4 h-4 text-green-600"/>
+                                                                    <span>Verified {formatDate(domain.verifiedAt)}</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Mobile actions */}
+                                                        <div className="flex flex-col gap-3 sm:hidden">
+                                                            {domain.verified && (
+                                                                <Button variant="outline" size="sm" asChild
+                                                                        className="gap-2 w-full">
+                                                                    <a
+                                                                        href={`https://${domain.domain}`}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                    >
+                                                                        <ExternalLink className="w-4 h-4"/>
+                                                                        Visit Site
+                                                                    </a>
+                                                                </Button>
+                                                            )}
+                                                            {!domain.verified && (
+                                                                <Button
+                                                                    onClick={() => handleVerifyDomain(domain.domain)}
+                                                                    disabled={verifyingDomain === domain.domain}
+                                                                    size="sm"
+                                                                    className="gap-2 w-full"
+                                                                >
+                                                                    {verifyingDomain === domain.domain ? (
+                                                                        <>
+                                                                            <RefreshCw
+                                                                                className="w-4 h-4 animate-spin"/>
+                                                                            Verifying...
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <CheckCircle className="w-4 h-4"/>
+                                                                            Verify Domain
+                                                                        </>
+                                                                    )}
+                                                                </Button>
+                                                            )}
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() => handleDeleteDomain(domain.domain)}
+                                                                className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-2 w-full"
+                                                            >
+                                                                <Trash2 className="w-4 h-4"/>
+                                                                Remove Domain
+                                                            </Button>
+                                                        </div>
+                                                    </motion.div>
+                                                )}
+                                            </AnimatePresence>
+
+                                            {/* Status Messages */}
+                                            <div className="mt-4">
+                                                {!domain.verified ? (
+                                                    <Alert hasIcon={false}
+                                                        className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950">
+                                                        <ArrowRight
+                                                            className="h-4 w-4 text-amber-600 dark:text-amber-400"/>
+                                                        <AlertDescription
+                                                            className="text-amber-800 dark:text-amber-200 text-sm">
+                                                            <strong>Next step:</strong> Add the DNS records shown above,
+                                                            then click &ldquo;Verify Domain&rdquo; to complete setup.
+                                                            If you can&apos;t see the DNS records, restart setup by
+                                                            deleting this domain.
+                                                        </AlertDescription>
+                                                    </Alert>
+                                                ) : (
+                                                    <Alert hasIcon={false}
+                                                        className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
+                                                        <AlertDescription
+                                                            className="text-green-800 dark:text-green-200 text-sm">
+                                                            <strong>🎉 Congratulations!</strong> Your changelog is live
+                                                            at{' '}
+                                                            <code
+                                                                className="bg-green-100 dark:bg-green-900 px-1 py-0.5 rounded text-xs break-all">
+                                                                {domain.domain}
+                                                            </code>
+                                                        </AlertDescription>
+                                                    </Alert>
                                                 )}
                                             </div>
                                         </div>
-
-                                        <div className="flex items-center space-x-2">
-                                            {!domain.verified && (
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => handleVerifyDomain(domain.domain)}
-                                                    disabled={verifyingDomain === domain.domain}
-                                                >
-                                                    {verifyingDomain === domain.domain ? 'Verifying...' : 'Verify'}
-                                                </Button>
-                                            )}
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => handleDeleteDomain(domain.domain)}
-                                                className="text-red-600 hover:text-red-800"
-                                            >
-                                                <Trash2 className="w-4 h-4"/>
-                                            </Button>
-                                        </div>
-                                    </div>
-
-                                    {/* Status Messages */}
-                                    {!domain.verified && (
-                                        <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                                            <p className="text-sm text-yellow-800">
-                                                <strong>Next step:</strong> Add the DNS records above and
-                                                click &ldquo;Verify&rdquo;
-                                                to complete setup. If you do not see the DNS records, please redo the process.
-                                            </p>
-                                        </div>
-                                    )}
-
-                                    {domain.verified && (
-                                        <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
-                                            <p className="text-sm text-green-800">
-                                                <strong>Live!</strong> Your changelog is available
-                                                at <code>{domain.domain}</code>
-                                            </p>
-                                        </div>
-                                    )}
-                                </motion.div>
-                            ))}
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+                                    </motion.div>
+                                ))}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </motion.div>
         </div>
     )
 }

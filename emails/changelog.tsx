@@ -30,6 +30,8 @@ interface ChangelogEmailProps {
     unsubscribeUrl?: string;
     recipientName?: string; // Added recipient name for personalization
     recipientEmail?: string; // Added recipient email for fallback
+    changelogUrl: string,
+    customDomain?: string // optional custom domain
 }
 
 export const ChangelogEmail: React.FC<ChangelogEmailProps> = ({
@@ -38,7 +40,9 @@ export const ChangelogEmail: React.FC<ChangelogEmailProps> = ({
                                                                   isDigest = false,
                                                                   unsubscribeUrl,
                                                                   recipientName,
-                                                                  recipientEmail
+                                                                  recipientEmail,
+                                                                  changelogUrl,
+                                                                  customDomain
                                                               }) => {
     const title = isDigest
         ? `${projectName} - Latest Changelog Updates`
@@ -56,6 +60,9 @@ export const ChangelogEmail: React.FC<ChangelogEmailProps> = ({
         }
         return 'Hello,';
     };
+
+    // Use custom domain for branding if available
+    const brandDomain = customDomain || changelogUrl
 
     return (
         <Html>
@@ -200,7 +207,7 @@ export const ChangelogEmail: React.FC<ChangelogEmailProps> = ({
                             fontSize: '12px',
                             textAlign: 'center'
                         }}>
-                            You received this email because you&apos;re subscribed to changelog updates for {projectName}.
+                            You received this email because you&apos;re subscribed to changelog updates for {projectName} | {brandDomain}.
                             {unsubscribeUrl && (
                                 <>
                                     <br />

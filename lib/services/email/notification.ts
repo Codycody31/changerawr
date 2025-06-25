@@ -15,6 +15,7 @@ export interface SendEmailParams {
     recipients?: string[];
     isDigest?: boolean;
     subscriberIds?: string[];
+    customDomain?: string;  // custom domain (optional)
 }
 
 export interface EmailResult {
@@ -37,12 +38,34 @@ interface SendNotificationParams {
     dashboardUrl: string;
 }
 
+interface SubscriberWithSubscriptions {
+    id: string;
+    email: string;
+    name: string | null;
+    unsubscribeToken: string;
+    subscriptions: Array<{
+        customDomain: string | null;
+    }>;
+}
+
+interface ManageSubscriptionParams {
+    email: string;
+    projectId: string;
+    subscriptionType?: 'ALL_UPDATES' | 'MAJOR_ONLY' | 'DIGEST_ONLY';
+    unsubscribe?: boolean;
+}
+
+interface SubscriptionResult {
+    success: boolean;
+    message: string;
+}
+
 /**
  * Sends changelog emails to specified recipients or subscribers
  */
 export async function sendChangelogEmail(params: SendEmailParams): Promise<EmailResult> {
     try {
-        const { projectId, subject, changelogEntryId, recipients, isDigest, subscriberIds } = params;
+        const { projectId, subject, changelogEntryId, recipients, isDigest, subscriberIds, customDomain } = params;
 
         // Get project and email config
         const project = await db.project.findUnique({
@@ -109,6 +132,10 @@ export async function sendChangelogEmail(params: SendEmailParams): Promise<Email
             const existingSubscribers = await db.emailSubscriber.findMany({
                 where: {
                     email: { in: recipients },
+                },
+                select: {
+                    id: true,
+                    email: true
                 }
             });
 
@@ -128,11 +155,13 @@ export async function sendChangelogEmail(params: SendEmailParams): Promise<Email
                                     subscriptionType: 'ALL_UPDATES'
                                 }
                             }
+                        },
+                        select: {
+                            id: true
                         }
                     });
                     return subscriber;
-                }
-                ));
+                }));
 
                 // Track new subscriber IDs
                 const newSubscriberIds = newSubscribers.map(s => s.id);
@@ -184,39 +213,55 @@ export async function sendChangelogEmail(params: SendEmailParams): Promise<Email
         // Use the existing entries from the query
         const entries = project.changelog ? project.changelog.entries : [];
 
-        // Generate unsubscribe URLs for each subscriber
-        const subscriberMap = await db.emailSubscriber.findMany({
+        // Get subscriber details with subscriptions - FIXED: using include only
+        const subscriberMap: SubscriberWithSubscriptions[] = await db.emailSubscriber.findMany({
             where: {
                 id: { in: finalSubscriberIds }
             },
-            select: {
-                id: true,
-                email: true,
-                name: true,
-                unsubscribeToken: true
+            include: {
+                subscriptions: {
+                    where: { projectId },
+                    select: { customDomain: true }
+                }
             }
         });
 
         // Get the app URL from environment
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        const baseUrl = customDomain
+            ? `https://${customDomain}`
+            : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
         // Process each email individually with custom unsubscribe link
         const emailPromises = emailRecipients.map(async (email) => {
             const subscriber = subscriberMap.find(s => s.email === email);
+
+            // Determine which domain to use for unsubscribe
+            let unsubscribeBaseUrl = baseUrl;
+            if (!customDomain && subscriber?.subscriptions?.[0]?.customDomain) {
+                unsubscribeBaseUrl = `https://${subscriber.subscriptions[0].customDomain}`;
+            }
+
             const unsubscribeUrl = subscriber
-                ? `${appUrl}/api/subscribers/unsubscribe/${subscriber.unsubscribeToken}?projectId=${projectId}`
-                : `${appUrl}/unsubscribe?email=${encodeURIComponent(email)}&projectId=${projectId}`;
+                ? `${unsubscribeBaseUrl}/api/changelog/unsubscribe/${subscriber.unsubscribeToken}?projectId=${projectId}`
+                : `${unsubscribeBaseUrl}/unsubscribe?email=${encodeURIComponent(email)}&projectId=${projectId}`;
 
-            // Get subscriber name for personalization
-            const recipientName = subscriber?.name || undefined;
+            // Generate the changelog URL based on domain
+            const changelogUrl = customDomain
+                ? `https://${customDomain}`
+                : subscriber?.subscriptions?.[0]?.customDomain
+                    ? `https://${subscriber.subscriptions[0].customDomain}`
+                    : `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/projects/${projectId}`;
 
+            // Pass custom domain and changelog URL to email template
             const emailComponent = ChangelogEmail({
                 projectName: project.name,
                 entries: entries,
                 isDigest: isDigest || false,
                 unsubscribeUrl,
-                recipientName,
-                recipientEmail: email
+                recipientName: subscriber?.name || undefined,
+                recipientEmail: email,
+                customDomain: customDomain || subscriber?.subscriptions?.[0]?.customDomain || undefined,
+                changelogUrl
             });
 
             const html = emailComponent && isValidElement(emailComponent) ? await render(emailComponent, {
@@ -397,12 +442,7 @@ export async function manageSubscription({
                                              projectId,
                                              subscriptionType,
                                              unsubscribe = false
-                                         }: {
-    email: string;
-    projectId: string;
-    subscriptionType?: 'ALL_UPDATES' | 'MAJOR_ONLY' | 'DIGEST_ONLY';
-    unsubscribe?: boolean;
-}) {
+                                         }: ManageSubscriptionParams): Promise<SubscriptionResult> {
     // Check if project exists
     const project = await db.project.findUnique({
         where: { id: projectId }
