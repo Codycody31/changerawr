@@ -1,5 +1,5 @@
-import { db } from '@/lib/db';
-import type { RequestStatus } from '@prisma/client';
+import {db} from '@/lib/db';
+import type {RequestStatus} from '@prisma/client';
 import {sendNotificationEmail} from "@/lib/services/email/notification";
 
 // Types
@@ -50,6 +50,7 @@ interface DatabaseChangelogRequest {
         content: string;
         version: string | null;
         publishedAt: Date | null;
+        scheduledAt: Date | null;
         changelogId: string;
         createdAt: Date;
         updatedAt: Date;
@@ -80,48 +81,48 @@ interface RequestProcessor {
 
 // Request processors
 class DeleteProjectProcessor implements RequestProcessor {
-    async processRequest({ tx, request }: RequestContext): Promise<void> {
+    async processRequest({tx, request}: RequestContext): Promise<void> {
         if (!request.projectId) {
             throw new Error('Project ID is required for project deletion');
         }
 
         // Delete all related requests first
         await tx.changelogRequest.deleteMany({
-            where: { projectId: request.projectId }
+            where: {projectId: request.projectId}
         });
 
         // Find and delete changelog entries if they exist
         const projectChangelog = await tx.changelog.findUnique({
-            where: { projectId: request.projectId },
-            include: { entries: true }
+            where: {projectId: request.projectId},
+            include: {entries: true}
         });
 
         if (projectChangelog) {
             await tx.changelogEntry.deleteMany({
-                where: { changelogId: projectChangelog.id }
+                where: {changelogId: projectChangelog.id}
             });
 
             // Delete the changelog
             await tx.changelog.delete({
-                where: { id: projectChangelog.id }
+                where: {id: projectChangelog.id}
             });
         }
 
         // Finally, delete the project
         await tx.project.delete({
-            where: { id: request.projectId }
+            where: {id: request.projectId}
         });
     }
 }
 
 class DeleteTagProcessor implements RequestProcessor {
-    async processRequest({ tx, request }: RequestContext): Promise<void> {
+    async processRequest({tx, request}: RequestContext): Promise<void> {
         if (!request.projectId || !request.targetId) {
             throw new Error('Project ID and target ID are required for tag deletion');
         }
 
         const project = await tx.project.findUnique({
-            where: { id: request.projectId },
+            where: {id: request.projectId},
             include: {
                 changelog: {
                     include: {
@@ -142,7 +143,7 @@ class DeleteTagProcessor implements RequestProcessor {
 
         // Update project with new tags array
         await tx.project.update({
-            where: { id: request.projectId },
+            where: {id: request.projectId},
             data: {
                 defaultTags: updatedTags
             }
@@ -158,53 +159,101 @@ class DeleteTagProcessor implements RequestProcessor {
         const entriesWithTag = await tx.changelogEntry.findMany({
             where: {
                 tags: {
-                    some: { id: tagId }
+                    some: {id: tagId}
                 }
             }
         });
 
         for (const entry of entriesWithTag) {
             await tx.changelogEntry.update({
-                where: { id: entry.id },
+                where: {id: entry.id},
                 data: {
                     tags: {
-                        disconnect: { id: tagId }
+                        disconnect: {id: tagId}
                     }
                 }
             });
         }
 
         await tx.changelogTag.delete({
-            where: { id: tagId }
+            where: {id: tagId}
         });
     }
 }
 
 class DeleteEntryProcessor implements RequestProcessor {
-    async processRequest({ tx, request }: RequestContext): Promise<void> {
+    async processRequest({tx, request}: RequestContext): Promise<void> {
         if (!request.ChangelogEntry?.id) {
             throw new Error('Changelog entry ID is required for entry deletion');
         }
 
         await tx.changelogEntry.delete({
-            where: { id: request.ChangelogEntry.id }
+            where: {id: request.ChangelogEntry.id}
         });
     }
 }
 
 class AllowPublishProcessor implements RequestProcessor {
-    async processRequest({ tx, request }: RequestContext): Promise<void> {
+    async processRequest({tx, request}: RequestContext): Promise<void> {
         if (!request.ChangelogEntry?.id) {
             throw new Error('Changelog entry ID is required for publishing');
         }
 
         // Update the entry's publish status
         await tx.changelogEntry.update({
-            where: { id: request.ChangelogEntry.id },
+            where: {id: request.ChangelogEntry.id},
             data: {
                 publishedAt: new Date()
             }
         });
+    }
+}
+
+class AllowScheduleProcessor implements RequestProcessor {
+    async processRequest({tx, request}: RequestContext): Promise<void> {
+        if (!request.ChangelogEntry?.id) {
+            throw new Error('Changelog entry ID is required for scheduling');
+        }
+
+        if (!request.targetId) {
+            throw new Error('Scheduled time is required for schedule approval');
+        }
+
+        const scheduledAt = new Date(request.targetId);
+
+        // Validate the scheduled time is in the future
+        if (scheduledAt <= new Date()) {
+            throw new Error('Scheduled time must be in the future');
+        }
+
+        // Check if entry is already published
+        if (request.ChangelogEntry.publishedAt) {
+            throw new Error('Cannot schedule an already published entry');
+        }
+
+        // Update the entry with the scheduled time
+        await tx.changelogEntry.update({
+            where: {id: request.ChangelogEntry.id},
+            data: {
+                scheduledAt: scheduledAt
+            }
+        });
+
+        // Create the scheduled job - import dynamically to avoid circular dependencies
+        try {
+            const {ScheduledJobService} = await import('@/lib/services/jobs/scheduled-job.service');
+            const {ScheduledJobType} = await import('@/lib/services/jobs/scheduled-job.service');
+
+            await ScheduledJobService.createJob({
+                type: ScheduledJobType.PUBLISH_CHANGELOG_ENTRY,
+                entityId: request.ChangelogEntry.id,
+                scheduledAt: scheduledAt,
+            });
+        } catch (error) {
+            console.error('Failed to create scheduled job:', error);
+            // Don't fail the transaction if job creation fails
+            // The entry will still be scheduled, but might need manual intervention
+        }
     }
 }
 
@@ -214,7 +263,8 @@ class RequestProcessorRegistry {
         'DELETE_PROJECT': new DeleteProjectProcessor(),
         'DELETE_TAG': new DeleteTagProcessor(),
         'DELETE_ENTRY': new DeleteEntryProcessor(),
-        'ALLOW_PUBLISH': new AllowPublishProcessor()
+        'ALLOW_PUBLISH': new AllowPublishProcessor(),
+        'ALLOW_SCHEDULE': new AllowScheduleProcessor()
     };
 
     static getProcessor(type: string): RequestProcessor {
@@ -258,8 +308,8 @@ class ChangelogRequestService {
             try {
                 // Need to fetch staff with settings included since it's not in the transaction result
                 const staffWithSettings = await db.user.findUnique({
-                    where: { id: result.data.staffId },
-                    include: { settings: true }
+                    where: {id: result.data.staffId},
+                    include: {settings: true}
                 });
 
                 // Only send notification if user exists and has them enabled (or if no preference is set)
@@ -267,8 +317,8 @@ class ChangelogRequestService {
                     // Fetch admin name for the notification
                     const admin = result.data.adminId
                         ? await db.user.findUnique({
-                            where: { id: result.data.adminId },
-                            select: { name: true }
+                            where: {id: result.data.adminId},
+                            select: {name: true}
                         })
                         : null;
 
@@ -311,7 +361,7 @@ class ChangelogRequestService {
 
     private async findRequest(tx: PrismaTransaction, requestId: string): Promise<DatabaseChangelogRequest> {
         const request = await tx.changelogRequest.findUnique({
-            where: { id: requestId },
+            where: {id: requestId},
             include: {
                 project: {
                     include: {
@@ -343,7 +393,7 @@ class ChangelogRequestService {
         options: ProcessRequestOptions
     ): Promise<DatabaseChangelogRequest> {
         const updatedRequest = await tx.changelogRequest.update({
-            where: { id: options.requestId },
+            where: {id: options.requestId},
             data: {
                 status: options.status,
                 adminId: options.adminId,
@@ -373,7 +423,7 @@ class ChangelogRequestService {
     private async processApprovedRequest(tx: PrismaTransaction, request: DatabaseChangelogRequest) {
         try {
             const processor = RequestProcessorRegistry.getProcessor(request.type);
-            await processor.processRequest({ tx, request });
+            await processor.processRequest({tx, request});
         } catch (error) {
             console.error('Error processing request:', error);
             throw new Error(`Failed to process ${request.type}: ${(error as Error).message}`);
@@ -422,4 +472,4 @@ export type {
     DatabaseChangelogRequest
 };
 
-export { RequestProcessorRegistry };
+export {RequestProcessorRegistry};

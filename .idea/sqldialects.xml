@@ -12,5 +12,8 @@
     <file url="file://$PROJECT_DIR$/prisma/migrations/20250512000000_add_github_integration/migration.sql" dialect="PostgreSQL" />
     <file url="file://$PROJECT_DIR$/prisma/migrations/20250610120000_fix_user_deletion_constraints/migration.sql" dialect="PostgreSQL" />
     <file url="file://$PROJECT_DIR$/prisma/migrations/20250613040144_changelog_analytics/migration.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/prisma/migrations/20250624024525_add_custom_domains/migration.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/prisma/migrations/20250625030954_add_custom_domains_to_email_notifications/migration.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/prisma/migrations/20250625120000_add_changelog_scheduling/migration.sql" dialect="PostgreSQL" />
   </component>
 </project>
