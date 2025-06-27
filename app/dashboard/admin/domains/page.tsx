@@ -490,7 +490,7 @@ export default function AdminDomainsPage() {
                             </div>
 
                             <div className="flex items-center justify-between pt-2">
-                                <Alert className="flex-1 mr-3 py-2 border-blue-200 bg-blue-50/50">
+                                <Alert>
                                     <AlertDescription className="text-xs text-blue-700">
                                         DNS changes can take up to 48 hours to propagate.
                                     </AlertDescription>

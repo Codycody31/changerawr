@@ -1,6 +1,7 @@
 - [ ] custom fields
-- [ ] tags can have a color assigned to them (requires updating the SDKs)
+- [x] tags can have a color assigned to them (requires updating the SDKs) - partially done DB side, UI implementation must be done.
 - [x] pwnedpasswords password check
 - [x] custom domains (what a headache to implement!)
-- [ ] scheduled publishing
-- [ ] full-text search
+- [x] scheduled publishing
+- [x] full-text search
+- [ ] version range comparison (catch-up) thinking a digest of what's been done from here-to-there, could be fun!

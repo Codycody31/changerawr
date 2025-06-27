@@ -34,6 +34,8 @@ If you don't know what a changelog is, check out [betterauth](https://www.better
 - **🔗 Multiple Integrations** - Connect with your existing tools
 - **🔐 Modern Authentication** - Custom-built auth with passkey support
 - **🖥️ Desktop-First Design** - Built for desktop use (mobile works, but it's quirky)
+- **🔍 Full-Text Search** - Search everything, instantly
+- -**🌐 Custom Domains** - Link a custom domain to your changelog
 
 ## 🚀 Quick Start
 
@@ -160,12 +162,14 @@ changerawr/
 ├── app/                 # Next.js App Router
 │   ├── api/            # API endpoints
 │   ├── (auth)/         # Auth pages
+|   ├── chaneglog/      # Changelog pages (public/custom-domain)
 │   └── dashboard/      # Main app
 ├── components/         # React components
 ├── lib/               # Core utilities
 ├── prisma/            # Database schema
 ├── widgets/           # Widget source
-└── scripts/           # Build scripts
+├── scripts/           # Build scripts
+└── emails/            # Email templates
 ```
 
 ## 🚢 Deployment
@@ -180,6 +184,9 @@ docker build -t changerawr .
 docker run -p 3000:3000 \
   -e DATABASE_URL="your-database-url" \
   -e JWT_ACCESS_SECRET="your-secret" \
+  -e NEXT_PUBLIC_APP_URL="your-app-url" \
+  -e GITHUB_ENCRYPTION_KEY="your-encryption-key-32-chars" \
+  -e ANALYTICS_SALT="your-analytics-salt" \
   changerawr
 ```
 

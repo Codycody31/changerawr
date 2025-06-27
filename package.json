@@ -20,6 +20,7 @@
   "dependencies": {
     "@faker-js/faker": "^9.5.0",
     "@headlessui/react": "^2.2.0",
+    "@heroicons/react": "^2.2.0",
     "@hookform/resolvers": "^4.0.0",
     "@mistralai/mistralai": "^1.5.0",
     "@prisma/client": "^6.6.0",
@@ -61,7 +62,7 @@
     "chalk": "^5.4.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "cmdk": "^1.0.0",
+    "cmdk": "^1.1.1",
     "comment-parser": "^1.4.1",
     "compare-versions": "^6.1.1",
     "cookies-next": "^5.1.0",
