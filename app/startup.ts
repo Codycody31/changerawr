@@ -1,32 +1,46 @@
-import {JobRunnerService} from "@/lib/services/jobs/job-runner.service";
+import {JobRunnerService} from '@/lib/services/jobs/job-runner.service';
+import {TelemetryService} from '@/lib/services/telemetry/service';
 
-export function startBackgroundServices(): void {
-    // Only start in production or when explicitly enabled
-    const shouldStartJobRunner =
-        process.env.NODE_ENV === 'production' ||
-        process.env.ENABLE_JOB_RUNNER === 'true';
+let servicesStarted = false;
 
-    if (shouldStartJobRunner) {
-        // Start job runner with 1-minute intervals
-        JobRunnerService.start(60000);
+export async function startBackgroundServices() {
+    if (servicesStarted) {
+        console.log('Background services already started');
+        return;
+    }
 
-        // Set up cleanup to run daily at 2 AM
-        const now = new Date();
-        const tomorrow2AM = new Date(now);
-        tomorrow2AM.setDate(tomorrow2AM.getDate() + 1);
-        tomorrow2AM.setHours(2, 0, 0, 0);
+    console.log('Starting background services...');
 
-        const msUntil2AM = tomorrow2AM.getTime() - now.getTime();
+    try {
+        // Initialize telemetry system
+        await TelemetryService.initialize();
+        console.log('✓ Telemetry service initialized');
 
-        setTimeout(() => {
-            JobRunnerService.cleanup(30); // Clean up jobs older than 30 days
+        // Start job runner (this will handle telemetry jobs and existing jobs)
+        JobRunnerService.start(60000); // Check every minute
+        console.log('✓ Job runner started');
 
-            // Set up daily cleanup
-            setInterval(() => {
-                JobRunnerService.cleanup(30);
-            }, 24 * 60 * 60 * 1000); // 24 hours
-        }, msUntil2AM);
+        // Handle graceful shutdown
+        const handleShutdown = async (signal: string) => {
+            console.log(`Received ${signal}, shutting down gracefully...`);
 
-        console.log('Background services started');
+            // Stop job runner
+            JobRunnerService.stop();
+            console.log('✓ Job runner stopped');
+
+            // Handle telemetry shutdown
+            await TelemetryService.shutdown();
+            console.log('✓ Telemetry service shutdown complete');
+
+            process.exit(0);
+        };
+
+        process.on('SIGINT', () => handleShutdown('SIGINT'));
+        process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+
+        servicesStarted = true;
+        console.log('✓ All background services started successfully');
+    } catch (error) {
+        console.error('Failed to start background services:', error);
     }
 }

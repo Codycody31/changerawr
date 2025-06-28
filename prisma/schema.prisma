@@ -239,24 +239,27 @@ model AuditLog {
 }
 
 model SystemConfig {
-  id                            Int      @id @default(1)
-  defaultInvitationExpiry       Int      @default(7)
-  requireApprovalForChangelogs  Boolean  @default(true)
-  maxChangelogEntriesPerProject Int      @default(100)
-  enableAnalytics               Boolean  @default(true)
-  enableNotifications           Boolean  @default(true)
-  enablePasswordReset           Boolean  @default(false)
-  enableAIAssistant             Boolean  @default(false) // Enable/disable AI assistant globally
+  id                            Int            @id @default(1)
+  defaultInvitationExpiry       Int            @default(7)
+  requireApprovalForChangelogs  Boolean        @default(true)
+  maxChangelogEntriesPerProject Int            @default(100)
+  enableAnalytics               Boolean        @default(true)
+  enableNotifications           Boolean        @default(true)
+  enablePasswordReset           Boolean        @default(false)
+  enableAIAssistant             Boolean        @default(false) // Enable/disable AI assistant globally
   aiApiKey                      String? // Global API key for AI service
-  aiApiProvider                 String?  @default("secton") // AI provider
-  aiDefaultModel                String?  @default("copilot-zero") // Default model to use
+  aiApiProvider                 String?        @default("secton") // AI provider
+  aiDefaultModel                String?        @default("copilot-zero") // Default model to use
   smtpHost                      String?
   smtpPort                      Int?
   smtpUser                      String?
   smtpPassword                  String?
   smtpSecure                    Boolean?
   systemEmail                   String?
-  updatedAt                     DateTime @updatedAt
+  allowTelemetry                TelemetryState @default(PROMPT)
+  telemetryInstanceId           String?        @unique
+  createdAt                     DateTime       @default(now())
+  updatedAt                     DateTime       @updatedAt
 }
 
 model EmailConfig {
@@ -417,21 +420,21 @@ model CustomDomain {
 }
 
 model ScheduledJob {
-  id           String           @id @default(cuid())
-  type         ScheduledJobType
-  entityId     String // ID of the entity (e.g., ChangelogEntry ID)
-  scheduledAt  DateTime // When to execute
-  executedAt   DateTime? // When it was actually executed
-  status       JobStatus        @default(PENDING)
-  errorMessage String? // Error details if failed
-  retryCount   Int              @default(0)
-  maxRetries   Int              @default(3)
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  id               String           @id @default(cuid())
+  type             ScheduledJobType
+  entityId         String // ID of the entity (e.g., ChangelogEntry ID)
+  scheduledAt      DateTime // When to execute
+  executedAt       DateTime? // When it was actually executed
+  status           JobStatus        @default(PENDING)
+  errorMessage     String? // Error details if failed
+  retryCount       Int              @default(0)
+  maxRetries       Int              @default(3)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  ChangelogEntry   ChangelogEntry?  @relation(fields: [changelogEntryId], references: [id])
+  changelogEntryId String?
 
   // Relations
-  changelogEntry ChangelogEntry? @relation(fields: [entityId], references: [id], onDelete: Cascade)
-
   @@index([type])
   @@index([entityId])
   @@index([scheduledAt])
@@ -444,6 +447,7 @@ enum ScheduledJobType {
   UNPUBLISH_CHANGELOG_ENTRY
   DELETE_CHANGELOG_ENTRY
   SEND_EMAIL_NOTIFICATION
+  TELEMETRY_SEND
 }
 
 enum JobStatus {
@@ -452,6 +456,12 @@ enum JobStatus {
   COMPLETED
   FAILED
   CANCELLED
+}
+
+enum TelemetryState {
+  PROMPT
+  ENABLED
+  DISABLED
 }
 
 enum Role {

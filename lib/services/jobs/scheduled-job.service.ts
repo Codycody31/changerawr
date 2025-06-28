@@ -2,6 +2,7 @@ import {db} from "@/lib/db";
 import {ScheduledJobType, JobStatus} from "@prisma/client";
 import {createAuditLog} from "@/lib/utils/auditLog";
 import {ChangelogPublishExecutor} from "@/lib/services/jobs/executors/changelog-publish.executor"
+import {TelemetrySendExecutor} from "@/lib/services/jobs/executors/telemetry-send.executor"
 
 export interface CreateScheduledJobParams {
     type: ScheduledJobType;
@@ -219,6 +220,11 @@ export class ScheduledJobService {
 ScheduledJobService.registerExecutor(
     ScheduledJobType.PUBLISH_CHANGELOG_ENTRY,
     new ChangelogPublishExecutor()
+);
+
+ScheduledJobService.registerExecutor(
+    ScheduledJobType.TELEMETRY_SEND,
+    new TelemetrySendExecutor()
 );
 
 // Export types and main service

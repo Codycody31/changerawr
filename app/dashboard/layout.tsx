@@ -28,7 +28,9 @@ import WhatsNewModal from '@/components/dashboard/WhatsNewModal'
 import {useWhatsNew} from '@/hooks/useWhatsNew'
 import {NavSection, Sidebar, SidebarUser} from '@/components/ui/sidebar'
 import {getGravatarUrl} from '@/lib/utils/gravatar'
-import {CommandPaletteProvider} from "@/components/providers/CommandPaletteProvider";
+import {CommandPaletteProvider} from "@/components/providers/CommandPaletteProvider"
+import {TelemetryPromptModal} from '@/components/telemetry/PromptModal'
+import {useTelemetry} from '@/hooks/useTelemetry'
 
 // Navigation Configuration
 const NAV_SECTIONS: NavSection[] = [
@@ -172,6 +174,12 @@ export default function DashboardLayout({
         isLoading: isWhatsNewLoading
     } = useWhatsNew()
 
+    // Telemetry modal state - always call hook but pass enabled flag
+    const {
+        showPrompt: showTelemetryPrompt,
+        handleTelemetryChoice,
+    } = useTelemetry(!!user)
+
     // Convert Prisma User to SidebarUser
     const sidebarUser: SidebarUser | null = user ? {
         id: user.id,
@@ -292,6 +300,14 @@ export default function DashboardLayout({
                         </div>
                     </div>
                 </main>
+
+                {/* Telemetry Prompt Modal */}
+                {user && (
+                    <TelemetryPromptModal
+                        isOpen={showTelemetryPrompt}
+                        onChoice={handleTelemetryChoice}
+                    />
+                )}
 
                 {/* What's New Modal */}
                 {!isWhatsNewLoading && (
