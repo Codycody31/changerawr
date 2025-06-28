@@ -15,3 +15,5 @@
     - media manager
     - storage providers (s3, local, maybe google drive not sure)
     - enables for reusable media that can be uploaded to the content editor.
+
+- [ ] ability to specify a custom logo for an SSO provider
