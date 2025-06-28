@@ -145,7 +145,7 @@ export async function middleware(request: NextRequest) {
     const accessToken = request.cookies.get('accessToken')?.value
     const refreshToken = request.cookies.get('refreshToken')?.value
 
-    if (AUTH_ROUTES.includes(pathname)) {
+    if (AUTH_ROUTES.some(route => pathname.startsWith(route))) {
         if (accessToken) {
             try {
                 const userId = await verifyAccessToken(accessToken)

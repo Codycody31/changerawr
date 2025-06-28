@@ -15,5 +15,6 @@
     <file url="file://$PROJECT_DIR$/prisma/migrations/20250624024525_add_custom_domains/migration.sql" dialect="PostgreSQL" />
     <file url="file://$PROJECT_DIR$/prisma/migrations/20250625030954_add_custom_domains_to_email_notifications/migration.sql" dialect="PostgreSQL" />
     <file url="file://$PROJECT_DIR$/prisma/migrations/20250625120000_add_changelog_scheduling/migration.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/prisma/migrations/20250627020135_add_color_field_to_changelog_tag/migration.sql" dialect="PostgreSQL" />
   </component>
 </project>

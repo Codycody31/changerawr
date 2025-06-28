@@ -64,7 +64,8 @@ interface CursorCondition {
  *               "type": "object",
  *               "properties": {
  *                 "id": { "type": "string" },
- *                 "name": { "type": "string" }
+ *                 "name": { "type": "string" },
+ *                 "color": { "type": "string", "nullable": true }
  *               }
  *             }
  *           }
@@ -198,7 +199,8 @@ export async function GET(
                     tags: {
                         select: {
                             id: true,
-                            name: true
+                            name: true,
+                            color: true  // Include color field in the response
                         }
                     }
                 }

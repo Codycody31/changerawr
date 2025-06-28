@@ -1,19 +1,28 @@
-import React, { useState, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
-import { Tags, Check, Plus, Sparkles, Loader2, X, AlertCircle, CheckCircle } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
-import { Badge } from "@/components/ui/badge";
-import { cn } from '@/lib/utils';
-import { motion, AnimatePresence } from 'framer-motion';
+// components/changelog/editor/TagSelector.tsx
+import React, {useState, useCallback} from 'react';
+import {Button} from '@/components/ui/button';
+import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover';
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+    CommandSeparator
+} from "@/components/ui/command";
+import {Tags, Check, Plus, Sparkles, Loader2, X, AlertCircle, CheckCircle, Palette} from 'lucide-react';
+import {Separator} from '@/components/ui/separator';
+import {Badge} from "@/components/ui/badge";
+import {cn} from '@/lib/utils';
+import {motion, AnimatePresence} from 'framer-motion';
 import {
     Tooltip,
     TooltipContent,
     TooltipTrigger,
     TooltipProvider
 } from '@/components/ui/tooltip';
-import { Input } from '@/components/ui/input';
+import {Input} from '@/components/ui/input';
 import {
     Card,
     CardContent,
@@ -22,10 +31,12 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
+import {ColorPicker} from '@/components/changelog/editor/TagColorPicker';
 
 interface Tag {
     id: string;
     name: string;
+    color?: string | null;
 }
 
 interface TagSelectorProps {
@@ -54,6 +65,8 @@ export default function TagSelector({
     const [isOpen, setIsOpen] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
     const [newTagName, setNewTagName] = useState('');
+    const [newTagColor, setNewTagColor] = useState<string | null>(null);
+    const [showColorPicker, setShowColorPicker] = useState(false);
 
     // AI suggestion state
     const [isGenerating, setIsGenerating] = useState(false);
@@ -172,7 +185,7 @@ export default function TagSelector({
         onTagsChange(newTags);
     };
 
-    // Handle creating a new tag
+    // Handle creating a new tag with color support
     const handleCreateTag = useCallback(async (name: string) => {
         if (!name.trim()) return;
 
@@ -183,7 +196,10 @@ export default function TagSelector({
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ name })
+                body: JSON.stringify({
+                    name: name.trim(),
+                    color: newTagColor
+                })
             });
 
             if (!response.ok) {
@@ -195,15 +211,17 @@ export default function TagSelector({
             // Add new tag to selected tags
             onTagsChange([...selectedTags, newTag]);
 
-            // Reset search
+            // Reset form
             setSearch('');
             setNewTagName('');
+            setNewTagColor(null);
+            setShowColorPicker(false);
         } catch (error) {
             console.error('Error creating tag:', error);
         } finally {
             setIsCreating(false);
         }
-    }, [projectId, selectedTags, onTagsChange]);
+    }, [projectId, selectedTags, onTagsChange, newTagColor]);
 
     // Handle AI tag suggestions
     const generateTagSuggestions = useCallback(async () => {
@@ -260,7 +278,7 @@ ${formattedSections}
                             role: 'system',
                             content: 'You are a skilled content tagger for a changelog system. Your job is to select the most appropriate tags for content.'
                         },
-                        { role: 'user', content: prompt }
+                        {role: 'user', content: prompt}
                     ],
                     temperature: 0.3,
                     max_tokens: 30 // Reduced to save tokens
@@ -326,13 +344,13 @@ ${formattedSections}
             <Popover open={isOpen} onOpenChange={setIsOpen}>
                 <PopoverTrigger asChild>
                     <Button variant="outline" className="h-8 border-dashed">
-                        <Tags className="mr-2 h-4 w-4" />
+                        <Tags className="mr-2 h-4 w-4"/>
                         {selectedTags?.length > 0 ? (
                             <>
                                 <span className="hidden md:inline-block">
                                   {selectedTags.length} selected
                                 </span>
-                                <Separator orientation="vertical" className="mx-2 h-4" />
+                                <Separator orientation="vertical" className="mx-2 h-4"/>
                             </>
                         ) : (
                             <span className="hidden md:inline-block">Select tags</span>
@@ -349,7 +367,7 @@ ${formattedSections}
                     {/* Header section with actions */}
                     <div className="flex items-center justify-between p-2 border-b">
                         <div className="flex items-center gap-2">
-                            <Tags className="h-4 w-4 text-muted-foreground" />
+                            <Tags className="h-4 w-4 text-muted-foreground"/>
                             <span className="text-sm font-medium">Tags</span>
                         </div>
 
@@ -363,7 +381,7 @@ ${formattedSections}
                                         onClick={clearTags}
                                         disabled={selectedTags.length === 0}
                                     >
-                                        <X className="h-3.5 w-3.5 mr-1" />
+                                        <X className="h-3.5 w-3.5 mr-1"/>
                                         <span className="text-xs">Clear</span>
                                     </Button>
                                 </TooltipTrigger>
@@ -393,9 +411,9 @@ ${formattedSections}
                                             }}
                                         >
                                             {isGenerating ? (
-                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                <Loader2 className="h-4 w-4 animate-spin"/>
                                             ) : (
-                                                <Sparkles className="h-4 w-4" />
+                                                <Sparkles className="h-4 w-4"/>
                                             )}
                                         </Button>
                                     </TooltipTrigger>
@@ -411,16 +429,16 @@ ${formattedSections}
                             <AnimatePresence>
                                 {showSuggestions && suggestedTags.length > 0 && (
                                     <motion.div
-                                        initial={{ opacity: 0, height: 0 }}
-                                        animate={{ opacity: 1, height: 'auto' }}
-                                        exit={{ opacity: 0, height: 0 }}
-                                        transition={{ duration: 0.2 }}
+                                        initial={{opacity: 0, height: 0}}
+                                        animate={{opacity: 1, height: 'auto'}}
+                                        exit={{opacity: 0, height: 0}}
+                                        transition={{duration: 0.2}}
                                         className="overflow-hidden"
                                     >
                                         <Card className="border-0 shadow-none rounded-none bg-primary/5">
                                             <CardHeader className="p-2 pb-0">
                                                 <CardTitle className="text-sm flex items-center gap-2">
-                                                    <Sparkles className="h-3.5 w-3.5 text-primary" />
+                                                    <Sparkles className="h-3.5 w-3.5 text-primary"/>
                                                     AI Suggested Tags
                                                 </CardTitle>
                                                 <CardDescription className="text-xs">
@@ -436,13 +454,14 @@ ${formattedSections}
                                                             <Badge
                                                                 key={`suggested-${tag.id}-${index}`}
                                                                 variant={isSelected ? "default" : "outline"}
+                                                                color={tag.color || undefined}
                                                                 className={cn(
                                                                     "cursor-pointer transition-all duration-200",
-                                                                    isSelected ? "bg-primary" : "bg-primary/10 hover:bg-primary/20"
+                                                                    !tag.color && (isSelected ? "bg-primary" : "bg-primary/10 hover:bg-primary/20")
                                                                 )}
                                                                 onClick={() => toggleTag(tag)}
                                                             >
-                                                                {isSelected && <Check className="h-3 w-3 mr-1" />}
+                                                                {isSelected && <Check className="h-3 w-3 mr-1"/>}
                                                                 {tag.name}
                                                             </Badge>
                                                         );
@@ -458,7 +477,7 @@ ${formattedSections}
                                                         className="h-7 text-xs"
                                                         onClick={applyAllSuggestions}
                                                     >
-                                                        <CheckCircle className="h-3 w-3 mr-1" />
+                                                        <CheckCircle className="h-3 w-3 mr-1"/>
                                                         Apply all
                                                     </Button>
                                                 )}
@@ -472,14 +491,14 @@ ${formattedSections}
                                                 </Button>
                                             </CardFooter>
                                         </Card>
-                                        <CommandSeparator />
+                                        <CommandSeparator/>
                                     </motion.div>
                                 )}
                             </AnimatePresence>
 
                             {suggestionError && (
                                 <div className="px-2 py-2 text-xs text-destructive flex items-start gap-2">
-                                    <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                                    <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5"/>
                                     <span>{suggestionError}</span>
                                 </div>
                             )}
@@ -488,7 +507,7 @@ ${formattedSections}
                                 <div className="py-3 px-4 text-center text-sm">
                                     <p className="text-muted-foreground mb-2">No tags found</p>
                                     {search && (
-                                        <div className="mt-2">
+                                        <div className="mt-2 space-y-3">
                                             <p className="text-xs text-muted-foreground mb-2">Create a new tag:</p>
                                             <div className="flex gap-2">
                                                 <Input
@@ -499,20 +518,40 @@ ${formattedSections}
                                                     placeholder="Tag name"
                                                 />
                                                 <Button
-                                                    variant="default"
+                                                    variant="outline"
                                                     size="sm"
-                                                    className="h-8"
-                                                    disabled={isCreating || !(newTagName || search).trim()}
-                                                    onClick={() => handleCreateTag(newTagName || search)}
+                                                    className="h-8 px-2"
+                                                    onClick={() => setShowColorPicker(!showColorPicker)}
                                                 >
-                                                    {isCreating ? (
-                                                        <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
-                                                    ) : (
-                                                        <Plus className="h-3.5 w-3.5 mr-1" />
-                                                    )}
-                                                    Create
+                                                    <Palette className="h-3.5 w-3.5"/>
                                                 </Button>
                                             </div>
+
+                                            {showColorPicker && (
+                                                <div className="w-full">
+                                                    <ColorPicker
+                                                        value={newTagColor}
+                                                        onChange={setNewTagColor}
+                                                        placeholder="Choose tag color"
+                                                        showCustomInput={true}
+                                                    />
+                                                </div>
+                                            )}
+
+                                            <Button
+                                                variant="default"
+                                                size="sm"
+                                                className="h-8 w-full"
+                                                disabled={isCreating || !(newTagName || search).trim()}
+                                                onClick={() => handleCreateTag(newTagName || search)}
+                                            >
+                                                {isCreating ? (
+                                                    <Loader2 className="h-3.5 w-3.5 animate-spin mr-1"/>
+                                                ) : (
+                                                    <Plus className="h-3.5 w-3.5 mr-1"/>
+                                                )}
+                                                Create &ldquo;{(newTagName || search).trim()}&rdquo;
+                                            </Button>
                                         </div>
                                     )}
                                 </div>
@@ -540,12 +579,21 @@ ${formattedSections}
                                                     "mr-2 h-4 w-4 flex items-center justify-center rounded-sm",
                                                     isSelected ? "bg-primary text-primary-foreground" : "border border-primary/20"
                                                 )}>
-                                                    {isSelected && <Check className="h-3 w-3" />}
+                                                    {isSelected && <Check className="h-3 w-3"/>}
                                                 </div>
+
+                                                {tag.color && (
+                                                    <div
+                                                        className="h-3 w-3 rounded-full border border-gray-300 mr-2"
+                                                        style={{backgroundColor: tag.color}}
+                                                    />
+                                                )}
+
                                                 <span className="flex-1">{tag.name}</span>
                                                 <div className="flex items-center gap-1">
                                                     {isSuggested && !isSelected && (
-                                                        <Badge variant="outline" className="ml-auto text-xs bg-primary/10">
+                                                        <Badge variant="outline"
+                                                               className="ml-auto text-xs bg-primary/10">
                                                             Suggested
                                                         </Badge>
                                                     )}
@@ -569,11 +617,15 @@ ${formattedSections}
                                             <Badge
                                                 key={`selected-${tag.id}-${index}`}
                                                 variant="default"
-                                                className="text-xs cursor-pointer flex items-center gap-1 bg-primary"
+                                                color={tag.color || undefined}
+                                                className={cn(
+                                                    "text-xs cursor-pointer flex items-center gap-1",
+                                                    !tag.color && "bg-primary"
+                                                )}
                                                 onClick={() => toggleTag(tag)}
                                             >
                                                 {tag.name}
-                                                <X className="h-3 w-3 ml-1" />
+                                                <X className="h-3 w-3 ml-1"/>
                                             </Badge>
                                         ))}
                                     </div>
