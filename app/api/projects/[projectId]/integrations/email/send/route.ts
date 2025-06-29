@@ -52,6 +52,20 @@ export async function POST(
             }, { status: 400 });
         }
 
+        // Detect custom domain from request headers
+        const host = request.headers.get('host');
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || '';
+        let customDomain: string | undefined;
+
+        try {
+            const appDomain = new URL(appUrl).hostname;
+            if (host && host !== appDomain && !host.includes('localhost') && !host.includes('127.0.0.1')) {
+                customDomain = host;
+            }
+        } catch (error) {
+            console.error('Error parsing app URL:', error);
+        }
+
         // Parse and validate request body
         const body = await request.json();
         const validatedData = sendEmailSchema.parse(body);
@@ -97,7 +111,8 @@ export async function POST(
             changelogEntryId: validatedData.isDigest ? undefined : validatedData.changelogEntryId,
             recipients: validatedData.recipients,
             isDigest: validatedData.isDigest,
-            subscriberIds: subscriberIds.length > 0 ? subscriberIds : undefined
+            subscriberIds: subscriberIds.length > 0 ? subscriberIds : undefined,
+            customDomain
         });
 
         return NextResponse.json({

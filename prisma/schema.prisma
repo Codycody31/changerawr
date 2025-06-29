@@ -4,7 +4,8 @@ datasource db {
 }
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearchPostgres"]
 }
 
 model User {
@@ -122,6 +123,7 @@ model Project {
   ProjectSubscription ProjectSubscription[]
   gitHubIntegration   GitHubIntegration?
   analyticsViews      PublicChangelogAnalytics[]
+  customDomains       CustomDomain[]
 }
 
 model Passkey {
@@ -155,6 +157,7 @@ model ChangelogEntry {
   content        String                     @db.Text
   version        String?
   publishedAt    DateTime?
+  scheduledAt    DateTime?
   createdAt      DateTime                   @default(now())
   updatedAt      DateTime                   @updatedAt
   tags           ChangelogTag[]
@@ -162,13 +165,17 @@ model ChangelogEntry {
   changelogId    String
   requests       ChangelogRequest[]
   analyticsViews PublicChangelogAnalytics[]
+  scheduledJobs  ScheduledJob[]
 
   @@index([changelogId])
+  @@index([scheduledAt])
+  @@index([scheduledAt, publishedAt])
 }
 
 model ChangelogTag {
   id        String             @id @default(cuid())
   name      String             @unique
+  color     String?
   entries   ChangelogEntry[]
   requests  ChangelogRequest[]
   createdAt DateTime           @default(now())
@@ -232,24 +239,27 @@ model AuditLog {
 }
 
 model SystemConfig {
-  id                            Int      @id @default(1)
-  defaultInvitationExpiry       Int      @default(7)
-  requireApprovalForChangelogs  Boolean  @default(true)
-  maxChangelogEntriesPerProject Int      @default(100)
-  enableAnalytics               Boolean  @default(true)
-  enableNotifications           Boolean  @default(true)
-  enablePasswordReset           Boolean  @default(false)
-  enableAIAssistant             Boolean  @default(false) // Enable/disable AI assistant globally
+  id                            Int            @id @default(1)
+  defaultInvitationExpiry       Int            @default(7)
+  requireApprovalForChangelogs  Boolean        @default(true)
+  maxChangelogEntriesPerProject Int            @default(100)
+  enableAnalytics               Boolean        @default(true)
+  enableNotifications           Boolean        @default(true)
+  enablePasswordReset           Boolean        @default(false)
+  enableAIAssistant             Boolean        @default(false) // Enable/disable AI assistant globally
   aiApiKey                      String? // Global API key for AI service
-  aiApiProvider                 String?  @default("secton") // AI provider
-  aiDefaultModel                String?  @default("copilot-zero") // Default model to use
+  aiApiProvider                 String?        @default("secton") // AI provider
+  aiDefaultModel                String?        @default("copilot-zero") // Default model to use
   smtpHost                      String?
   smtpPort                      Int?
   smtpUser                      String?
   smtpPassword                  String?
   smtpSecure                    Boolean?
   systemEmail                   String?
-  updatedAt                     DateTime @updatedAt
+  allowTelemetry                TelemetryState @default(PROMPT)
+  telemetryInstanceId           String?        @unique
+  createdAt                     DateTime       @default(now())
+  updatedAt                     DateTime       @updatedAt
 }
 
 model EmailConfig {
@@ -303,6 +313,7 @@ model EmailSubscriber {
 model ProjectSubscription {
   id               String           @id @default(cuid())
   projectId        String
+  customDomain     String? // domain subscribed from ( optional )
   project          Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
   subscriberId     String
   subscriber       EmailSubscriber  @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
@@ -312,6 +323,7 @@ model ProjectSubscription {
 
   @@unique([projectId, subscriberId])
   @@index([projectId])
+  @@index([customDomain])
   @@index([subscriberId])
 }
 
@@ -386,6 +398,72 @@ model PublicChangelogAnalytics {
   @@index([sessionHash])
 }
 
+model CustomDomain {
+  id                String    @id @default(cuid())
+  domain            String    @unique
+  projectId         String
+  verificationToken String    @unique
+  verified          Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  verifiedAt        DateTime?
+  userId            String? // Optional: link to user who owns this domain
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([domain])
+  @@index([projectId])
+  @@index([userId])
+  @@index([verified])
+  @@map("custom_domains")
+}
+
+model ScheduledJob {
+  id               String           @id @default(cuid())
+  type             ScheduledJobType
+  entityId         String // ID of the entity (e.g., ChangelogEntry ID)
+  scheduledAt      DateTime // When to execute
+  executedAt       DateTime? // When it was actually executed
+  status           JobStatus        @default(PENDING)
+  errorMessage     String? // Error details if failed
+  retryCount       Int              @default(0)
+  maxRetries       Int              @default(3)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  ChangelogEntry   ChangelogEntry?  @relation(fields: [changelogEntryId], references: [id], onDelete: SetNull)
+  changelogEntryId String?
+
+  // Relations
+  @@index([type])
+  @@index([entityId])
+  @@index([scheduledAt])
+  @@index([status])
+  @@index([scheduledAt, status])
+}
+
+enum ScheduledJobType {
+  PUBLISH_CHANGELOG_ENTRY
+  UNPUBLISH_CHANGELOG_ENTRY
+  DELETE_CHANGELOG_ENTRY
+  SEND_EMAIL_NOTIFICATION
+  TELEMETRY_SEND
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum TelemetryState {
+  PROMPT
+  ENABLED
+  DISABLED
+}
+
 enum Role {
   ADMIN
   STAFF
@@ -397,6 +475,7 @@ enum RequestType {
   DELETE_TAG
   DELETE_PROJECT
   ALLOW_PUBLISH
+  ALLOW_SCHEDULE
 }
 
 enum RequestStatus {

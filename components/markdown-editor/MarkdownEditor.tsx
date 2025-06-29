@@ -1,18 +1,17 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Bold, Italic, Link, List, ListOrdered, Quote, Code, Heading1, Heading2, Heading3,
-    Image, RotateCcw, RotateCw, Save, FileDown, Eye, EyeOff, Split, Sparkles } from 'lucide-react';
+import React, {useState, useEffect, useRef, useCallback} from 'react';
+import {Bold, Italic, Link, List, ListOrdered, Quote, Code, Heading1, Heading2, Heading3, Image} from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+// Import the MarkdownToolbar component
+import MarkdownToolbar, {ToolbarGroup, ToolbarDropdown} from './MarkdownToolbar';
 
 // Import AI integration
 import useAIAssistant from '@/hooks/useAIAssistant';
-import { AICompletionType } from '@/lib/utils/ai/types';
+import {AICompletionType} from '@/lib/utils/ai/types';
 import AIAssistantPanel from './ai/AIAssistantPanel';
-import { RenderMarkdown } from '../MarkdownEditor';
+import {RenderMarkdown} from '../MarkdownEditor';
 
 /**
  * Simple, stable Markdown Editor component
@@ -48,7 +47,7 @@ export default function MarkdownEditor({
     const [content, setContent] = useState(initialValue);
     const [view, setView] = useState<'edit' | 'preview' | 'split'>('edit');
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const [selection, setSelection] = useState({ start: 0, end: 0 });
+    const [selection, setSelection] = useState({start: 0, end: 0});
 
     // Track history for undo/redo
     const [history, setHistory] = useState<string[]>([initialValue]);
@@ -431,211 +430,111 @@ export default function MarkdownEditor({
         });
     }, [enableAI, ai, getContextForAI]);
 
+    // Create toolbar groups for MarkdownToolbar
+    const toolbarGroups: ToolbarGroup[] = [
+        {
+            name: 'format',
+            actions: [
+                {
+                    icon: <Bold size={16}/>,
+                    label: 'Bold',
+                    onClick: handleBold,
+                    shortcut: 'Ctrl+B',
+                },
+                {
+                    icon: <Italic size={16}/>,
+                    label: 'Italic',
+                    onClick: handleItalic,
+                    shortcut: 'Ctrl+I',
+                },
+                {
+                    icon: <Link size={16}/>,
+                    label: 'Link',
+                    onClick: handleLink,
+                    shortcut: 'Ctrl+K',
+                },
+            ],
+        },
+        {
+            name: 'content',
+            actions: [
+                {
+                    icon: <List size={16}/>,
+                    label: 'Bullet List',
+                    onClick: handleBulletList,
+                },
+                {
+                    icon: <ListOrdered size={16}/>,
+                    label: 'Numbered List',
+                    onClick: handleNumberedList,
+                },
+                {
+                    icon: <Quote size={16}/>,
+                    label: 'Blockquote',
+                    onClick: handleQuote,
+                },
+                {
+                    icon: <Code size={16}/>,
+                    label: 'Inline Code',
+                    onClick: handleCode,
+                },
+                {
+                    icon: <Image size={16}/>,
+                    label: 'Image',
+                    onClick: handleImage,
+                },
+            ],
+        },
+    ];
+
+    // Create toolbar dropdowns for MarkdownToolbar
+    const toolbarDropdowns: ToolbarDropdown[] = [
+        {
+            name: 'Headings',
+            icon: <Heading2 size={16}/>,
+            actions: [
+                {
+                    icon: <Heading1 size={16}/>,
+                    label: 'Heading 1',
+                    onClick: handleHeading1,
+                    shortcut: 'Ctrl+1',
+                },
+                {
+                    icon: <Heading2 size={16}/>,
+                    label: 'Heading 2',
+                    onClick: handleHeading2,
+                    shortcut: 'Ctrl+2',
+                },
+                {
+                    icon: <Heading3 size={16}/>,
+                    label: 'Heading 3',
+                    onClick: handleHeading3,
+                    shortcut: 'Ctrl+3',
+                },
+            ],
+        },
+    ];
+
     return (
         <div className={`border rounded-md shadow-sm bg-background ${className}`}>
-            {/* Toolbar */}
-            <div className="flex items-center p-2 border-b bg-muted/10">
-                <div className="flex items-center space-x-1">
-                    {/* Undo/Redo */}
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleUndo}
-                        disabled={!canUndo}
-                        className="h-8 w-8"
-                    >
-                        <RotateCcw size={16} />
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleRedo}
-                        disabled={!canRedo}
-                        className="h-8 w-8"
-                    >
-                        <RotateCw size={16} />
-                    </Button>
-
-                    <Separator orientation="vertical" className="mx-1 h-6" />
-
-                    {/* Text formatting */}
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleBold}
-                        className="h-8 w-8"
-                        title="Bold (Ctrl+B)"
-                    >
-                        <Bold size={16} />
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleItalic}
-                        className="h-8 w-8"
-                        title="Italic (Ctrl+I)"
-                    >
-                        <Italic size={16} />
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleLink}
-                        className="h-8 w-8"
-                        title="Link (Ctrl+K)"
-                    >
-                        <Link size={16} />
-                    </Button>
-
-                    <Separator orientation="vertical" className="mx-1 h-6" />
-
-                    {/* Headings */}
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleHeading1}
-                        className="h-8 w-8"
-                        title="Heading 1 (Ctrl+1)"
-                    >
-                        <Heading1 size={16} />
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleHeading2}
-                        className="h-8 w-8"
-                        title="Heading 2 (Ctrl+2)"
-                    >
-                        <Heading2 size={16} />
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleHeading3}
-                        className="h-8 w-8"
-                        title="Heading 3 (Ctrl+3)"
-                    >
-                        <Heading3 size={16} />
-                    </Button>
-
-                    <Separator orientation="vertical" className="mx-1 h-6" />
-
-                    {/* Lists and quotes */}
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleBulletList}
-                        className="h-8 w-8"
-                        title="Bullet List"
-                    >
-                        <List size={16} />
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleNumberedList}
-                        className="h-8 w-8"
-                        title="Numbered List"
-                    >
-                        <ListOrdered size={16} />
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleQuote}
-                        className="h-8 w-8"
-                        title="Blockquote"
-                    >
-                        <Quote size={16} />
-                    </Button>
-
-                    <Separator orientation="vertical" className="mx-1 h-6" />
-
-                    {/* Code and images */}
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleCode}
-                        className="h-8 w-8"
-                        title="Inline Code"
-                    >
-                        <Code size={16} />
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleImage}
-                        className="h-8 w-8"
-                        title="Image"
-                    >
-                        <Image size={16} />
-                    </Button>
-                </div>
-
-                {/* Right side toolbar */}
-                <div className="ml-auto flex items-center space-x-1">
-                    {/* AI Assistant button (if enabled) */}
-                    {enableAI && ai && (
-                        <>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => ai.openAssistant(AICompletionType.COMPLETE)}
-                                className="h-8 gap-1 text-primary"
-                                title="AI Assistant (Alt+A)"
-                            >
-                                <Sparkles size={15} />
-                                <span>AI</span>
-                            </Button>
-
-                            <Separator orientation="vertical" className="mx-1 h-6" />
-                        </>
-                    )}
-
-                    {/* Save and export */}
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleSave}
-                        className="h-8 w-8"
-                        title="Save (Ctrl+S)"
-                    >
-                        <Save size={16} />
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleExport}
-                        className="h-8 w-8"
-                        title="Export"
-                    >
-                        <FileDown size={16} />
-                    </Button>
-
-                    <Separator orientation="vertical" className="mx-1 h-6" />
-
-                    {/* View mode selector */}
-                    <Tabs value={view} onValueChange={(v: string) => setView(v as 'edit' | 'preview' | 'split')}>
-                        <TabsList className="h-8">
-                            <TabsTrigger value="edit" className="h-7 px-2">
-                                <EyeOff size={14} className="mr-1" />
-                                <span className="text-xs">Edit</span>
-                            </TabsTrigger>
-                            <TabsTrigger value="preview" className="h-7 px-2">
-                                <Eye size={14} className="mr-1" />
-                                <span className="text-xs">Preview</span>
-                            </TabsTrigger>
-                            <TabsTrigger value="split" className="h-7 px-2">
-                                <Split size={14} className="mr-1" />
-                                <span className="text-xs">Split</span>
-                            </TabsTrigger>
-                        </TabsList>
-                    </Tabs>
-                </div>
-            </div>
+            {/* Use MarkdownToolbar component */}
+            <MarkdownToolbar
+                groups={toolbarGroups}
+                dropdowns={toolbarDropdowns}
+                canUndo={canUndo}
+                canRedo={canRedo}
+                onUndo={handleUndo}
+                onRedo={handleRedo}
+                onSave={onSave ? handleSave : undefined}
+                onExport={handleExport}
+                viewMode={view}
+                onViewModeChange={(mode: 'edit' | 'preview' | 'split') => setView(mode)}
+                onAIAssist={enableAI && ai ? () => ai.openAssistant(AICompletionType.COMPLETE) : undefined}
+                enableAI={enableAI}
+            />
 
             {/* Editor content */}
-            <div className="flex" style={{ height }}>
+            <div className="flex" style={{height}}>
                 {/* Edit mode */}
                 {(view === 'edit' || view === 'split') && (
                     <div className={`${view === 'split' ? 'w-1/2 border-r' : 'w-full'}`}>
@@ -663,7 +562,8 @@ export default function MarkdownEditor({
             </div>
 
             {/* Status bar */}
-            <div className="flex items-center justify-between h-6 px-3 py-1 text-xs text-muted-foreground border-t bg-muted/20">
+            <div
+                className="flex items-center justify-between h-6 px-3 py-1 text-xs text-muted-foreground border-t bg-muted/20">
                 <div className="flex items-center space-x-3">
                     <span>{wordCount} words</span>
                     <span>{charCount} characters</span>

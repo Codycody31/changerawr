@@ -12,8 +12,7 @@ import {Button} from '@/components/ui/button'
 import {Card, CardContent} from "@/components/ui/card"
 import {Badge} from "@/components/ui/badge"
 import {compareVersions} from 'compare-versions'
-import {ChangelogTag} from "@prisma/client";
-import { ChangelogEntry, ChangelogTag as ChTag } from '@/lib/types/changelog'
+import {ChangelogEntry, ChangelogTag as ChTag} from '@/lib/types/changelog'
 
 interface ChangelogPageProps {
     params: Promise<{ projectId: string }>
@@ -150,18 +149,48 @@ export default function ChangelogPage({params}: ChangelogPageProps) {
                                 </div>
                             </div>
                         </div>
-                        <div className="flex gap-2 flex-wrap">
-                            {data?.tags.map((tag: ChangelogTag) => (
-                                <Button
-                                    key={tag.id}
-                                    variant={selectedTag === tag.name ? "default" : "outline"}
-                                    size="sm"
-                                    onClick={() => setSelectedTag(selectedTag === tag.name ? null : tag.name)}
-                                >
-                                    {tag.name}
-                                </Button>
-                            ))}
-                        </div>
+
+                        {/* Enhanced Tag Filter Section with Colors */}
+                        {data?.tags && data.tags.length > 0 && (
+                            <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <Tag className="h-4 w-4 text-muted-foreground"/>
+                                    <span className="text-sm font-medium text-muted-foreground">Filter by tags:</span>
+                                    {selectedTag && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => setSelectedTag(null)}
+                                            className="h-6 px-2 text-xs"
+                                        >
+                                            Clear filter
+                                        </Button>
+                                    )}
+                                </div>
+                                <div className="flex gap-2 flex-wrap">
+                                    {data.tags.map((tag: ChTag) => {
+                                        const isSelected = selectedTag === tag.name;
+                                        return (
+                                            <Button
+                                                key={tag.id}
+                                                variant={isSelected ? "default" : "outline"}
+                                                size="sm"
+                                                onClick={() => setSelectedTag(isSelected ? null : tag.name)}
+                                                className="flex items-center gap-2"
+                                            >
+                                                {tag.color && (
+                                                    <div
+                                                        className="h-3 w-3 rounded-full border border-white/20"
+                                                        style={{backgroundColor: tag.color}}
+                                                    />
+                                                )}
+                                                {tag.name}
+                                            </Button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
 
@@ -182,7 +211,11 @@ export default function ChangelogPage({params}: ChangelogPageProps) {
                                 <Card key={i} className="animate-pulse">
                                     <CardContent className="p-6">
                                         <div className="h-4 bg-muted rounded w-3/4 mb-4"/>
-                                        <div className="h-4 bg-muted rounded w-1/2"/>
+                                        <div className="h-4 bg-muted rounded w-1/2 mb-3"/>
+                                        <div className="flex gap-2">
+                                            <div className="h-6 bg-muted rounded w-16"/>
+                                            <div className="h-6 bg-muted rounded w-20"/>
+                                        </div>
                                     </CardContent>
                                 </Card>
                             ))}
@@ -204,23 +237,24 @@ export default function ChangelogPage({params}: ChangelogPageProps) {
                                     variants={item}
                                     whileHover={{y: -2}}
                                 >
-                                    <Card className="group transition-colors">
+                                    <Card className="group transition-colors hover:border-primary/50">
                                         <CardContent className="p-6">
                                             <Link
                                                 href={`/dashboard/projects/${projectId}/changelog/${entry.id}`}
                                                 className="block"
                                             >
                                                 <div className="flex justify-between items-start mb-4">
-                                                    <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                                                    <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-2">
                                                         {entry.title}
                                                     </h3>
                                                     <ChevronRight
-                                                        className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-all transform group-hover:translate-x-1"/>
+                                                        className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-all transform group-hover:translate-x-1 ml-2 flex-shrink-0"/>
                                                 </div>
+
                                                 <div
-                                                    className="flex items-center gap-4 text-sm text-muted-foreground">
+                                                    className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
                                                     {entry.version && (
-                                                        <Badge variant="outline">
+                                                        <Badge variant="outline" size="sm">
                                                             <Tag className="h-3 w-3 mr-1"/>
                                                             {entry.version}
                                                         </Badge>
@@ -230,10 +264,18 @@ export default function ChangelogPage({params}: ChangelogPageProps) {
                                                         <span>{format(new Date(entry.createdAt), 'MMM d, yyyy')}</span>
                                                     </div>
                                                 </div>
+
+                                                {/* Tags */}
                                                 {entry.tags.length > 0 && (
-                                                    <div className="mt-4 flex flex-wrap gap-2">
+                                                    <div className="flex flex-wrap gap-2">
                                                         {entry.tags.map((tag: ChTag) => (
-                                                            <Badge key={tag.id} variant="secondary">
+                                                            <Badge
+                                                                key={tag.id}
+                                                                variant="secondary"
+                                                                color={tag.color || undefined}
+                                                                size="sm"
+                                                                className="flex items-center gap-1.5"
+                                                            >
                                                                 {tag.name}
                                                             </Badge>
                                                         ))}
@@ -248,23 +290,50 @@ export default function ChangelogPage({params}: ChangelogPageProps) {
                     )}
                 </AnimatePresence>
 
-                {data?.entries.length === 0 && (
+                {/* Empty State */}
+                {!isLoading && data?.entries.length === 0 && (
                     <Card>
                         <CardContent className="p-12 text-center">
                             <div
                                 className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
                                 <Plus className="h-6 w-6 text-primary"/>
                             </div>
-                            <h3 className="text-lg font-medium text-foreground mb-2">No entries found</h3>
+                            <h3 className="text-lg font-medium text-foreground mb-2">
+                                {search || selectedTag ? 'No entries match your filters' : 'No entries found'}
+                            </h3>
                             <p className="text-muted-foreground mb-6">
-                                Get started by creating your first changelog entry
+                                {search || selectedTag
+                                    ? 'Try adjusting your search or tag filters to find what you\'re looking for.'
+                                    : 'Get started by creating your first changelog entry'
+                                }
                             </p>
-                            <Button asChild>
-                                <Link href={`/dashboard/projects/${projectId}/changelog/new`}>
-                                    <Plus className="h-4 w-4 mr-2"/>
-                                    Create Entry
-                                </Link>
-                            </Button>
+                            {search || selectedTag ? (
+                                <div className="flex gap-2 justify-center">
+                                    {search && (
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => setSearchInput('')}
+                                        >
+                                            Clear search
+                                        </Button>
+                                    )}
+                                    {selectedTag && (
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => setSelectedTag(null)}
+                                        >
+                                            Clear tag filter
+                                        </Button>
+                                    )}
+                                </div>
+                            ) : (
+                                <Button asChild>
+                                    <Link href={`/dashboard/projects/${projectId}/changelog/new`}>
+                                        <Plus className="h-4 w-4 mr-2"/>
+                                        Create Entry
+                                    </Link>
+                                </Button>
+                            )}
                         </CardContent>
                     </Card>
                 )}

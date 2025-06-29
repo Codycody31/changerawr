@@ -796,7 +796,6 @@ export function ChangelogEditor({
                             <Alert
                                 variant={status.lastSaveError.retryable ? "warning" : "destructive"}
                             >
-                                <AlertTriangle className="h-4 w-4"/>
                                 <AlertTitle>
                                     {status.lastSaveError.retryable ? 'Save Failed' : 'Validation Error'}
                                 </AlertTitle>

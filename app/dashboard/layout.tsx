@@ -4,29 +4,33 @@ import React, {useEffect, useState} from 'react'
 import {useRouter} from 'next/navigation'
 import {useAuth} from '@/context/auth'
 import {
+    ChartNoAxesCombined,
     ClipboardCheck,
+    Clock,
     FileText,
-    Folder,
     Fingerprint,
+    Folder,
+    Globe,
+    Info,
     Key,
     LayoutGrid,
     Loader2,
+    PanelRightClose,
     ServerCog,
     Settings,
     Shield,
-    Users,
-    Info,
     Sparkles,
-    Clock,
-    ChartNoAxesCombined,
-    PanelRightClose
+    Users
 } from 'lucide-react'
 import {cn} from '@/lib/utils'
 import {useMediaQuery} from '@/hooks/use-media-query'
 import WhatsNewModal from '@/components/dashboard/WhatsNewModal'
 import {useWhatsNew} from '@/hooks/useWhatsNew'
-import {Sidebar, NavSection, SidebarUser} from '@/components/ui/sidebar'
+import {NavSection, Sidebar, SidebarUser} from '@/components/ui/sidebar'
 import {getGravatarUrl} from '@/lib/utils/gravatar'
+import {CommandPaletteProvider} from "@/components/providers/CommandPaletteProvider"
+import {TelemetryPromptModal} from '@/components/telemetry/PromptModal'
+import {useTelemetry} from '@/hooks/useTelemetry'
 
 // Navigation Configuration
 const NAV_SECTIONS: NavSection[] = [
@@ -78,6 +82,12 @@ const NAV_SECTIONS: NavSection[] = [
                 href: "/dashboard/admin/oauth",
                 label: "OAuth Providers",
                 icon: Fingerprint,
+                requiredRole: ['ADMIN']
+            },
+            {
+                href: "/dashboard/admin/domains",
+                label: "Domains",
+                icon: Globe,
                 requiredRole: ['ADMIN']
             },
             {
@@ -164,6 +174,12 @@ export default function DashboardLayout({
         isLoading: isWhatsNewLoading
     } = useWhatsNew()
 
+    // Telemetry modal state - always call hook but pass enabled flag
+    const {
+        showPrompt: showTelemetryPrompt,
+        handleTelemetryChoice,
+    } = useTelemetry(!!user)
+
     // Convert Prisma User to SidebarUser
     const sidebarUser: SidebarUser | null = user ? {
         id: user.id,
@@ -229,69 +245,79 @@ export default function DashboardLayout({
     }
 
     return (
-        <div className="min-h-screen bg-background">
-            <Sidebar
-                user={sidebarUser}
-                sections={NAV_SECTIONS}
-                onLogout={logout}
-                brandName="Changerawr"
-                brandHref="/dashboard"
-                isExpanded={sidebarExpanded}
-                setIsExpanded={setSidebarExpanded}
-                isVisible={sidebarVisible}
-                // setIsVisible={setSidebarVisible}
-            />
-
-            {/* Main content area with proper responsive behavior */}
-            <main
-                className={cn(
-                    "min-h-screen transition-all duration-300 ease-in-out",
-                    // Mobile: always full width with top padding for mobile header
-                    "pt-16 md:pt-0",
-                    // Desktop: adjust margin based on sidebar state
-                    !isMobile && (
-                        sidebarVisible
-                            ? (sidebarExpanded ? "md:ml-64" : "md:ml-16")
-                            : "md:ml-0"
-                    )
-                )}
-            >
-                {/* Show sidebar toggle when hidden */}
-                {!sidebarVisible && !isMobile && (
-                    <div className="fixed top-4 left-4 z-50 group">
-                        {/* Larger invisible hover trigger area */}
-                        <div className="absolute -inset-4 w-16 h-16"/>
-                        <button
-                            onClick={() => setSidebarVisible(true)}
-                            className="relative p-2 bg-background border border-border rounded-md shadow-sm hover:bg-secondary transition-all duration-200 opacity-0 group-hover:opacity-100"
-                            aria-label="Show sidebar"
-                        >
-                            <PanelRightClose className="h-5 w-5"/>
-                        </button>
-                    </div>
-                )}
-
-                <div className="h-full p-4 md:p-6 lg:p-8">
-                    <div
-                        className={cn(
-                            "mx-auto",
-                            // When sidebar is hidden, use much wider container
-                            sidebarVisible ? "max-w-7xl" : "max-w-none"
-                        )}
-                    >
-                        {children}
-                    </div>
-                </div>
-            </main>
-
-            {/* What's New Modal */}
-            {!isWhatsNewLoading && (
-                <WhatsNewModal
-                    content={whatsNewContent}
-                    isOpen={showWhatsNew}
-                    onClose={closeWhatsNew}
+        <CommandPaletteProvider>
+            <div className="min-h-screen bg-background">
+                <Sidebar
+                    user={sidebarUser}
+                    sections={NAV_SECTIONS}
+                    onLogout={logout}
+                    brandName="Changerawr"
+                    brandHref="/dashboard"
+                    isExpanded={sidebarExpanded}
+                    setIsExpanded={setSidebarExpanded}
+                    isVisible={sidebarVisible}
+                    // setIsVisible={setSidebarVisible}
                 />
-            )}
-        </div>
+
+                {/* Main content area with proper responsive behavior */}
+                <main
+                    className={cn(
+                        "min-h-screen transition-all duration-300 ease-in-out",
+                        // Mobile: always full width with top padding for mobile header
+                        "pt-16 md:pt-0",
+                        // Desktop: adjust margin based on sidebar state
+                        !isMobile && (
+                            sidebarVisible
+                                ? (sidebarExpanded ? "md:ml-64" : "md:ml-16")
+                                : "md:ml-0"
+                        )
+                    )}
+                >
+                    {/* Show sidebar toggle when hidden */}
+                    {!sidebarVisible && !isMobile && (
+                        <div className="fixed top-4 left-4 z-50 group">
+                            {/* Larger invisible hover trigger area */}
+                            <div className="absolute -inset-4 w-16 h-16"/>
+                            <button
+                                onClick={() => setSidebarVisible(true)}
+                                className="relative p-2 bg-background border border-border rounded-md shadow-sm hover:bg-secondary transition-all duration-200 opacity-0 group-hover:opacity-100"
+                                aria-label="Show sidebar"
+                            >
+                                <PanelRightClose className="h-5 w-5"/>
+                            </button>
+                        </div>
+                    )}
+
+                    <div className="h-full p-4 md:p-6 lg:p-8">
+                        <div
+                            className={cn(
+                                "mx-auto",
+                                // When sidebar is hidden, use much wider container
+                                sidebarVisible ? "max-w-7xl" : "max-w-none"
+                            )}
+                        >
+                            {children}
+                        </div>
+                    </div>
+                </main>
+
+                {/* Telemetry Prompt Modal */}
+                {user && (
+                    <TelemetryPromptModal
+                        isOpen={showTelemetryPrompt}
+                        onChoice={handleTelemetryChoice}
+                    />
+                )}
+
+                {/* What's New Modal */}
+                {!isWhatsNewLoading && (
+                    <WhatsNewModal
+                        content={whatsNewContent}
+                        isOpen={showWhatsNew}
+                        onClose={closeWhatsNew}
+                    />
+                )}
+            </div>
+        </CommandPaletteProvider>
     )
 }

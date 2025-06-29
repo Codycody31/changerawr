@@ -3,22 +3,41 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { nanoid } from 'nanoid';
 
+interface SubscribeRequest {
+    email: string;
+    projectId: string;
+    name?: string;
+    subscriptionType: 'ALL_UPDATES' | 'MAJOR_ONLY' | 'DIGEST_ONLY';
+    customDomain?: string | null; // Allow null values
+}
+
+interface SubscribeResponse {
+    success: boolean;
+    message: string;
+}
+
+interface ErrorResponse {
+    error: string;
+    details?: unknown;
+}
+
 /**
  * @method POST
  * @description Creates a subscription for a user to receive email notifications for changelog updates
  */
-export async function POST(request: Request) {
+export async function POST(request: Request): Promise<NextResponse<SubscribeResponse | ErrorResponse>> {
     try {
         const subscribeSchema = z.object({
             email: z.string().email('Invalid email format'),
             projectId: z.string().min(1, 'Project ID is required'),
             name: z.string().optional(),
-            subscriptionType: z.enum(['ALL_UPDATES', 'MAJOR_ONLY', 'DIGEST_ONLY']).default('ALL_UPDATES')
+            subscriptionType: z.enum(['ALL_UPDATES', 'MAJOR_ONLY', 'DIGEST_ONLY']).default('ALL_UPDATES'),
+            customDomain: z.string().nullable().optional() // Allow null, undefined, or string
         });
 
         // Parse and validate request body
         const body = await request.json();
-        const { email, projectId, name, subscriptionType } = subscribeSchema.parse(body);
+        const { email, projectId, name, subscriptionType, customDomain }: SubscribeRequest = subscribeSchema.parse(body);
 
         // Verify project exists
         const project = await db.project.findUnique({
@@ -31,6 +50,10 @@ export async function POST(request: Request) {
                 { status: 404 }
             );
         }
+
+        // Determine the domain to use - default to app domain if no custom domain provided
+        const appDomain = process.env.NEXT_PUBLIC_APP_URL?.replace(/^https?:\/\//, '') || 'localhost:3000';
+        const finalDomain = customDomain || appDomain; // customDomain can be null, so this will default to appDomain
 
         // Find or create subscriber
         let subscriber = await db.emailSubscriber.findUnique({
@@ -49,7 +72,7 @@ export async function POST(request: Request) {
                     email,
                     name,
                     unsubscribeToken: nanoid(32),
-                    isActive: true,
+                    isActive: true
                 },
                 include: {
                     subscriptions: {
@@ -67,19 +90,23 @@ export async function POST(request: Request) {
 
         // Create or update subscription
         if (subscriber.subscriptions.length === 0) {
-            // Create new subscription
+            // Create new subscription with domain
             await db.projectSubscription.create({
                 data: {
                     subscriberId: subscriber.id,
                     projectId,
-                    subscriptionType
+                    subscriptionType,
+                    customDomain: finalDomain // Use finalDomain (either custom or app domain)
                 }
             });
         } else {
             // Update existing subscription
             await db.projectSubscription.update({
                 where: { id: subscriber.subscriptions[0].id },
-                data: { subscriptionType }
+                data: {
+                    subscriptionType,
+                    customDomain: finalDomain // Update domain on existing subscription
+                }
             });
         }
 

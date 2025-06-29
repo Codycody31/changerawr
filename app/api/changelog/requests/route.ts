@@ -1,11 +1,12 @@
-import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
-import { validateAuthAndGetUser } from '@/lib/utils/changelog'
-import { z } from 'zod'
+// app/api/changelog/requests/route.ts
+import {NextResponse} from 'next/server'
+import {db} from '@/lib/db'
+import {validateAuthAndGetUser} from '@/lib/utils/changelog'
+import {z} from 'zod'
 import {Prisma} from "@prisma/client";
 
 const requestSchema = z.object({
-    type: z.enum(['DELETE_PROJECT', 'DELETE_TAG', 'DELETE_ENTRY']),
+    type: z.enum(['DELETE_PROJECT', 'DELETE_TAG', 'DELETE_ENTRY', 'ALLOW_PUBLISH', 'ALLOW_SCHEDULE']),
     projectId: z.string(),
     targetId: z.string().optional()
 })
@@ -13,7 +14,7 @@ const requestSchema = z.object({
 /**
  * @method GET
  * @description Retrieves pending changelog requests for authenticated user
- * @path /api/requests
+ * @path /api/changelog/requests
  * @query {projectId: string} (optional)
  * @response 200 {
  *   "type": "array",
@@ -21,9 +22,10 @@ const requestSchema = z.object({
  *     "type": "object",
  *     "properties": {
  *       "id": { "type": "string" },
- *       "type": { "type": "string", "enum": ["DELETE_PROJECT", "DELETE_TAG", "DELETE_ENTRY"] },
- *       "status": { "type": "string", "enum": ["PENDING"] },
+ *       "type": { "type": "string", "enum": ["DELETE_PROJECT", "DELETE_TAG", "DELETE_ENTRY", "ALLOW_PUBLISH", "ALLOW_SCHEDULE"] },
+ *       "status": { "type": "string", "enum": ["PENDING", "APPROVED", "REJECTED"] },
  *       "staffId": { "type": "string" },
+ *       "targetId": { "type": "string" },
  *       "staff": {
  *         "type": "object",
  *         "properties": {
@@ -44,6 +46,20 @@ const requestSchema = z.object({
  *             }
  *           }
  *         }
+ *       },
+ *       "ChangelogEntry": {
+ *         "type": "object",
+ *         "properties": {
+ *           "id": { "type": "string" },
+ *           "title": { "type": "string" }
+ *         }
+ *       },
+ *       "ChangelogTag": {
+ *         "type": "object",
+ *         "properties": {
+ *           "id": { "type": "string" },
+ *           "name": { "type": "string" }
+ *         }
  *       }
  *     }
  *   }
@@ -54,7 +70,7 @@ const requestSchema = z.object({
 export async function GET(request: Request) {
     try {
         const user = await validateAuthAndGetUser()
-        const { searchParams } = new URL(request.url)
+        const {searchParams} = new URL(request.url)
         const projectId = searchParams.get('projectId')
 
         // Build the base query
@@ -88,6 +104,18 @@ export async function GET(request: Request) {
                         name: true,
                         defaultTags: true
                     }
+                },
+                ChangelogEntry: {
+                    select: {
+                        id: true,
+                        title: true
+                    }
+                },
+                ChangelogTag: {
+                    select: {
+                        id: true,
+                        name: true
+                    }
                 }
             },
             orderBy: {
@@ -100,8 +128,8 @@ export async function GET(request: Request) {
     } catch (error) {
         console.error('Failed to fetch requests:', error)
         return NextResponse.json(
-            { error: 'Failed to fetch requests' },
-            { status: 500 }
+            {error: 'Failed to fetch requests'},
+            {status: 500}
         )
     }
 }
@@ -109,13 +137,13 @@ export async function GET(request: Request) {
 /**
  * @method POST
  * @description Creates a new pending changelog request
- * @path /api/requests
+ * @path /api/changelog/requests
  * @request {json}
  * @response 201 {
  *   "type": "object",
  *   "properties": {
  *     "id": { "type": "string" },
- *     "type": { "type": "string", "enum": ["DELETE_PROJECT", "DELETE_TAG", "DELETE_ENTRY"] },
+ *     "type": { "type": "string", "enum": ["DELETE_PROJECT", "DELETE_TAG", "DELETE_ENTRY", "ALLOW_PUBLISH", "ALLOW_SCHEDULE"] },
  *     "status": { "type": "string", "enum": ["PENDING"] },
  *     "staffId": { "type": "string" },
  *     "staff": {
@@ -143,86 +171,31 @@ export async function GET(request: Request) {
  * }
  * @error 401 Unauthorized - User not authenticated
  * @error 403 Forbidden - Only staff members can create requests
- * @error 400 Invalid request data
- * @error 500 Internal Server Error
+ * @error 400 Bad Request - Invalid request data
+ * @error 500 An unexpected error occurred while creating the request
  */
 export async function POST(request: Request) {
     try {
         const user = await validateAuthAndGetUser()
-        console.log('User attempting to create request:', { id: user.id, role: user.role })
 
-        // Ensure only staff members can create requests (Admins should perform actions directly)
-        if (user.role !== 'STAFF') {
+        if (user.role === 'VIEWER') {
             return NextResponse.json(
-                { error: 'Only staff can create requests' },
-                { status: 403 }
+                {error: 'Only staff members can create requests'},
+                {status: 403}
             )
         }
 
         const body = await request.json()
-        console.log('Received request body:', body)
-
         const validatedData = requestSchema.parse(body)
 
-        // Check if project exists and retrieve its details
-        const project = await db.project.findUnique({
-            where: { id: validatedData.projectId },
-            select: {
-                id: true,
-                name: true,
-                defaultTags: true
-            }
-        })
-
-        if (!project) {
-            return NextResponse.json(
-                { error: 'Project not found' },
-                { status: 404 }
-            )
-        }
-
-        // Validate DELETE_TAG type requests
-        if (validatedData.type === 'DELETE_TAG') {
-            if (!validatedData.targetId) {
-                return NextResponse.json(
-                    { error: 'Target ID is required for tag deletion' },
-                    { status: 400 }
-                )
-            }
-
-            if (!project.defaultTags.includes(validatedData.targetId)) {
-                return NextResponse.json(
-                    { error: 'Tag not found in project' },
-                    { status: 404 }
-                )
-            }
-        }
-
-        // Check if a similar pending request already exists from any staff member
-        const existingRequest = await db.changelogRequest.findFirst({
-            where: {
-                projectId: validatedData.projectId,
-                type: validatedData.type,
-                targetId: validatedData.targetId,
-                status: 'PENDING'
-            }
-        })
-
-        if (existingRequest) {
-            return NextResponse.json(
-                { error: 'A similar request is already pending' },
-                { status: 409 } // Using 409 Conflict for better semantic meaning
-            )
-        }
-
         // Create the request
-        const changelogRequest = await db.changelogRequest.create({
+        const newRequest = await db.changelogRequest.create({
             data: {
                 type: validatedData.type,
-                status: 'PENDING',
                 staffId: user.id,
                 projectId: validatedData.projectId,
-                targetId: validatedData.targetId
+                targetId: validatedData.targetId,
+                status: 'PENDING'
             },
             include: {
                 staff: {
@@ -242,38 +215,21 @@ export async function POST(request: Request) {
             }
         })
 
-        // Create an audit log entry
-        await db.auditLog.create({
-            data: {
-                action: 'REQUEST_CREATED',
-                userId: user.id,
-                details: {
-                    requestId: changelogRequest.id,
-                    requestType: validatedData.type,
-                    projectId: validatedData.projectId,
-                    targetId: validatedData.targetId
-                }
-            }
-        })
-
-        return NextResponse.json(changelogRequest, { status: 201 })
+        return NextResponse.json(newRequest, {status: 201})
 
     } catch (error) {
         console.error('Failed to create request:', error)
 
         if (error instanceof z.ZodError) {
             return NextResponse.json(
-                {
-                    error: 'Invalid request data',
-                    details: error.errors
-                },
-                { status: 400 }
+                {error: 'Invalid request data', details: error.errors},
+                {status: 400}
             )
         }
 
         return NextResponse.json(
-            { error: 'Failed to create request' },
-            { status: 500 }
+            {error: 'Failed to create request'},
+            {status: 500}
         )
     }
 }

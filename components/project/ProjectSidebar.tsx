@@ -22,7 +22,9 @@ import {
     MailIcon,
     Rss,
     type LucideIcon,
-    Github, ChartNoAxesCombined
+    Github,
+    ChartNoAxesCombined,
+    Globe
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -469,6 +471,13 @@ export function ProjectSidebar({ projectId }: { projectId: string }) {
                             label="Analytics"
                             active={pathname.includes(`/dashboard/projects/${projectId}/analytics`)}
                         />
+                        <NavItem
+                            href={`/dashboard/projects/${projectId}/domains`}
+                            icon={Globe}
+                            label="Domains"
+                            active={pathname.includes(`/dashboard/projects/${projectId}/domains`)}
+                            disabled={!isPublic}
+                        />
                     </nav>
 
                     <Separator className="my-3" />
@@ -488,7 +497,7 @@ export function ProjectSidebar({ projectId }: { projectId: string }) {
                     <div className="px-3 py-2">
                         <Alert variant="warning" className="py-2 px-3">
                             <AlertDescription className="text-xs">
-                                Make this project public in settings to enable the widget and public page.
+                                Make this project public in settings to enable all features.
                             </AlertDescription>
                         </Alert>
                     </div>

@@ -18,7 +18,7 @@ import {
     Fingerprint,
     Info,
     Sparkles,
-    ChartNoAxesCombined
+    ChartNoAxesCombined, Globe
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -52,6 +52,13 @@ const tabs = [
         icon: Fingerprint,
         path: '/dashboard/admin/oauth',
         pattern: /^\/dashboard\/admin\/oauth/
+    },
+    {
+        id: 'domains',
+        label: 'Domains',
+        icon: Globe,
+        path: '/dashboard/admin/domains',
+        pattern: /^\/dashboard\/admin\/domains/
     },
     {
         id: 'api-keys',

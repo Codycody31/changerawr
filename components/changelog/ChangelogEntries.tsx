@@ -1,11 +1,12 @@
+// components/changelog/ChangelogEntries.tsx
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
-import { motion, useInView, useScroll, useSpring, AnimatePresence } from 'framer-motion'
-import { format } from 'date-fns'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
+import {useEffect, useRef, useState, useCallback} from 'react'
+import {motion, useInView, useScroll, useSpring, AnimatePresence} from 'framer-motion'
+import {format} from 'date-fns'
+import {Badge} from '@/components/ui/badge'
+import {Card, CardContent} from '@/components/ui/card'
+import {Skeleton} from '@/components/ui/skeleton'
 import {
     ChevronRight,
     Clock,
@@ -18,12 +19,12 @@ import {
     SortAsc,
     X
 } from 'lucide-react'
-import { useInfiniteQuery } from '@tanstack/react-query'
-import type { ChangelogEntry } from '@/lib/types/changelog'
-import { cn } from '@/lib/utils'
-import { RenderMarkdown } from "@/components/MarkdownEditor"
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
+import {useInfiniteQuery} from '@tanstack/react-query'
+import type {ChangelogEntry} from '@/lib/types/changelog'
+import {cn} from '@/lib/utils'
+import {RenderMarkdown} from "@/components/MarkdownEditor"
+import {Input} from '@/components/ui/input'
+import {Button} from '@/components/ui/button'
 import {
     Select,
     SelectContent,
@@ -43,6 +44,7 @@ import {
     CommandInput,
     CommandItem,
 } from '@/components/ui/command'
+import {ColoredTag} from '@/components/changelog/editor/TagColorPicker'
 
 interface ChangelogEntriesProps {
     projectId: string
@@ -56,7 +58,7 @@ interface ChangelogApiResponse {
 
 // Animation variants
 const container = {
-    hidden: { opacity: 0 },
+    hidden: {opacity: 0},
     show: {
         opacity: 1,
         transition: {
@@ -66,13 +68,20 @@ const container = {
 }
 
 const item = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.4 } }
+    hidden: {opacity: 0, y: 20},
+    show: {opacity: 1, y: 0, transition: {duration: 0.4}}
 }
 
 const fadeIn = {
-    hidden: { opacity: 0 },
-    show: { opacity: 1, transition: { duration: 0.3 } }
+    hidden: {opacity: 0},
+    show: {opacity: 1, transition: {duration: 0.3}}
+}
+
+// Enhanced tag interface with color support
+interface TagWithColor {
+    id: string;
+    name: string;
+    color?: string | null;
 }
 
 // Skeleton components
@@ -82,23 +91,23 @@ const SkeletonEntry = () => (
             <div className="space-y-6">
                 <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                     <div className="space-y-2">
-                        <Skeleton className="h-8 w-64" />
+                        <Skeleton className="h-8 w-64"/>
                         <div className="flex items-center gap-2">
-                            <Skeleton className="h-5 w-24" />
+                            <Skeleton className="h-5 w-24"/>
                         </div>
                     </div>
-                    <Skeleton className="h-5 w-32" />
+                    <Skeleton className="h-5 w-32"/>
                 </div>
                 <div className="space-y-4">
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-3/4" />
-                    <Skeleton className="h-4 w-5/6" />
+                    <Skeleton className="h-4 w-full"/>
+                    <Skeleton className="h-4 w-3/4"/>
+                    <Skeleton className="h-4 w-5/6"/>
                 </div>
                 <div className="pt-6 border-t border-border">
                     <div className="flex items-center gap-2">
-                        <Skeleton className="h-6 w-16" />
-                        <Skeleton className="h-6 w-16" />
-                        <Skeleton className="h-6 w-16" />
+                        <Skeleton className="h-6 w-16"/>
+                        <Skeleton className="h-6 w-16"/>
+                        <Skeleton className="h-6 w-16"/>
                     </div>
                 </div>
             </div>
@@ -108,7 +117,7 @@ const SkeletonEntry = () => (
 
 const SkeletonSidebarItem = () => (
     <div className="px-3 py-2">
-        <Skeleton className="h-6 w-full" />
+        <Skeleton className="h-6 w-full"/>
     </div>
 )
 
@@ -120,7 +129,7 @@ type FilterState = {
     tags: string[];
 }
 
-export default function ChangelogEntries({ projectId }: ChangelogEntriesProps) {
+export default function ChangelogEntries({projectId}: ChangelogEntriesProps) {
     const loadMoreRef = useRef<HTMLDivElement>(null)
     const containerRef = useRef<HTMLDivElement>(null)
     const [activeEntry, setActiveEntry] = useState<string | null>(null)
@@ -132,7 +141,7 @@ export default function ChangelogEntries({ projectId }: ChangelogEntriesProps) {
         tags: []
     })
     const [searchInput, setSearchInput] = useState('')
-    const [availableTags, setAvailableTags] = useState<{id: string, name: string}[]>([])
+    const [availableTags, setAvailableTags] = useState<TagWithColor[]>([])
     const [isFilterApplied, setIsFilterApplied] = useState(false)
 
     const isLoadMoreVisible = useInView(loadMoreRef, {
@@ -150,7 +159,7 @@ export default function ChangelogEntries({ projectId }: ChangelogEntriesProps) {
         refetch
     } = useInfiniteQuery({
         queryKey: ['changelog-entries', projectId, filters],
-        queryFn: async ({ pageParam }): Promise<ChangelogApiResponse> => {
+        queryFn: async ({pageParam}): Promise<ChangelogApiResponse> => {
             const searchParams = new URLSearchParams()
             if (pageParam !== undefined) {
                 searchParams.set('cursor', String(pageParam))
@@ -179,14 +188,18 @@ export default function ChangelogEntries({ projectId }: ChangelogEntriesProps) {
         refetchOnWindowFocus: false,
     })
 
-    // Extract all tags for the filter
+    // Extract all tags for the filter with color support
     useEffect(() => {
         if (data?.pages) {
-            const tags = new Map<string, {id: string, name: string}>();
+            const tags = new Map<string, TagWithColor>();
             data.pages.forEach((page) => {
                 (page as ChangelogApiResponse).items.forEach((entry: ChangelogEntry) => {
                     entry.tags?.forEach(tag => {
-                        tags.set(tag.id, tag);
+                        tags.set(tag.id, {
+                            id: tag.id,
+                            name: tag.name,
+                            color: tag.color || null
+                        });
                     });
                 });
             });
@@ -202,7 +215,7 @@ export default function ChangelogEntries({ projectId }: ChangelogEntriesProps) {
     }, [isLoadMoreVisible, hasNextPage, isFetchingNextPage, fetchNextPage])
 
     // Scroll progress indicator
-    const { scrollYProgress } = useScroll({
+    const {scrollYProgress} = useScroll({
         target: containerRef,
         offset: ["start start", "end end"]
     })
@@ -237,7 +250,7 @@ export default function ChangelogEntries({ projectId }: ChangelogEntriesProps) {
             setActiveEntry(closestEntry)
         }
 
-        window.addEventListener('scroll', handleScroll, { passive: true })
+        window.addEventListener('scroll', handleScroll, {passive: true})
         handleScroll()
 
         return () => window.removeEventListener('scroll', handleScroll)
@@ -313,13 +326,13 @@ export default function ChangelogEntries({ projectId }: ChangelogEntriesProps) {
             {/* Progress bar */}
             <motion.div
                 className="fixed top-0 left-0 right-0 h-1 bg-primary/10 z-50"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.5 }}
+                initial={{opacity: 0}}
+                animate={{opacity: 1}}
+                transition={{delay: 0.5}}
             >
                 <motion.div
                     className="h-full bg-gradient-to-r from-primary/40 to-primary origin-left"
-                    style={{ scaleX }}
+                    style={{scaleX}}
                 />
             </motion.div>
 
@@ -340,7 +353,7 @@ export default function ChangelogEntries({ projectId }: ChangelogEntriesProps) {
                             className="bg-background"
                         />
                         <Button onClick={applyFilters} variant="secondary" size="icon">
-                            <Search className="h-4 w-4" />
+                            <Search className="h-4 w-4"/>
                         </Button>
                     </div>
 
@@ -350,18 +363,18 @@ export default function ChangelogEntries({ projectId }: ChangelogEntriesProps) {
                             onValueChange={handleSortChange}
                         >
                             <SelectTrigger className="w-[140px] bg-background">
-                                <SelectValue placeholder="Sort by" />
+                                <SelectValue placeholder="Sort by"/>
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="newest">
                                     <div className="flex items-center gap-2">
-                                        <SortDesc className="h-4 w-4" />
+                                        <SortDesc className="h-4 w-4"/>
                                         <span>Newest</span>
                                     </div>
                                 </SelectItem>
                                 <SelectItem value="oldest">
                                     <div className="flex items-center gap-2">
-                                        <SortAsc className="h-4 w-4" />
+                                        <SortAsc className="h-4 w-4"/>
                                         <span>Oldest</span>
                                     </div>
                                 </SelectItem>
@@ -371,7 +384,7 @@ export default function ChangelogEntries({ projectId }: ChangelogEntriesProps) {
                         <Popover>
                             <PopoverTrigger asChild>
                                 <Button variant="outline" className="bg-background">
-                                    <Filter className="h-4 w-4 mr-2" />
+                                    <Filter className="h-4 w-4 mr-2"/>
                                     Tags
                                     {filters.tags.length > 0 && (
                                         <Badge variant="secondary" className="ml-2">
@@ -380,9 +393,9 @@ export default function ChangelogEntries({ projectId }: ChangelogEntriesProps) {
                                     )}
                                 </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-[200px] p-0" align="end">
+                            <PopoverContent className="w-[250px] p-0" align="end">
                                 <Command>
-                                    <CommandInput placeholder="Search tags..." />
+                                    <CommandInput placeholder="Search tags..."/>
                                     <CommandEmpty>No tags found.</CommandEmpty>
                                     <CommandGroup>
                                         {availableTags.map(tag => (
@@ -396,7 +409,13 @@ export default function ChangelogEntries({ projectId }: ChangelogEntriesProps) {
                                                     filters.tags.includes(tag.id)
                                                         ? "bg-primary border-primary"
                                                         : "border-border"
-                                                )} />
+                                                )}/>
+                                                {tag.color && (
+                                                    <div
+                                                        className="h-3 w-3 rounded-full border border-gray-300"
+                                                        style={{ backgroundColor: tag.color }}
+                                                    />
+                                                )}
                                                 <span>{tag.name}</span>
                                             </CommandItem>
                                         ))}
@@ -412,7 +431,7 @@ export default function ChangelogEntries({ projectId }: ChangelogEntriesProps) {
                                 onClick={resetFilters}
                                 className="text-muted-foreground hover:text-foreground"
                             >
-                                <X className="h-4 w-4" />
+                                <X className="h-4 w-4"/>
                             </Button>
                         )}
                     </div>
@@ -435,7 +454,7 @@ export default function ChangelogEntries({ projectId }: ChangelogEntriesProps) {
                                     initial="hidden"
                                     animate="show"
                                 >
-                                    <SkeletonEntry />
+                                    <SkeletonEntry/>
                                 </motion.div>
                             ))}
                         </div>
@@ -479,9 +498,9 @@ export default function ChangelogEntries({ projectId }: ChangelogEntriesProps) {
                                                     className={cn(
                                                         "absolute -left-4 top-1/2 -translate-y-1/2 w-2 h-8 rounded-full bg-primary/40"
                                                     )}
-                                                    initial={{ opacity: 0 }}
-                                                    animate={{ opacity: activeEntry === entry.id ? 1 : 0 }}
-                                                    transition={{ duration: 0.2 }}
+                                                    initial={{opacity: 0}}
+                                                    animate={{opacity: activeEntry === entry.id ? 1 : 0}}
+                                                    transition={{duration: 0.2}}
                                                 />
 
                                                 <Card
@@ -500,8 +519,9 @@ export default function ChangelogEntries({ projectId }: ChangelogEntriesProps) {
                                                                     {entry.version && (
                                                                         <div className="flex items-center gap-2">
                                                                             <GitCommit
-                                                                                className="w-4 h-4 text-muted-foreground" />
-                                                                            <Badge variant="outline" className="font-mono">
+                                                                                className="w-4 h-4 text-muted-foreground"/>
+                                                                            <Badge variant="outline"
+                                                                                   className="font-mono">
                                                                                 {entry.version}
                                                                             </Badge>
                                                                         </div>
@@ -512,7 +532,7 @@ export default function ChangelogEntries({ projectId }: ChangelogEntriesProps) {
                                                                     <div
                                                                         className="flex items-center gap-2 text-muted-foreground"
                                                                     >
-                                                                        <Clock className="w-4 h-4" />
+                                                                        <Clock className="w-4 h-4"/>
                                                                         <time
                                                                             dateTime={typeof entry.publishedAt === 'string'
                                                                                 ? entry.publishedAt
@@ -532,9 +552,9 @@ export default function ChangelogEntries({ projectId }: ChangelogEntriesProps) {
 
                                                             {/* Content with animation */}
                                                             <motion.div
-                                                                initial={{ opacity: 0.8 }}
-                                                                animate={{ opacity: 1 }}
-                                                                transition={{ duration: 0.5 }}
+                                                                initial={{opacity: 0.8}}
+                                                                animate={{opacity: 1}}
+                                                                transition={{duration: 0.5}}
                                                                 className="prose prose-lg max-w-none prose-neutral dark:prose-invert prose-p:leading-relaxed prose-pre:bg-muted/50 prose-pre:border prose-pre:border-border"
                                                             >
                                                                 <RenderMarkdown>
@@ -542,22 +562,22 @@ export default function ChangelogEntries({ projectId }: ChangelogEntriesProps) {
                                                                 </RenderMarkdown>
                                                             </motion.div>
 
-                                                            {/* Tags */}
+                                                            {/* Tags with Color Support */}
                                                             {entry.tags?.length > 0 && (
                                                                 <div className="pt-6 border-t border-border">
                                                                     <div className="flex items-start gap-2">
                                                                         <Tag
-                                                                            className="w-4 h-4 text-muted-foreground mt-1" />
+                                                                            className="w-4 h-4 text-muted-foreground mt-1"/>
                                                                         <div className="flex flex-wrap gap-2">
                                                                             {entry.tags.map((tag) => (
-                                                                                <Badge
+                                                                                <ColoredTag
                                                                                     key={tag.id}
-                                                                                    variant="secondary"
-                                                                                    className="bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer"
+                                                                                    name={tag.name}
+                                                                                    color={tag.color}
+                                                                                    size="sm"
                                                                                     onClick={() => toggleTag(tag.id)}
-                                                                                >
-                                                                                    {tag.name}
-                                                                                </Badge>
+                                                                                    className="cursor-pointer hover:opacity-80 transition-opacity"
+                                                                                />
                                                                             ))}
                                                                         </div>
                                                                     </div>
@@ -585,10 +605,10 @@ export default function ChangelogEntries({ projectId }: ChangelogEntriesProps) {
                         {isFetchingNextPage && (
                             <motion.div
                                 className="flex items-center gap-2 text-muted-foreground"
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
+                                initial={{opacity: 0, y: 20}}
+                                animate={{opacity: 1, y: 0}}
                             >
-                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <Loader2 className="w-4 h-4 animate-spin"/>
                                 <span>Loading more entries...</span>
                             </motion.div>
                         )}
@@ -607,7 +627,7 @@ export default function ChangelogEntries({ projectId }: ChangelogEntriesProps) {
                                     {isLoading ? (
                                         <div className="space-y-1">
                                             {[...Array(5)].map((_, i) => (
-                                                <SkeletonSidebarItem key={i} />
+                                                <SkeletonSidebarItem key={i}/>
                                             ))}
                                         </div>
                                     ) : allEntries.length === 0 ? (
@@ -620,7 +640,8 @@ export default function ChangelogEntries({ projectId }: ChangelogEntriesProps) {
                                             {isFilterApplied && (
                                                 <div className="px-3 py-2 mb-2 bg-muted/50 rounded-md text-sm">
                                                     <p className="text-muted-foreground">
-                                                        Showing {allEntries.length} filtered result{allEntries.length !== 1 ? 's' : ''}
+                                                        Showing {allEntries.length} filtered
+                                                        result{allEntries.length !== 1 ? 's' : ''}
                                                     </p>
                                                     <Button
                                                         variant="ghost"
@@ -640,7 +661,7 @@ export default function ChangelogEntries({ projectId }: ChangelogEntriesProps) {
                                                             onClick={() => {
                                                                 document
                                                                     .querySelector(`[data-entry-id="${entry.id}"]`)
-                                                                    ?.scrollIntoView({ behavior: 'smooth' })
+                                                                    ?.scrollIntoView({behavior: 'smooth'})
                                                             }}
                                                             className={cn(
                                                                 "flex items-center w-full text-left px-3 py-2 rounded-md transition-all",
@@ -649,14 +670,14 @@ export default function ChangelogEntries({ projectId }: ChangelogEntriesProps) {
                                                                     "bg-primary/20 text-primary font-medium" :
                                                                     "text-muted-foreground"
                                                             )}
-                                                            initial={{ opacity: 0, x: -20 }}
-                                                            animate={{ opacity: 1, x: 0 }}
-                                                            transition={{ delay: 0.1 }}
+                                                            initial={{opacity: 0, x: -20}}
+                                                            animate={{opacity: 1, x: 0}}
+                                                            transition={{delay: 0.1}}
                                                         >
                                                             <ChevronRight className={cn(
                                                                 "w-4 h-4 mr-2 transition-transform",
                                                                 activeEntry === entry.id && "rotate-90"
-                                                            )} />
+                                                            )}/>
                                                             <div className="truncate">
                                                                 <span className="truncate">{entry.title}</span>
                                                                 {entry.version && (
@@ -674,29 +695,24 @@ export default function ChangelogEntries({ projectId }: ChangelogEntriesProps) {
                             </CardContent>
                         </Card>
 
-                        {/* Tag filter card */}
+                        {/* Tag filter card with colors */}
                         {availableTags.length > 0 && (
                             <Card className="shadow-sm">
                                 <CardContent className="p-4">
                                     <h4 className="font-semibold mb-4">Filter by Tags</h4>
                                     <div className="flex flex-wrap gap-2">
                                         {availableTags.map(tag => (
-                                            <Badge
+                                            <ColoredTag
                                                 key={tag.id}
+                                                name={tag.name}
+                                                color={tag.color}
+                                                size="sm"
                                                 variant={filters.tags.includes(tag.id) ? "default" : "outline"}
-                                                className={cn(
-                                                    "cursor-pointer",
-                                                    filters.tags.includes(tag.id)
-                                                        ? "bg-primary hover:bg-primary/90"
-                                                        : "hover:bg-primary/10"
-                                                )}
                                                 onClick={() => toggleTag(tag.id)}
-                                            >
-                                                {tag.name}
-                                                {filters.tags.includes(tag.id) && (
-                                                    <X className="ml-1 h-3 w-3" />
-                                                )}
-                                            </Badge>
+                                                removable={filters.tags.includes(tag.id)}
+                                                onRemove={filters.tags.includes(tag.id) ? () => toggleTag(tag.id) : undefined}
+                                                className="cursor-pointer hover:opacity-80 transition-opacity"
+                                            />
                                         ))}
                                     </div>
                                 </CardContent>

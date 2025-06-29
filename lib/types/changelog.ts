@@ -7,6 +7,7 @@ export interface ChangelogEntry {
     content: string
     version?: string | null
     publishedAt?: Date | null
+    scheduledAt?: Date | null
     createdAt: Date
     updatedAt: Date
     tags: ChangelogTag[]
@@ -15,6 +16,7 @@ export interface ChangelogEntry {
 export interface ChangelogTag {
     id: string
     name: string
+    color?: string | null
 }
 
 export interface Changelog {
@@ -53,6 +55,7 @@ export interface ChangelogRequest {
     ChangelogTag?: {
         id: string
         name: string
+        color?: string | null
     } | null
 }
 
@@ -102,5 +105,44 @@ export interface RequestDataType {
         defaultTags: string[];
     };
     ChangelogEntry: unknown | null;
-    ChangelogTag: unknown;
+    ChangelogTag: {
+        id: string;
+        name: string;
+        color?: string | null;  // Added color support
+    } | null;
+}
+
+// Color utility types and constants
+export type TagColorOption = {
+    value: string;
+    label: string;
+    color: string;
+    textColor?: string;
+}
+
+export const TAG_COLOR_OPTIONS: TagColorOption[] = [
+    {value: 'blue', label: 'Blue', color: '#3b82f6', textColor: '#ffffff'},
+    {value: 'green', label: 'Green', color: '#10b981', textColor: '#ffffff'},
+    {value: 'red', label: 'Red', color: '#ef4444', textColor: '#ffffff'},
+    {value: 'yellow', label: 'Yellow', color: '#f59e0b', textColor: '#000000'},
+    {value: 'purple', label: 'Purple', color: '#8b5cf6', textColor: '#ffffff'},
+    {value: 'pink', label: 'Pink', color: '#ec4899', textColor: '#ffffff'},
+    {value: 'indigo', label: 'Indigo', color: '#6366f1', textColor: '#ffffff'},
+    {value: 'orange', label: 'Orange', color: '#f97316', textColor: '#ffffff'},
+    {value: 'teal', label: 'Teal', color: '#14b8a6', textColor: '#ffffff'},
+    {value: 'cyan', label: 'Cyan', color: '#06b6d4', textColor: '#ffffff'},
+    {value: 'gray', label: 'Gray', color: '#6b7280', textColor: '#ffffff'},
+    {value: 'slate', label: 'Slate', color: '#475569', textColor: '#ffffff'},
+];
+
+export const DEFAULT_TAG_COLOR = '#6b7280'; // Gray color as default
+
+// Utility function to get color info
+export function getTagColorInfo(color: string | null | undefined): TagColorOption {
+    if (!color) {
+        return TAG_COLOR_OPTIONS.find(option => option.value === 'gray') || TAG_COLOR_OPTIONS[0];
+    }
+
+    return TAG_COLOR_OPTIONS.find(option => option.color === color || option.value === color) ||
+        {value: 'custom', label: 'Custom', color: color, textColor: '#ffffff'};
 }

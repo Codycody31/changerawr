@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import {NextResponse} from 'next/server'
+import {db} from '@/lib/db'
 
 const ITEMS_PER_PAGE = 10
 
@@ -64,7 +64,8 @@ interface CursorCondition {
  *               "type": "object",
  *               "properties": {
  *                 "id": { "type": "string" },
- *                 "name": { "type": "string" }
+ *                 "name": { "type": "string" },
+ *                 "color": { "type": "string", "nullable": true }
  *               }
  *             }
  *           }
@@ -85,9 +86,9 @@ export async function GET(
 ) {
     return await (async () => {
         try {
-            const { params } = context
-            const { projectId } = await (async () => params)();
-            const { searchParams } = new URL(request.url)
+            const {params} = context
+            const {projectId} = await (async () => params)();
+            const {searchParams} = new URL(request.url)
 
             // Get pagination, search, and filter parameters
             const cursor = searchParams.get('cursor')
@@ -122,22 +123,22 @@ export async function GET(
 
             if (!project?.changelog) {
                 return NextResponse.json(
-                    { error: 'Changelog not found or not public' },
-                    { status: 404 }
+                    {error: 'Changelog not found or not public'},
+                    {status: 404}
                 )
             }
 
             // Build base where clause
             const baseWhere: BaseWhereClause = {
                 changelogId: project.changelog.id,
-                publishedAt: { not: null }
+                publishedAt: {not: null}
             }
 
             // Add search condition if present
             if (search) {
                 const searchConditions: SearchCondition[] = [
-                    { title: { contains: search, mode: 'insensitive' } },
-                    { content: { contains: search, mode: 'insensitive' } }
+                    {title: {contains: search, mode: 'insensitive'}},
+                    {content: {contains: search, mode: 'insensitive'}}
                 ]
                 baseWhere.OR = searchConditions
             }
@@ -146,35 +147,35 @@ export async function GET(
             if (tagIds.length > 0) {
                 baseWhere.tags = {
                     some: {
-                        id: { in: tagIds }
+                        id: {in: tagIds}
                     }
                 }
             }
 
             // Build cursor-based pagination where clause
-            let where: BaseWhereClause = { ...baseWhere }
+            let where: BaseWhereClause = {...baseWhere}
 
             if (cursor) {
                 const cursorEntry = await db.changelogEntry.findUnique({
-                    where: { id: cursor },
-                    select: { publishedAt: true }
+                    where: {id: cursor},
+                    select: {publishedAt: true}
                 })
 
                 if (cursorEntry?.publishedAt) {
                     // Different cursor logic based on sort order
                     const cursorConditions: CursorCondition[] = sortOrder === 'desc'
                         ? [
-                            { publishedAt: { lt: cursorEntry.publishedAt } },
+                            {publishedAt: {lt: cursorEntry.publishedAt}},
                             {
-                                publishedAt: { equals: cursorEntry.publishedAt },
-                                id: { lt: cursor }
+                                publishedAt: {equals: cursorEntry.publishedAt},
+                                id: {lt: cursor}
                             }
                         ]
                         : [
-                            { publishedAt: { gt: cursorEntry.publishedAt } },
+                            {publishedAt: {gt: cursorEntry.publishedAt}},
                             {
-                                publishedAt: { equals: cursorEntry.publishedAt },
-                                id: { gt: cursor }
+                                publishedAt: {equals: cursorEntry.publishedAt},
+                                id: {gt: cursor}
                             }
                         ]
 
@@ -191,14 +192,15 @@ export async function GET(
                 where,
                 take: ITEMS_PER_PAGE + 1,
                 orderBy: [
-                    { publishedAt: sortOrder },
-                    { id: sortOrder }
+                    {publishedAt: sortOrder},
+                    {id: sortOrder}
                 ],
                 include: {
                     tags: {
                         select: {
                             id: true,
-                            name: true
+                            name: true,
+                            color: true  // Include color field in the response
                         }
                     }
                 }
@@ -224,8 +226,8 @@ export async function GET(
         } catch (error) {
             console.error('Error fetching changelog entries:', error)
             return NextResponse.json(
-                { error: 'Failed to fetch changelog entries' },
-                { status: 500 }
+                {error: 'Failed to fetch changelog entries'},
+                {status: 500}
             )
         }
     })()

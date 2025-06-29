@@ -51,6 +51,7 @@ interface GameState {
     gameStarted: boolean
     keys: Record<string, boolean>
     frameCount: number
+    lastObstacleSpawn: number
 }
 
 const DinoGame: React.FC<DinoGameProps> = ({ isOpen, onClose }) => {
@@ -92,7 +93,8 @@ const DinoGame: React.FC<DinoGameProps> = ({ isOpen, onClose }) => {
         gameOver: false,
         gameStarted: false,
         keys: {},
-        frameCount: 0
+        frameCount: 0,
+        lastObstacleSpawn: 0
     })
 
     // Load high score from localStorage
@@ -118,7 +120,7 @@ const DinoGame: React.FC<DinoGameProps> = ({ isOpen, onClose }) => {
             ...gameState.current,
             dino: {
                 x: 80,
-                y: GROUND_Y - DINO_HEIGHT,
+                y: GROUND_Y - DINO_HEIGHT + 3, // Position dino so its bottom touches the ground line
                 width: DINO_WIDTH,
                 height: DINO_HEIGHT,
                 dy: 0,
@@ -139,7 +141,8 @@ const DinoGame: React.FC<DinoGameProps> = ({ isOpen, onClose }) => {
             gameOver: false,
             gameStarted: true,
             keys: {},
-            frameCount: 0
+            frameCount: 0,
+            lastObstacleSpawn: 0
         }
         setScore(0)
         setGameOver(false)
@@ -161,12 +164,12 @@ const DinoGame: React.FC<DinoGameProps> = ({ isOpen, onClose }) => {
             if (isDucking && state.dino.grounded) {
                 state.dino.isDucking = true
                 state.dino.height = DINO_DUCK_HEIGHT
-                state.dino.y = GROUND_Y - DINO_DUCK_HEIGHT
+                state.dino.y = GROUND_Y - DINO_DUCK_HEIGHT // Position so bottom touches ground
             } else if (!isDucking && state.dino.isDucking) {
                 state.dino.isDucking = false
                 state.dino.height = DINO_HEIGHT
                 if (state.dino.grounded) {
-                    state.dino.y = GROUND_Y - DINO_HEIGHT
+                    state.dino.y = GROUND_Y - DINO_HEIGHT // Position so bottom touches ground
                 }
             }
         }
@@ -224,7 +227,7 @@ const DinoGame: React.FC<DinoGameProps> = ({ isOpen, onClose }) => {
             case 'bird_high':
                 obstacle = {
                     x: CANVAS_WIDTH,
-                    y: GROUND_Y - 90,
+                    y: GROUND_Y - 100, // Higher up - requires ducking when jumping
                     width: 42,
                     height: 30,
                     type: 'bird_high'
@@ -233,7 +236,7 @@ const DinoGame: React.FC<DinoGameProps> = ({ isOpen, onClose }) => {
             case 'bird_low':
                 obstacle = {
                     x: CANVAS_WIDTH,
-                    y: GROUND_Y - 40,
+                    y: GROUND_Y - 55, // Lower - can be jumped over
                     width: 42,
                     height: 30,
                     type: 'bird_low'
@@ -242,6 +245,7 @@ const DinoGame: React.FC<DinoGameProps> = ({ isOpen, onClose }) => {
         }
 
         state.obstacles.push(obstacle)
+        state.lastObstacleSpawn = state.frameCount
     }, [])
 
     const updateClouds = useCallback(() => {
@@ -256,6 +260,31 @@ const DinoGame: React.FC<DinoGameProps> = ({ isOpen, onClose }) => {
                 cloud.height = 15 + Math.random() * 15
             }
         })
+    }, [])
+
+    // Improved collision detection with proper hitboxes
+    const checkCollision = useCallback((dino: Dino, obstacle: Obstacle): boolean => {
+        // More precise hitboxes with proper margins
+        const dinoHitbox = {
+            left: dino.x + 8,
+            right: dino.x + dino.width - 8,
+            top: dino.y + (dino.isDucking ? 4 : 8),
+            bottom: dino.y + dino.height - 4
+        }
+
+        const obstacleHitbox = {
+            left: obstacle.x + 4,
+            right: obstacle.x + obstacle.width - 4,
+            top: obstacle.y + 4,
+            bottom: obstacle.y + obstacle.height - 4
+        }
+
+        return (
+            dinoHitbox.left < obstacleHitbox.right &&
+            dinoHitbox.right > obstacleHitbox.left &&
+            dinoHitbox.top < obstacleHitbox.bottom &&
+            dinoHitbox.bottom > obstacleHitbox.top
+        )
     }, [])
 
     const update = useCallback(() => {
@@ -273,8 +302,11 @@ const DinoGame: React.FC<DinoGameProps> = ({ isOpen, onClose }) => {
         state.dino.dy += GRAVITY
         state.dino.y += state.dino.dy
 
-        // Ground collision
-        const targetGroundY = state.dino.isDucking ? GROUND_Y - DINO_DUCK_HEIGHT : GROUND_Y - DINO_HEIGHT
+        // Ground collision - dino should be ON the ground line, not above it
+        const targetGroundY = state.dino.isDucking
+            ? GROUND_Y - DINO_DUCK_HEIGHT + 3
+            : GROUND_Y - DINO_HEIGHT + 3; // Add 3 pixels here too
+
         if (state.dino.y >= targetGroundY) {
             state.dino.y = targetGroundY
             state.dino.dy = 0
@@ -282,11 +314,18 @@ const DinoGame: React.FC<DinoGameProps> = ({ isOpen, onClose }) => {
             state.dino.isJumping = false
         }
 
-        // Spawn obstacles with better timing
-        const spawnChance = 0.012 + (state.speed - 6) * 0.002
-        if (Math.random() < spawnChance && state.frameCount > 90) {
+        // Improved obstacle spawning with better spacing and timing
+        const timeSinceLastSpawn = state.frameCount - state.lastObstacleSpawn
+        const minSpawnDistance = Math.max(120, 200 - Math.floor(state.score / 1000) * 10) // Minimum frames between spawns
+        const baseSpawnChance = 0.008 // Reduced base spawn rate
+        const speedBonus = Math.min((state.speed - 6) * 0.001, 0.004) // Cap the speed bonus
+        const spawnChance = baseSpawnChance + speedBonus
+
+        if (timeSinceLastSpawn > minSpawnDistance && Math.random() < spawnChance) {
             const lastObstacle = state.obstacles[state.obstacles.length - 1]
-            if (!lastObstacle || lastObstacle.x < CANVAS_WIDTH - 300) {
+            const minDistance = Math.max(250, 350 - Math.floor(state.score / 2000) * 50) // Minimum pixel distance
+
+            if (!lastObstacle || lastObstacle.x < CANVAS_WIDTH - minDistance) {
                 spawnObstacle()
             }
         }
@@ -300,19 +339,9 @@ const DinoGame: React.FC<DinoGameProps> = ({ isOpen, onClose }) => {
         // Update clouds
         updateClouds()
 
-        // Collision detection
+        // Collision detection with improved hitboxes
         for (const obstacle of state.obstacles) {
-            const dinoLeft = state.dino.x + 4
-            const dinoRight = state.dino.x + state.dino.width - 4
-            const dinoTop = state.dino.y + 4
-            const dinoBottom = state.dino.y + state.dino.height - 4
-
-            if (
-                dinoLeft < obstacle.x + obstacle.width - 4 &&
-                dinoRight > obstacle.x + 4 &&
-                dinoTop < obstacle.y + obstacle.height - 4 &&
-                dinoBottom > obstacle.y + 4
-            ) {
+            if (checkCollision(state.dino, obstacle)) {
                 state.gameOver = true
                 setGameOver(true)
                 saveHighScore(Math.floor(state.score / 10))
@@ -320,15 +349,20 @@ const DinoGame: React.FC<DinoGameProps> = ({ isOpen, onClose }) => {
             }
         }
 
-        // Update score and speed
+        // Update score and speed with more balanced progression
         state.score += 1
-        if (state.score % 300 === 0) {
-            state.speed += 0.4
+
+        // More balanced speed increase - slower progression
+        if (state.score % 500 === 0) { // Increased interval
+            state.speed += 0.2 // Reduced speed increment
         }
+
+        // Cap the maximum speed to keep the game playable
+        state.speed = Math.min(state.speed, 12)
 
         const currentScore = Math.floor(state.score / 10)
         setScore(currentScore)
-    }, [spawnObstacle, updateClouds, saveHighScore])
+    }, [spawnObstacle, updateClouds, saveHighScore, checkCollision])
 
     const drawDino = useCallback((ctx: CanvasRenderingContext2D, dino: Dino) => {
         const { x, y, width, height, isJumping, isDucking, runFrame } = dino
@@ -540,8 +574,6 @@ const DinoGame: React.FC<DinoGameProps> = ({ isOpen, onClose }) => {
 
         // Day/night cycle
         const isDark = Math.floor(state.score / 2000) % 2 === 1
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const bgColor = isDark ? '#1a1a1a' : '#f0f9ff'
 
         // Gradient sky
         const gradient = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT)
@@ -727,7 +759,7 @@ const DinoGame: React.FC<DinoGameProps> = ({ isOpen, onClose }) => {
                                 size="lg"
                                 className="flex items-center gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
                             >
-                                {gameStarted ? <RotateCcw className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                                {gameStarted ? <RotateCcw className="h-4 w-4"/> : <Play className="h-4 w-4"/>}
                                 {gameStarted ? 'Restart Game' : 'Start Game'}
                             </Button>
                             <Button onClick={onClose} variant="outline" size="lg">

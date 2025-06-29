@@ -1,10 +1,10 @@
 'use client'
 
-import { use } from 'react'
+import {use} from 'react'
 import Link from 'next/link'
-import { useQuery } from '@tanstack/react-query'
-import { motion } from 'framer-motion'
-import { Button } from '@/components/ui/button'
+import {useQuery} from '@tanstack/react-query'
+import {motion} from 'framer-motion'
+import {Button} from '@/components/ui/button'
 import {
     Card,
     CardContent,
@@ -13,10 +13,10 @@ import {
     CardTitle,
     CardFooter,
 } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Progress } from '@/components/ui/progress'
+import {Badge} from '@/components/ui/badge'
+import {Separator} from '@/components/ui/separator'
+import {Avatar, AvatarFallback} from '@/components/ui/avatar'
+import {Progress} from '@/components/ui/progress'
 import {
     Settings,
     ExternalLink,
@@ -82,9 +82,9 @@ interface FeatureCardProps {
 }
 
 const fadeIn = {
-    initial: { opacity: 0, y: 20 },
-    animate: { opacity: 1, y: 0 },
-    transition: { duration: 0.3 }
+    initial: {opacity: 0, y: 20},
+    animate: {opacity: 1, y: 0},
+    transition: {duration: 0.3}
 };
 
 function formatDate(dateString: string) {
@@ -101,16 +101,16 @@ function getStatusColor(isPublished: boolean) {
         : "text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-950/40";
 }
 
-function EntryCard({ entry, projectId }: EntryCardProps) {
+function EntryCard({entry, projectId}: EntryCardProps) {
     const isPublished = !!entry.publishedAt;
     const statusColor = getStatusColor(isPublished);
 
     return (
         <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            whileHover={{ y: -2 }}
-            transition={{ duration: 0.2 }}
+            initial={{opacity: 0, y: 10}}
+            animate={{opacity: 1, y: 0}}
+            whileHover={{y: -2}}
+            transition={{duration: 0.2}}
         >
             <Card className="group overflow-hidden transition-all">
                 <CardHeader className="p-4 pb-0">
@@ -139,7 +139,7 @@ function EntryCard({ entry, projectId }: EntryCardProps) {
                         <div className="flex gap-1">
                             <Button variant="ghost" size="icon" asChild className="h-8 w-8">
                                 <Link href={`/dashboard/projects/${projectId}/changelog/${entry.id}`}>
-                                    <Edit className="h-4 w-4" />
+                                    <Edit className="h-4 w-4"/>
                                 </Link>
                             </Button>
                         </div>
@@ -148,13 +148,13 @@ function EntryCard({ entry, projectId }: EntryCardProps) {
                 <CardContent className="p-4 pt-3">
                     <div className="flex items-center text-xs text-muted-foreground gap-3 mt-1">
                         <div className="flex items-center">
-                            <Clock className="h-3 w-3 mr-1" />
+                            <Clock className="h-3 w-3 mr-1"/>
                             <span>Updated {formatDate(entry.updatedAt)}</span>
                         </div>
 
                         {entry.tags && entry.tags.length > 0 && (
                             <div className="flex items-center gap-1">
-                                <TagsIcon className="h-3 w-3" />
+                                <TagsIcon className="h-3 w-3"/>
                                 <span>{entry.tags.map((t) => t.name).join(', ')}</span>
                             </div>
                         )}
@@ -162,7 +162,8 @@ function EntryCard({ entry, projectId }: EntryCardProps) {
                 </CardContent>
                 <CardFooter className="p-0 overflow-hidden">
                     <div className="w-full h-1 bg-muted">
-                        <div className={`h-full ${isPublished ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: isPublished ? '100%' : '50%' }}></div>
+                        <div className={`h-full ${isPublished ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                             style={{width: isPublished ? '100%' : '50%'}}></div>
                     </div>
                 </CardFooter>
             </Card>
@@ -170,7 +171,7 @@ function EntryCard({ entry, projectId }: EntryCardProps) {
     );
 }
 
-function ProjectStats({ project }: { project: Project }) {
+function ProjectStats({project}: { project: Project }) {
     const totalEntries = project.changelog?.entries.length || 0;
     const publishedEntries = project.changelog?.entries.filter(entry => entry.publishedAt).length || 0;
     const draftEntries = totalEntries - publishedEntries;
@@ -181,7 +182,7 @@ function ProjectStats({ project }: { project: Project }) {
         <Card className="overflow-hidden">
             <CardHeader className="p-4 pb-2">
                 <CardTitle className="text-lg font-medium flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-primary" />
+                    <FileText className="h-5 w-5 text-primary"/>
                     Changelog Stats
                 </CardTitle>
             </CardHeader>
@@ -198,17 +199,19 @@ function ProjectStats({ project }: { project: Project }) {
                         <div className="space-y-1">
                             <div className="flex justify-between items-center">
                                 <span className="text-sm text-muted-foreground">Published</span>
-                                <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">{publishedEntries}</span>
+                                <span
+                                    className="text-sm font-medium text-emerald-600 dark:text-emerald-400">{publishedEntries}</span>
                             </div>
-                            <Progress value={publishedPercentage} className="h-2 bg-muted" />
+                            <Progress value={publishedPercentage} className="h-2 bg-muted"/>
                         </div>
 
                         <div className="space-y-1">
                             <div className="flex justify-between items-center">
                                 <span className="text-sm text-muted-foreground">Drafts</span>
-                                <span className="text-sm font-medium text-amber-600 dark:text-amber-400">{draftEntries}</span>
+                                <span
+                                    className="text-sm font-medium text-amber-600 dark:text-amber-400">{draftEntries}</span>
                             </div>
-                            <Progress value={100 - publishedPercentage} className="h-2 bg-muted" />
+                            <Progress value={100 - publishedPercentage} className="h-2 bg-muted"/>
                         </div>
                     </div>
                 </div>
@@ -229,8 +232,9 @@ function FeatureCard({
         <Card className={`h-full transition-all ${!enabled ? 'opacity-60' : 'hover:shadow-md'}`}>
             <Link href={enabled ? href : '#'} className={`block h-full ${!enabled ? 'cursor-not-allowed' : ''}`}>
                 <CardContent className="p-6 h-full flex flex-col">
-                    <div className={`h-10 w-10 rounded-full ${color} bg-primary/10 flex items-center justify-center mb-4`}>
-                        <Icon className="h-5 w-5" />
+                    <div
+                        className={`h-10 w-10 rounded-full ${color} bg-primary/10 flex items-center justify-center mb-4`}>
+                        <Icon className="h-5 w-5"/>
                     </div>
                     <CardTitle className="text-lg mb-2">{title}</CardTitle>
                     <CardDescription className="flex-grow">
@@ -241,10 +245,11 @@ function FeatureCard({
                         {enabled ? (
                             <>
                                 <span className="text-primary">Configure</span>
-                                <ArrowRight className="ml-1 h-4 w-4 text-primary" />
+                                <ArrowRight className="ml-1 h-4 w-4 text-primary"/>
                             </>
                         ) : (
-                            <Badge variant="outline" className="border-amber-200 bg-amber-100/50 text-amber-700 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-400">
+                            <Badge variant="outline"
+                                   className="border-amber-200 bg-amber-100/50 text-amber-700 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-400">
                                 Requires Public Project
                             </Badge>
                         )}
@@ -255,10 +260,10 @@ function FeatureCard({
     );
 }
 
-export default function ProjectPage({ params }: ProjectPageProps) {
-    const { projectId } = use(params)
+export default function ProjectPage({params}: ProjectPageProps) {
+    const {projectId} = use(params)
 
-    const { data: project, isLoading } = useQuery<Project>({
+    const {data: project, isLoading} = useQuery<Project>({
         queryKey: ['project', projectId],
         queryFn: async () => {
             const response = await fetch(`/api/projects/${projectId}`)
@@ -270,11 +275,11 @@ export default function ProjectPage({ params }: ProjectPageProps) {
     if (isLoading) {
         return (
             <div className="space-y-6 p-4 md:p-8">
-                <div className="h-8 w-48 bg-muted rounded-md animate-pulse mb-4" />
+                <div className="h-8 w-48 bg-muted rounded-md animate-pulse mb-4"/>
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    <div className="h-48 bg-muted rounded-md animate-pulse" />
-                    <div className="h-48 bg-muted rounded-md animate-pulse" />
-                    <div className="h-48 bg-muted rounded-md animate-pulse" />
+                    <div className="h-48 bg-muted rounded-md animate-pulse"/>
+                    <div className="h-48 bg-muted rounded-md animate-pulse"/>
+                    <div className="h-48 bg-muted rounded-md animate-pulse"/>
                 </div>
             </div>
         )
@@ -311,7 +316,8 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                 className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gradient-to-r from-background to-muted/60 p-4 rounded-xl border"
             >
                 <div className="flex gap-4 items-center">
-                    <Avatar className="h-16 w-16 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-medium text-2xl border-2 border-primary/20">
+                    <Avatar
+                        className="h-16 w-16 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-medium text-2xl border-2 border-primary/20">
                         <AvatarFallback>
                             {project.name.substring(0, 1).toUpperCase()}
                         </AvatarFallback>
@@ -335,20 +341,20 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                     {project.isPublic && (
                         <Button variant="outline" size="sm" asChild>
                             <Link href={`/changelog/${project.id}`} target="_blank">
-                                <ExternalLink className="h-4 w-4 mr-2" />
+                                <ExternalLink className="h-4 w-4 mr-2"/>
                                 View Public Page
                             </Link>
                         </Button>
                     )}
                     <Button variant="secondary" size="sm" asChild>
                         <Link href={`/dashboard/projects/${project.id}/settings`}>
-                            <Settings className="h-4 w-4 mr-2" />
+                            <Settings className="h-4 w-4 mr-2"/>
                             Settings
                         </Link>
                     </Button>
                     <Button size="sm" asChild>
                         <Link href={`/dashboard/projects/${project.id}/changelog/new`}>
-                            <Plus className="h-4 w-4 mr-2" />
+                            <Plus className="h-4 w-4 mr-2"/>
                             New Entry
                         </Link>
                     </Button>
@@ -362,13 +368,13 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                 variants={fadeIn}
                 className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
             >
-                <ProjectStats project={project} />
+                <ProjectStats project={project}/>
 
                 <Card className="md:col-span-2 overflow-hidden h-full">
                     <CardHeader className="p-4 pb-2">
                         <div className="flex items-center justify-between">
                             <CardTitle className="text-lg font-medium flex items-center gap-2">
-                                <CalendarIcon className="h-5 w-5 text-primary" />
+                                <CalendarIcon className="h-5 w-5 text-primary"/>
                                 Project Settings
                             </CardTitle>
                             <Button
@@ -387,8 +393,10 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-start gap-2">
-                                    <div className={`mt-0.5 h-4 w-4 rounded-full flex items-center justify-center ${project.isPublic ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
-                                        {project.isPublic ? <Check className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                                    <div
+                                        className={`mt-0.5 h-4 w-4 rounded-full flex items-center justify-center ${project.isPublic ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                                        {project.isPublic ? <Check className="h-3 w-3"/> :
+                                            <XCircle className="h-3 w-3"/>}
                                     </div>
                                     <div>
                                         <span className="text-sm font-medium">Public Access</span>
@@ -402,8 +410,10 @@ export default function ProjectPage({ params }: ProjectPageProps) {
 
                             <div className="flex items-center justify-between">
                                 <div className="flex items-start gap-2">
-                                    <div className={`mt-0.5 h-4 w-4 rounded-full flex items-center justify-center ${project.allowAutoPublish ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
-                                        {project.allowAutoPublish ? <Check className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                                    <div
+                                        className={`mt-0.5 h-4 w-4 rounded-full flex items-center justify-center ${project.allowAutoPublish ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                                        {project.allowAutoPublish ? <Check className="h-3 w-3"/> :
+                                            <XCircle className="h-3 w-3"/>}
                                     </div>
                                     <div>
                                         <span className="text-sm font-medium">Auto-publish</span>
@@ -417,8 +427,10 @@ export default function ProjectPage({ params }: ProjectPageProps) {
 
                             <div className="flex items-center justify-between">
                                 <div className="flex items-start gap-2">
-                                    <div className={`mt-0.5 h-4 w-4 rounded-full flex items-center justify-center ${project.requireApproval ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600'}`}>
-                                        {project.requireApproval ? <Check className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                                    <div
+                                        className={`mt-0.5 h-4 w-4 rounded-full flex items-center justify-center ${project.requireApproval ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                                        {project.requireApproval ? <Check className="h-3 w-3"/> :
+                                            <XCircle className="h-3 w-3"/>}
                                     </div>
                                     <div>
                                         <span className="text-sm font-medium">Approval Required</span>
@@ -442,7 +454,7 @@ export default function ProjectPage({ params }: ProjectPageProps) {
             >
                 <div className="flex items-center gap-2 mb-4">
                     <h2 className="text-xl font-semibold">Integrations & Features</h2>
-                    <Separator className="flex-1" />
+                    <Separator className="flex-1"/>
                 </div>
 
                 <div className="grid gap-6 grid-cols-1 md:grid-cols-3">
@@ -500,21 +512,22 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                 {project.changelog?.entries.length ? (
                     <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                         {recentEntries.map((entry) => (
-                            <EntryCard key={entry.id} entry={entry} projectId={project.id} />
+                            <EntryCard key={entry.id} entry={entry} projectId={project.id}/>
                         ))}
                     </div>
                 ) : (
                     <Card className="bg-muted/30">
                         <CardContent className="p-12 text-center">
                             <div className="flex flex-col items-center">
-                                <PenTool className="h-12 w-12 text-muted-foreground mb-4" />
+                                <PenTool className="h-12 w-12 text-muted-foreground mb-4"/>
                                 <h3 className="font-medium text-lg mb-1">No entries yet</h3>
                                 <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
-                                    Get started by creating your first changelog entry to keep your users up to date with your changes.
+                                    Get started by creating your first changelog entry to keep your users up to date
+                                    with your changes.
                                 </p>
                                 <Button asChild>
                                     <Link href={`/dashboard/projects/${project.id}/changelog/new`}>
-                                        <Plus className="h-4 w-4 mr-2" />
+                                        <Plus className="h-4 w-4 mr-2"/>
                                         Create First Entry
                                     </Link>
                                 </Button>

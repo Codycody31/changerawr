@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { motion } from 'framer-motion';
-import { z } from 'zod';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+import {useState, useEffect} from 'react';
+import {useParams, useRouter} from 'next/navigation';
+import {useQuery, useMutation, useQueryClient} from '@tanstack/react-query';
+import {motion} from 'framer-motion';
+import {z} from 'zod';
+import {useForm} from 'react-hook-form';
+import {zodResolver} from '@hookform/resolvers/zod';
 
 // UI Components
 import {
@@ -25,9 +25,9 @@ import {
     FormLabel,
     FormMessage,
 } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
+import {Input} from '@/components/ui/input';
+import {Button} from '@/components/ui/button';
+import {Switch} from '@/components/ui/switch';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -38,8 +38,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { useToast } from '@/hooks/use-toast';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import {useToast} from '@/hooks/use-toast';
+import {Alert, AlertDescription} from '@/components/ui/alert';
 import {
     CheckIcon,
     Loader2Icon,
@@ -55,11 +55,11 @@ import {
     PlusIcon,
     UserPlusIcon,
 } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { RenderMarkdown } from '@/components/MarkdownEditor';
+import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs';
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
+import {Badge} from "@/components/ui/badge";
+import {RadioGroup, RadioGroupItem} from "@/components/ui/radio-group";
+import {RenderMarkdown} from '@/components/MarkdownEditor';
 
 // Define types
 interface EmailConfig {
@@ -147,7 +147,7 @@ type SendEmailFormValues = z.infer<typeof sendEmailSchema>;
 export default function EmailIntegrationPage() {
     const params = useParams();
     const router = useRouter();
-    const { toast } = useToast();
+    const {toast} = useToast();
     const queryClient = useQueryClient();
     const projectId = params.projectId as string;
 
@@ -165,8 +165,29 @@ export default function EmailIntegrationPage() {
         'ALL_UPDATES', 'MAJOR_ONLY', 'DIGEST_ONLY'
     ]);
 
+    const getCustomDomain = (): string | null => {
+        if (typeof window === 'undefined') return null;
+
+        const hostname = window.location.hostname;
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || '';
+
+        try {
+            const appDomain = new URL(appUrl).hostname;
+
+            if (hostname !== appDomain &&
+                !hostname.includes('localhost') &&
+                !hostname.includes('127.0.0.1')) {
+                return hostname;
+            }
+        } catch (error) {
+            console.error('Error parsing app URL:', error);
+        }
+
+        return null;
+    };
+
     // Fetch email configuration
-    const { data: emailConfig, isLoading } = useQuery<EmailConfig>({
+    const {data: emailConfig, isLoading} = useQuery<EmailConfig>({
         queryKey: ['email-config', projectId],
         queryFn: async () => {
             const response = await fetch(`/api/projects/${projectId}/integrations/email`);
@@ -176,7 +197,7 @@ export default function EmailIntegrationPage() {
     });
 
     // Fetch project info
-    const { data: project } = useQuery<Project>({
+    const {data: project} = useQuery<Project>({
         queryKey: ['project', projectId],
         queryFn: async () => {
             const response = await fetch(`/api/projects/${projectId}`);
@@ -186,7 +207,7 @@ export default function EmailIntegrationPage() {
     });
 
     // Fetch recent changelog entries
-    const { data: entriesData } = useQuery({
+    const {data: entriesData} = useQuery({
         queryKey: ['changelog-entries', projectId],
         queryFn: async () => {
             const response = await fetch(`/api/projects/${projectId}/changelog?limit=10`);
@@ -286,7 +307,7 @@ export default function EmailIntegrationPage() {
         mutationFn: async (data: FormValues) => {
             const response = await fetch(`/api/projects/${projectId}/integrations/email`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(data),
             });
 
@@ -302,7 +323,7 @@ export default function EmailIntegrationPage() {
                 title: 'Settings Saved',
                 description: 'Email configuration has been updated successfully.',
             });
-            queryClient.invalidateQueries({ queryKey: ['email-config', projectId] });
+            queryClient.invalidateQueries({queryKey: ['email-config', projectId]});
         },
         onError: (error) => {
             toast({
@@ -318,7 +339,7 @@ export default function EmailIntegrationPage() {
         mutationFn: async (data: TestEmailFormValues & FormValues) => {
             const response = await fetch(`/api/projects/${projectId}/integrations/email/test`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(data),
             });
 
@@ -350,6 +371,8 @@ export default function EmailIntegrationPage() {
     const sendEmailMutation = useMutation({
         mutationFn: async (data: SendEmailFormValues) => {
             const isDigest = data.changelogEntryId === 'digest';
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const customDomain = getCustomDomain();
 
             // Prepare recipients based on selection
             let recipients: string[] = [];
@@ -366,12 +389,12 @@ export default function EmailIntegrationPage() {
                 subscriptionTypes: (data.recipientType === 'SUBSCRIBERS' || data.recipientType === 'BOTH')
                     ? selectedSubscriptionTypes
                     : undefined,
-                ...(isDigest ? {} : { changelogEntryId: data.changelogEntryId })
+                ...(isDigest ? {} : {changelogEntryId: data.changelogEntryId})
             };
 
             const response = await fetch(`/api/projects/${projectId}/integrations/email/send`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(payload)
             });
 
@@ -511,7 +534,7 @@ export default function EmailIntegrationPage() {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-96">
-                <Loader2Icon className="h-8 w-8 animate-spin text-primary" />
+                <Loader2Icon className="h-8 w-8 animate-spin text-primary"/>
             </div>
         );
     }
@@ -525,7 +548,7 @@ export default function EmailIntegrationPage() {
                     className="gap-1"
                     onClick={() => router.push(`/dashboard/projects/${projectId}/settings`)}
                 >
-                    <ArrowLeftIcon className="h-4 w-4" />
+                    <ArrowLeftIcon className="h-4 w-4"/>
                     Back to Settings
                 </Button>
                 <h1 className="text-2xl font-bold ml-4">Email Integration</h1>
@@ -537,25 +560,25 @@ export default function EmailIntegrationPage() {
                         className="gap-1"
                         onClick={() => router.push(`/dashboard/projects/${projectId}/integrations/email/subscribers`)}
                     >
-                        <UsersIcon className="h-4 w-4" />
+                        <UsersIcon className="h-4 w-4"/>
                         Manage Subscribers
                     </Button>
                 </div>
             </div>
 
             <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
+                initial={{opacity: 0, y: 20}}
+                animate={{opacity: 1, y: 0}}
+                transition={{duration: 0.3}}
             >
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                     <TabsList className="mb-6">
                         <TabsTrigger value="settings" className="flex items-center gap-2">
-                            <MailIcon className="h-4 w-4" />
+                            <MailIcon className="h-4 w-4"/>
                             SMTP Settings
                         </TabsTrigger>
                         <TabsTrigger value="send" className="flex items-center gap-2">
-                            <SendIcon className="h-4 w-4" />
+                            <SendIcon className="h-4 w-4"/>
                             Send Emails
                         </TabsTrigger>
                     </TabsList>
@@ -564,7 +587,7 @@ export default function EmailIntegrationPage() {
                         <Card>
                             <CardHeader>
                                 <div className="flex items-center">
-                                    <MailIcon className="h-5 w-5 mr-2 text-primary" />
+                                    <MailIcon className="h-5 w-5 mr-2 text-primary"/>
                                     <CardTitle>Email SMTP Configuration</CardTitle>
                                 </div>
                                 <CardDescription>
@@ -579,8 +602,9 @@ export default function EmailIntegrationPage() {
                                         <FormField
                                             control={form.control}
                                             name="enabled"
-                                            render={({ field }) => (
-                                                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                                            render={({field}) => (
+                                                <FormItem
+                                                    className="flex flex-row items-center justify-between rounded-lg border p-4">
                                                     <div className="space-y-0.5">
                                                         <FormLabel className="text-base">
                                                             Enable Email Notifications
@@ -606,13 +630,13 @@ export default function EmailIntegrationPage() {
                                                 <FormField
                                                     control={form.control}
                                                     name="smtpHost"
-                                                    render={({ field }) => (
+                                                    render={({field}) => (
                                                         <FormItem>
                                                             <FormLabel>SMTP Host</FormLabel>
                                                             <FormControl>
                                                                 <Input placeholder="smtp.example.com" {...field} />
                                                             </FormControl>
-                                                            <FormMessage />
+                                                            <FormMessage/>
                                                         </FormItem>
                                                     )}
                                                 />
@@ -620,13 +644,13 @@ export default function EmailIntegrationPage() {
                                                 <FormField
                                                     control={form.control}
                                                     name="smtpPort"
-                                                    render={({ field }) => (
+                                                    render={({field}) => (
                                                         <FormItem>
                                                             <FormLabel>SMTP Port</FormLabel>
                                                             <FormControl>
                                                                 <Input type="number" {...field} />
                                                             </FormControl>
-                                                            <FormMessage />
+                                                            <FormMessage/>
                                                         </FormItem>
                                                     )}
                                                 />
@@ -634,13 +658,14 @@ export default function EmailIntegrationPage() {
                                                 <FormField
                                                     control={form.control}
                                                     name="smtpUser"
-                                                    render={({ field }) => (
+                                                    render={({field}) => (
                                                         <FormItem>
                                                             <FormLabel>SMTP Username</FormLabel>
                                                             <FormControl>
-                                                                <Input placeholder="username" {...field} value={field.value ?? ""} />
+                                                                <Input placeholder="username" {...field}
+                                                                       value={field.value ?? ""}/>
                                                             </FormControl>
-                                                            <FormMessage />
+                                                            <FormMessage/>
                                                         </FormItem>
                                                     )}
                                                 />
@@ -648,7 +673,7 @@ export default function EmailIntegrationPage() {
                                                 <FormField
                                                     control={form.control}
                                                     name="smtpPassword"
-                                                    render={({ field }) => (
+                                                    render={({field}) => (
                                                         <FormItem>
                                                             <FormLabel>SMTP Password</FormLabel>
                                                             <FormControl>
@@ -667,9 +692,9 @@ export default function EmailIntegrationPage() {
                                                                         onClick={() => setShowPassword(!showPassword)}
                                                                     >
                                                                         {showPassword ? (
-                                                                            <EyeOffIcon className="h-4 w-4" />
+                                                                            <EyeOffIcon className="h-4 w-4"/>
                                                                         ) : (
-                                                                            <EyeIcon className="h-4 w-4" />
+                                                                            <EyeIcon className="h-4 w-4"/>
                                                                         )}
                                                                     </Button>
                                                                 </div>
@@ -679,7 +704,7 @@ export default function EmailIntegrationPage() {
                                                                     "Password saved. Leave blank to keep the same password." :
                                                                     "Enter your SMTP password."}
                                                             </FormDescription>
-                                                            <FormMessage />
+                                                            <FormMessage/>
                                                         </FormItem>
                                                     )}
                                                 />
@@ -687,8 +712,9 @@ export default function EmailIntegrationPage() {
                                                 <FormField
                                                     control={form.control}
                                                     name="smtpSecure"
-                                                    render={({ field }) => (
-                                                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 col-span-2">
+                                                    render={({field}) => (
+                                                        <FormItem
+                                                            className="flex flex-row items-center justify-between rounded-lg border p-4 col-span-2">
                                                             <div className="space-y-0.5">
                                                                 <FormLabel>Use Secure Connection (TLS)</FormLabel>
                                                                 <FormDescription>
@@ -714,13 +740,14 @@ export default function EmailIntegrationPage() {
                                                 <FormField
                                                     control={form.control}
                                                     name="fromEmail"
-                                                    render={({ field }) => (
+                                                    render={({field}) => (
                                                         <FormItem>
                                                             <FormLabel>From Email</FormLabel>
                                                             <FormControl>
-                                                                <Input placeholder="changelog@yourcompany.com" {...field} />
+                                                                <Input
+                                                                    placeholder="changelog@yourcompany.com" {...field} />
                                                             </FormControl>
-                                                            <FormMessage />
+                                                            <FormMessage/>
                                                         </FormItem>
                                                     )}
                                                 />
@@ -728,13 +755,14 @@ export default function EmailIntegrationPage() {
                                                 <FormField
                                                     control={form.control}
                                                     name="fromName"
-                                                    render={({ field }) => (
+                                                    render={({field}) => (
                                                         <FormItem>
                                                             <FormLabel>From Name</FormLabel>
                                                             <FormControl>
-                                                                <Input placeholder="Your Company Changelog" {...field} value={field.value ?? ''} />
+                                                                <Input placeholder="Your Company Changelog" {...field}
+                                                                       value={field.value ?? ''}/>
                                                             </FormControl>
-                                                            <FormMessage />
+                                                            <FormMessage/>
                                                         </FormItem>
                                                     )}
                                                 />
@@ -742,13 +770,14 @@ export default function EmailIntegrationPage() {
                                                 <FormField
                                                     control={form.control}
                                                     name="replyToEmail"
-                                                    render={({ field }) => (
+                                                    render={({field}) => (
                                                         <FormItem>
                                                             <FormLabel>Reply-To Email (Optional)</FormLabel>
                                                             <FormControl>
-                                                                <Input placeholder="support@yourcompany.com" {...field} value={field.value ?? ''} />
+                                                                <Input placeholder="support@yourcompany.com" {...field}
+                                                                       value={field.value ?? ''}/>
                                                             </FormControl>
-                                                            <FormMessage />
+                                                            <FormMessage/>
                                                         </FormItem>
                                                     )}
                                                 />
@@ -756,13 +785,14 @@ export default function EmailIntegrationPage() {
                                                 <FormField
                                                     control={form.control}
                                                     name="defaultSubject"
-                                                    render={({ field }) => (
+                                                    render={({field}) => (
                                                         <FormItem>
                                                             <FormLabel>Default Subject</FormLabel>
                                                             <FormControl>
-                                                                <Input placeholder="New Changelog Update" {...field} value={field.value || ''} />
+                                                                <Input placeholder="New Changelog Update" {...field}
+                                                                       value={field.value || ''}/>
                                                             </FormControl>
-                                                            <FormMessage />
+                                                            <FormMessage/>
                                                         </FormItem>
                                                     )}
                                                 />
@@ -776,7 +806,7 @@ export default function EmailIntegrationPage() {
                                                 onClick={() => setIsTestDialogOpen(true)}
                                                 disabled={saveConfig.isPending || !form.formState.isValid}
                                             >
-                                                <SendIcon className="mr-2 h-4 w-4" />
+                                                <SendIcon className="mr-2 h-4 w-4"/>
                                                 Test Connection
                                             </Button>
 
@@ -786,12 +816,12 @@ export default function EmailIntegrationPage() {
                                             >
                                                 {saveConfig.isPending ? (
                                                     <>
-                                                        <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+                                                        <Loader2Icon className="mr-2 h-4 w-4 animate-spin"/>
                                                         Saving...
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <CheckIcon className="mr-2 h-4 w-4" />
+                                                        <CheckIcon className="mr-2 h-4 w-4"/>
                                                         Save Settings
                                                     </>
                                                 )}
@@ -811,8 +841,8 @@ export default function EmailIntegrationPage() {
                                         }`}>
                                             <div className="flex items-center">
                                                 {emailConfig.testStatus?.startsWith('failed')
-                                                    ? <AlertCircleIcon className="h-5 w-5 mr-2" />
-                                                    : <CheckIcon className="h-5 w-5 mr-2" />
+                                                    ? <AlertCircleIcon className="h-5 w-5 mr-2"/>
+                                                    : <CheckIcon className="h-5 w-5 mr-2"/>
                                                 }
                                                 <div>
                                                     <p className="font-medium">
@@ -827,7 +857,8 @@ export default function EmailIntegrationPage() {
                                                         }
                                                     </p>
                                                     <p className="text-xs mt-1">
-                                                        Last tested: {new Date(emailConfig.lastTestedAt).toLocaleString()}
+                                                        Last
+                                                        tested: {new Date(emailConfig.lastTestedAt).toLocaleString()}
                                                     </p>
                                                 </div>
                                             </div>
@@ -842,7 +873,7 @@ export default function EmailIntegrationPage() {
                         <Card>
                             <CardHeader>
                                 <div className="flex items-center">
-                                    <SendIcon className="h-5 w-5 mr-2 text-primary" />
+                                    <SendIcon className="h-5 w-5 mr-2 text-primary"/>
                                     <CardTitle>Send Changelog Email</CardTitle>
                                 </div>
                                 <CardDescription>
@@ -853,22 +884,24 @@ export default function EmailIntegrationPage() {
                                 {!emailConfig?.enabled ? (
                                     <Alert className="mb-6">
                                         <AlertDescription>
-                                            Email notifications are not enabled. Please enable them in the SMTP Settings tab.
+                                            Email notifications are not enabled. Please enable them in the SMTP Settings
+                                            tab.
                                         </AlertDescription>
                                     </Alert>
                                 ) : (
                                     <Form {...sendEmailForm}>
-                                        <form onSubmit={sendEmailForm.handleSubmit(onSendEmailSubmit)} className="space-y-6">
+                                        <form onSubmit={sendEmailForm.handleSubmit(onSendEmailSubmit)}
+                                              className="space-y-6">
                                             <FormField
                                                 control={sendEmailForm.control}
                                                 name="subject"
-                                                render={({ field }) => (
+                                                render={({field}) => (
                                                     <FormItem>
                                                         <FormLabel>Email Subject</FormLabel>
                                                         <FormControl>
                                                             <Input placeholder="New Changelog Update" {...field} />
                                                         </FormControl>
-                                                        <FormMessage />
+                                                        <FormMessage/>
                                                     </FormItem>
                                                 )}
                                             />
@@ -876,7 +909,7 @@ export default function EmailIntegrationPage() {
                                             <FormField
                                                 control={sendEmailForm.control}
                                                 name="changelogEntryId"
-                                                render={({ field }) => (
+                                                render={({field}) => (
                                                     <FormItem>
                                                         <FormLabel>Content to Send</FormLabel>
                                                         <Select
@@ -885,13 +918,15 @@ export default function EmailIntegrationPage() {
                                                         >
                                                             <FormControl>
                                                                 <SelectTrigger>
-                                                                    <SelectValue placeholder="Select an entry or send a digest" />
+                                                                    <SelectValue
+                                                                        placeholder="Select an entry or send a digest"/>
                                                                 </SelectTrigger>
                                                             </FormControl>
                                                             <SelectContent>
                                                                 <SelectItem value="digest">
                                                                     <div className="flex items-center">
-                                                                        <div className="mr-2 h-2 w-2 rounded-full bg-primary"></div>
+                                                                        <div
+                                                                            className="mr-2 h-2 w-2 rounded-full bg-primary"></div>
                                                                         Send digest of recent entries
                                                                     </div>
                                                                 </SelectItem>
@@ -903,9 +938,10 @@ export default function EmailIntegrationPage() {
                                                             </SelectContent>
                                                         </Select>
                                                         <FormDescription>
-                                                            Choose a specific changelog entry or send a digest of recent entries
+                                                            Choose a specific changelog entry or send a digest of recent
+                                                            entries
                                                         </FormDescription>
-                                                        <FormMessage />
+                                                        <FormMessage/>
                                                     </FormItem>
                                                 )}
                                             />
@@ -914,7 +950,7 @@ export default function EmailIntegrationPage() {
                                                 <FormField
                                                     control={sendEmailForm.control}
                                                     name="recipientType"
-                                                    render={({ field }) => (
+                                                    render={({field}) => (
                                                         <FormItem className="space-y-3">
                                                             <FormLabel>Send To</FormLabel>
                                                             <FormControl>
@@ -925,54 +961,66 @@ export default function EmailIntegrationPage() {
                                                                     defaultValue={field.value}
                                                                     className="flex flex-col space-y-1"
                                                                 >
-                                                                    <FormItem className="flex items-center space-x-3 space-y-0">
+                                                                    <FormItem
+                                                                        className="flex items-center space-x-3 space-y-0">
                                                                         <FormControl>
-                                                                            <RadioGroupItem value="SUBSCRIBERS" />
+                                                                            <RadioGroupItem value="SUBSCRIBERS"/>
                                                                         </FormControl>
-                                                                        <FormLabel className="font-normal cursor-pointer">
+                                                                        <FormLabel
+                                                                            className="font-normal cursor-pointer">
                                                                             <div className="flex items-center">
-                                                                                <UsersIcon className="h-4 w-4 mr-2 text-muted-foreground" />
+                                                                                <UsersIcon
+                                                                                    className="h-4 w-4 mr-2 text-muted-foreground"/>
                                                                                 Subscribers
                                                                                 {isLoadingSubscribers ? (
-                                                                                    <Loader2Icon className="ml-2 h-3 w-3 animate-spin" />
+                                                                                    <Loader2Icon
+                                                                                        className="ml-2 h-3 w-3 animate-spin"/>
                                                                                 ) : (
-                                                                                    <Badge variant="outline" className="ml-2">
+                                                                                    <Badge variant="outline"
+                                                                                           className="ml-2">
                                                                                         {subscriberCount}
                                                                                     </Badge>
                                                                                 )}
                                                                             </div>
                                                                         </FormLabel>
                                                                     </FormItem>
-                                                                    <FormItem className="flex items-center space-x-3 space-y-0">
+                                                                    <FormItem
+                                                                        className="flex items-center space-x-3 space-y-0">
                                                                         <FormControl>
-                                                                            <RadioGroupItem value="MANUAL" />
+                                                                            <RadioGroupItem value="MANUAL"/>
                                                                         </FormControl>
-                                                                        <FormLabel className="font-normal cursor-pointer">
+                                                                        <FormLabel
+                                                                            className="font-normal cursor-pointer">
                                                                             <div className="flex items-center">
-                                                                                <MailIcon className="h-4 w-4 mr-2 text-muted-foreground" />
+                                                                                <MailIcon
+                                                                                    className="h-4 w-4 mr-2 text-muted-foreground"/>
                                                                                 Manual Recipients
                                                                                 {manualRecipients.length > 0 && (
-                                                                                    <Badge variant="outline" className="ml-2">
+                                                                                    <Badge variant="outline"
+                                                                                           className="ml-2">
                                                                                         {manualRecipients.length}
                                                                                     </Badge>
                                                                                 )}
                                                                             </div>
                                                                         </FormLabel>
                                                                     </FormItem>
-                                                                    <FormItem className="flex items-center space-x-3 space-y-0">
+                                                                    <FormItem
+                                                                        className="flex items-center space-x-3 space-y-0">
                                                                         <FormControl>
-                                                                            <RadioGroupItem value="BOTH" />
+                                                                            <RadioGroupItem value="BOTH"/>
                                                                         </FormControl>
-                                                                        <FormLabel className="font-normal cursor-pointer">
+                                                                        <FormLabel
+                                                                            className="font-normal cursor-pointer">
                                                                             <div className="flex items-center">
-                                                                                <UserPlusIcon className="h-4 w-4 mr-2 text-muted-foreground" />
+                                                                                <UserPlusIcon
+                                                                                    className="h-4 w-4 mr-2 text-muted-foreground"/>
                                                                                 Both (Subscribers and Manual Recipients)
                                                                             </div>
                                                                         </FormLabel>
                                                                     </FormItem>
                                                                 </RadioGroup>
                                                             </FormControl>
-                                                            <FormMessage />
+                                                            <FormMessage/>
                                                         </FormItem>
                                                     )}
                                                 />
@@ -989,7 +1037,7 @@ export default function EmailIntegrationPage() {
                                                             onClick={() => toggleSubscriptionType('ALL_UPDATES')}
                                                         >
                                                             {selectedSubscriptionTypes.includes('ALL_UPDATES') && (
-                                                                <CheckCircleIcon className="mr-1 h-3 w-3" />
+                                                                <CheckCircleIcon className="mr-1 h-3 w-3"/>
                                                             )}
                                                             All Updates
                                                         </Badge>
@@ -999,7 +1047,7 @@ export default function EmailIntegrationPage() {
                                                             onClick={() => toggleSubscriptionType('MAJOR_ONLY')}
                                                         >
                                                             {selectedSubscriptionTypes.includes('MAJOR_ONLY') && (
-                                                                <CheckCircleIcon className="mr-1 h-3 w-3" />
+                                                                <CheckCircleIcon className="mr-1 h-3 w-3"/>
                                                             )}
                                                             Major Updates Only
                                                         </Badge>
@@ -1009,7 +1057,7 @@ export default function EmailIntegrationPage() {
                                                             onClick={() => toggleSubscriptionType('DIGEST_ONLY')}
                                                         >
                                                             {selectedSubscriptionTypes.includes('DIGEST_ONLY') && (
-                                                                <CheckCircleIcon className="mr-1 h-3 w-3" />
+                                                                <CheckCircleIcon className="mr-1 h-3 w-3"/>
                                                             )}
                                                             Digest Only
                                                         </Badge>
@@ -1028,21 +1076,22 @@ export default function EmailIntegrationPage() {
                                                     render={() => (
                                                         <FormItem>
                                                             <FormLabel>Manual Recipients</FormLabel>
-                                                            <div className="flex flex-wrap gap-2 p-2 border rounded-md min-h-[80px]">
+                                                            <div
+                                                                className="flex flex-wrap gap-2 p-2 border rounded-md min-h-[80px]">
                                                                 {manualRecipients.map((email, index) => (
                                                                     <Badge
                                                                         key={index}
                                                                         variant="secondary"
                                                                         className="flex items-center gap-1 px-3 py-1"
                                                                     >
-                                                                        <MailIcon className="h-3 w-3" />
+                                                                        <MailIcon className="h-3 w-3"/>
                                                                         {email}
                                                                         <button
                                                                             type="button"
                                                                             onClick={() => removeRecipient(index)}
                                                                             className="ml-1 hover:text-destructive"
                                                                         >
-                                                                            <XIcon className="h-3 w-3" />
+                                                                            <XIcon className="h-3 w-3"/>
                                                                         </button>
                                                                     </Badge>
                                                                 ))}
@@ -1076,7 +1125,7 @@ export default function EmailIntegrationPage() {
                                                                     onClick={addRecipient}
                                                                     disabled={!newRecipient}
                                                                 >
-                                                                    <PlusIcon className="h-3 w-3 mr-1" />
+                                                                    <PlusIcon className="h-3 w-3 mr-1"/>
                                                                     Add Recipient
                                                                 </Button>
                                                             </div>
@@ -1095,10 +1144,12 @@ export default function EmailIntegrationPage() {
                                                                 <>Sending to {subscriberCount} subscribers</>
                                                             )}
                                                             {sendEmailForm.watch('recipientType') === 'MANUAL' && (
-                                                                <>Sending to {manualRecipients.length} manual recipients</>
+                                                                <>Sending to {manualRecipients.length} manual
+                                                                    recipients</>
                                                             )}
                                                             {sendEmailForm.watch('recipientType') === 'BOTH' && (
-                                                                <>Sending to {manualRecipients.length} manual recipients and approximately {subscriberCount} subscribers</>
+                                                                <>Sending to {manualRecipients.length} manual recipients
+                                                                    and approximately {subscriberCount} subscribers</>
                                                             )}
                                                         </p>
                                                     </div>
@@ -1113,12 +1164,12 @@ export default function EmailIntegrationPage() {
                                                     >
                                                         {sendEmailMutation.isPending ? (
                                                             <>
-                                                                <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+                                                                <Loader2Icon className="mr-2 h-4 w-4 animate-spin"/>
                                                                 Sending...
                                                             </>
                                                         ) : (
                                                             <>
-                                                                <SendIcon className="mr-2 h-4 w-4" />
+                                                                <SendIcon className="mr-2 h-4 w-4"/>
                                                                 Send Email
                                                             </>
                                                         )}
@@ -1138,28 +1189,43 @@ export default function EmailIntegrationPage() {
                             </CardHeader>
                             <CardContent>
                                 <div className="bg-card border rounded-md p-4 mb-4 text-sm">
-                                    <div style={{ maxWidth: '100%' }}>
-                                        <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '10px', textAlign: 'center' }}>
+                                    <div style={{maxWidth: '100%'}}>
+                                        <h2 style={{
+                                            fontSize: '18px',
+                                            fontWeight: 'bold',
+                                            marginBottom: '10px',
+                                            textAlign: 'center'
+                                        }}>
                                             {project?.name || 'Project Name'} Changelog
                                         </h2>
-                                        <p style={{ color: '#666', fontSize: '14px', marginBottom: '10px', textAlign: 'center' }}>
+                                        <p style={{
+                                            color: '#666',
+                                            fontSize: '14px',
+                                            marginBottom: '10px',
+                                            textAlign: 'center'
+                                        }}>
                                             {sendEmailForm.watch('changelogEntryId') === 'digest' ? 'Recent updates to our product' : 'New update to our product'}
                                         </p>
-                                        <hr style={{ margin: '10px 0' }} />
+                                        <hr style={{margin: '10px 0'}}/>
 
-                                        <div style={{ padding: '10px 0' }}>
-                                            <div style={{ fontSize: '16px', fontWeight: 'bold', margin: '8px 0' }}>
+                                        <div style={{padding: '10px 0'}}>
+                                            <div style={{fontSize: '16px', fontWeight: 'bold', margin: '8px 0'}}>
                                                 {recentEntries.length > 0 && sendEmailForm.watch('changelogEntryId') !== 'digest'
                                                     ? recentEntries.find(e => e.id === sendEmailForm.watch('changelogEntryId'))?.title || 'Example Changelog Entry'
                                                     : 'Recent Updates'}
                                                 {recentEntries.length > 0 && sendEmailForm.watch('changelogEntryId') !== 'digest' && (
-                                                    <span style={{ color: '#666', fontSize: '12px', fontWeight: 'normal', marginLeft: '8px' }}>
+                                                    <span style={{
+                                                        color: '#666',
+                                                        fontSize: '12px',
+                                                        fontWeight: 'normal',
+                                                        marginLeft: '8px'
+                                                    }}>
                                                         {recentEntries.find(e => e.id === sendEmailForm.watch('changelogEntryId'))?.version || 'v1.0.0'}
                                                     </span>
                                                 )}
                                             </div>
 
-                                            <div style={{ marginBottom: '8px' }}>
+                                            <div style={{marginBottom: '8px'}}>
                                                 <span style={{
                                                     backgroundColor: '#f1f5f9',
                                                     borderRadius: '4px',
@@ -1174,10 +1240,21 @@ export default function EmailIntegrationPage() {
                                             </div>
 
                                             {sendEmailForm.watch('changelogEntryId') === 'digest'
-                                                ? <div style={{ color: '#333', fontSize: '12px', lineHeight: '1.4', margin: '8px 0' }}>
-                                                    &apos;This digest contains multiple recent updates to our product...&apos;
+                                                ? <div style={{
+                                                    color: '#333',
+                                                    fontSize: '12px',
+                                                    lineHeight: '1.4',
+                                                    margin: '8px 0'
+                                                }}>
+                                                    &apos;This digest contains multiple recent updates to our
+                                                    product...&apos;
                                                 </div>
-                                                : <div style={{ color: '#333', fontSize: '12px', lineHeight: '1.4', margin: '8px 0' }}>
+                                                : <div style={{
+                                                    color: '#333',
+                                                    fontSize: '12px',
+                                                    lineHeight: '1.4',
+                                                    margin: '8px 0'
+                                                }}>
                                                     <RenderMarkdown>
                                                         {recentEntries.find(e => e.id === sendEmailForm.watch('changelogEntryId'))?.content.substring(0, 100) + '...' ||
                                                             'This is a simplified preview of how your email will look.'}
@@ -1189,7 +1266,8 @@ export default function EmailIntegrationPage() {
 
                                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                                     <p>
-                                        This is a simplified preview. Actual emails will include styling and formatting based on the entry content.
+                                        This is a simplified preview. Actual emails will include styling and formatting
+                                        based on the entry content.
                                     </p>
                                     <Button
                                         variant="ghost"
@@ -1197,7 +1275,7 @@ export default function EmailIntegrationPage() {
                                         className="hover:text-foreground transition-colors"
                                         onClick={() => router.push(`/dashboard/projects/${projectId}/integrations/email/subscribers`)}
                                     >
-                                        <UsersIcon className="h-3 w-3 mr-1" />
+                                        <UsersIcon className="h-3 w-3 mr-1"/>
                                         Manage Subscribers
                                     </Button>
                                 </div>
@@ -1222,7 +1300,7 @@ export default function EmailIntegrationPage() {
                                 <FormField
                                     control={testEmailForm.control}
                                     name="testEmail"
-                                    render={({ field }) => (
+                                    render={({field}) => (
                                         <FormItem>
                                             <FormLabel>Recipient Email</FormLabel>
                                             <FormControl>
@@ -1234,7 +1312,7 @@ export default function EmailIntegrationPage() {
                                             <FormDescription>
                                                 Enter your email address to receive the test message
                                             </FormDescription>
-                                            <FormMessage />
+                                            <FormMessage/>
                                         </FormItem>
                                     )}
                                 />
@@ -1249,12 +1327,12 @@ export default function EmailIntegrationPage() {
                             >
                                 {testConnection.isPending ? (
                                     <>
-                                        <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+                                        <Loader2Icon className="mr-2 h-4 w-4 animate-spin"/>
                                         Testing...
                                     </>
                                 ) : (
                                     <>
-                                        <SendIcon className="mr-2 h-4 w-4" />
+                                        <SendIcon className="mr-2 h-4 w-4"/>
                                         Send Test Email
                                     </>
                                 )}
