@@ -1,9 +1,9 @@
 'use client'
 
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/context/auth';
-import { useRouter } from 'next/navigation';
-import { useThemeWithLoading } from '@/components/theme-provider';
+import React, {useState, useEffect} from 'react';
+import {useAuth} from '@/context/auth';
+import {useRouter} from 'next/navigation';
+import {useThemeWithLoading} from '@/components/theme-provider';
 import {
     Card,
     CardContent,
@@ -11,15 +11,15 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { useToast } from '@/hooks/use-toast';
-import { Loader2, Moon, Sun, Save, Bell, Lock } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useMediaQuery } from '@/hooks/use-media-query';
-import { Switch } from '@/components/ui/switch';
-import { Separator } from '@/components/ui/separator';
+import {Button} from '@/components/ui/button';
+import {Input} from '@/components/ui/input';
+import {Label} from '@/components/ui/label';
+import {useToast} from '@/hooks/use-toast';
+import {Loader2, Moon, Sun, Save, Bell, Lock} from 'lucide-react';
+import {motion, AnimatePresence} from 'framer-motion';
+import {useMediaQuery} from '@/hooks/use-media-query';
+import {Switch} from '@/components/ui/switch';
+import {Separator} from '@/components/ui/separator';
 import {
     Dialog,
     DialogContent,
@@ -28,23 +28,53 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { PasskeysSection } from "@/components/settings/passkeys-section";
+import {PasskeysSection} from "@/components/settings/passkeys-section";
+import ConnectedSsoProviders from '@/components/settings/connected-sso-section';
 
 interface FormState {
     name: string;
     enableNotifications: boolean;
 }
 
+interface OAuthProvider {
+    id: string;
+    name: string;
+    enabled: boolean;
+    isDefault: boolean;
+}
+
+interface OAuthConnection {
+    id: string;
+    providerId: string;
+    provider: OAuthProvider;
+    providerUserId: string;
+    expiresAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+interface SsoData {
+    connections: OAuthConnection[];
+    allProviders: OAuthProvider[];
+}
+
 export default function SettingsPage() {
-    const { user } = useAuth();
-    const { theme, setTheme, isLoading: themeLoading } = useThemeWithLoading();
+    const {user} = useAuth();
+    const {theme, setTheme, isLoading: themeLoading} = useThemeWithLoading();
     const router = useRouter();
-    const { toast } = useToast();
+    const {toast} = useToast();
     const [isLoading, setIsLoading] = useState(false);
     const [isFetching, setIsFetching] = useState(true);
     const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
     const [isResettingPassword, setIsResettingPassword] = useState(false);
     const isMobile = useMediaQuery("(max-width: 640px)");
+
+    // SSO connections state
+    const [ssoData, setSsoData] = useState<SsoData>({
+        connections: [],
+        allProviders: []
+    });
+    const [isSsoLoading, setIsSsoLoading] = useState(true);
 
     // Original saved values - these don't change unless we explicitly save
     const [savedValues, setSavedValues] = useState<FormState | null>(null);
@@ -91,6 +121,29 @@ export default function SettingsPage() {
         }
     }, [user, toast]);
 
+    // Fetch SSO connections
+    useEffect(() => {
+        async function fetchSsoConnections() {
+            try {
+                setIsSsoLoading(true);
+                const response = await fetch('/api/auth/connections');
+                if (response.ok) {
+                    const data = await response.json();
+                    setSsoData(data);
+                }
+            } catch (error) {
+                console.error('Failed to fetch SSO connections:', error);
+                // Don't show error toast for SSO data as it's not critical
+            } finally {
+                setIsSsoLoading(false);
+            }
+        }
+
+        if (user) {
+            fetchSsoConnections();
+        }
+    }, [user]);
+
     // Check if there are unsaved changes
     const hasChanges = savedValues ? (
         formState.name !== savedValues.name ||
@@ -104,12 +157,12 @@ export default function SettingsPage() {
 
     // Handle name change
     const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setFormState(prev => ({ ...prev, name: e.target.value }));
+        setFormState(prev => ({...prev, name: e.target.value}));
     };
 
     // Handle notification toggle
     const handleNotificationToggle = (checked: boolean) => {
-        setFormState(prev => ({ ...prev, enableNotifications: checked }));
+        setFormState(prev => ({...prev, enableNotifications: checked}));
     };
 
     // Handle password reset request
@@ -118,7 +171,7 @@ export default function SettingsPage() {
         try {
             const response = await fetch('/api/auth/reset-password/request', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {'Content-Type': 'application/json'},
             });
 
             if (!response.ok) {
@@ -152,7 +205,7 @@ export default function SettingsPage() {
         try {
             const response = await fetch('/api/auth/settings', {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(formState),
             });
 
@@ -190,7 +243,7 @@ export default function SettingsPage() {
     if (isFetching || themeLoading) {
         return (
             <div className="flex items-center justify-center h-full">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <Loader2 className="h-8 w-8 animate-spin text-primary"/>
             </div>
         );
     }
@@ -199,11 +252,15 @@ export default function SettingsPage() {
         <div className="min-h-screen bg-background">
 
             <form
-                onSubmit={(e) => { e.preventDefault(); handleSave(); }}
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSave();
+                }}
                 className="container max-w-2xl px-4 md:px-6 space-y-4 md:space-y-6 pb-20 md:pb-8"
             >
                 {/* Desktop header */}
-                <div className="hidden md:flex sticky top-0 z-10 bg-background pt-4 pb-2 mb-4 flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div
+                    className="hidden md:flex sticky top-0 z-10 bg-background pt-4 pb-2 mb-4 flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div className="flex items-center">
                         <div>
                             <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Settings</h1>
@@ -216,10 +273,10 @@ export default function SettingsPage() {
                     <AnimatePresence>
                         {hasChanges && (
                             <motion.div
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: 20 }}
-                                transition={{ duration: 0.2 }}
+                                initial={{opacity: 0, y: 20}}
+                                animate={{opacity: 1, y: 0}}
+                                exit={{opacity: 0, y: 20}}
+                                transition={{duration: 0.2}}
                                 className="flex gap-2 w-full sm:w-auto"
                             >
                                 <Button
@@ -236,10 +293,10 @@ export default function SettingsPage() {
                                     className="flex-1 sm:flex-initial sm:min-w-[100px]"
                                 >
                                     {isLoading ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        <Loader2 className="h-4 w-4 animate-spin"/>
                                     ) : (
                                         <>
-                                            <Save className="mr-2 h-4 w-4" />
+                                            <Save className="mr-2 h-4 w-4"/>
                                             Save Changes
                                         </>
                                     )}
@@ -262,14 +319,14 @@ export default function SettingsPage() {
                             <ThemeButton
                                 isActive={theme === 'light'}
                                 onClick={() => handleThemeToggle('light')}
-                                icon={<Sun className="h-4 w-4 md:h-5 md:w-5" />}
+                                icon={<Sun className="h-4 w-4 md:h-5 md:w-5"/>}
                                 name="Light"
                                 disabled={themeLoading}
                             />
                             <ThemeButton
                                 isActive={theme === 'dark'}
                                 onClick={() => handleThemeToggle('dark')}
-                                icon={<Moon className="h-4 w-4 md:h-5 md:w-5" />}
+                                icon={<Moon className="h-4 w-4 md:h-5 md:w-5"/>}
                                 name="Dark"
                                 disabled={themeLoading}
                             />
@@ -288,7 +345,7 @@ export default function SettingsPage() {
                     <CardContent className="space-y-4">
                         <div className="flex items-start justify-between space-x-3">
                             <div className="flex items-start space-x-3 flex-1">
-                                <Bell className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
+                                <Bell className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0"/>
                                 <div className="min-w-0 flex-1">
                                     <p className="font-medium text-sm md:text-base">Email Notifications</p>
                                     <p className="text-xs md:text-sm text-muted-foreground mt-1">
@@ -337,14 +394,14 @@ export default function SettingsPage() {
                             </p>
                         </div>
 
-                        <Separator className="my-4" />
+                        <Separator className="my-4"/>
 
                         {/* Password Reset Section */}
                         <div className="pt-2">
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                                 <div className="space-y-1 flex-1">
                                     <h3 className="text-sm font-medium flex items-center">
-                                        <Lock className="h-4 w-4 mr-1" />
+                                        <Lock className="h-4 w-4 mr-1"/>
                                         Password
                                     </h3>
                                     <p className="text-xs text-muted-foreground">
@@ -364,8 +421,15 @@ export default function SettingsPage() {
                     </CardContent>
                 </Card>
 
+                {/* Connected SSO Providers Section */}
+                <ConnectedSsoProviders
+                    connections={ssoData.connections}
+                    allProviders={ssoData.allProviders}
+                    isLoading={isSsoLoading}
+                />
+
                 {/* Passkeys Section */}
-                <PasskeysSection />
+                <PasskeysSection/>
 
                 {/* Password Reset Dialog */}
                 <Dialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
@@ -392,7 +456,7 @@ export default function SettingsPage() {
                             >
                                 {isResettingPassword ? (
                                     <>
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin"/>
                                         Sending...
                                     </>
                                 ) : 'Send Reset Link'}
@@ -404,9 +468,9 @@ export default function SettingsPage() {
                 {/* Mobile fixed save button */}
                 {isMobile && hasChanges && (
                     <motion.div
-                        initial={{ y: 100, opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        exit={{ y: 100, opacity: 0 }}
+                        initial={{y: 100, opacity: 0}}
+                        animate={{y: 0, opacity: 1}}
+                        exit={{y: 100, opacity: 0}}
                         className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur-sm border-t z-40"
                     >
                         <div className="flex gap-3 max-w-sm mx-auto">
@@ -424,10 +488,10 @@ export default function SettingsPage() {
                                 className="flex-1 h-11"
                             >
                                 {isLoading ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <Loader2 className="h-4 w-4 animate-spin"/>
                                 ) : (
                                     <>
-                                        <Save className="mr-2 h-4 w-4" />
+                                        <Save className="mr-2 h-4 w-4"/>
                                         Save
                                     </>
                                 )}
@@ -471,8 +535,8 @@ function ThemeButton({
 
             {isActive && (
                 <motion.span
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
+                    initial={{opacity: 0, scale: 0.8}}
+                    animate={{opacity: 1, scale: 1}}
                     className="absolute right-3 text-xs bg-primary-foreground text-primary px-2 py-1 rounded-full"
                 >
                     Active
