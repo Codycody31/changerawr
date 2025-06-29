@@ -1,12 +1,12 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { motion, useInView } from 'framer-motion'
+import React, {useState, useRef, useEffect} from 'react'
+import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter} from '@/components/ui/dialog'
+import {Button} from '@/components/ui/button'
+import {Badge} from '@/components/ui/badge'
+import {ScrollArea} from '@/components/ui/scroll-area'
+import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs'
+import {motion, useInView} from 'framer-motion'
 import {
     AlertCircle,
     ArrowRight,
@@ -39,10 +39,10 @@ interface WhatsNewModalProps {
 }
 
 const typeIcons = {
-    feature: <Rocket className="h-4 w-4 text-primary" />,
-    improvement: <ThumbsUp className="h-4 w-4 text-green-500" />,
-    bugfix: <XCircle className="h-4 w-4 text-red-500" />,
-    other: <AlertCircle className="h-4 w-4 text-blue-500" />
+    feature: <Rocket className="h-4 w-4 text-primary"/>,
+    improvement: <ThumbsUp className="h-4 w-4 text-green-500"/>,
+    bugfix: <XCircle className="h-4 w-4 text-red-500"/>,
+    other: <AlertCircle className="h-4 w-4 text-blue-500"/>
 }
 
 const typeColors = {
@@ -52,24 +52,27 @@ const typeColors = {
     other: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800"
 }
 
-const ItemCard = ({ item, index }: { item: WhatsNewItem; index: number }) => {
+const ItemCard = ({item, index}: { item: WhatsNewItem; index: number }) => {
     const ref = useRef(null)
-    const isInView = useInView(ref, { once: true, margin: "-10% 0px -10% 0px" })
+    const isInView = useInView(ref, {once: true, margin: "-10% 0px -10% 0px"})
 
     return (
         <motion.div
             ref={ref}
-            initial={{ opacity: 0, y: 20 }}
-            animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-            transition={{ delay: index * 0.08, duration: 0.4 }}
+            initial={{opacity: 0, y: 20}}
+            animate={isInView ? {opacity: 1, y: 0} : {opacity: 0, y: 20}}
+            transition={{delay: index * 0.08, duration: 0.4}}
             className="group relative"
         >
-            <div className="absolute left-2 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-border to-transparent" />
+            <div
+                className="absolute left-2 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-border to-transparent"/>
 
             <div className="relative pl-6 pb-6">
-                <div className="absolute left-0 top-1 h-3 w-3 rounded-full border-2 border-background bg-muted-foreground" />
+                <div
+                    className="absolute left-0 top-1 h-3 w-3 rounded-full border-2 border-background bg-muted-foreground"/>
 
-                <div className="overflow-hidden rounded-lg border bg-card p-4 shadow-sm transition-all group-hover:shadow-md">
+                <div
+                    className="overflow-hidden rounded-lg border bg-card p-4 shadow-sm transition-all group-hover:shadow-md">
                     <div className="flex gap-3">
                         <div className="mt-0.5 flex-shrink-0">
                             <div className="rounded-full bg-muted p-1.5">
@@ -107,7 +110,7 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({
     const [countdown, setCountdown] = useState(3)
     const mainRef = useRef(null)
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const isInView = useInView(mainRef, { once: true })
+    const isInView = useInView(mainRef, {once: true})
 
     // Reset to current tab when opening the modal and start countdown
     useEffect(() => {
@@ -149,33 +152,36 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({
     return (
         <Dialog
             open={isOpen}
-            onOpenChange={() => {}} // Prevent closing from outside clicks or escape
+            onOpenChange={() => {
+            }} // Prevent closing from outside clicks or escape
         >
             <DialogContent
-                className="sm:max-w-xl max-h-[90vh] p-0 overflow-hidden flex flex-col gap-0 border-none bg-background/95 backdrop-blur-sm shadow-2xl"
+                className="sm:max-w-xl w-full max-w-[95vw] h-[90vh] max-h-[90vh] p-0 overflow-hidden flex flex-col gap-0 border-none bg-background/95 backdrop-blur-sm shadow-2xl"
                 onPointerDownOutside={(e) => e.preventDefault()} // Prevent outside clicks
                 onEscapeKeyDown={(e) => e.preventDefault()} // Prevent escape key
             >
-                <div className="absolute inset-0 bg-gradient-to-tr from-primary/5 via-background to-background/95 -z-10" />
+                <div
+                    className="absolute inset-0 bg-gradient-to-tr from-primary/5 via-background to-background/95 -z-10"/>
 
                 {/* Remove the default close button by overriding it */}
                 <div className="absolute right-4 top-4 z-10">
                     {/* Empty div to occupy space where close button would be */}
                 </div>
 
-                <DialogHeader className="p-6 pb-4 border-b">
+                <DialogHeader className="p-6 pb-4 border-b flex-shrink-0">
                     <div className="flex items-start gap-4">
-                        <div className="h-12 w-12 rounded-full bg-primary/10 flex-shrink-0 flex items-center justify-center">
-                            <Sparkles className="h-6 w-6 text-primary" />
+                        <div
+                            className="h-12 w-12 rounded-full bg-primary/10 flex-shrink-0 flex items-center justify-center">
+                            <Sparkles className="h-6 w-6 text-primary"/>
                         </div>
 
-                        <div className="space-y-1">
+                        <div className="space-y-1 min-w-0 flex-1">
                             <DialogTitle className="text-xl font-semibold">
                                 What&apos;s New in v{content.version}
                             </DialogTitle>
 
                             <div className="flex items-center text-sm text-muted-foreground">
-                                <Calendar className="h-3.5 w-3.5 mr-1.5" />
+                                <Calendar className="h-3.5 w-3.5 mr-1.5 flex-shrink-0"/>
                                 <time dateTime={content.releaseDate}>
                                     {new Date(content.releaseDate).toLocaleDateString(undefined, {
                                         year: 'numeric',
@@ -192,7 +198,7 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({
                     </div>
                 </DialogHeader>
 
-                <div className="flex-1 min-h-0">
+                <div className="flex-1 min-h-0 overflow-hidden">
                     {previousVersions.length > 0 ? (
                         <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
                             <div className="border-b px-6 flex-shrink-0">
@@ -212,28 +218,29 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({
                                 </TabsList>
                             </div>
 
-                            <TabsContent value="current" className="flex-1 min-h-0 p-0 m-0">
-                                <ScrollArea className="h-full">
+                            <TabsContent value="current" className="flex-1 min-h-0 p-0 m-0 overflow-hidden">
+                                <ScrollArea className="h-full w-full">
                                     <div className="px-6 py-4" ref={mainRef}>
                                         <div className="space-y-0">
                                             {content.items.map((item, index) => (
-                                                <ItemCard key={index} item={item} index={index} />
+                                                <ItemCard key={index} item={item} index={index}/>
                                             ))}
                                         </div>
                                     </div>
                                 </ScrollArea>
                             </TabsContent>
 
-                            <TabsContent value="history" className="flex-1 min-h-0 p-0 m-0">
-                                <ScrollArea className="h-full">
+                            <TabsContent value="history" className="flex-1 min-h-0 p-0 m-0 overflow-hidden">
+                                <ScrollArea className="h-full w-full">
                                     <div className="px-6 py-4">
                                         <div className="space-y-6">
                                             {previousVersions.map((version, versionIndex) => (
                                                 <div key={version.version} className="pb-6 last:pb-0">
                                                     <div className="mb-3 border-b pb-1">
                                                         <h3 className="font-medium">v{version.version} - {version.title}</h3>
-                                                        <div className="flex items-center text-xs text-muted-foreground">
-                                                            <Calendar className="h-3 w-3 mr-1" />
+                                                        <div
+                                                            className="flex items-center text-xs text-muted-foreground">
+                                                            <Calendar className="h-3 w-3 mr-1 flex-shrink-0"/>
                                                             <time dateTime={version.releaseDate}>
                                                                 {new Date(version.releaseDate).toLocaleDateString()}
                                                             </time>
@@ -263,11 +270,11 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({
                             </TabsContent>
                         </Tabs>
                     ) : (
-                        <ScrollArea className="h-full">
+                        <ScrollArea className="h-full w-full">
                             <div className="px-6 py-4" ref={mainRef}>
                                 <div className="space-y-0">
                                     {content.items.map((item, index) => (
-                                        <ItemCard key={index} item={item} index={index} />
+                                        <ItemCard key={index} item={item} index={index}/>
                                     ))}
                                 </div>
                             </div>
@@ -285,9 +292,9 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({
                         disabled={!canClose}
                     >
                         {canClose ? (
-                            <>Got it <ArrowRight className="ml-2 h-4 w-4" /></>
+                            <>Got it <ArrowRight className="ml-2 h-4 w-4"/></>
                         ) : (
-                            <>Wait {countdown}s <ArrowRight className="ml-2 h-4 w-4" /></>
+                            <>Wait {countdown}s <ArrowRight className="ml-2 h-4 w-4"/></>
                         )}
                     </Button>
                 </DialogFooter>
