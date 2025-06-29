@@ -17,3 +17,4 @@
     - enables for reusable media that can be uploaded to the content editor.
 
 - [ ] ability to specify a custom logo for an SSO provider (will be added when I get around to media storage!)
+- [ ] update the MCP server so it can use scheduled publishing
