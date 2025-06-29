@@ -212,7 +212,7 @@ export function ColoredTag({
     return (
         <Badge
             variant={color ? variant : 'secondary'}
-            color={color || undefined}
+            customColor={color || undefined}
             className={cn(
                 size === 'sm' && 'text-xs px-2 py-1',
                 size === 'default' && 'text-sm px-2.5 py-1.5',
