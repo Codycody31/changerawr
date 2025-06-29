@@ -1,8 +1,7 @@
-// app/api/projects/[projectId]/integrations/github/test/route.ts
-import { NextResponse } from 'next/server';
-import { validateAuthAndGetUser } from '@/lib/utils/changelog';
-import { z } from 'zod';
-import { createGitHubClient } from '@/lib/services/github/client';
+import {NextResponse} from 'next/server';
+import {validateAuthAndGetUser} from '@/lib/utils/changelog';
+import {z} from 'zod';
+import {createGitHubClient} from '@/lib/services/github/client';
 
 const testSchema = z.object({
     repositoryUrl: z.string().url('Invalid repository URL'),
@@ -19,15 +18,16 @@ export async function POST(
 ) {
     try {
         await validateAuthAndGetUser();
-        const { projectId } = await context.params;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const {projectId} = await context.params;
 
         const body = await request.json();
-        console.log('Test request body:', {
-            hasRepositoryUrl: !!body.repositoryUrl,
-            hasAccessToken: !!body.accessToken,
-            repositoryUrl: body.repositoryUrl,
-            projectId: projectId
-        });
+        // console.log('Test request body:', {
+        //     hasRepositoryUrl: !!body.repositoryUrl,
+        //     hasAccessToken: !!body.accessToken,
+        //     repositoryUrl: body.repositoryUrl,
+        //     projectId: projectId
+        // });
 
         const validatedData = testSchema.parse(body);
 
@@ -37,25 +37,25 @@ export async function POST(
             repositoryUrl: validatedData.repositoryUrl,
         });
 
-        console.log('Testing GitHub connection...');
-        console.log('Repository URL:', validatedData.repositoryUrl);
-        console.log('Token starts with:', validatedData.accessToken.substring(0, 8) + '...');
+        // console.log('Testing GitHub connection...');
+        // console.log('Repository URL:', validatedData.repositoryUrl);
+        // console.log('Token starts with:', validatedData.accessToken.substring(0, 8) + '...');
 
         try {
             // Test 1: Check user authentication
-            console.log('Step 1: Testing user authentication');
+            // console.log('Step 1: Testing user authentication');
             const user = await githubClient.getUser();
-            console.log('Authenticated as:', user.login);
+            // console.log('Authenticated as:', user.login);
 
             // Test 2: Check repository access
-            console.log('Step 2: Testing repository access');
+            // console.log('Step 2: Testing repository access');
             const repo = await githubClient.testConnection(validatedData.repositoryUrl);
-            console.log('Repository accessed:', repo.full_name);
+            // console.log('Repository accessed:', repo.full_name);
 
             // Test 3: Try to fetch a few commits
-            console.log('Step 3: Testing commit access');
-            const commits = await githubClient.getCommits(validatedData.repositoryUrl, { per_page: 5 });
-            console.log('Fetched commits:', commits.length);
+            // console.log('Step 3: Testing commit access');
+            const commits = await githubClient.getCommits(validatedData.repositoryUrl, {per_page: 5});
+            // console.log('Fetched commits:', commits.length);
 
             return NextResponse.json({
                 success: true,
@@ -100,7 +100,7 @@ export async function POST(
                     error: errorMessage,
                     details: githubError instanceof Error ? githubError.message : 'Unknown error'
                 },
-                { status: statusCode }
+                {status: statusCode}
             );
         }
 
@@ -114,7 +114,7 @@ export async function POST(
                     error: 'Validation failed',
                     details: error.errors.map(e => `${e.path.join('.')}: ${e.message}`)
                 },
-                { status: 400 }
+                {status: 400}
             );
         }
 
@@ -124,7 +124,7 @@ export async function POST(
                 error: 'Failed to test GitHub connection',
                 details: error instanceof Error ? error.message : 'Unknown error'
             },
-            { status: 500 }
+            {status: 500}
         );
     }
 }

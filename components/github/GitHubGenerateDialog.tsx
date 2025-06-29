@@ -39,8 +39,8 @@ import {Switch} from '@/components/ui/switch';
 import {Badge} from '@/components/ui/badge';
 import {Separator} from '@/components/ui/separator';
 import {Alert, AlertDescription} from '@/components/ui/alert';
-import {Textarea} from '@/components/ui/textarea';
 import {Slider} from '@/components/ui/slider';
+import {ScrollArea} from '@/components/ui/scroll-area';
 import {
     Select,
     SelectContent,
@@ -501,130 +501,132 @@ export default function GitHubGenerateDialog({
                             </div>
 
                             {/* Current Step Info */}
-                            <div className="p-6 flex-1">
-                                <AnimatePresence mode="wait">
-                                    {currentStep === 1 && (
-                                        <motion.div
-                                            key="step1-info"
-                                            initial={{opacity: 0, y: 10}}
-                                            animate={{opacity: 1, y: 0}}
-                                            exit={{opacity: 0, y: -10}}
-                                            className="space-y-4"
-                                        >
-                                            <h3 className="font-semibold text-primary">Choose Source Method</h3>
-                                            <div className="space-y-3 text-sm text-muted-foreground">
-                                                <div className="p-3 bg-background rounded-lg border">
-                                                    <div className="font-medium text-foreground mb-1">Recent Commits
+                            <ScrollArea className="flex-1">
+                                <div className="p-6">
+                                    <AnimatePresence mode="wait">
+                                        {currentStep === 1 && (
+                                            <motion.div
+                                                key="step1-info"
+                                                initial={{opacity: 0, y: 10}}
+                                                animate={{opacity: 1, y: 0}}
+                                                exit={{opacity: 0, y: -10}}
+                                                className="space-y-4"
+                                            >
+                                                <h3 className="font-semibold text-primary">Choose Source Method</h3>
+                                                <div className="space-y-3 text-sm text-muted-foreground">
+                                                    <div className="p-3 bg-background rounded-lg border">
+                                                        <div className="font-medium text-foreground mb-1">Recent Commits
+                                                        </div>
+                                                        <div>Analyze commits from the last N days</div>
                                                     </div>
-                                                    <div>Analyze commits from the last N days</div>
-                                                </div>
-                                                <div className="p-3 bg-background rounded-lg border">
-                                                    <div className="font-medium text-foreground mb-1">Between Tags</div>
-                                                    <div>Compare changes between releases</div>
-                                                </div>
-                                                <div className="p-3 bg-background rounded-lg border">
-                                                    <div className="font-medium text-foreground mb-1">Between Commits
+                                                    <div className="p-3 bg-background rounded-lg border">
+                                                        <div className="font-medium text-foreground mb-1">Between Tags</div>
+                                                        <div>Compare changes between releases</div>
                                                     </div>
-                                                    <div>Specify exact commit range</div>
+                                                    <div className="p-3 bg-background rounded-lg border">
+                                                        <div className="font-medium text-foreground mb-1">Between Commits
+                                                        </div>
+                                                        <div>Specify exact commit range</div>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </motion.div>
-                                    )}
+                                            </motion.div>
+                                        )}
 
-                                    {currentStep === 2 && (
-                                        <motion.div
-                                            key="step2-info"
-                                            initial={{opacity: 0, y: 10}}
-                                            animate={{opacity: 1, y: 0}}
-                                            exit={{opacity: 0, y: -10}}
-                                            className="space-y-4"
-                                        >
-                                            <h3 className="font-semibold text-primary">Configure Options</h3>
-                                            <div className="space-y-3">
-                                                <div className="p-3 bg-background rounded-lg border">
-                                                    <div className="font-medium text-foreground mb-2">Current Settings
-                                                    </div>
-                                                    <div className="space-y-2 text-sm text-muted-foreground">
-                                                        <div className="flex justify-between">
-                                                            <span>AI Enhancement:</span>
-                                                            <span
-                                                                className={options.useAI ? 'text-green-600' : 'text-orange-600'}>
-                                                                {options.useAI ? 'Enabled' : 'Disabled'}
-                                                            </span>
+                                        {currentStep === 2 && (
+                                            <motion.div
+                                                key="step2-info"
+                                                initial={{opacity: 0, y: 10}}
+                                                animate={{opacity: 1, y: 0}}
+                                                exit={{opacity: 0, y: -10}}
+                                                className="space-y-4"
+                                            >
+                                                <h3 className="font-semibold text-primary">Configure Options</h3>
+                                                <div className="space-y-3">
+                                                    <div className="p-3 bg-background rounded-lg border">
+                                                        <div className="font-medium text-foreground mb-2">Current Settings
                                                         </div>
-                                                        <div className="flex justify-between">
-                                                            <span>Code Analysis:</span>
-                                                            <span
-                                                                className={options.includeCodeAnalysis ? 'text-green-600' : 'text-muted-foreground'}>
-                                                                {options.includeCodeAnalysis ? 'Yes' : 'No'}
-                                                            </span>
-                                                        </div>
-                                                        <div className="flex justify-between">
-                                                            <span>Group by Type:</span>
-                                                            <span
-                                                                className={options.groupByType ? 'text-green-600' : 'text-muted-foreground'}>
-                                                                {options.groupByType ? 'Yes' : 'No'}
-                                                            </span>
+                                                        <div className="space-y-2 text-sm text-muted-foreground">
+                                                            <div className="flex justify-between">
+                                                                <span>AI Enhancement:</span>
+                                                                <span
+                                                                    className={options.useAI ? 'text-green-600' : 'text-orange-600'}>
+                                                                    {options.useAI ? 'Enabled' : 'Disabled'}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex justify-between">
+                                                                <span>Code Analysis:</span>
+                                                                <span
+                                                                    className={options.includeCodeAnalysis ? 'text-green-600' : 'text-muted-foreground'}>
+                                                                    {options.includeCodeAnalysis ? 'Yes' : 'No'}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex justify-between">
+                                                                <span>Group by Type:</span>
+                                                                <span
+                                                                    className={options.groupByType ? 'text-green-600' : 'text-muted-foreground'}>
+                                                                    {options.groupByType ? 'Yes' : 'No'}
+                                                                </span>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        </motion.div>
-                                    )}
+                                            </motion.div>
+                                        )}
 
-                                    {currentStep === 3 && result && (
-                                        <motion.div
-                                            key="step3-info"
-                                            initial={{opacity: 0, y: 10}}
-                                            animate={{opacity: 1, y: 0}}
-                                            exit={{opacity: 0, y: -10}}
-                                            className="space-y-4"
-                                        >
-                                            <h3 className="font-semibold text-primary">Generation Complete</h3>
-                                            <div className="space-y-3">
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <div className="text-center p-3 bg-primary/5 rounded-lg">
+                                        {currentStep === 3 && result && (
+                                            <motion.div
+                                                key="step3-info"
+                                                initial={{opacity: 0, y: 10}}
+                                                animate={{opacity: 1, y: 0}}
+                                                exit={{opacity: 0, y: -10}}
+                                                className="space-y-4"
+                                            >
+                                                <h3 className="font-semibold text-primary">Generation Complete</h3>
+                                                <div className="space-y-3">
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        <div className="text-center p-3 bg-primary/5 rounded-lg">
+                                                            <div
+                                                                className="text-xl font-bold text-primary">{result.changelog?.commitsCount || 0}</div>
+                                                            <div className="text-xs text-muted-foreground">Commits</div>
+                                                        </div>
                                                         <div
-                                                            className="text-xl font-bold text-primary">{result.changelog?.commitsCount || 0}</div>
-                                                        <div className="text-xs text-muted-foreground">Commits</div>
-                                                    </div>
-                                                    <div
-                                                        className="text-center p-3 bg-green-50 dark:bg-green-950/20 rounded-lg">
-                                                        <div
-                                                            className="text-xl font-bold text-green-600">{result.changelog?.entriesCount || 0}</div>
-                                                        <div className="text-xs text-muted-foreground">Entries</div>
-                                                    </div>
-                                                </div>
-
-                                                {result.changelog?.version && (
-                                                    <div
-                                                        className="text-center p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
-                                                        <div
-                                                            className="text-sm font-semibold text-blue-600">{result.changelog.version}</div>
-                                                        <div className="text-xs text-muted-foreground">Suggested
-                                                            Version
+                                                            className="text-center p-3 bg-green-50 dark:bg-green-950/20 rounded-lg">
+                                                            <div
+                                                                className="text-xl font-bold text-green-600">{result.changelog?.entriesCount || 0}</div>
+                                                            <div className="text-xs text-muted-foreground">Entries</div>
                                                         </div>
                                                     </div>
-                                                )}
 
-                                                <div className="space-y-2 text-xs text-muted-foreground">
-                                                    {result.metadata?.hasCodeAnalysis && (
-                                                        <div className="flex items-center gap-2">
-                                                            <Database className="h-3 w-3 text-green-600"/>
-                                                            <span
-                                                                className="text-green-600">Deep analysis enabled</span>
+                                                    {result.changelog?.version && (
+                                                        <div
+                                                            className="text-center p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
+                                                            <div
+                                                                className="text-sm font-semibold text-blue-600">{result.changelog.version}</div>
+                                                            <div className="text-xs text-muted-foreground">Suggested
+                                                                Version
+                                                            </div>
                                                         </div>
                                                     )}
-                                                    <div className="flex items-center gap-2">
-                                                        <Clock className="h-3 w-3"/>
-                                                        <span>Generated just now</span>
+
+                                                    <div className="space-y-2 text-xs text-muted-foreground">
+                                                        {result.metadata?.hasCodeAnalysis && (
+                                                            <div className="flex items-center gap-2">
+                                                                <Database className="h-3 w-3 text-green-600"/>
+                                                                <span
+                                                                    className="text-green-600">Deep analysis enabled</span>
+                                                            </div>
+                                                        )}
+                                                        <div className="flex items-center gap-2">
+                                                            <Clock className="h-3 w-3"/>
+                                                            <span>Generated just now</span>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-                            </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
+                            </ScrollArea>
 
                             {/* Footer Actions */}
                             <div className="p-6 border-t space-y-3">
@@ -697,7 +699,7 @@ export default function GitHubGenerateDialog({
                         </div>
 
                         {/* Main Content */}
-                        <div className="flex-1 flex flex-col">
+                        <div className="flex-1 flex flex-col min-h-0">
                             {/* Error Alert */}
                             <AnimatePresence>
                                 {error && (
@@ -705,7 +707,7 @@ export default function GitHubGenerateDialog({
                                         initial={{opacity: 0, height: 0}}
                                         animate={{opacity: 1, height: 'auto'}}
                                         exit={{opacity: 0, height: 0}}
-                                        className="p-4 border-b bg-destructive/5"
+                                        className="p-4 border-b bg-destructive/5 flex-shrink-0"
                                     >
                                         <Alert variant="destructive" className="border-destructive/30">
                                             <AlertCircle className="h-4 w-4"/>
@@ -716,618 +718,620 @@ export default function GitHubGenerateDialog({
                             </AnimatePresence>
 
                             {/* Step Content */}
-                            <div className="flex-1 p-8 overflow-auto">
-                                <AnimatePresence mode="wait">
-                                    {/* Step 1: Source Selection */}
-                                    {currentStep === 1 && (
-                                        <motion.div
-                                            key="step1"
-                                            initial={{opacity: 0, x: 20}}
-                                            animate={{opacity: 1, x: 0}}
-                                            exit={{opacity: 0, x: -20}}
-                                            className="h-full flex flex-col"
-                                        >
-                                            <div className="mb-8">
-                                                <h2 className="text-2xl font-bold mb-2">Choose Your Source</h2>
-                                                <p className="text-muted-foreground">Select how to gather commits for
-                                                    your changelog</p>
-                                            </div>
+                            <ScrollArea className="flex-1">
+                                <div className="p-8">
+                                    <AnimatePresence mode="wait">
+                                        {/* Step 1: Source Selection */}
+                                        {currentStep === 1 && (
+                                            <motion.div
+                                                key="step1"
+                                                initial={{opacity: 0, x: 20}}
+                                                animate={{opacity: 1, x: 0}}
+                                                exit={{opacity: 0, x: -20}}
+                                                className="space-y-8"
+                                            >
+                                                <div>
+                                                    <h2 className="text-2xl font-bold mb-2">Choose Your Source</h2>
+                                                    <p className="text-muted-foreground">Select how to gather commits for
+                                                        your changelog</p>
+                                                </div>
 
-                                            <div className="grid grid-cols-3 gap-6 mb-8">
-                                                {[
-                                                    {
-                                                        value: 'recent' as const,
-                                                        title: 'Recent Commits',
-                                                        icon: Calendar,
-                                                        description: 'Last N days of commits'
-                                                    },
-                                                    {
-                                                        value: 'between_tags' as const,
-                                                        title: 'Between Tags',
-                                                        icon: Tag,
-                                                        description: 'Compare two releases'
-                                                    },
-                                                    {
-                                                        value: 'between_commits' as const,
-                                                        title: 'Between Commits',
-                                                        icon: GitBranch,
-                                                        description: 'Specific commit range'
-                                                    }
-                                                ].map((method) => {
-                                                    const Icon = method.icon;
-                                                    const isSelected = options.method === method.value;
+                                                <div className="grid grid-cols-3 gap-6">
+                                                    {[
+                                                        {
+                                                            value: 'recent' as const,
+                                                            title: 'Recent Commits',
+                                                            icon: Calendar,
+                                                            description: 'Last N days of commits'
+                                                        },
+                                                        {
+                                                            value: 'between_tags' as const,
+                                                            title: 'Between Tags',
+                                                            icon: Tag,
+                                                            description: 'Compare two releases'
+                                                        },
+                                                        {
+                                                            value: 'between_commits' as const,
+                                                            title: 'Between Commits',
+                                                            icon: GitBranch,
+                                                            description: 'Specific commit range'
+                                                        }
+                                                    ].map((method) => {
+                                                        const Icon = method.icon;
+                                                        const isSelected = options.method === method.value;
 
-                                                    return (
-                                                        <motion.div
-                                                            key={method.value}
-                                                            whileHover={{scale: 1.02}}
-                                                            whileTap={{scale: 0.98}}
-                                                        >
-                                                            <Card
-                                                                className={`cursor-pointer transition-all h-32 ${
-                                                                    isSelected
-                                                                        ? 'border-primary bg-primary/5 shadow-lg'
-                                                                        : 'hover:border-primary/30 hover:shadow-md'
-                                                                }`}
-                                                                onClick={() => updateOptions({method: method.value})}
+                                                        return (
+                                                            <motion.div
+                                                                key={method.value}
+                                                                whileHover={{scale: 1.02}}
+                                                                whileTap={{scale: 0.98}}
                                                             >
-                                                                <CardContent
-                                                                    className="p-4 h-full flex flex-col items-center justify-center text-center">
-                                                                    <div
-                                                                        className="p-3 rounded-full mb-3 bg-primary/10">
-                                                                        <Icon className="h-6 w-6 text-primary"/>
-                                                                    </div>
-                                                                    <div
-                                                                        className="font-semibold mb-1">{method.title}</div>
-                                                                    <div
-                                                                        className="text-sm text-muted-foreground">{method.description}</div>
-                                                                    {isSelected && (
-                                                                        <Check className="h-5 w-5 text-primary mt-2"/>
-                                                                    )}
-                                                                </CardContent>
-                                                            </Card>
-                                                        </motion.div>
-                                                    );
-                                                })}
-                                            </div>
-
-                                            {/* Method Configuration */}
-                                            <div className="flex-1">
-                                                <AnimatePresence mode="wait">
-                                                    {options.method === 'recent' && (
-                                                        <motion.div
-                                                            key="recent"
-                                                            initial={{opacity: 0, y: 20}}
-                                                            animate={{opacity: 1, y: 0}}
-                                                            exit={{opacity: 0, y: -20}}
-                                                        >
-                                                            <Card>
-                                                                <CardHeader>
-                                                                    <CardTitle className="flex items-center gap-2">
-                                                                        <Clock className="h-5 w-5"/>
-                                                                        Days to look back
-                                                                    </CardTitle>
-                                                                </CardHeader>
-                                                                <CardContent className="space-y-6">
-                                                                    <div
-                                                                        className="text-center p-8 bg-muted/50 rounded-lg">
-                                                                        <span
-                                                                            className="text-6xl font-bold text-primary">{options.daysBack}</span>
-                                                                        <span
-                                                                            className="text-2xl text-muted-foreground ml-2">days</span>
-                                                                    </div>
-                                                                    <Slider
-                                                                        value={[options.daysBack]}
-                                                                        onValueChange={(value) => updateOptions({daysBack: value[0]})}
-                                                                        min={1}
-                                                                        max={365}
-                                                                        step={1}
-                                                                        className="w-full"
-                                                                    />
-                                                                    <div
-                                                                        className="flex justify-between text-sm text-muted-foreground">
-                                                                        <span>1 day</span>
-                                                                        <span>365 days</span>
-                                                                    </div>
-                                                                </CardContent>
-                                                            </Card>
-                                                        </motion.div>
-                                                    )}
-
-                                                    {options.method === 'between_tags' && (
-                                                        <motion.div
-                                                            key="tags"
-                                                            initial={{opacity: 0, y: 20}}
-                                                            animate={{opacity: 1, y: 0}}
-                                                            exit={{opacity: 0, y: -20}}
-                                                        >
-                                                            <Card>
-                                                                <CardHeader>
-                                                                    <CardTitle className="flex items-center gap-2">
-                                                                        <Tag className="h-5 w-5"/>
-                                                                        Select Tag Range
-                                                                    </CardTitle>
-                                                                </CardHeader>
-                                                                <CardContent>
-                                                                    {isFetchingTags ? (
+                                                                <Card
+                                                                    className={`cursor-pointer transition-all h-32 ${
+                                                                        isSelected
+                                                                            ? 'border-primary bg-primary/5 shadow-lg'
+                                                                            : 'hover:border-primary/30 hover:shadow-md'
+                                                                    }`}
+                                                                    onClick={() => updateOptions({method: method.value})}
+                                                                >
+                                                                    <CardContent
+                                                                        className="p-4 h-full flex flex-col items-center justify-center text-center">
                                                                         <div
-                                                                            className="flex items-center justify-center py-12">
-                                                                            <div className="text-center">
-                                                                                <Loader2
-                                                                                    className="h-8 w-8 animate-spin mx-auto mb-4 text-primary"/>
-                                                                                <p className="text-muted-foreground">Loading
-                                                                                    tags and releases...</p>
-                                                                            </div>
+                                                                            className="p-3 rounded-full mb-3 bg-primary/10">
+                                                                            <Icon className="h-6 w-6 text-primary"/>
                                                                         </div>
-                                                                    ) : tags.length === 0 && releases.length === 0 ? (
-                                                                        <Alert>
-                                                                            <AlertDescription>
-                                                                                No tags or releases found in the
-                                                                                repository. Create some tags or releases
-                                                                                first.
-                                                                            </AlertDescription>
-                                                                        </Alert>
-                                                                    ) : (
+                                                                        <div
+                                                                            className="font-semibold mb-1">{method.title}</div>
+                                                                        <div
+                                                                            className="text-sm text-muted-foreground">{method.description}</div>
+                                                                        {isSelected && (
+                                                                            <Check className="h-5 w-5 text-primary mt-2"/>
+                                                                        )}
+                                                                    </CardContent>
+                                                                </Card>
+                                                            </motion.div>
+                                                        );
+                                                    })}
+                                                </div>
+
+                                                {/* Method Configuration */}
+                                                <div>
+                                                    <AnimatePresence mode="wait">
+                                                        {options.method === 'recent' && (
+                                                            <motion.div
+                                                                key="recent"
+                                                                initial={{opacity: 0, y: 20}}
+                                                                animate={{opacity: 1, y: 0}}
+                                                                exit={{opacity: 0, y: -20}}
+                                                            >
+                                                                <Card>
+                                                                    <CardHeader>
+                                                                        <CardTitle className="flex items-center gap-2">
+                                                                            <Clock className="h-5 w-5"/>
+                                                                            Days to look back
+                                                                        </CardTitle>
+                                                                    </CardHeader>
+                                                                    <CardContent className="space-y-6">
+                                                                        <div
+                                                                            className="text-center p-8 bg-muted/50 rounded-lg">
+                                                                            <span
+                                                                                className="text-6xl font-bold text-primary">{options.daysBack}</span>
+                                                                            <span
+                                                                                className="text-2xl text-muted-foreground ml-2">days</span>
+                                                                        </div>
+                                                                        <Slider
+                                                                            value={[options.daysBack]}
+                                                                            onValueChange={(value) => updateOptions({daysBack: value[0]})}
+                                                                            min={1}
+                                                                            max={365}
+                                                                            step={1}
+                                                                            className="w-full"
+                                                                        />
+                                                                        <div
+                                                                            className="flex justify-between text-sm text-muted-foreground">
+                                                                            <span>1 day</span>
+                                                                            <span>365 days</span>
+                                                                        </div>
+                                                                    </CardContent>
+                                                                </Card>
+                                                            </motion.div>
+                                                        )}
+
+                                                        {options.method === 'between_tags' && (
+                                                            <motion.div
+                                                                key="tags"
+                                                                initial={{opacity: 0, y: 20}}
+                                                                animate={{opacity: 1, y: 0}}
+                                                                exit={{opacity: 0, y: -20}}
+                                                            >
+                                                                <Card>
+                                                                    <CardHeader>
+                                                                        <CardTitle className="flex items-center gap-2">
+                                                                            <Tag className="h-5 w-5"/>
+                                                                            Select Tag Range
+                                                                        </CardTitle>
+                                                                    </CardHeader>
+                                                                    <CardContent>
+                                                                        {isFetchingTags ? (
+                                                                            <div
+                                                                                className="flex items-center justify-center py-12">
+                                                                                <div className="text-center">
+                                                                                    <Loader2
+                                                                                        className="h-8 w-8 animate-spin mx-auto mb-4 text-primary"/>
+                                                                                    <p className="text-muted-foreground">Loading
+                                                                                        tags and releases...</p>
+                                                                                </div>
+                                                                            </div>
+                                                                        ) : tags.length === 0 && releases.length === 0 ? (
+                                                                            <Alert>
+                                                                                <AlertDescription>
+                                                                                    No tags or releases found in the
+                                                                                    repository. Create some tags or releases
+                                                                                    first.
+                                                                                </AlertDescription>
+                                                                            </Alert>
+                                                                        ) : (
+                                                                            <div className="grid grid-cols-2 gap-6">
+                                                                                <div className="space-y-2">
+                                                                                    <Label className="text-base">From
+                                                                                        Tag/Release</Label>
+                                                                                    <Select
+                                                                                        value={options.fromRef}
+                                                                                        onValueChange={(value) => updateOptions({fromRef: value})}
+                                                                                    >
+                                                                                        <SelectTrigger className="h-12">
+                                                                                            <SelectValue
+                                                                                                placeholder="Select starting point"/>
+                                                                                        </SelectTrigger>
+                                                                                        <SelectContent>
+                                                                                            {releases.map(release => (
+                                                                                                <SelectItem
+                                                                                                    key={`release-from-${release.tagName}`}
+                                                                                                    value={release.tagName}>
+                                                                                                    📦 {release.name} ({release.tagName})
+                                                                                                </SelectItem>
+                                                                                            ))}
+                                                                                            {tags.map(tag => (
+                                                                                                <SelectItem
+                                                                                                    key={`tag-from-${tag.name}`}
+                                                                                                    value={tag.name}>
+                                                                                                    🏷️ {tag.name}
+                                                                                                </SelectItem>
+                                                                                            ))}
+                                                                                        </SelectContent>
+                                                                                    </Select>
+                                                                                </div>
+                                                                                <div className="space-y-2">
+                                                                                    <Label className="text-base">To
+                                                                                        Tag/Release</Label>
+                                                                                    <Select
+                                                                                        value={options.toRef}
+                                                                                        onValueChange={(value) => updateOptions({toRef: value})}
+                                                                                    >
+                                                                                        <SelectTrigger className="h-12">
+                                                                                            <SelectValue
+                                                                                                placeholder="Select ending point"/>
+                                                                                        </SelectTrigger>
+                                                                                        <SelectContent>
+                                                                                            <SelectItem value="HEAD">🔥
+                                                                                                Latest (HEAD)</SelectItem>
+                                                                                            {releases.map(release => (
+                                                                                                <SelectItem
+                                                                                                    key={`release-to-${release.tagName}`}
+                                                                                                    value={release.tagName}>
+                                                                                                    📦 {release.name} ({release.tagName})
+                                                                                                </SelectItem>
+                                                                                            ))}
+                                                                                            {tags.map(tag => (
+                                                                                                <SelectItem
+                                                                                                    key={`tag-to-${tag.name}`}
+                                                                                                    value={tag.name}>
+                                                                                                    🏷️ {tag.name}
+                                                                                                </SelectItem>
+                                                                                            ))}
+                                                                                        </SelectContent>
+                                                                                    </Select>
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+                                                                    </CardContent>
+                                                                </Card>
+                                                            </motion.div>
+                                                        )}
+
+                                                        {options.method === 'between_commits' && (
+                                                            <motion.div
+                                                                key="commits"
+                                                                initial={{opacity: 0, y: 20}}
+                                                                animate={{opacity: 1, y: 0}}
+                                                                exit={{opacity: 0, y: -20}}
+                                                            >
+                                                                <Card>
+                                                                    <CardHeader>
+                                                                        <CardTitle className="flex items-center gap-2">
+                                                                            <GitBranch className="h-5 w-5"/>
+                                                                            Specify Commit Range
+                                                                        </CardTitle>
+                                                                    </CardHeader>
+                                                                    <CardContent className="space-y-4">
                                                                         <div className="grid grid-cols-2 gap-6">
                                                                             <div className="space-y-2">
-                                                                                <Label className="text-base">From
-                                                                                    Tag/Release</Label>
-                                                                                <Select
+                                                                                <Label htmlFor="fromCommit"
+                                                                                       className="text-base">From
+                                                                                    Commit/Branch</Label>
+                                                                                <Input
+                                                                                    id="fromCommit"
                                                                                     value={options.fromRef}
-                                                                                    onValueChange={(value) => updateOptions({fromRef: value})}
-                                                                                >
-                                                                                    <SelectTrigger className="h-12">
-                                                                                        <SelectValue
-                                                                                            placeholder="Select starting point"/>
-                                                                                    </SelectTrigger>
-                                                                                    <SelectContent>
-                                                                                        {releases.map(release => (
-                                                                                            <SelectItem
-                                                                                                key={`release-from-${release.tagName}`}
-                                                                                                value={release.tagName}>
-                                                                                                📦 {release.name} ({release.tagName})
-                                                                                            </SelectItem>
-                                                                                        ))}
-                                                                                        {tags.map(tag => (
-                                                                                            <SelectItem
-                                                                                                key={`tag-from-${tag.name}`}
-                                                                                                value={tag.name}>
-                                                                                                🏷️ {tag.name}
-                                                                                            </SelectItem>
-                                                                                        ))}
-                                                                                    </SelectContent>
-                                                                                </Select>
+                                                                                    onChange={(e) => updateOptions({fromRef: e.target.value})}
+                                                                                    placeholder="abc123... or branch-name"
+                                                                                    className="h-12"
+                                                                                />
                                                                             </div>
                                                                             <div className="space-y-2">
-                                                                                <Label className="text-base">To
-                                                                                    Tag/Release</Label>
-                                                                                <Select
+                                                                                <Label htmlFor="toCommit"
+                                                                                       className="text-base">To
+                                                                                    Commit/Branch</Label>
+                                                                                <Input
+                                                                                    id="toCommit"
                                                                                     value={options.toRef}
-                                                                                    onValueChange={(value) => updateOptions({toRef: value})}
-                                                                                >
-                                                                                    <SelectTrigger className="h-12">
-                                                                                        <SelectValue
-                                                                                            placeholder="Select ending point"/>
-                                                                                    </SelectTrigger>
-                                                                                    <SelectContent>
-                                                                                        <SelectItem value="HEAD">🔥
-                                                                                            Latest (HEAD)</SelectItem>
-                                                                                        {releases.map(release => (
-                                                                                            <SelectItem
-                                                                                                key={`release-to-${release.tagName}`}
-                                                                                                value={release.tagName}>
-                                                                                                📦 {release.name} ({release.tagName})
-                                                                                            </SelectItem>
-                                                                                        ))}
-                                                                                        {tags.map(tag => (
-                                                                                            <SelectItem
-                                                                                                key={`tag-to-${tag.name}`}
-                                                                                                value={tag.name}>
-                                                                                                🏷️ {tag.name}
-                                                                                            </SelectItem>
-                                                                                        ))}
-                                                                                    </SelectContent>
-                                                                                </Select>
+                                                                                    onChange={(e) => updateOptions({toRef: e.target.value})}
+                                                                                    placeholder="def456... or main"
+                                                                                    className="h-12"
+                                                                                />
                                                                             </div>
                                                                         </div>
-                                                                    )}
-                                                                </CardContent>
-                                                            </Card>
-                                                        </motion.div>
-                                                    )}
+                                                                        <p className="text-sm text-muted-foreground">
+                                                                            Use commit SHAs (full or short) or branch names.
+                                                                            Leave &ldquo;To&rdquo; as &ldquo;main&rdquo; or &ldquo;HEAD&rdquo; for
+                                                                            latest.
+                                                                        </p>
+                                                                    </CardContent>
+                                                                </Card>
+                                                            </motion.div>
+                                                        )}
+                                                    </AnimatePresence>
+                                                </div>
+                                            </motion.div>
+                                        )}
 
-                                                    {options.method === 'between_commits' && (
-                                                        <motion.div
-                                                            key="commits"
-                                                            initial={{opacity: 0, y: 20}}
-                                                            animate={{opacity: 1, y: 0}}
-                                                            exit={{opacity: 0, y: -20}}
-                                                        >
-                                                            <Card>
-                                                                <CardHeader>
-                                                                    <CardTitle className="flex items-center gap-2">
-                                                                        <GitBranch className="h-5 w-5"/>
-                                                                        Specify Commit Range
-                                                                    </CardTitle>
-                                                                </CardHeader>
-                                                                <CardContent className="space-y-4">
-                                                                    <div className="grid grid-cols-2 gap-6">
-                                                                        <div className="space-y-2">
-                                                                            <Label htmlFor="fromCommit"
-                                                                                   className="text-base">From
-                                                                                Commit/Branch</Label>
-                                                                            <Input
-                                                                                id="fromCommit"
-                                                                                value={options.fromRef}
-                                                                                onChange={(e) => updateOptions({fromRef: e.target.value})}
-                                                                                placeholder="abc123... or branch-name"
-                                                                                className="h-12"
-                                                                            />
-                                                                        </div>
-                                                                        <div className="space-y-2">
-                                                                            <Label htmlFor="toCommit"
-                                                                                   className="text-base">To
-                                                                                Commit/Branch</Label>
-                                                                            <Input
-                                                                                id="toCommit"
-                                                                                value={options.toRef}
-                                                                                onChange={(e) => updateOptions({toRef: e.target.value})}
-                                                                                placeholder="def456... or main"
-                                                                                className="h-12"
-                                                                            />
-                                                                        </div>
-                                                                    </div>
+                                        {/* Step 2: AI & Options */}
+                                        {currentStep === 2 && (
+                                            <motion.div
+                                                key="step2"
+                                                initial={{opacity: 0, x: 20}}
+                                                animate={{opacity: 1, x: 0}}
+                                                exit={{opacity: 0, x: -20}}
+                                                className="space-y-8"
+                                            >
+                                                <div>
+                                                    <h2 className="text-2xl font-bold mb-2">Configure Options</h2>
+                                                    <p className="text-muted-foreground">Customize how your changelog will
+                                                        be generated</p>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-8">
+                                                    {/* AI Enhancement */}
+                                                    <Card>
+                                                        <CardHeader>
+                                                            <CardTitle className="flex items-center gap-2">
+                                                                <Brain className="h-5 w-5"/>
+                                                                AI Enhancement
+                                                            </CardTitle>
+                                                            <CardDescription>
+                                                                Improve commit messages and categorization with AI
+                                                            </CardDescription>
+                                                        </CardHeader>
+                                                        <CardContent className="space-y-6">
+                                                            <div
+                                                                className="flex items-center justify-between p-4 border rounded-lg">
+                                                                <div className="space-y-1">
+                                                                    <Label className="text-base font-medium">Enable AI
+                                                                        Processing</Label>
                                                                     <p className="text-sm text-muted-foreground">
-                                                                        Use commit SHAs (full or short) or branch names.
-                                                                        Leave &ldquo;To&rdquo; as &ldquo;main&rdquo; or &ldquo;HEAD&rdquo; for
-                                                                        latest.
+                                                                        Uses advanced AI to enhance commit analysis
                                                                     </p>
-                                                                </CardContent>
-                                                            </Card>
-                                                        </motion.div>
-                                                    )}
-                                                </AnimatePresence>
-                                            </div>
-                                        </motion.div>
-                                    )}
-
-                                    {/* Step 2: AI & Options */}
-                                    {currentStep === 2 && (
-                                        <motion.div
-                                            key="step2"
-                                            initial={{opacity: 0, x: 20}}
-                                            animate={{opacity: 1, x: 0}}
-                                            exit={{opacity: 0, x: -20}}
-                                            className="h-full flex flex-col"
-                                        >
-                                            <div className="mb-8">
-                                                <h2 className="text-2xl font-bold mb-2">Configure Options</h2>
-                                                <p className="text-muted-foreground">Customize how your changelog will
-                                                    be generated</p>
-                                            </div>
-
-                                            <div className="grid grid-cols-2 gap-8 flex-1">
-                                                {/* AI Enhancement */}
-                                                <Card className="h-fit">
-                                                    <CardHeader>
-                                                        <CardTitle className="flex items-center gap-2">
-                                                            <Brain className="h-5 w-5"/>
-                                                            AI Enhancement
-                                                        </CardTitle>
-                                                        <CardDescription>
-                                                            Improve commit messages and categorization with AI
-                                                        </CardDescription>
-                                                    </CardHeader>
-                                                    <CardContent className="space-y-6">
-                                                        <div
-                                                            className="flex items-center justify-between p-4 border rounded-lg">
-                                                            <div className="space-y-1">
-                                                                <Label className="text-base font-medium">Enable AI
-                                                                    Processing</Label>
-                                                                <p className="text-sm text-muted-foreground">
-                                                                    Uses advanced AI to enhance commit analysis
-                                                                </p>
-                                                                {!aiSettings.enableAIAssistant && (
-                                                                    <Badge variant="secondary" className="text-xs">
-                                                                        AI assistant not configured
-                                                                    </Badge>
-                                                                )}
+                                                                    {!aiSettings.enableAIAssistant && (
+                                                                        <Badge variant="secondary" className="text-xs">
+                                                                            AI assistant not configured
+                                                                        </Badge>
+                                                                    )}
+                                                                </div>
+                                                                <Switch
+                                                                    checked={options.useAI}
+                                                                    disabled={!aiSettings.enableAIAssistant || !aiSettings.aiApiKey}
+                                                                    onCheckedChange={(checked) => updateOptions({useAI: checked})}
+                                                                    className="scale-125"
+                                                                />
                                                             </div>
-                                                            <Switch
-                                                                checked={options.useAI}
-                                                                disabled={!aiSettings.enableAIAssistant || !aiSettings.aiApiKey}
-                                                                onCheckedChange={(checked) => updateOptions({useAI: checked})}
-                                                                className="scale-125"
-                                                            />
-                                                        </div>
 
-                                                        {options.useAI && aiSettings.enableAIAssistant && (
-                                                            <motion.div
-                                                                initial={{opacity: 0, height: 0}}
-                                                                animate={{opacity: 1, height: 'auto'}}
-                                                                className="space-y-4"
-                                                            >
-                                                                <Separator/>
+                                                            {options.useAI && aiSettings.enableAIAssistant && (
+                                                                <motion.div
+                                                                    initial={{opacity: 0, height: 0}}
+                                                                    animate={{opacity: 1, height: 'auto'}}
+                                                                    className="space-y-4"
+                                                                >
+                                                                    <Separator/>
 
+                                                                    <div
+                                                                        className="flex items-center justify-between p-4 border rounded-lg">
+                                                                        <div className="space-y-1">
+                                                                            <Label
+                                                                                className="text-base font-medium flex items-center gap-2">
+                                                                                <Code2 className="h-4 w-4"/>
+                                                                                Deep Code Analysis
+                                                                            </Label>
+                                                                            <p className="text-sm text-muted-foreground">
+                                                                                Analyze file changes for better
+                                                                                categorization
+                                                                            </p>
+                                                                        </div>
+                                                                        <Switch
+                                                                            checked={options.includeCodeAnalysis}
+                                                                            onCheckedChange={(checked) => updateOptions({includeCodeAnalysis: checked})}
+                                                                            className="scale-125"
+                                                                        />
+                                                                    </div>
+
+                                                                    {options.includeCodeAnalysis && (
+                                                                        <motion.div
+                                                                            initial={{opacity: 0, height: 0}}
+                                                                            animate={{opacity: 1, height: 'auto'}}
+                                                                            className="p-4 bg-muted/30 rounded-lg space-y-4"
+                                                                        >
+                                                                            <Label className="text-base">Maximum Commits to
+                                                                                Analyze</Label>
+                                                                            <div className="space-y-3">
+                                                                                <div
+                                                                                    className="flex items-center justify-between">
+                                                                                    <span
+                                                                                        className="text-2xl font-bold text-primary">{options.maxCommitsToAnalyze}</span>
+                                                                                    <Badge variant="outline">
+                                                                                        {options.maxCommitsToAnalyze <= 10 ? 'Fast' :
+                                                                                            options.maxCommitsToAnalyze <= 30 ? 'Balanced' : 'Thorough'}
+                                                                                    </Badge>
+                                                                                </div>
+                                                                                <Slider
+                                                                                    value={[options.maxCommitsToAnalyze]}
+                                                                                    onValueChange={(value) => updateOptions({maxCommitsToAnalyze: value[0]})}
+                                                                                    min={5}
+                                                                                    max={100}
+                                                                                    step={5}
+                                                                                    className="w-full"
+                                                                                />
+                                                                                <div
+                                                                                    className="flex justify-between text-xs text-muted-foreground">
+                                                                                    <span>5 (faster)</span>
+                                                                                    <span>100 (more detailed)</span>
+                                                                                </div>
+                                                                            </div>
+                                                                            <Alert icon={<Activity className="h-4 w-4"/>}>
+                                                                                <AlertDescription>
+                                                                                    Higher values provide more detail but
+                                                                                    take longer to process.
+                                                                                </AlertDescription>
+                                                                            </Alert>
+                                                                        </motion.div>
+                                                                    )}
+                                                                </motion.div>
+                                                            )}
+
+                                                            {!aiSettings.enableAIAssistant && (
+                                                                <Alert>
+                                                                    <Info className="h-4 w-4"/>
+                                                                    <AlertDescription>
+                                                                        AI assistant is not configured. Contact your
+                                                                        administrator to enable AI features.
+                                                                    </AlertDescription>
+                                                                </Alert>
+                                                            )}
+                                                        </CardContent>
+                                                    </Card>
+
+                                                    {/* Formatting Options */}
+                                                    <Card>
+                                                        <CardHeader>
+                                                            <CardTitle className="flex items-center gap-2">
+                                                                <FileText className="h-5 w-5"/>
+                                                                Format Settings
+                                                            </CardTitle>
+                                                            <CardDescription>
+                                                                Customize the changelog structure and style
+                                                            </CardDescription>
+                                                        </CardHeader>
+                                                        <CardContent className="space-y-6">
+                                                            <div className="space-y-4">
                                                                 <div
                                                                     className="flex items-center justify-between p-4 border rounded-lg">
                                                                     <div className="space-y-1">
-                                                                        <Label
-                                                                            className="text-base font-medium flex items-center gap-2">
-                                                                            <Code2 className="h-4 w-4"/>
-                                                                            Deep Code Analysis
-                                                                        </Label>
+                                                                        <Label className="text-base font-medium">Group by
+                                                                            Type</Label>
                                                                         <p className="text-sm text-muted-foreground">
-                                                                            Analyze file changes for better
-                                                                            categorization
+                                                                            Organize into Features, Bug Fixes, etc.
                                                                         </p>
                                                                     </div>
                                                                     <Switch
-                                                                        checked={options.includeCodeAnalysis}
-                                                                        onCheckedChange={(checked) => updateOptions({includeCodeAnalysis: checked})}
+                                                                        checked={options.groupByType}
+                                                                        onCheckedChange={(checked) => updateOptions({groupByType: checked})}
                                                                         className="scale-125"
                                                                     />
                                                                 </div>
 
-                                                                {options.includeCodeAnalysis && (
-                                                                    <motion.div
-                                                                        initial={{opacity: 0, height: 0}}
-                                                                        animate={{opacity: 1, height: 'auto'}}
-                                                                        className="p-4 bg-muted/30 rounded-lg space-y-4"
-                                                                    >
-                                                                        <Label className="text-base">Maximum Commits to
-                                                                            Analyze</Label>
-                                                                        <div className="space-y-3">
-                                                                            <div
-                                                                                className="flex items-center justify-between">
-                                                                                <span
-                                                                                    className="text-2xl font-bold text-primary">{options.maxCommitsToAnalyze}</span>
-                                                                                <Badge variant="outline">
-                                                                                    {options.maxCommitsToAnalyze <= 10 ? 'Fast' :
-                                                                                        options.maxCommitsToAnalyze <= 30 ? 'Balanced' : 'Thorough'}
-                                                                                </Badge>
-                                                                            </div>
-                                                                            <Slider
-                                                                                value={[options.maxCommitsToAnalyze]}
-                                                                                onValueChange={(value) => updateOptions({maxCommitsToAnalyze: value[0]})}
-                                                                                min={5}
-                                                                                max={100}
-                                                                                step={5}
-                                                                                className="w-full"
-                                                                            />
-                                                                            <div
-                                                                                className="flex justify-between text-xs text-muted-foreground">
-                                                                                <span>5 (faster)</span>
-                                                                                <span>100 (more detailed)</span>
-                                                                            </div>
+                                                                <div
+                                                                    className="flex items-center justify-between p-4 border rounded-lg">
+                                                                    <div className="space-y-1">
+                                                                        <Label className="text-base font-medium">Include
+                                                                            Commit Links</Label>
+                                                                        <p className="text-sm text-muted-foreground">
+                                                                            Add clickable GitHub commit links
+                                                                        </p>
+                                                                    </div>
+                                                                    <Switch
+                                                                        checked={options.includeCommitLinks}
+                                                                        onCheckedChange={(checked) => updateOptions({includeCommitLinks: checked})}
+                                                                        className="scale-125"
+                                                                    />
+                                                                </div>
+                                                            </div>
+
+                                                            <div
+                                                                className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg">
+                                                                <div className="flex items-start gap-3">
+                                                                    <Check className="h-5 w-5 text-green-600 mt-0.5"/>
+                                                                    <div className="space-y-1">
+                                                                        <p className="font-medium text-green-900 dark:text-green-100">Active
+                                                                            Features</p>
+                                                                        <div
+                                                                            className="text-sm text-green-700 dark:text-green-300 space-y-1">
+                                                                            {options.groupByType &&
+                                                                                <p>✓ Grouped by change type</p>}
+                                                                            {options.includeCommitLinks &&
+                                                                                <p>✓ Clickable commit links</p>}
+                                                                            {options.useAI &&
+                                                                                <p>✓ AI-enhanced descriptions</p>}
+                                                                            {options.includeCodeAnalysis &&
+                                                                                <p>✓ Deep code analysis</p>}
+                                                                            {!options.groupByType && !options.includeCommitLinks && !options.useAI && !options.includeCodeAnalysis && (
+                                                                                <p className="text-muted-foreground">Basic
+                                                                                    changelog generation</p>
+                                                                            )}
                                                                         </div>
-                                                                        <Alert icon={<Activity className="h-4 w-4"/>}>
-                                                                            <AlertDescription>
-                                                                                Higher values provide more detail but
-                                                                                take longer to process.
-                                                                            </AlertDescription>
-                                                                        </Alert>
-                                                                    </motion.div>
-                                                                )}
-                                                            </motion.div>
-                                                        )}
-
-                                                        {!aiSettings.enableAIAssistant && (
-                                                            <Alert>
-                                                                <Info className="h-4 w-4"/>
-                                                                <AlertDescription>
-                                                                    AI assistant is not configured. Contact your
-                                                                    administrator to enable AI features.
-                                                                </AlertDescription>
-                                                            </Alert>
-                                                        )}
-                                                    </CardContent>
-                                                </Card>
-
-                                                {/* Formatting Options */}
-                                                <Card className="h-fit">
-                                                    <CardHeader>
-                                                        <CardTitle className="flex items-center gap-2">
-                                                            <FileText className="h-5 w-5"/>
-                                                            Format Settings
-                                                        </CardTitle>
-                                                        <CardDescription>
-                                                            Customize the changelog structure and style
-                                                        </CardDescription>
-                                                    </CardHeader>
-                                                    <CardContent className="space-y-6">
-                                                        <div className="space-y-4">
-                                                            <div
-                                                                className="flex items-center justify-between p-4 border rounded-lg">
-                                                                <div className="space-y-1">
-                                                                    <Label className="text-base font-medium">Group by
-                                                                        Type</Label>
-                                                                    <p className="text-sm text-muted-foreground">
-                                                                        Organize into Features, Bug Fixes, etc.
-                                                                    </p>
-                                                                </div>
-                                                                <Switch
-                                                                    checked={options.groupByType}
-                                                                    onCheckedChange={(checked) => updateOptions({groupByType: checked})}
-                                                                    className="scale-125"
-                                                                />
-                                                            </div>
-
-                                                            <div
-                                                                className="flex items-center justify-between p-4 border rounded-lg">
-                                                                <div className="space-y-1">
-                                                                    <Label className="text-base font-medium">Include
-                                                                        Commit Links</Label>
-                                                                    <p className="text-sm text-muted-foreground">
-                                                                        Add clickable GitHub commit links
-                                                                    </p>
-                                                                </div>
-                                                                <Switch
-                                                                    checked={options.includeCommitLinks}
-                                                                    onCheckedChange={(checked) => updateOptions({includeCommitLinks: checked})}
-                                                                    className="scale-125"
-                                                                />
-                                                            </div>
-                                                        </div>
-
-                                                        <div
-                                                            className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg">
-                                                            <div className="flex items-start gap-3">
-                                                                <Check className="h-5 w-5 text-green-600 mt-0.5"/>
-                                                                <div className="space-y-1">
-                                                                    <p className="font-medium text-green-900 dark:text-green-100">Active
-                                                                        Features</p>
-                                                                    <div
-                                                                        className="text-sm text-green-700 dark:text-green-300 space-y-1">
-                                                                        {options.groupByType &&
-                                                                            <p>✓ Grouped by change type</p>}
-                                                                        {options.includeCommitLinks &&
-                                                                            <p>✓ Clickable commit links</p>}
-                                                                        {options.useAI &&
-                                                                            <p>✓ AI-enhanced descriptions</p>}
-                                                                        {options.includeCodeAnalysis &&
-                                                                            <p>✓ Deep code analysis</p>}
-                                                                        {!options.groupByType && !options.includeCommitLinks && !options.useAI && !options.includeCodeAnalysis && (
-                                                                            <p className="text-muted-foreground">Basic
-                                                                                changelog generation</p>
-                                                                        )}
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                        </div>
-                                                    </CardContent>
-                                                </Card>
-                                            </div>
-                                        </motion.div>
-                                    )}
+                                                        </CardContent>
+                                                    </Card>
+                                                </div>
+                                            </motion.div>
+                                        )}
 
-                                    {/* Step 3: Results - THE FIXED SCROLLING SECTION */}
-                                    {currentStep === 3 && result && (
-                                        <motion.div
-                                            key="step3"
-                                            initial={{opacity: 0, x: 20}}
-                                            animate={{opacity: 1, x: 0}}
-                                            exit={{opacity: 0, x: -20}}
-                                            className="h-full flex flex-col"
-                                        >
-                                            <div className="mb-6">
-                                                <h2 className="text-2xl font-bold mb-2">Generated Changelog</h2>
-                                                <p className="text-muted-foreground">Your changelog content is ready to
-                                                    use</p>
-                                            </div>
+                                        {/* Step 3: Results - FIXED SCROLLING SECTION */}
+                                        {currentStep === 3 && result && (
+                                            <motion.div
+                                                key="step3"
+                                                initial={{opacity: 0, x: 20}}
+                                                animate={{opacity: 1, x: 0}}
+                                                exit={{opacity: 0, x: -20}}
+                                                className="space-y-6"
+                                            >
+                                                <div>
+                                                    <h2 className="text-2xl font-bold mb-2">Generated Changelog</h2>
+                                                    <p className="text-muted-foreground">Your changelog content is ready to
+                                                        use</p>
+                                                </div>
 
-                                            <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0">
-                                                {/* Content Preview */}
-                                                <Card className="lg:col-span-2 flex flex-col min-h-0">
-                                                    <CardHeader className="flex-shrink-0">
-                                                        <div className="flex items-center justify-between">
-                                                            <CardTitle>Changelog Content</CardTitle>
-                                                            <div className="flex gap-2">
-                                                                <Tooltip>
-                                                                    <TooltipTrigger asChild>
-                                                                        <Button
-                                                                            variant="outline"
-                                                                            size="sm"
-                                                                            onClick={copyToClipboard}
-                                                                            className="gap-2"
-                                                                        >
-                                                                            {copied ? (
-                                                                                <>
-                                                                                    <Check className="h-4 w-4"/>
-                                                                                    Copied!
-                                                                                </>
-                                                                            ) : (
-                                                                                <>
-                                                                                    <Copy className="h-4 w-4"/>
-                                                                                    Copy
-                                                                                </>
-                                                                            )}
-                                                                        </Button>
-                                                                    </TooltipTrigger>
-                                                                    <TooltipContent>Copy to clipboard</TooltipContent>
-                                                                </Tooltip>
+                                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-12rem)]">
+                                                    {/* Content Preview */}
+                                                    <Card className="lg:col-span-2 flex flex-col h-full">
+                                                        <CardHeader className="flex-shrink-0">
+                                                            <div className="flex items-center justify-between">
+                                                                <CardTitle>Changelog Content</CardTitle>
+                                                                <div className="flex gap-2">
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger asChild>
+                                                                            <Button
+                                                                                variant="outline"
+                                                                                size="sm"
+                                                                                onClick={copyToClipboard}
+                                                                                className="gap-2"
+                                                                            >
+                                                                                {copied ? (
+                                                                                    <>
+                                                                                        <Check className="h-4 w-4"/>
+                                                                                        Copied!
+                                                                                    </>
+                                                                                ) : (
+                                                                                    <>
+                                                                                        <Copy className="h-4 w-4"/>
+                                                                                        Copy
+                                                                                    </>
+                                                                                )}
+                                                                            </Button>
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent>Copy to clipboard</TooltipContent>
+                                                                    </Tooltip>
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    </CardHeader>
-                                                    <CardContent className="p-0 flex-1 flex flex-col min-h-0">
-                                                        <div className="relative flex-1 min-h-0">
-                                                            <Textarea
-                                                                value={result.changelog?.content || ''}
-                                                                readOnly
-                                                                className="h-full resize-none font-mono text-sm border-0 rounded-none"
-                                                                placeholder="Generated content will appear here..."
-                                                            />
-                                                            <div className="absolute bottom-3 right-3">
+                                                        </CardHeader>
+                                                        <CardContent className="flex-1 p-3 relative overflow-hidden">
+                                                            <ScrollArea className="h-full w-full">
+                                                                <div className="p-3">
+                                                                    <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-foreground bg-muted/30 p-4 rounded-lg">
+                                                                        {result.changelog?.content || 'Generated content will appear here...'}
+                                                                    </pre>
+                                                                </div>
+                                                            </ScrollArea>
+                                                            <div className="absolute bottom-6 right-6">
                                                                 <Badge variant="secondary" className="text-xs">
                                                                     {result.changelog?.content?.length || 0} chars
                                                                 </Badge>
                                                             </div>
-                                                        </div>
-                                                    </CardContent>
-                                                </Card>
+                                                        </CardContent>
+                                                    </Card>
 
-                                                {/* Entries Preview - FIXED SCROLLING SECTION */}
-                                                <Card className="flex flex-col min-h-0">
-                                                    <CardHeader className="flex-shrink-0">
-                                                        <CardTitle className="text-lg">Entry Breakdown</CardTitle>
-                                                        <CardDescription>
-                                                            Overview of generated entries
-                                                        </CardDescription>
-                                                    </CardHeader>
-                                                    <CardContent className="flex-1 flex flex-col min-h-0 p-0">
-                                                        {result.changelog?.entries && result.changelog.entries.length > 0 ? (
-                                                            <div className="flex-1 overflow-y-auto p-6 pt-0 space-y-3">
-                                                                {result.changelog.entries.map((entry, index) => (
-                                                                    <div key={index}
-                                                                         className="p-3 border rounded-lg space-y-2 flex-shrink-0">
-                                                                        <div
-                                                                            className="flex items-center justify-between">
-                                                                            <Badge variant="outline"
-                                                                                   className="text-xs">{entry.category}</Badge>
-                                                                            <span
-                                                                                className="text-xs text-muted-foreground">#{entry.commit.slice(0, 7)}</span>
-                                                                        </div>
-                                                                        <p className="text-sm font-medium line-clamp-2">{entry.description}</p>
-                                                                        {entry.impact && (
-                                                                            <p className="text-xs text-muted-foreground line-clamp-1">
-                                                                                {entry.impact}
-                                                                            </p>
-                                                                        )}
-                                                                        {entry.files && entry.files.length > 0 && (
-                                                                            <div className="flex flex-wrap gap-1 mt-2">
-                                                                                {entry.files.slice(0, 3).map((file, fileIndex) => (
-                                                                                    <Badge key={fileIndex}
-                                                                                           variant="secondary"
-                                                                                           className="text-xs px-1 py-0">
-                                                                                        {file.split('/').pop()}
-                                                                                    </Badge>
-                                                                                ))}
-                                                                                {entry.files.length > 3 && (
-                                                                                    <Badge variant="secondary"
-                                                                                           className="text-xs px-1 py-0">
-                                                                                        +{entry.files.length - 3} more
-                                                                                    </Badge>
+                                                    {/* Entries Preview - PROPERLY SCROLLABLE */}
+                                                    <Card className="flex flex-col h-full">
+                                                        <CardHeader className="flex-shrink-0">
+                                                            <CardTitle className="text-lg">Entry Breakdown</CardTitle>
+                                                            <CardDescription>
+                                                                Overview of generated entries
+                                                            </CardDescription>
+                                                        </CardHeader>
+                                                        <CardContent className="flex-1 overflow-hidden p-0">
+                                                            {result.changelog?.entries && result.changelog.entries.length > 0 ? (
+                                                                <ScrollArea className="h-full w-full">
+                                                                    <div className="p-4 space-y-3">
+                                                                        {result.changelog.entries.map((entry, index) => (
+                                                                            <div key={index}
+                                                                                 className="p-3 border rounded-lg space-y-2 bg-background">
+                                                                                <div
+                                                                                    className="flex items-center justify-between">
+                                                                                    <Badge variant="outline"
+                                                                                           className="text-xs">{entry.category}</Badge>
+                                                                                    <span
+                                                                                        className="text-xs text-muted-foreground">#{entry.commit.slice(0, 7)}</span>
+                                                                                </div>
+                                                                                <p className="text-sm font-medium">{entry.description}</p>
+                                                                                {entry.impact && (
+                                                                                    <p className="text-xs text-muted-foreground">
+                                                                                        {entry.impact}
+                                                                                    </p>
+                                                                                )}
+                                                                                {entry.files && entry.files.length > 0 && (
+                                                                                    <div className="flex flex-wrap gap-1 mt-2">
+                                                                                        {entry.files.slice(0, 3).map((file, fileIndex) => (
+                                                                                            <Badge key={fileIndex}
+                                                                                                   variant="secondary"
+                                                                                                   className="text-xs px-1 py-0">
+                                                                                                {file.split('/').pop()}
+                                                                                            </Badge>
+                                                                                        ))}
+                                                                                        {entry.files.length > 3 && (
+                                                                                            <Badge variant="secondary"
+                                                                                                   className="text-xs px-1 py-0">
+                                                                                                +{entry.files.length - 3} more
+                                                                                            </Badge>
+                                                                                        )}
+                                                                                    </div>
                                                                                 )}
                                                                             </div>
-                                                                        )}
+                                                                        ))}
                                                                     </div>
-                                                                ))}
-                                                            </div>
-                                                        ) : (
-                                                            <div
-                                                                className="flex-1 flex items-center justify-center p-6">
-                                                                <p className="text-sm text-muted-foreground text-center">
-                                                                    No detailed entries available
-                                                                </p>
-                                                            </div>
-                                                        )}
-                                                    </CardContent>
-                                                </Card>
-                                            </div>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-                            </div>
+                                                                </ScrollArea>
+                                                            ) : (
+                                                                <div className="flex-1 flex items-center justify-center p-6">
+                                                                    <p className="text-sm text-muted-foreground text-center">
+                                                                        No detailed entries available
+                                                                    </p>
+                                                                </div>
+                                                            )}
+                                                        </CardContent>
+                                                    </Card>
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
+                            </ScrollArea>
                         </div>
                     </div>
                 </DialogContent>
