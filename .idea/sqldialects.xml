@@ -20,5 +20,6 @@
     <file url="file://$PROJECT_DIR$/prisma/migrations/20250628180800_add_telemetry_support/migration.sql" dialect="PostgreSQL" />
     <file url="file://$PROJECT_DIR$/prisma/migrations/20250628215000_complete_telemetry_fix/migration.sql" dialect="PostgreSQL" />
     <file url="file://$PROJECT_DIR$/prisma/migrations/20250628215100_fix_telemetry_casting/migration.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/prisma/migrations/20250628230000_add_changelogentryid_back/migration.sql" dialect="PostgreSQL" />
   </component>
 </project>
