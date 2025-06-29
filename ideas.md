@@ -10,10 +10,10 @@
 - [x] full-text search
 - [ ] version range comparison (catch-up) thinking a digest of what's been done from here-to-there, could be fun!
 - [ ] more changelog customization
-  - set a logo for your changelog ( thats all ideas for now )
+  - set a logo for your changelog (thats all ideas for now)
     - requirements:
     - media manager
     - storage providers (s3, local, maybe google drive not sure)
     - enables for reusable media that can be uploaded to the content editor.
 
-- [ ] ability to specify a custom logo for an SSO provider
+- [ ] ability to specify a custom logo for an SSO provider (will be added when I get around to media storage!)

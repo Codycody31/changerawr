@@ -431,7 +431,7 @@ model ScheduledJob {
   maxRetries       Int              @default(3)
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
-  ChangelogEntry   ChangelogEntry?  @relation(fields: [changelogEntryId], references: [id])
+  ChangelogEntry   ChangelogEntry?  @relation(fields: [changelogEntryId], references: [id], onDelete: SetNull)
   changelogEntryId String?
 
   // Relations
