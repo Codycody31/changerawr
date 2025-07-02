@@ -130,6 +130,7 @@ body:
         - Email Notifications
         - GitHub Integration
         - Mobile Interface
+        - Deployment/Pre-Deployment
         - Other / Not Sure
       default: 10
     validations:
@@ -205,6 +206,8 @@ body:
           required: true
         - label: I have all required ENV variables configured.
           required: true
+        - label: I am using docker ( only check this if you are deploying with docker! )
+          required: false
 
   - type: markdown
     attributes:
