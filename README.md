@@ -10,13 +10,14 @@
 
 # What is Changerawr?
 
-Changerawr lets you write down what you changed, then share those changes with people. You write entries about updates you made, and Changerawr gives you ways to display them - like widgets for your website, public pages people can visit, or APIs to use however you want.
+Changerawr lets you write down what you changed, then share those changes with people. You write entries about updates you made, and Changerawr gives you ways to display them - like widgets for your website, public pages people can visit, or APIs to use however you want. \
+You can think of it as a **Changelog Management System** [CMS]
 
 If you don't know what a changelog is, check out [betterauth](https://www.better-auth.com/changelogs) for an example!
 
 ## ✨ Why Changerawr?
 
-**Developer-focused.** Headless API, beautiful documentation, SDKs, and integrations.
+**Developer-focused.** Headless API, beautiful documentation, SDKs, integrations, and a CLI.
 
 **Fully customizable.** Do things your way. No vendor lock-in, no forced workflows.
 

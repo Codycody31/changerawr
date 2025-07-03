@@ -30,6 +30,7 @@ model User {
   lastChallenge     String?
   twoFactorMode     TwoFactorMode?     @default(NONE)
   twoFactorSessions TwoFactorSession[]
+  CliAuthCode       CliAuthCode[]
 }
 
 model RefreshToken {
@@ -124,6 +125,8 @@ model Project {
   gitHubIntegration   GitHubIntegration?
   analyticsViews      PublicChangelogAnalytics[]
   customDomains       CustomDomain[]
+  syncMetadata        ProjectSyncMetadata?
+  syncedCommits       SyncedCommit[]
 }
 
 model Passkey {
@@ -440,6 +443,66 @@ model ScheduledJob {
   @@index([scheduledAt])
   @@index([status])
   @@index([scheduledAt, status])
+}
+
+model CliAuthCode {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  userId      String
+  callbackUrl String
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([code])
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model ProjectSyncMetadata {
+  id                 String    @id @default(cuid())
+  projectId          String    @unique
+  lastSyncHash       String?
+  lastSyncedAt       DateTime?
+  totalCommitsSynced Int       @default(0)
+  repositoryUrl      String?
+  branch             String    @default("main")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([lastSyncedAt])
+}
+
+model SyncedCommit {
+  id                String   @id @default(cuid())
+  projectId         String
+  commitHash        String
+  commitMessage     String
+  commitAuthor      String
+  commitEmail       String
+  commitDate        DateTime
+  commitFiles       String[] // Array of file paths
+  conventionalType  String? // feat, fix, docs, etc.
+  conventionalScope String? // Optional scope from conventional commits
+  isBreaking        Boolean  @default(false)
+  commitBody        String? // Optional commit body
+  commitFooter      String? // Optional commit footer
+  syncedAt          DateTime @default(now())
+  branch            String   @default("main")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, commitHash]) // Prevent duplicate commits per project
+  @@index([projectId])
+  @@index([commitHash])
+  @@index([syncedAt])
+  @@index([conventionalType])
+  @@index([branch])
 }
 
 enum ScheduledJobType {

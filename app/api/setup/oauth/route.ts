@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server';
-import { z } from 'zod';
-import { setupEasypanelProvider } from '@/lib/auth/providers/easypanel';
+import {NextResponse} from 'next/server';
+import {z} from 'zod';
+import {setupEasypanelProvider} from '@/lib/auth/providers/easypanel';
+import {setupPocketIDProvider} from '@/lib/auth/providers/pocketid';
 
 /**
  * Schema for validating OAuth provider setup request.
@@ -15,50 +16,12 @@ const oauthSetupSchema = z.object({
 /**
  * @method POST
  * @description Sets up an OAuth provider during initial system setup
- * @body {
- *   "type": "object",
- *   "required": ["provider", "baseUrl", "clientId", "clientSecret"],
- *   "properties": {
- *     "provider": {
- *       "type": "string",
- *       "description": "OAuth provider type"
- *     },
- *     "baseUrl": {
- *       "type": "string",
- *       "format": "url",
- *       "description": "Base URL of the authentication server"
- *     },
- *     "clientId": {
- *       "type": "string",
- *       "description": "OAuth client ID"
- *     },
- *     "clientSecret": {
- *       "type": "string",
- *       "description": "OAuth client secret"
- *     }
- *   }
- * }
- * @response 200 {
- *   "type": "object",
- *   "properties": {
- *     "success": { "type": "boolean" },
- *     "provider": {
- *       "type": "object",
- *       "properties": {
- *         "id": { "type": "string" },
- *         "name": { "type": "string" }
- *       }
- *     }
- *   }
- * }
- * @error 400 Validation failed - Invalid input data
- * @error 500 An unexpected error occurred
  */
 export async function POST(request: Request) {
     try {
         // Validate request data
         const body = await request.json();
-        const { provider, baseUrl, clientId, clientSecret } = oauthSetupSchema.parse(body);
+        const {provider, baseUrl, clientId, clientSecret} = oauthSetupSchema.parse(body);
 
         let result;
 
@@ -71,10 +34,17 @@ export async function POST(request: Request) {
                     clientSecret
                 });
                 break;
+            case 'pocketid':
+                result = await setupPocketIDProvider({
+                    baseUrl,
+                    clientId,
+                    clientSecret
+                });
+                break;
             default:
                 return NextResponse.json(
-                    { error: `Unsupported provider: ${provider}` },
-                    { status: 400 }
+                    {error: `Unsupported provider: ${provider}`},
+                    {status: 400}
                 );
         }
 
@@ -90,14 +60,14 @@ export async function POST(request: Request) {
 
         if (error instanceof z.ZodError) {
             return NextResponse.json(
-                { error: 'Validation failed', details: error.errors },
-                { status: 400 }
+                {error: 'Validation failed', details: error.errors},
+                {status: 400}
             );
         }
 
         return NextResponse.json(
-            { error: 'Failed to set up OAuth provider' },
-            { status: 500 }
+            {error: 'Failed to set up OAuth provider'},
+            {status: 500}
         );
     }
 }

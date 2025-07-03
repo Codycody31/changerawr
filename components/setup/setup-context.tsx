@@ -31,6 +31,8 @@ export const SetupProvider: React.FC<{children: React.ReactNode}> = ({ children 
 
     const checkSetupStatus = async () => {
         setIsLoading(true);
+        console.log('🔍 checkSetupStatus: Starting setup status check...');
+
         try {
             const response = await fetch('/api/setup');
             if (!response.ok) {
@@ -38,29 +40,28 @@ export const SetupProvider: React.FC<{children: React.ReactNode}> = ({ children 
             }
 
             const data = await response.json();
+            console.log('📊 checkSetupStatus: API response:', data);
 
             if (data.isComplete) {
+                console.log('✅ checkSetupStatus: Setup is complete, redirecting to login');
                 router.replace('/login');
                 return;
             }
 
-            // Set completed steps based on server response
-            const completed: SetupStep[] = [];
-            if (data.adminCreated) completed.push('admin');
-            if (data.settingsConfigured) completed.push('settings');
-            if (data.oauthConfigured) completed.push('oauth');
-
+            // Use the completed steps from API (which now enforces proper order)
+            const completed: SetupStep[] = data.completedSteps || [];
+            console.log('📝 checkSetupStatus: Completed steps from API:', completed);
             setCompletedSteps(completed);
 
-            // Determine current step
-            if (completed.length === 0) {
-                setCurrentStep('welcome');
-            } else {
-                const lastCompleted = completed[completed.length - 1];
-                const nextStepIndex = stepOrder.indexOf(lastCompleted) + 1;
-                setCurrentStep(stepOrder[nextStepIndex] || 'welcome');
-            }
-        } catch {
+            // TRUST THE API's currentStep - don't recalculate it here!
+            const apiCurrentStep = data.currentStep as SetupStep;
+            console.log(`🎯 checkSetupStatus: Using API's current step: ${apiCurrentStep}`);
+            setCurrentStep(apiCurrentStep);
+
+        } catch (error) {
+            console.error('❌ checkSetupStatus: Error occurred:', error);
+            console.log('🎬 checkSetupStatus: Error fallback - setting to welcome');
+            setCurrentStep('welcome');
             toast({
                 title: 'Error',
                 description: 'Failed to check setup status',
@@ -68,6 +69,7 @@ export const SetupProvider: React.FC<{children: React.ReactNode}> = ({ children 
             });
         } finally {
             setIsLoading(false);
+            console.log('🏁 checkSetupStatus: Finished setup status check');
         }
     };
 

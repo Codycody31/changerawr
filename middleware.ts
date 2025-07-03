@@ -30,7 +30,8 @@ const PUBLIC_CONTENT_PATHS = [
     '/unsubscribed',
     '/experiments/',
     '/forgot-password',
-    '/two-factor'
+    '/two-factor',
+    '/cli/auth',
 ]
 
 function isAlwaysPublicPath(pathname: string): boolean {
