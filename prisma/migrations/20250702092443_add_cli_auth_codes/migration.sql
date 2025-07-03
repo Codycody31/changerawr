@@ -1,6 +1,3 @@
--- Drop index only if it exists
-DROP INDEX IF EXISTS "ScheduledJob_changelogEntryId_idx";
-
 -- Create CliAuthCode table
 CREATE TABLE "CliAuthCode" (
                                "id" TEXT NOT NULL,
@@ -20,11 +17,18 @@ CREATE INDEX "CliAuthCode_code_idx" ON "CliAuthCode"("code");
 CREATE INDEX "CliAuthCode_userId_idx" ON "CliAuthCode"("userId");
 CREATE INDEX "CliAuthCode_expiresAt_idx" ON "CliAuthCode"("expiresAt");
 
--- Add foreign key constraints conditionally
+-- Add foreign key constraint for CliAuthCode
+ALTER TABLE "CliAuthCode" ADD CONSTRAINT "CliAuthCode_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- The changelogEntryId column should exist from migration 20250628230000
+-- But let's add the foreign key constraint that was removed in the telemetry fixes
+-- Only add it if both the column exists AND the constraint doesn't exist
 DO $$
     BEGIN
-        -- Add ScheduledJob foreign key if it doesn't exist
-        IF NOT EXISTS (
+        IF EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'ScheduledJob' AND column_name = 'changelogEntryId'
+        ) AND NOT EXISTS (
             SELECT 1 FROM pg_constraint
             WHERE conname = 'ScheduledJob_changelogEntryId_fkey'
         ) THEN
@@ -34,6 +38,3 @@ DO $$
                         ON DELETE SET NULL ON UPDATE CASCADE;
         END IF;
     END $$;
-
--- Add CliAuthCode foreign key
-ALTER TABLE "CliAuthCode" ADD CONSTRAINT "CliAuthCode_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
