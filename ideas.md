@@ -10,7 +10,9 @@
 - [x] full-text search
 - [ ] version range comparison (catch-up) thinking a digest of what's been done from here-to-there, could be fun!
 - [ ] more changelog customization
-  - set a logo for your changelog (thats all ideas for now)
+  - set SEO for public changelog
+  - custom scripting for public changelog ( custom js, CSS makes no sense due to changerawr being a CMS)
+  - set a logo for your changelog
     - requirements:
     - media manager
     - storage providers (s3, local, maybe google drive not sure)
@@ -18,3 +20,8 @@
 
 - [ ] ability to specify a custom logo for an SSO provider (will be added when I get around to media storage!)
 - [ ] update the MCP server so it can use scheduled publishing
+- [ ] collaboration
+- [ ] allow for inviting other staff members to work on the same changelog entry
+- [x] CLI for Changerawr
+- [ ] do stuff with the syncCommit and syncCommitMetadata (no ideas what I could do as of writing)
+- [ ] extend markdown with custom elements (perhaps, can call it Changerawr Universal Markdown Engine) - CUME

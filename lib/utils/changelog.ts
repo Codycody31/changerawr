@@ -1,7 +1,7 @@
-import { z } from 'zod'
-import { db } from '@/lib/db'
-import { RequestStatus } from '@prisma/client'
-import { verifyAccessToken } from '@/lib/auth/tokens'
+import {z} from 'zod'
+import {db} from '@/lib/db'
+import {RequestStatus} from '@prisma/client'
+import {verifyAccessToken} from '@/lib/auth/tokens'
 import {cookies, headers} from "next/headers";
 
 // Zod Schemas
@@ -20,43 +20,60 @@ export type ChangelogEntryInput = z.infer<typeof changelogEntrySchema>
 
 // Auth Helper
 export async function validateAuthAndGetUser() {
-    // Check for Bearer token (API key) first
+    // Check for Bearer token (API key or JWT) first
     const headersList = await headers();
     const authHeader = headersList.get('authorization');
 
     if (authHeader?.startsWith('Bearer ')) {
-        const apiKey = authHeader.substring(7); // Remove 'Bearer ' prefix
+        const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
-        // Find and validate API key
+        // First, try to validate as JWT token (for CLI)
+        try {
+            const userId = await verifyAccessToken(token);
+            if (userId) {
+                const user = await db.user.findUnique({
+                    where: {id: userId}
+                });
+
+                if (user) {
+                    return user;
+                }
+            }
+        } catch {
+            // If JWT validation fails, continue to API key check
+        }
+
+        // Then try to validate as API key (for API access)
         const validApiKey = await db.apiKey.findFirst({
             where: {
-                key: apiKey,
+                key: token,
                 OR: [
-                    { expiresAt: null },
-                    { expiresAt: { gt: new Date() } }
+                    {expiresAt: null},
+                    {expiresAt: {gt: new Date()}}
                 ],
                 isRevoked: false
             }
         });
 
-        if (!validApiKey) {
-            throw new Error('Invalid API key');
+        if (validApiKey) {
+            // Update last used timestamp
+            await db.apiKey.update({
+                where: {id: validApiKey.id},
+                data: {lastUsed: new Date()}
+            });
+
+            // API keys always get admin access since they can only be created by admins
+            return {
+                id: validApiKey.userId,
+                email: 'api.key@changerawr.sys',
+                role: 'ADMIN',
+                createdAt: validApiKey.createdAt,
+                updatedAt: new Date()
+            };
         }
 
-        // Update last used timestamp
-        await db.apiKey.update({
-            where: { id: validApiKey.id },
-            data: { lastUsed: new Date() }
-        });
-
-        // API keys always get admin access since they can only be created by admins
-        return {
-            id: validApiKey.userId,
-            email: 'api.key@changerawr.sys',
-            role: 'ADMIN',
-            createdAt: validApiKey.createdAt,
-            updatedAt: new Date()
-        };
+        // If neither JWT nor API key validation worked
+        throw new Error('Invalid token');
     }
 
     // Fall back to cookie authentication
@@ -74,7 +91,7 @@ export async function validateAuthAndGetUser() {
     }
 
     const user = await db.user.findUnique({
-        where: { id: userId }
+        where: {id: userId}
     });
 
     if (!user) {
@@ -87,10 +104,10 @@ export async function validateAuthAndGetUser() {
 // Response Helpers
 export function sendError(message: string, status: number = 400) {
     return new Response(
-        JSON.stringify({ error: message }),
+        JSON.stringify({error: message}),
         {
             status,
-            headers: { 'Content-Type': 'application/json' }
+            headers: {'Content-Type': 'application/json'}
         }
     )
 }
@@ -100,7 +117,7 @@ export function sendSuccess(data: unknown, status: number = 200) {
         JSON.stringify(data),
         {
             status,
-            headers: { 'Content-Type': 'application/json' }
+            headers: {'Content-Type': 'application/json'}
         }
     )
 }

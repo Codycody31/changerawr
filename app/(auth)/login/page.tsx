@@ -181,7 +181,7 @@ export default function LoginPage() {
 
     useEffect(() => {
         const searchParams = new URLSearchParams(window.location.search)
-        const redirectParam = searchParams.get('redirectTo')
+        const redirectParam = searchParams.get('redirectTo') || searchParams.get('from')
         if (redirectParam) {
             setRedirectTo(redirectParam)
         }

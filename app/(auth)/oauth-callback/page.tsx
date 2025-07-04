@@ -41,7 +41,7 @@ export default function OAuthCallback() {
     }, [router])
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center">
+        <div className="min-h-screen flex flex-col bg-transparent items-center justify-center">
             {error ? (
                 <div className="text-center">
                     <p className="text-destructive">{error}</p>

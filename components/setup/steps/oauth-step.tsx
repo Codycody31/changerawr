@@ -1,4 +1,3 @@
-// components/setup/steps/oauth-step.tsx
 'use client';
 
 import React, {useState, useEffect} from 'react';
@@ -81,10 +80,13 @@ export function OAuthStep({onNext, onBack}: OAuthStepProps) {
     const [setupMode, setSetupMode] = useState<'auto' | 'manual'>('auto');
     const [error, setError] = useState('');
 
-    // Get the callback URL
-    const callbackUrl = typeof window !== 'undefined'
-        ? `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/api/auth/oauth/callback/easypanel`
-        : 'http://localhost:3000/api/auth/oauth/callback/easypanel';
+    // Get the callback URL for the selected provider
+    const getCallbackUrl = (provider: string) => {
+        const baseUrl = typeof window !== 'undefined'
+            ? (process.env.NEXT_PUBLIC_APP_URL || window.location.origin)
+            : 'http://localhost:3000';
+        return `${baseUrl}/api/auth/oauth/callback/${provider.toLowerCase()}`;
+    };
 
     // Check auto setup availability on mount
     useEffect(() => {
@@ -316,7 +318,7 @@ export function OAuthStep({onNext, onBack}: OAuthStepProps) {
                             >
                                 {/* Status Banner */}
                                 <Alert hasIcon={false}
-                                    className={autoSetupStatus.connected ? 'border-green-200 bg-green-50 dark:bg-green-950/20' : 'border-yellow-200 bg-yellow-50 dark:bg-yellow-950/20'}>
+                                       className={autoSetupStatus.connected ? 'border-green-200 bg-green-50 dark:bg-green-950/20' : 'border-yellow-200 bg-yellow-50 dark:bg-yellow-950/20'}>
                                     <div className="flex items-center gap-2">
                                         {autoSetupStatus.connected ? (
                                             <CheckCircle className="h-4 w-4 text-green-600"/>
@@ -388,7 +390,7 @@ export function OAuthStep({onNext, onBack}: OAuthStepProps) {
                                             <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
                                                 <li>• Creates OAuth client on your server automatically</li>
                                                 <li>• Uses fixed redirect URI: <code
-                                                    className="bg-blue-100 dark:bg-blue-900/50 px-1 rounded text-xs">{callbackUrl}</code>
+                                                    className="bg-blue-100 dark:bg-blue-900/50 px-1 rounded text-xs">{getCallbackUrl('easypanel')}</code>
                                                 </li>
                                                 <li>• Configures required scopes: openid, profile, email</li>
                                                 <li>• Sets up local OAuth provider configuration</li>
@@ -505,9 +507,28 @@ export function OAuthStep({onNext, onBack}: OAuthStepProps) {
                                                     <SelectValue placeholder="Select a provider"/>
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    <SelectItem value="easypanel">Easypanel</SelectItem>
+                                                    <SelectItem value="easypanel">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                                            Easypanel
+                                                        </div>
+                                                    </SelectItem>
+                                                    <SelectItem value="pocketid">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                                            PocketID
+                                                        </div>
+                                                    </SelectItem>
                                                 </SelectContent>
                                             </Select>
+                                            <p className="text-xs text-muted-foreground">
+                                                {providerType === 'easypanel'
+                                                    ? 'OAuth provider for Easypanel authentication servers'
+                                                    : providerType === 'pocketid'
+                                                        ? 'OpenID Connect provider for PocketID authentication'
+                                                        : 'Choose your authentication provider type'
+                                                }
+                                            </p>
                                         </div>
 
                                         {/* Callback URL Display */}
@@ -516,33 +537,42 @@ export function OAuthStep({onNext, onBack}: OAuthStepProps) {
                                             <div className="flex items-center gap-2">
                                                 <code
                                                     className="flex-1 p-2 text-xs bg-background rounded border overflow-x-auto">
-                                                    {callbackUrl}
+                                                    {getCallbackUrl(providerType)}
                                                 </code>
                                                 <Button
                                                     type="button"
                                                     variant="outline"
                                                     size="sm"
-                                                    onClick={() => copyToClipboard(callbackUrl)}
+                                                    onClick={() => copyToClipboard(getCallbackUrl(providerType))}
                                                 >
                                                     <Copy className="h-4 w-4"/>
                                                 </Button>
                                             </div>
                                             <p className="text-xs text-muted-foreground">
-                                                Configure your OAuth server to use this URL as the redirect URI.
+                                                Configure your {providerType === 'pocketid' ? 'PocketID' : 'Easypanel'} server to use this URL as the redirect URI.
                                             </p>
                                         </div>
 
                                         <div className="space-y-2">
-                                            <Label htmlFor="baseUrl">Authentication Server URL</Label>
+                                            <Label htmlFor="baseUrl">
+                                                {providerType === 'pocketid' ? 'PocketID Server URL' : 'Authentication Server URL'}
+                                            </Label>
                                             <Input
                                                 id="baseUrl"
                                                 value={baseUrl}
                                                 onChange={(e) => setBaseUrl(e.target.value)}
-                                                placeholder="https://auth.example.com"
+                                                placeholder={
+                                                    providerType === 'pocketid'
+                                                        ? 'https://id.yourserver.com'
+                                                        : 'https://auth.example.com'
+                                                }
                                                 className="h-12"
                                             />
                                             <p className="text-xs text-muted-foreground">
-                                                The base URL of your authentication server.
+                                                {providerType === 'pocketid'
+                                                    ? 'The base URL of your PocketID server instance.'
+                                                    : 'The base URL of your authentication server.'
+                                                }
                                             </p>
                                         </div>
 

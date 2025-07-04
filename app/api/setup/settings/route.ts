@@ -1,6 +1,6 @@
-import { NextResponse } from 'next/server'
-import { z } from 'zod'
-import { db } from '@/lib/db'
+import {NextResponse} from 'next/server'
+import {z} from 'zod'
+import {db} from '@/lib/db'
 
 /**
  * Schema for validating system settings request body.
@@ -135,35 +135,44 @@ const settingsSchema = z.object({
  */
 export async function POST(request: Request) {
     try {
-        // Check if settings already exist
-        const existingConfig = await db.systemConfig.findFirst()
-        if (existingConfig) {
-            return NextResponse.json(
-                { error: 'System settings already configured' },
-                { status: 400 }
-            )
-        }
-
-        // Validate request data
+        // Validate request data first
         const body = await request.json()
         const validatedData = settingsSchema.parse(body)
 
-        // Create system config
-        const config = await db.systemConfig.create({
-            data: {
-                id: 1,
-                defaultInvitationExpiry: validatedData.defaultInvitationExpiry,
-                requireApprovalForChangelogs: validatedData.requireApprovalForChangelogs,
-                maxChangelogEntriesPerProject: validatedData.maxChangelogEntriesPerProject,
-                enableAnalytics: validatedData.enableAnalytics,
-                enableNotifications: validatedData.enableNotifications,
-            }
-        })
+        // Check if settings already exist
+        const existingConfig = await db.systemConfig.findFirst()
+
+        let config;
+        if (existingConfig) {
+            // Update existing settings
+            config = await db.systemConfig.update({
+                where: {id: existingConfig.id},
+                data: {
+                    defaultInvitationExpiry: validatedData.defaultInvitationExpiry,
+                    requireApprovalForChangelogs: validatedData.requireApprovalForChangelogs,
+                    maxChangelogEntriesPerProject: validatedData.maxChangelogEntriesPerProject,
+                    enableAnalytics: validatedData.enableAnalytics,
+                    enableNotifications: validatedData.enableNotifications,
+                }
+            })
+        } else {
+            // Create new settings
+            config = await db.systemConfig.create({
+                data: {
+                    id: 1,
+                    defaultInvitationExpiry: validatedData.defaultInvitationExpiry,
+                    requireApprovalForChangelogs: validatedData.requireApprovalForChangelogs,
+                    maxChangelogEntriesPerProject: validatedData.maxChangelogEntriesPerProject,
+                    enableAnalytics: validatedData.enableAnalytics,
+                    enableNotifications: validatedData.enableNotifications,
+                }
+            })
+        }
 
         return NextResponse.json({
-            message: 'System settings configured successfully',
+            message: existingConfig ? 'System settings updated successfully' : 'System settings configured successfully',
             config
-        }, { status: 201 })
+        }, {status: existingConfig ? 200 : 201})
     } catch (error) {
         if (error instanceof z.ZodError) {
             return NextResponse.json(
@@ -174,14 +183,14 @@ export async function POST(request: Request) {
                         message: e.message
                     }))
                 },
-                { status: 400 }
+                {status: 400}
             )
         }
 
         console.error('Settings setup error:', error)
         return NextResponse.json(
-            { error: 'An unexpected error occurred during configuration' },
-            { status: 500 }
+            {error: 'An unexpected error occurred during configuration'},
+            {status: 500}
         )
     }
 }
@@ -202,7 +211,7 @@ export async function POST(request: Request) {
  */
 export async function GET() {
     return NextResponse.json(
-        { error: 'Method not allowed' },
-        { status: 405 }
+        {error: 'Method not allowed'},
+        {status: 405}
     )
 }
