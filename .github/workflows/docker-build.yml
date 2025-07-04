@@ -19,15 +19,6 @@ on:
         required: false
         type: boolean
         default: false
-      build_strategy:
-        description: 'Build strategy'
-        required: false
-        type: choice
-        default: 'buildx-multi'
-        options:
-          - 'buildx-multi'
-          - 'buildx-single'
-          - 'legacy'
 
 env:
   REGISTRY: ghcr.io
@@ -77,21 +68,13 @@ jobs:
         id: repo
         run: echo "name=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
 
-      - name: Set up QEMU (for multi-platform builds)
-        if: github.event.inputs.build_strategy != 'legacy'
+      - name: Set up QEMU (for ARM builds)
         uses: docker/setup-qemu-action@v3
         with:
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/arm64
 
       - name: Set up Docker Buildx
-        if: github.event.inputs.build_strategy != 'legacy'
         uses: docker/setup-buildx-action@v3
-        with:
-          driver-opts: |
-            network=host
-          buildkitd-flags: |
-            --allow-insecure-entitlement security.insecure
-            --allow-insecure-entitlement network.host
 
       - name: Log in to Container Registry
         uses: docker/login-action@v3
@@ -100,18 +83,54 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
+      - name: Determine version and tags
+        id: version
+        run: |
+          # Set defaults
+          VERSION="unknown"
+          REVISION="${{ github.sha }}"
+          BUILDTIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          
+          # Determine version from different sources
+          if [ -n "${{ github.event.inputs.tag_override }}" ]; then
+            VERSION="${{ github.event.inputs.tag_override }}"
+            TAGS="${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:${{ github.event.inputs.tag_override }}"
+          elif [ "${{ github.event_name }}" = "release" ] && [ -n "${{ github.event.release.tag_name }}" ]; then
+            VERSION="${{ github.event.release.tag_name }}"
+            # Remove 'v' prefix if present
+            CLEAN_VERSION="${VERSION#v}"
+            TAGS="${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:${CLEAN_VERSION},${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:latest"
+          elif [ "${{ github.ref_type }}" = "tag" ]; then
+            VERSION="${{ github.ref_name }}"
+            # Remove 'v' prefix if present
+            CLEAN_VERSION="${VERSION#v}"
+            TAGS="${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:${CLEAN_VERSION},${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:latest"
+          elif [ "${{ github.ref_name }}" = "main" ] || [ "${{ github.ref_name }}" = "master" ]; then
+            VERSION="latest"
+            TAGS="${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:latest"
+          else
+            VERSION="${{ github.ref_name }}"
+            TAGS="${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:${{ github.ref_name }}"
+          fi
+          
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tags=${TAGS}" >> $GITHUB_OUTPUT
+          echo "buildtime=${BUILDTIME}" >> $GITHUB_OUTPUT
+          echo "revision=${REVISION}" >> $GITHUB_OUTPUT
+          
+          echo "✅ Version: ${VERSION}"
+          echo "✅ Tags: ${TAGS}"
+          echo "✅ Build time: ${BUILDTIME}"
+          echo "✅ Revision: ${REVISION}"
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=raw,value=latest,enable={{is_default_branch}}
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.version.outputs.tags }}
           labels: |
             org.opencontainers.image.title=Changerawr
             org.opencontainers.image.description=Ship, Change, Rawr 🦖 - Changelog management made cute and simple
@@ -119,86 +138,15 @@ jobs:
             org.opencontainers.image.url=https://github.com/${{ github.repository }}
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.documentation=https://github.com/${{ github.repository }}#readme
-
-      - name: Determine final tags and build args
-        id: build_config
-        run: |
-          if [ -n "${{ github.event.inputs.tag_override }}" ]; then
-            echo "tags=${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:${{ github.event.inputs.tag_override }}" >> $GITHUB_OUTPUT
-          else
-            echo "tags=${{ steps.meta.outputs.tags }}" >> $GITHUB_OUTPUT
-          fi
-          
-          # Set build args
-          echo "buildtime=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}" >> $GITHUB_OUTPUT
-          echo "version=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}" >> $GITHUB_OUTPUT
-          echo "revision=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}" >> $GITHUB_OUTPUT
-
-      # Strategy 1: Multi-platform buildx (default)
-      - name: Build and push Docker image (Multi-platform)
-        if: github.event.inputs.build_strategy == 'buildx-multi' || github.event.inputs.build_strategy == ''
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.build_config.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
+            org.opencontainers.image.revision=${{ steps.version.outputs.revision }}
+            org.opencontainers.image.created=${{ steps.version.outputs.buildtime }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            BUILDTIME=${{ steps.build_config.outputs.buildtime }}
-            VERSION=${{ steps.build_config.outputs.version }}
-            REVISION=${{ steps.build_config.outputs.revision }}
-          provenance: false
-          sbom: false
-
-      # Strategy 2: Single platform buildx (fallback)
-      - name: Build and push Docker image (Single platform)
-        if: github.event.inputs.build_strategy == 'buildx-single'
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile
-          platforms: linux/amd64
-          push: true
-          tags: ${{ steps.build_config.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: |
-            BUILDTIME=${{ steps.build_config.outputs.buildtime }}
-            VERSION=${{ steps.build_config.outputs.version }}
-            REVISION=${{ steps.build_config.outputs.revision }}
-          provenance: false
-          sbom: false
-
-      # Strategy 3: Legacy docker build (last resort)
-      - name: Build Docker image (Legacy)
-        if: github.event.inputs.build_strategy == 'legacy'
-        run: |
-          # Get the first tag for legacy build
-          FIRST_TAG=$(echo "${{ steps.build_config.outputs.tags }}" | head -n1)
-          
-          docker build \
-            --build-arg BUILDTIME="${{ steps.build_config.outputs.buildtime }}" \
-            --build-arg VERSION="${{ steps.build_config.outputs.version }}" \
-            --build-arg REVISION="${{ steps.build_config.outputs.revision }}" \
-            --tag "$FIRST_TAG" \
-            --file ./Dockerfile \
-            .
-
-      - name: Push Docker image (Legacy)
-        if: github.event.inputs.build_strategy == 'legacy'
-        run: |
-          # Push all tags for legacy build
-          echo "${{ steps.build_config.outputs.tags }}" | while IFS= read -r tag; do
-            if [ -n "$tag" ]; then
-              echo "Pushing $tag"
-              docker push "$tag"
-            fi
-          done
+            BUILDTIME=${{ steps.version.outputs.buildtime }}
+            VERSION=${{ steps.version.outputs.version }}
+            REVISION=${{ steps.version.outputs.revision }}
 
       - name: Generate image summary
         run: |
@@ -210,32 +158,18 @@ jobs:
             echo "" >> $GITHUB_STEP_SUMMARY
           fi
           
-          BUILD_STRATEGY="${{ github.event.inputs.build_strategy }}"
-          if [ -z "$BUILD_STRATEGY" ]; then
-            BUILD_STRATEGY="buildx-multi"
-          fi
-          echo "**Build Strategy:** $BUILD_STRATEGY" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
           echo "**Image:** \`${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** \`${{ steps.version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Platform:** linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "${{ steps.build_config.outputs.tags }}" | tr ',' '\n' >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.version.outputs.tags }}" | tr ',' '\n' >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          if [ "$BUILD_STRATEGY" = "legacy" ]; then
-            echo "**Platforms:** linux/amd64" >> $GITHUB_STEP_SUMMARY
-          elif [ "$BUILD_STRATEGY" = "buildx-single" ]; then
-            echo "**Platforms:** linux/amd64" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "**Platforms:** linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
-          fi
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Pull Command:**" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-          echo "docker pull ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:latest" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
   skip-build:
@@ -251,8 +185,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**To enable Docker builds:**" >> $GITHUB_STEP_SUMMARY
           echo "1. Make the repository public, or" >> $GITHUB_STEP_SUMMARY
-          echo "2. Run workflow manually with 'Force build' option enabled, or" >> $GITHUB_STEP_SUMMARY
-          echo "3. Modify the workflow to allow private builds by default" >> $GITHUB_STEP_SUMMARY
+          echo "2. Run workflow manually with 'Force build' option enabled" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Repository:** \`${{ github.repository }}\`" >> $GITHUB_STEP_SUMMARY
           echo "**Trigger:** \`${{ github.event_name }}\`" >> $GITHUB_STEP_SUMMARY
