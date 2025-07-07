@@ -25,3 +25,4 @@
 - [x] CLI for Changerawr
 - [ ] do stuff with the syncCommit and syncCommitMetadata (no ideas what I could do as of writing)
 - [ ] extend markdown with custom elements (perhaps, can call it Changerawr Universal Markdown Engine) - CUME
+- [ ] allow for importing a full changelog.md into changerawr to jump-start a project from existing data. look into canny importing as well.
