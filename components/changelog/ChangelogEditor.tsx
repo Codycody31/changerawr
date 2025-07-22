@@ -7,7 +7,7 @@ import {Button} from '@/components/ui/button';
 import {useDebounce} from 'use-debounce';
 import {toast} from "@/hooks/use-toast";
 import EditorHeader from '@/components/changelog/editor/EditorHeader';
-import {Loader2, AlertTriangle, RefreshCw, Save} from 'lucide-react';
+import {Loader2, RefreshCw, Save} from 'lucide-react';
 import {Alert, AlertDescription, AlertActions, AlertTitle} from '@/components/ui/alert';
 import {motion, AnimatePresence} from 'framer-motion';
 import {cn} from '@/lib/utils';
@@ -851,7 +851,6 @@ export function ChangelogEditor({
                             transition={{duration: 0.3}}
                         >
                             <Alert variant="warning">
-                                <AlertTriangle className="h-4 w-4"/>
                                 <AlertTitle>Version Conflict</AlertTitle>
                                 <AlertDescription>
                                     The selected version already exists. Please choose a different version to continue.

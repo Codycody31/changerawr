@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ## [1.0.4] - 2025-07-20
 
+:::warning
+There are no breaking changes in this release.
+:::
+
 ### Features
 - **Data Importing** - You can now import data from various sources to jump-start your Changerawr project!
 - **CUM** - Changerawr Universal Markdown engine introduces more functionality for the content editor. As of writing, Embeds, Buttons, and Alerts are available! \

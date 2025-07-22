@@ -22,8 +22,9 @@ import {
     TrendingUp,
     Upload,
     Users,
-    Zap
 } from 'lucide-react';
+
+import {SiGithub} from '@icons-pack/react-simple-icons';
 
 import {
     Avatar,
@@ -608,7 +609,7 @@ export default function ProjectPage({params}: ProjectPageProps) {
                     <ActionCard
                         title="GitHub Integration"
                         description="Automatically sync commits and releases from your GitHub repository."
-                        icon={Zap}
+                        icon={SiGithub}
                         href={`/dashboard/projects/${project.id}/integrations/github`}
                         color="text-gray-700"
                         badge="Beta"

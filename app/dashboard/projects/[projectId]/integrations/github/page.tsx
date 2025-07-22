@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
-    Github,
     ArrowLeft,
     Settings,
     Activity,
@@ -17,6 +16,7 @@ import {
     CheckCircle2,
     Loader2
 } from 'lucide-react';
+import {SiGithub} from '@icons-pack/react-simple-icons';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -245,7 +245,7 @@ export default function GitHubIntegrationPage() {
                     </Button>
                     <div className="flex items-center gap-3">
                         <div className="p-2 bg-primary/10 rounded-lg">
-                            <Github className="h-6 w-6 text-primary" />
+                            <SiGithub className="h-6 w-6 text-primary" />
                         </div>
                         <div>
                             <h1 className="text-2xl font-bold">GitHub Integration</h1>
@@ -324,7 +324,7 @@ export default function GitHubIntegrationPage() {
                     </Card>
                 </div>
             ) : (
-                <Alert>
+                <Alert variant="warning">
                     <AlertDescription>
                         GitHub integration is not configured. Set up your repository connection below to start generating changelog content from commits.
                     </AlertDescription>
@@ -336,7 +336,7 @@ export default function GitHubIntegrationPage() {
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
-                            <Github className="h-5 w-5" />
+                            <SiGithub className="h-5 w-5" />
                             Repository Information
                             <Button variant="ghost" size="icon" className="ml-auto">
                                 <ExternalLink

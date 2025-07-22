@@ -519,7 +519,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
                 onChange={(e) => handleContentChange(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={placeholder}
-                className="flex-1 resize-none border-0 rounded-none focus:outline-none font-mono text-sm p-4 bg-transparent"
+                className="w-full h-full p-4 font-mono text-sm border-0 bg-background focus-visible:ring-0 focus-visible:outline-none resize-none"
                 readOnly={readOnly}
                 maxLength={maxLength}
             />
