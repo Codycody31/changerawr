@@ -22,7 +22,7 @@ import {
 import {useInfiniteQuery} from '@tanstack/react-query'
 import type {ChangelogEntry} from '@/lib/types/changelog'
 import {cn} from '@/lib/utils'
-import {RenderMarkdown} from "@/components/MarkdownEditor"
+import {RenderMarkdown} from "@/components/markdown-editor/RenderMarkdown"
 import {Input} from '@/components/ui/input'
 import {Button} from '@/components/ui/button'
 import {

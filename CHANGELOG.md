@@ -8,10 +8,14 @@ All notable changes to this project will be documented in this file.
 
 ### Features
 - **Data Importing** - You can now import data from various sources to jump-start your Changerawr project!
+- **CUM** - Changerawr Universal Markdown engine introduces more functionality for the content editor. As of writing, Embeds, Buttons, and Alerts are available! \
+Provides a better experience overall, improving the parsing engine, adding tokenization, and improving overall usability!
 
 ### Improvements
 - **Redesigned Projects Dashboard** - Updated the dashboard at (/dashboard/projects/projectId) to be less cluttered and more professional.
 - **Updated Projects Fetch Pagination** - Updated the default fetch for projects to 50 entries when listing.
+- **Redesigned Main Dashboard** - Redesigned the dashboard at (/dashboard), it needed a facelift and has been the same since 0.3.0 :(
+- **Content Editor Upgrades** - Introduces the CUM ( Changerawr Universal Markdown ) rendering engine for a better changelog experience.
 
 ## [1.0.3] - 2025-07-02
 

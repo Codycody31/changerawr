@@ -4,14 +4,14 @@ import {useMutation, useQuery, useInfiniteQuery, useQueryClient} from '@tanstack
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {Input} from '@/components/ui/input';
 import {Button} from '@/components/ui/button';
-import MarkdownEditor from '@/components/markdown-editor/MarkdownEditor';
 import {useDebounce} from 'use-debounce';
 import {toast} from "@/hooks/use-toast";
 import EditorHeader from '@/components/changelog/editor/EditorHeader';
-import {Loader2, AlertTriangle, RefreshCw, Save, AlertCircle} from 'lucide-react';
+import {Loader2, AlertTriangle, RefreshCw, Save} from 'lucide-react';
 import {Alert, AlertDescription, AlertActions, AlertTitle} from '@/components/ui/alert';
 import {motion, AnimatePresence} from 'framer-motion';
 import {cn} from '@/lib/utils';
+import {MarkdownEditor} from "@/components/markdown-editor";
 
 // ===== Type Definitions =====
 
@@ -729,7 +729,6 @@ export function ChangelogEditor({
         return (
             <div className="flex items-center justify-center min-h-screen p-6">
                 <Alert variant="destructive" className="max-w-md">
-                    <AlertCircle className="h-4 w-4"/>
                     <AlertTitle>Failed to load editor</AlertTitle>
                     <AlertDescription className="mt-2">
                         {(initialDataError as Error)?.message || (tagsError as Error)?.message || 'An unexpected error occurred'}

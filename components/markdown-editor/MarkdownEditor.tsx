@@ -1,21 +1,39 @@
+// components/markdown-editor/MarkdownEditor.tsx
+
 'use client';
 
 import React, {useState, useEffect, useRef, useCallback} from 'react';
-import {Bold, Italic, Link, List, ListOrdered, Quote, Code, Heading1, Heading2, Heading3, Image} from 'lucide-react';
+import {Badge} from '@/components/ui/badge';
+import {
+    Bold,
+    Italic,
+    Link,
+    List,
+    ListOrdered,
+    Quote,
+    Code,
+    Heading1,
+    Heading2,
+    Heading3,
+    Image,
+    Zap
+} from 'lucide-react';
 
+// Import existing components
+import MarkdownToolbar, {ToolbarGroup, ToolbarDropdown} from '@/components/markdown-editor/MarkdownToolbar';
 
-// Import the MarkdownToolbar component
-import MarkdownToolbar, {ToolbarGroup, ToolbarDropdown} from './MarkdownToolbar';
+// Import our NEW markdown renderer
+import {renderMarkdown, debugMarkdown, parseMarkdown} from '@/lib/services/core/markdown';
 
 // Import AI integration
 import useAIAssistant from '@/hooks/useAIAssistant';
 import {AICompletionType} from '@/lib/utils/ai/types';
-import AIAssistantPanel from './ai/AIAssistantPanel';
-import {RenderMarkdown} from '../MarkdownEditor';
+import AIAssistantPanel from '@/components/markdown-editor/ai/AIAssistantPanel';
 
-/**
- * Simple, stable Markdown Editor component
- */
+// Import CUM modals
+import {CUMButtonModal, CUMAlertModal, CUMEmbedModal} from '@/components/markdown-editor/modals';
+import {useCUMModals} from '@/components/markdown-editor/hooks/useCUMModals';
+
 export interface MarkdownEditorProps {
     initialValue?: string;
     onChange?: (value: string) => void;
@@ -27,245 +45,259 @@ export interface MarkdownEditorProps {
     autoFocus?: boolean;
     readOnly?: boolean;
     enableAI?: boolean;
+    enableCUM?: boolean;
     aiApiKey?: string;
+    maxLength?: number;
 }
 
-export default function MarkdownEditor({
-                                           initialValue = '',
-                                           onChange,
-                                           onSave,
-                                           onExport,
-                                           placeholder = 'Start writing...',
-                                           className = '',
-                                           height = '500px',
-                                           autoFocus = false,
-                                           readOnly = false,
-                                           enableAI = false,
-                                           aiApiKey,
-                                       }: MarkdownEditorProps) {
-    // Main state
+export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
+                                                                  initialValue = '',
+                                                                  onChange,
+                                                                  onSave,
+                                                                  onExport,
+                                                                  placeholder = 'Start writing your markdown...',
+                                                                  className = '',
+                                                                  height = '400px',
+                                                                  autoFocus = false,
+                                                                  readOnly = false,
+                                                                  enableAI = false,
+                                                                  enableCUM = process.env.NEXT_PUBLIC_ENABLE_CUM !== 'false',
+                                                                  aiApiKey,
+                                                                  maxLength
+                                                              }) => {
+    // Core editor state
     const [content, setContent] = useState(initialValue);
     const [view, setView] = useState<'edit' | 'preview' | 'split'>('edit');
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const [selection, setSelection] = useState({start: 0, end: 0});
-
-    // Track history for undo/redo
     const [history, setHistory] = useState<string[]>([initialValue]);
     const [historyIndex, setHistoryIndex] = useState(0);
-
-    // UI state
     const [wordCount, setWordCount] = useState(0);
     const [charCount, setCharCount] = useState(0);
     const [isSaved, setIsSaved] = useState(true);
-    const [lastSaved, setLastSaved] = useState<Date | null>(null);
-    const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
-    // Refs
     const textareaRef = useRef<HTMLTextAreaElement>(null);
-    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const isInitialRender = useRef(true);
 
-    // Track if initial value is changed externally (controlled component behavior)
-    const initialValueRef = useRef(initialValue);
+    // AI integration - ALWAYS call the hook
+    const ai = useAIAssistant({apiKey: aiApiKey});
 
-    // Initialize AI assistant (always call the hook, but conditionally use its methods)
-    const ai = useAIAssistant({
-        apiKey: aiApiKey,
-        onGenerated: () => {
-            // Show success message
-            setStatusMessage('AI content generated');
-            setTimeout(() => setStatusMessage(null), 3000);
-        }
-    });
+    // CUM modals state
+    const {modals, openModal, closeModal} = useCUMModals();
 
-    // Only enable AI features if the prop is true
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const enabledAI = enableAI ? ai : null;
-
-    // Effect to handle initialValue changes (controlled component support)
+    // Initialize content
     useEffect(() => {
-        // If initialValue has changed from what we previously stored
-        if (initialValue !== initialValueRef.current) {
-            // Store new initial value
-            initialValueRef.current = initialValue;
-
-            // Reset the editor state
+        if (initialValue !== content) {
             setContent(initialValue);
             setHistory([initialValue]);
             setHistoryIndex(0);
-            setIsSaved(true);
-
-            // Recalculate metrics for new content
-            calculateMetrics(initialValue);
         }
-    }, [initialValue]);
+    }, [initialValue, content]);
 
-    // Calculate metrics (word count, char count) from content
-    const calculateMetrics = useCallback((text: string) => {
-        // Count words
-        const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+    // Update metrics
+    useEffect(() => {
+        const words = content.trim() ? content.trim().split(/\s+/).length : 0;
+        const chars = content.length;
         setWordCount(words);
+        setCharCount(chars);
+    }, [content]);
 
-        // Count characters
-        setCharCount(text.length);
-    }, []);
-
-    // Add content to history when it changes
-    const addToHistory = useCallback((newContent: string) => {
-        if (newContent === history[historyIndex]) return;
-
-        // Clear timeout if exists
-        if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
+    // Auto focus
+    useEffect(() => {
+        if (autoFocus && textareaRef.current) {
+            textareaRef.current.focus();
         }
+    }, [autoFocus]);
 
-        // Debounce history additions
-        timeoutRef.current = setTimeout(() => {
-            setHistory(prev => {
-                // Remove future history if we're not at the end
-                const newHistory = prev.slice(0, historyIndex + 1);
-                newHistory.push(newContent);
+    // History management
+    const addToHistory = useCallback((newContent: string) => {
+        setHistory(prev => {
+            const newHistory = prev.slice(0, historyIndex + 1);
+            newHistory.push(newContent);
+            if (newHistory.length > 50) newHistory.shift();
+            return newHistory;
+        });
+        setHistoryIndex(prev => Math.min(prev + 1, 49));
+    }, [historyIndex]);
 
-                // Limit history size
-                if (newHistory.length > 100) {
-                    return newHistory.slice(newHistory.length - 100);
-                }
-                return newHistory;
-            });
-            setHistoryIndex(prev => prev + 1);
-        }, 500);
-    }, [history, historyIndex]);
+    // Content change handler
+    const handleContentChange = useCallback((newContent: string) => {
+        setContent(newContent);
+        setIsSaved(false);
+        onChange?.(newContent);
+        addToHistory(newContent);
+    }, [onChange, addToHistory]);
 
-    // Undo/redo functions
+    // Undo/Redo
     const canUndo = historyIndex > 0;
     const canRedo = historyIndex < history.length - 1;
 
     const handleUndo = useCallback(() => {
-        if (!canUndo) return;
-        const newIndex = historyIndex - 1;
-        const previousContent = history[newIndex];
-
-        setHistoryIndex(newIndex);
-        setContent(previousContent);
-
-        // Notify parent of the change
-        onChange?.(previousContent);
-    }, [canUndo, history, historyIndex, onChange]);
+        if (canUndo) {
+            const newIndex = historyIndex - 1;
+            const newContent = history[newIndex];
+            setContent(newContent);
+            setHistoryIndex(newIndex);
+            onChange?.(newContent);
+        }
+    }, [canUndo, historyIndex, history, onChange]);
 
     const handleRedo = useCallback(() => {
-        if (!canRedo) return;
-        const newIndex = historyIndex + 1;
-        const nextContent = history[newIndex];
+        if (canRedo) {
+            const newIndex = historyIndex + 1;
+            const newContent = history[newIndex];
+            setContent(newContent);
+            setHistoryIndex(newIndex);
+            onChange?.(newContent);
+        }
+    }, [canRedo, historyIndex, history, onChange]);
 
-        setHistoryIndex(newIndex);
-        setContent(nextContent);
+    // Text manipulation helpers
+    const insertAtCursor = useCallback((text: string) => {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
 
-        // Notify parent of the change
-        onChange?.(nextContent);
-    }, [canRedo, history, historyIndex, onChange]);
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const newContent = content.slice(0, start) + text + content.slice(end);
 
-    // Handle content change
-    const handleChange = useCallback((newContent: string) => {
-        setContent(newContent);
-        setIsSaved(false);
+        handleContentChange(newContent);
 
-        // Notify parent
-        onChange?.(newContent);
+        setTimeout(() => {
+            textarea.selectionStart = textarea.selectionEnd = start + text.length;
+            textarea.focus();
+        }, 0);
+    }, [content, handleContentChange]);
 
-        // Add to history for undo/redo
-        addToHistory(newContent);
+    const wrapSelection = useCallback((prefix: string, suffix: string) => {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
 
-        // Update metrics
-        calculateMetrics(newContent);
-    }, [onChange, addToHistory, calculateMetrics]);
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const selectedText = content.slice(start, end);
+        const replacement = prefix + selectedText + suffix;
 
-    // Initial calculation of metrics
-    useEffect(() => {
-        calculateMetrics(content);
-    }, []);
+        const newContent = content.slice(0, start) + replacement + content.slice(end);
+        handleContentChange(newContent);
 
-    // Handle save function
+        setTimeout(() => {
+            textarea.selectionStart = start + prefix.length;
+            textarea.selectionEnd = start + prefix.length + selectedText.length;
+            textarea.focus();
+        }, 0);
+    }, [content, handleContentChange]);
+
+    // Basic markdown action handlers
+    const handleBold = useCallback(() => wrapSelection('**', '**'), [wrapSelection]);
+    const handleItalic = useCallback(() => wrapSelection('*', '*'), [wrapSelection]);
+    const handleCode = useCallback(() => wrapSelection('`', '`'), [wrapSelection]);
+    const handleLink = useCallback(() => wrapSelection('[', '](url)'), [wrapSelection]);
+    const handleImage = useCallback(() => wrapSelection('![', '](url)'), [wrapSelection]);
+    const handleQuote = useCallback(() => insertAtCursor('\n> '), [insertAtCursor]);
+    const handleBulletList = useCallback(() => insertAtCursor('\n- '), [insertAtCursor]);
+    const handleNumberedList = useCallback(() => insertAtCursor('\n1. '), [insertAtCursor]);
+    const handleHeading1 = useCallback(() => insertAtCursor('\n# '), [insertAtCursor]);
+    const handleHeading2 = useCallback(() => insertAtCursor('\n## '), [insertAtCursor]);
+    const handleHeading3 = useCallback(() => insertAtCursor('\n### '), [insertAtCursor]);
+
+    // CUM modal handlers
+    const handleCUMButton = useCallback(() => openModal('button'), [openModal]);
+    const handleCUMAlert = useCallback(() => openModal('alert'), [openModal]);
+    const handleCUMEmbed = useCallback(() => openModal('embed'), [openModal]);
+
+    // Modal insertion handler
+    const handleModalInsert = useCallback((markdown: string) => {
+        insertAtCursor(`\n${markdown}\n`);
+    }, [insertAtCursor]);
+
+    // Save handler
     const handleSave = useCallback(() => {
         onSave?.(content);
         setIsSaved(true);
-        setLastSaved(new Date());
-        setStatusMessage('Document saved');
-        setTimeout(() => setStatusMessage(null), 3000);
     }, [content, onSave]);
 
-    // Handle export function
+    // Export handler
     const handleExport = useCallback(() => {
-        if (onExport) {
-            onExport(content);
-        } else {
-            // Default export implementation
-            const element = document.createElement('a');
-            const file = new Blob([content], {type: 'text/markdown'});
-            element.href = URL.createObjectURL(file);
-            element.download = `document_${new Date().toISOString().slice(0, 10)}.md`;
-            document.body.appendChild(element);
-            element.click();
-            document.body.removeChild(element);
-        }
+        onExport?.(content);
     }, [content, onExport]);
 
-    // Formatting helpers
-    const insertFormat = useCallback((prefix: string, suffix: string = '') => {
-        if (!textareaRef.current) return;
-
+    // AI helper functions
+    const getContextForAI = useCallback(() => {
         const textarea = textareaRef.current;
+        if (!textarea) return content;
+
         const start = textarea.selectionStart;
         const end = textarea.selectionEnd;
-        const selectedText = content.substring(start, end);
 
-        // If no selection, just insert prefix+suffix and place cursor in between
-        if (start === end) {
-            const newContent =
-                content.substring(0, start) +
-                prefix + suffix +
-                content.substring(end);
-
-            handleChange(newContent);
-
-            // Set cursor position between prefix and suffix
-            setTimeout(() => {
-                textarea.focus();
-                textarea.selectionStart = start + prefix.length;
-                textarea.selectionEnd = start + prefix.length;
-            }, 0);
-        } else {
-            // Wrap selected text
-            const newContent =
-                content.substring(0, start) +
-                prefix + selectedText + suffix +
-                content.substring(end);
-
-            handleChange(newContent);
-
-            // Maintain selection with formatting
-            setTimeout(() => {
-                textarea.focus();
-                textarea.selectionStart = start + prefix.length;
-                textarea.selectionEnd = start + prefix.length + selectedText.length;
-            }, 0);
+        if (start !== end) {
+            return content.slice(start, end);
         }
-    }, [content, handleChange]);
 
-    // Format handlers
-    const handleBold = useCallback(() => insertFormat('**', '**'), [insertFormat]);
-    const handleItalic = useCallback(() => insertFormat('_', '_'), [insertFormat]);
-    const handleLink = useCallback(() => insertFormat('[', '](url)'), [insertFormat]);
-    const handleImage = useCallback(() => insertFormat('![', '](url)'), [insertFormat]);
-    const handleCode = useCallback(() => insertFormat('`', '`'), [insertFormat]);
-    const handleHeading1 = useCallback(() => insertFormat('# '), [insertFormat]);
-    const handleHeading2 = useCallback(() => insertFormat('## '), [insertFormat]);
-    const handleHeading3 = useCallback(() => insertFormat('### '), [insertFormat]);
-    const handleQuote = useCallback(() => insertFormat('> '), [insertFormat]);
-    const handleBulletList = useCallback(() => insertFormat('- '), [insertFormat]);
-    const handleNumberedList = useCallback(() => insertFormat('1. '), [insertFormat]);
+        const lines = content.split('\n');
+        const position = start;
+        let currentPos = 0;
+        let lineIndex = 0;
 
-    // Handle keyboard shortcuts
+        for (let i = 0; i < lines.length; i++) {
+            if (currentPos + lines[i].length >= position) {
+                lineIndex = i;
+                break;
+            }
+            currentPos += lines[i].length + 1;
+        }
+
+        const startLine = Math.max(0, lineIndex - 2);
+        const endLine = Math.min(lines.length, lineIndex + 3);
+        return lines.slice(startLine, endLine).join('\n');
+    }, [content]);
+
+    const handleApplyAIContent = useCallback((text: string) => {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+
+        let newContent;
+        let newCursorPos;
+
+        if (start !== end) {
+            newContent = content.slice(0, start) + text + content.slice(end);
+            newCursorPos = start + text.length;
+        } else {
+            newContent = content.slice(0, start) + text + content.slice(start);
+            newCursorPos = start + text.length;
+        }
+
+        handleContentChange(newContent);
+
+        setTimeout(() => {
+            textarea.focus();
+            textarea.selectionStart = newCursorPos;
+            textarea.selectionEnd = newCursorPos;
+        }, 0);
+    }, [content, handleContentChange]);
+
+    const handleGenerateAI = useCallback(() => {
+        if (!enableAI || !ai) return;
+
+        const contextText = getContextForAI();
+
+        if (!contextText.trim()) {
+            return;
+        }
+
+        ai.generateCompletion({
+            type: ai.state.completionType,
+            content: contextText,
+            customPrompt: ai.state.customPrompt,
+            options: {
+                temperature: ai.state.temperature
+            }
+        }).catch(error => {
+            console.error('Error generating AI content:', error);
+        });
+    }, [enableAI, ai, getContextForAI]);
+
+    // Keyboard shortcuts
     const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         // Save shortcut: Ctrl+S
         if (e.ctrlKey && e.key === 's') {
@@ -330,110 +362,17 @@ export default function MarkdownEditor({
         enableAI, ai
     ]);
 
-    // Handle selection change
-    const handleSelect = useCallback((e: React.SyntheticEvent<HTMLTextAreaElement>) => {
-        const target = e.currentTarget;
-        setSelection({
-            start: target.selectionStart,
-            end: target.selectionEnd
-        });
-    }, []);
+    // Render markdown using our NEW renderer
+    console.log('=== DEBUGGING MARKDOWN ===');
+    debugMarkdown(); // Shows what rules are registered
+    const tokens = parseMarkdown(content);
+    console.log('Tokens created:', tokens);
+    const renderedHtml = renderMarkdown(content);
 
-    // Utility to extract relevant content for AI processing
-    const getContextForAI = useCallback(() => {
-        if (!textareaRef.current) return '';
-
-        const textarea = textareaRef.current;
-        const selectedText = content.substring(textarea.selectionStart, textarea.selectionEnd);
-
-        // If there's a selection, use that
-        if (selectedText.trim()) {
-            return selectedText;
-        }
-
-        // No selection - get context around cursor
-        const cursorPos = textarea.selectionStart;
-
-        // Get a reasonable amount of context around cursor
-        // (up to 2000 chars - 1000 before, 1000 after)
-        const contextStart = Math.max(0, cursorPos - 1000);
-        const contextEnd = Math.min(content.length, cursorPos + 1000);
-
-        return content.substring(contextStart, contextEnd);
-    }, [content]);
-
-    // Apply AI-generated content
-    const handleApplyAIContent = useCallback((text: string) => {
-        if (!textareaRef.current) return;
-
-        const textarea = textareaRef.current;
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-
-        // If there's a selection, replace it
-        if (start !== end) {
-            const newContent =
-                content.substring(0, start) +
-                text +
-                content.substring(end);
-
-            handleChange(newContent);
-        } else {
-            // No selection, insert at cursor
-            const newContent =
-                content.substring(0, start) +
-                text +
-                content.substring(start);
-
-            handleChange(newContent);
-        }
-
-        // Close the AI panel
-        ai?.closeAssistant();
-
-        // Show success message
-        setStatusMessage('AI content applied');
-        setTimeout(() => setStatusMessage(null), 3000);
-
-        // Focus back on editor
-        setTimeout(() => {
-            textarea.focus();
-            const newCursorPos = start + text.length;
-            textarea.selectionStart = newCursorPos;
-            textarea.selectionEnd = newCursorPos;
-        }, 0);
-    }, [content, handleChange, ai]);
-
-    // Generate AI content
-    const handleGenerateAI = useCallback(() => {
-        if (!enableAI || !ai) return;
-
-        const contextText = getContextForAI();
-
-        if (!contextText.trim()) {
-            setStatusMessage('Please select text or position cursor in content');
-            setTimeout(() => setStatusMessage(null), 3000);
-            return;
-        }
-
-        ai.generateCompletion({
-            type: ai.state.completionType,
-            content: contextText,
-            customPrompt: ai.state.customPrompt,
-            options: {
-                temperature: ai.state.temperature
-            }
-        }).catch(error => {
-            console.error('Error generating AI content:', error);
-            setStatusMessage('Error generating AI content');
-            setTimeout(() => setStatusMessage(null), 3000);
-        });
-    }, [enableAI, ai, getContextForAI]);
-
-    // Create toolbar groups for MarkdownToolbar
+    // Create clean toolbar structure
     const toolbarGroups: ToolbarGroup[] = [
         {
-            name: 'format',
+            name: 'Formatting',
             actions: [
                 {
                     icon: <Bold size={16}/>,
@@ -448,6 +387,11 @@ export default function MarkdownEditor({
                     shortcut: 'Ctrl+I',
                 },
                 {
+                    icon: <Code size={16}/>,
+                    label: 'Code',
+                    onClick: handleCode,
+                },
+                {
                     icon: <Link size={16}/>,
                     label: 'Link',
                     onClick: handleLink,
@@ -456,7 +400,7 @@ export default function MarkdownEditor({
             ],
         },
         {
-            name: 'content',
+            name: 'Structure',
             actions: [
                 {
                     icon: <List size={16}/>,
@@ -474,11 +418,6 @@ export default function MarkdownEditor({
                     onClick: handleQuote,
                 },
                 {
-                    icon: <Code size={16}/>,
-                    label: 'Inline Code',
-                    onClick: handleCode,
-                },
-                {
                     icon: <Image size={16}/>,
                     label: 'Image',
                     onClick: handleImage,
@@ -487,7 +426,7 @@ export default function MarkdownEditor({
         },
     ];
 
-    // Create toolbar dropdowns for MarkdownToolbar
+    // Create toolbar dropdowns with CUM extensions
     const toolbarDropdowns: ToolbarDropdown[] = [
         {
             name: 'Headings',
@@ -515,9 +454,34 @@ export default function MarkdownEditor({
         },
     ];
 
+    // Add CUM Extensions dropdown if enabled
+    if (enableCUM) {
+        toolbarDropdowns.push({
+            name: 'CUM Extensions',
+            icon: <Zap size={16}/>,
+            actions: [
+                {
+                    icon: <Zap size={16}/>,
+                    label: 'Button',
+                    onClick: handleCUMButton,
+                },
+                {
+                    icon: <Zap size={16}/>,
+                    label: 'Alert',
+                    onClick: handleCUMAlert,
+                },
+                {
+                    icon: <Zap size={16}/>,
+                    label: 'Embed',
+                    onClick: handleCUMEmbed,
+                },
+            ],
+        });
+    }
+
     return (
-        <div className={`border rounded-md shadow-sm bg-background ${className}`}>
-            {/* Use MarkdownToolbar component */}
+        <div className={`flex flex-col border rounded-md shadow-sm bg-background ${className}`}>
+            {/* Toolbar */}
             <MarkdownToolbar
                 groups={toolbarGroups}
                 dropdowns={toolbarDropdowns}
@@ -526,64 +490,100 @@ export default function MarkdownEditor({
                 onUndo={handleUndo}
                 onRedo={handleRedo}
                 onSave={onSave ? handleSave : undefined}
-                onExport={handleExport}
+                onExport={onExport ? handleExport : undefined}
                 viewMode={view}
                 onViewModeChange={(mode: 'edit' | 'preview' | 'split') => setView(mode)}
-                onAIAssist={enableAI && ai ? () => ai.openAssistant(AICompletionType.COMPLETE) : undefined}
+                onAIAssist={enableAI && ai ? () => ai.openAssistant?.(AICompletionType.COMPLETE) : undefined}
                 enableAI={enableAI}
+                onBold={handleBold}
+                onItalic={handleItalic}
+                onLink={handleLink}
+                onHeading1={handleHeading1}
+                onHeading2={handleHeading2}
+                onHeading3={handleHeading3}
+                onBulletList={handleBulletList}
+                onNumberedList={handleNumberedList}
+                onQuote={handleQuote}
+                onCode={handleCode}
+                onImage={handleImage}
             />
 
             {/* Editor content */}
-            <div className="flex" style={{height}}>
+            <div className="flex flex-1" style={{height}}>
                 {/* Edit mode */}
                 {(view === 'edit' || view === 'split') && (
-                    <div className={`${view === 'split' ? 'w-1/2 border-r' : 'w-full'}`}>
+                    <div className={`flex flex-col ${view === 'split' ? 'w-1/2 border-r' : 'w-full'}`}>
             <textarea
                 ref={textareaRef}
                 value={content}
-                onChange={(e) => handleChange(e.target.value)}
-                onSelect={handleSelect}
+                onChange={(e) => handleContentChange(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={placeholder}
-                className="w-full h-full p-4 font-mono text-sm border-0 bg-background focus-visible:ring-0 focus-visible:outline-none resize-none"
-                spellCheck="false"
-                autoFocus={autoFocus}
+                className="flex-1 resize-none border-0 rounded-none focus:outline-none font-mono text-sm p-4 bg-transparent"
                 readOnly={readOnly}
+                maxLength={maxLength}
             />
                     </div>
                 )}
 
-                {/* Preview mode - using RenderMarkdown component */}
+                {/* Preview mode */}
                 {(view === 'preview' || view === 'split') && (
-                    <div className={`${view === 'split' ? 'w-1/2' : 'w-full'} overflow-auto p-4`}>
-                        <RenderMarkdown>{content}</RenderMarkdown>
+                    <div className={`flex flex-col overflow-auto ${view === 'split' ? 'w-1/2' : 'w-full'}`}>
+                        <div className="flex-1 p-4">
+                            <div
+                                className="prose max-w-none prose-img:my-4 prose-headings:mt-6 prose-headings:mb-4 prose-p:mb-4 prose-pre:my-4 prose-blockquote:my-4"
+                                dangerouslySetInnerHTML={{__html: renderedHtml}}
+                                suppressHydrationWarning
+                            />
+                        </div>
                     </div>
                 )}
             </div>
 
-            {/* Status bar */}
+            {/* Status bar with your updated styling */}
             <div
                 className="flex items-center justify-between h-6 px-3 py-1 text-xs text-muted-foreground border-t bg-muted/20">
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center gap-4">
                     <span>{wordCount} words</span>
                     <span>{charCount} characters</span>
+                    {maxLength && (
+                        <Badge variant={charCount > maxLength * 0.9 ? 'destructive' : 'secondary'}>
+                            {charCount}/{maxLength}
+                        </Badge>
+                    )}
+                    {!isSaved && <Badge variant="outline">Unsaved</Badge>}
                 </div>
 
-                {statusMessage && (
-                    <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center">
-                        {isSaved && <span className="text-green-500 mr-1">●</span>}
-                        <span>{statusMessage}</span>
-                    </div>
-                )}
-
-                <div className="flex items-center">
-                    {lastSaved && (
-                        <span>
-              Saved {lastSaved.toLocaleTimeString()}
-            </span>
+                <div className="flex items-center gap-2">
+                    {enableCUM && (
+                        <Badge variant="outline" className="text-xs">
+                            CUM Enabled
+                        </Badge>
                     )}
+                    <span className="capitalize">{view} mode</span>
                 </div>
             </div>
+
+            {/* CUM Modals */}
+            {enableCUM && (
+                <>
+                    <CUMButtonModal
+                        isOpen={modals.buttonModal}
+                        onClose={() => closeModal('button')}
+                        onInsert={handleModalInsert}
+                    />
+                    <CUMAlertModal
+                        isOpen={modals.alertModal}
+                        onClose={() => closeModal('alert')}
+                        onInsert={handleModalInsert}
+                    />
+                    <CUMEmbedModal
+                        isOpen={modals.embedModal}
+                        onClose={() => closeModal('embed')}
+                        onInsert={handleModalInsert}
+                    />
+                </>
+            )}
 
             {/* AI Assistant Panel */}
             {enableAI && ai && (
@@ -609,4 +609,4 @@ export default function MarkdownEditor({
             )}
         </div>
     );
-}
+};
