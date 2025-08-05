@@ -26,3 +26,4 @@
 - [ ] do stuff with the syncCommit and syncCommitMetadata (no ideas what I could do as of writing)
 - [x] extend markdown with custom elements (perhaps, can call it Changerawr Universal Markdown engine) - CUM
 - [x] allow for importing a full changelog.md into changerawr to jump-start a project from existing data. look into canny importing as well.
+- [ ] add a configuration option for project email notifications to allow emails to be sent out on publish
