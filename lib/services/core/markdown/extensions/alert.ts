@@ -12,7 +12,7 @@ export const AlertExtension: Extension = {
             name: 'alert',
             pattern: /:::(\w+)(?:\s+(.*?))?\s*\n([\s\S]*?)\n:::/, // REMOVED the 'g' flag
             render: (match: RegExpMatchArray) => {
-                console.log('Alert match found:', match);
+                // console.log('Alert match found:', match);
                 return {
                     type: 'alert',
                     content: match[3].trim(),

@@ -54,23 +54,32 @@ export class MarkdownRenderer {
     }
 
     addRule(rule: RenderRule): void {
-        console.log(`Adding render rule for type: ${rule.type}`);
+        if (process.env.NODE_ENV === 'development') {
+            console.log(`Adding render rule for type: ${rule.type}`);
+        }
         this.rules.set(rule.type, rule);
     }
 
     render(tokens: MarkdownToken[]): string {
-        console.log('🎨 Rendering tokens:', tokens.map(t => `${t.type}: ${t.raw?.substring(0, 30)}`));
+        if (process.env.NODE_ENV === 'development') {
+            console.log('🎨 Rendering tokens:', tokens.map(t => `${t.type}: ${t.raw?.substring(0, 30)}`));
+        }
 
         // Render each token
         const htmlParts = tokens.map(token => this.renderToken(token));
         const combinedHtml = htmlParts.join('');
 
-        console.log('🎨 Combined HTML length before sanitization:', combinedHtml.length);
+        if (process.env.NODE_ENV === 'development') {
+            console.log('🎨 Combined HTML length before sanitization:', combinedHtml.length);
+        }
 
         // Apply minimal sanitization
         const sanitizedHtml = this.minimalSanitize(combinedHtml);
 
-        console.log('🎨 Final HTML length after sanitization:', sanitizedHtml.length);
+        if (process.env.NODE_ENV === 'development') {
+            console.log('🎨 Final HTML length after sanitization:', sanitizedHtml.length);
+        }
+
         return sanitizedHtml;
     }
 
@@ -78,10 +87,14 @@ export class MarkdownRenderer {
         const rule = this.rules.get(token.type);
 
         if (rule) {
-            console.log(`🎨 Rendering token type '${token.type}' with registered rule`);
+            if (process.env.NODE_ENV === 'development') {
+                console.log(`🎨 Rendering token type '${token.type}' with registered rule`);
+            }
             try {
                 const result = rule.render(token);
-                console.log(`🎨 Rule output length: ${result.length}`);
+                if (process.env.NODE_ENV === 'development') {
+                    console.log(`🎨 Rule output length: ${result.length}`);
+                }
                 return result;
             } catch (error) {
                 console.error(`🎨 Error rendering token ${token.type}:`, error);
@@ -90,7 +103,9 @@ export class MarkdownRenderer {
         }
 
         // Enhanced fallback with better debugging
-        console.warn(`🎨 No render rule found for token type: '${token.type}'. Available rules:`, Array.from(this.rules.keys()));
+        if (process.env.NODE_ENV === 'development') {
+            console.warn(`🎨 No render rule found for token type: '${token.type}'. Available rules:`, Array.from(this.rules.keys()));
+        }
 
         // For text tokens, just return the content
         if (token.type === 'text') {
@@ -317,7 +332,9 @@ export class MarkdownRenderer {
         try {
             // Skip sanitization entirely for embed content in debug mode
             if (html.includes('codepen.io/') || html.includes('youtube.com/embed/') || html.includes('🚨 DEBUG')) {
-                console.log('🚨 SKIPPING SANITIZATION for embed content');
+                if (process.env.NODE_ENV === 'development') {
+                    console.log('🚨 SKIPPING SANITIZATION for embed content');
+                }
                 return html;
             }
 
@@ -349,11 +366,13 @@ export class MarkdownRenderer {
                 });
 
                 if (sanitized.length < html.length * 0.7) {
-                    console.warn('🚨 MAJOR content loss during sanitization! Falling back to basic sanitization');
-                    console.log('Original length:', html.length);
-                    console.log('Sanitized length:', sanitized.length);
-                    console.log('Original HTML sample:', html.substring(0, 200));
-                    console.log('Sanitized HTML sample:', sanitized.substring(0, 200));
+                    if (process.env.NODE_ENV === 'development') {
+                        console.warn('🚨 MAJOR content loss during sanitization! Falling back to basic sanitization');
+                        console.log('Original length:', html.length);
+                        console.log('Sanitized length:', sanitized.length);
+                        console.log('Original HTML sample:', html.substring(0, 200));
+                        console.log('Sanitized HTML sample:', sanitized.substring(0, 200));
+                    }
 
                     // Fall back to basic sanitization if too much content is lost
                     return this.basicSanitize(html);

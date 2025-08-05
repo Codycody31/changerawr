@@ -10,7 +10,7 @@ export const EmbedExtension: Extension = {
             name: 'embed',
             pattern: /\[embed:(\w+)\]\(([^)]+)\)(?:\{([^}]+)\})?/,
             render: (match) => {
-                console.log('🎬 Embed match found:', match);
+                // console.log('🎬 Embed match found:', match);
                 return {
                     type: 'embed',
                     content: match[2], // URL
@@ -32,7 +32,7 @@ export const EmbedExtension: Extension = {
                 const url = token.attributes?.url || '';
                 const options = token.attributes?.options || '';
 
-                console.log(`🎬 Rendering embed: ${provider} - ${url}`);
+                // console.log(`🎬 Rendering embed: ${provider} - ${url}`);
                 const html = renderEmbed(provider, url, options);
 
                 if (DEBUG_EMBEDS) {
@@ -146,7 +146,7 @@ function renderCodePenEmbed(url: string, options: Record<string, string>, classe
     }
 
     const [, user, penId] = match;
-    console.log(`🎨 CodePen: user=${user}, penId=${penId}`);
+    // console.log(`🎨 CodePen: user=${user}, penId=${penId}`);
 
     const height = options.height || '400';
     const theme = options.theme === 'light' ? 'light' : 'dark';
@@ -160,7 +160,7 @@ function renderCodePenEmbed(url: string, options: Record<string, string>, classe
     });
 
     const embedUrl = `https://codepen.io/${user}/embed/${penId}?${embedParams.toString()}`;
-    console.log(`🎨 CodePen embed URL: ${embedUrl}`);
+    // console.log(`🎨 CodePen embed URL: ${embedUrl}`);
 
     // CodePen requires specific iframe attributes for proper embedding
     return `

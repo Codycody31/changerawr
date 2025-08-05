@@ -28,23 +28,23 @@ export class ChangerawrMarkdown {
         this.parser.setupDefaultRulesIfEmpty();
 
         // Debug: Log registered rules
-        console.log('Parser rules:', this.parser.rules?.map(r => r.name) || 'rules not accessible');
-        console.log('Renderer rules:', this.renderer.getRegisteredRules());
+        // console.log('Parser rules:', this.parser.rules?.map(r => r.name) || 'rules not accessible');
+        // console.log('Renderer rules:', this.renderer.getRegisteredRules());
     }
 
     registerExtension(extension: Extension): void {
-        console.log(`Registering extension: ${extension.name}`);
+        // console.log(`Registering extension: ${extension.name}`);
         this.extensions.set(extension.name, extension);
 
         // Add parse rules to parser FIRST
         extension.parseRules.forEach(rule => {
-            console.log(`Adding parse rule: ${rule.name} with pattern: ${rule.pattern}`);
+            // console.log(`Adding parse rule: ${rule.name} with pattern: ${rule.pattern}`);
             this.parser.addRule(rule);
         });
 
         // Add render rules to renderer
         extension.renderRules.forEach(rule => {
-            console.log(`Adding render rule: ${rule.type}`);
+            // console.log(`Adding render rule: ${rule.type}`);
             this.renderer.addRule(rule);
         });
     }
@@ -91,14 +91,13 @@ export class ChangerawrMarkdown {
     }
 
     parse(markdown: string): MarkdownToken[] {
-        console.log('Parsing markdown in main class:', markdown.substring(0, 50));
-        const tokens = this.parser.parse(markdown);
-        console.log('Parsed tokens:', tokens.map(t => ({type: t.type, content: t.content?.substring(0, 30)})));
-        return tokens;
+        // console.log('Parsing markdown in main class:', markdown.substring(0, 50));
+        // console.log('Parsed tokens:', tokens.map(t => ({type: t.type, content: t.content?.substring(0, 30)})));
+        return this.parser.parse(markdown);
     }
 
     render(tokens: MarkdownToken[]): string {
-        console.log('Rendering tokens in main class:', tokens.map(t => t.type));
+        // console.log('Rendering tokens in main class:', tokens.map(t => t.type));
         return this.renderer.render(tokens);
     }
 

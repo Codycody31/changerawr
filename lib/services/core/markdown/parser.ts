@@ -9,7 +9,7 @@ export class MarkdownParser {
     }
 
     addRule(rule: ParseRule): void {
-        console.log(`Adding rule: ${rule.name}`);
+        // console.log(`Adding rule: ${rule.name}`);
         this.rules.push(rule);
         // Sort by priority - put specific patterns first
         this.rules.sort((a, b) => {
@@ -19,15 +19,15 @@ export class MarkdownParser {
             // Then other rules
             return a.name.localeCompare(b.name);
         });
-        console.log('Rules order:', this.rules.map(r => r.name));
+        // console.log('Rules order:', this.rules.map(r => r.name));
     }
 
     setupDefaultRulesIfEmpty(): void {
         // Always ensure default rules are present
-        console.log('Ensuring default markdown rules are present...');
-        console.log('Current rules before default setup:', this.rules.map(r => r.name));
+        // console.log('Ensuring default markdown rules are present...');
+        // console.log('Current rules before default setup:', this.rules.map(r => r.name));
         this.setupDefaultRules();
-        console.log('Current rules after default setup:', this.rules.map(r => r.name));
+        // console.log('Current rules after default setup:', this.rules.map(r => r.name));
     }
 
     parse(markdown: string): MarkdownToken[] {
@@ -37,8 +37,8 @@ export class MarkdownParser {
         // Ensure we have some rules
         this.setupDefaultRulesIfEmpty();
 
-        console.log('Parsing markdown:', markdown.substring(0, 100));
-        console.log('Available rules:', this.rules.map(r => r.name));
+        // console.log('Parsing markdown:', markdown.substring(0, 100));
+        // console.log('Available rules:', this.rules.map(r => r.name));
 
         // Pre-process markdown to handle common issues
         const processedMarkdown = this.preprocessMarkdown(markdown);
@@ -92,7 +92,7 @@ export class MarkdownParser {
 
                 // Process the match
                 try {
-                    console.log(`Rule "${rule.name}" matched:`, match[0].substring(0, 50));
+                    // console.log(`Rule "${rule.name}" matched:`, match[0].substring(0, 50));
                     const token = rule.render(match);
                     tokens.push({
                         ...token,
@@ -135,8 +135,8 @@ export class MarkdownParser {
         // Post-process tokens to merge consecutive text and validate structure
         const processedTokens = this.postProcessTokens(tokens);
 
-        console.log('Final tokens:', processedTokens.slice(0, 10).map(t => `${t.type}: ${t.raw?.substring(0, 30)}`));
-        console.log(`Total tokens: ${processedTokens.length}`);
+        // console.log('Final tokens:', processedTokens.slice(0, 10).map(t => `${t.type}: ${t.raw?.substring(0, 30)}`));
+        // console.log(`Total tokens: ${processedTokens.length}`);
 
         if (this.warnings.length > 0) {
             console.warn('Parser warnings:', this.warnings);
