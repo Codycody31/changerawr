@@ -4,7 +4,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.0.4] - 2025-07-20
+## [1.0.4] - 2025-08-06
 
 :::warning
 There are no breaking changes in this release.
@@ -20,6 +20,7 @@ Provides a better experience overall, improving the parsing engine, adding token
 - **Updated Projects Fetch Pagination** - Updated the default fetch for projects to 50 entries when listing.
 - **Redesigned Main Dashboard** - Redesigned the dashboard at (/dashboard), it needed a facelift and has been the same since 0.3.0 :(
 - **Content Editor Upgrades** - Introduces the CUM ( Changerawr Universal Markdown ) rendering engine for a better changelog experience.
+- **Improved Modal UI** - Added depth and optical borders to the modal UI. Also adds a "disableClose" prop for the rare case in which Changerawr is doing something and needs to let you know of it's progress.
 
 ## [1.0.3] - 2025-07-02
 
