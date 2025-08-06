@@ -26,6 +26,33 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Show build info
+        run: |
+          IMAGE_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          
+          # Determine version
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            TRIGGER="Manual (workflow_dispatch)"
+          else
+            VERSION="${{ github.ref_name }}"
+            TRIGGER="Tag push"
+          fi
+          
+          echo "🚀 Docker Build Starting"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📦 Repository: ${{ github.repository }}"
+          echo "🏷️  Version: $VERSION"
+          echo "🎯 Trigger: $TRIGGER"
+          echo "🐳 Registry: ${{ env.REGISTRY }}"
+          echo ""
+          echo "📋 Will be tagged as:"
+          echo "   • ${{ env.REGISTRY }}/$IMAGE_NAME:$VERSION"
+          echo "   • ${{ env.REGISTRY }}/$IMAGE_NAME:latest"
+          echo ""
+          echo "🏗️  Platforms: linux/amd64, linux/arm64"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -48,12 +75,11 @@ jobs:
             VERSION="${{ github.ref_name }}"
           fi
           
-          # Clean version (remove 'v' prefix if present)
-          CLEAN_VERSION="${VERSION#v}"
+          # Keep version as-is (don't trim 'v' prefix)
           
           echo "image_name=$IMAGE_NAME" >> $GITHUB_OUTPUT
-          echo "version=$CLEAN_VERSION" >> $GITHUB_OUTPUT
-          echo "tags=${{ env.REGISTRY }}/$IMAGE_NAME:$CLEAN_VERSION,${{ env.REGISTRY }}/$IMAGE_NAME:latest" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tags=${{ env.REGISTRY }}/$IMAGE_NAME:$VERSION,${{ env.REGISTRY }}/$IMAGE_NAME:latest" >> $GITHUB_OUTPUT
 
       - name: Build and push
         uses: docker/build-push-action@v5
