@@ -1,191 +1,82 @@
-# .github/workflows/docker-build.yml
-
 name: Build and Push Docker Image
 
 on:
   push:
     tags:
       - 'v*'
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
-      tag_override:
-        description: 'Override tag (optional)'
-        required: false
+      version:
+        description: 'Version to build (e.g., v1.0.4)'
+        required: true
         type: string
-      force_build:
-        description: 'Force build even if repository is private'
-        required: false
-        type: boolean
-        default: false
 
 env:
   REGISTRY: ghcr.io
 
 jobs:
-  check-repository-visibility:
-    runs-on: ubuntu-latest
-    outputs:
-      is_public: ${{ steps.check.outputs.is_public }}
-      should_build: ${{ steps.check.outputs.should_build }}
-    steps:
-      - name: Check if repository is public
-        id: check
-        run: |
-          REPO_INFO=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}")
-          IS_PRIVATE=$(echo "$REPO_INFO" | jq -r '.private')
-          
-          if [ "$IS_PRIVATE" = "false" ]; then
-            echo "is_public=true" >> $GITHUB_OUTPUT
-            echo "should_build=true" >> $GITHUB_OUTPUT
-            echo "Repository is public - proceeding with Docker build"
-          elif [ "${{ github.event.inputs.force_build }}" = "true" ]; then
-            echo "is_public=false" >> $GITHUB_OUTPUT
-            echo "should_build=true" >> $GITHUB_OUTPUT
-            echo "Repository is private but force_build is enabled - proceeding with Docker build"
-          else
-            echo "is_public=false" >> $GITHUB_OUTPUT
-            echo "should_build=false" >> $GITHUB_OUTPUT
-            echo "Repository is private - skipping Docker build"
-          fi
-
   build-and-push:
-    needs: check-repository-visibility
-    if: needs.check-repository-visibility.outputs.should_build == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     permissions:
       contents: read
       packages: write
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Convert repository name to lowercase
-        id: repo
-        run: echo "name=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
-
-      - name: Set up QEMU (for ARM builds)
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: linux/arm64
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Container Registry
+      - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Determine version and tags
-        id: version
+      - name: Set image name and version
+        id: meta
         run: |
-          # Set defaults
-          VERSION="unknown"
-          REVISION="${{ github.sha }}"
-          BUILDTIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          IMAGE_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           
-          # Determine version from different sources
-          if [ -n "${{ github.event.inputs.tag_override }}" ]; then
-            VERSION="${{ github.event.inputs.tag_override }}"
-            TAGS="${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:${{ github.event.inputs.tag_override }}"
-          elif [ "${{ github.event_name }}" = "release" ] && [ -n "${{ github.event.release.tag_name }}" ]; then
-            VERSION="${{ github.event.release.tag_name }}"
-            # Remove 'v' prefix if present
-            CLEAN_VERSION="${VERSION#v}"
-            TAGS="${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:${CLEAN_VERSION},${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:latest"
-          elif [ "${{ github.ref_type }}" = "tag" ]; then
-            VERSION="${{ github.ref_name }}"
-            # Remove 'v' prefix if present
-            CLEAN_VERSION="${VERSION#v}"
-            TAGS="${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:${CLEAN_VERSION},${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:latest"
-          elif [ "${{ github.ref_name }}" = "main" ] || [ "${{ github.ref_name }}" = "master" ]; then
-            VERSION="latest"
-            TAGS="${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:latest"
+          # Determine version
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
           else
             VERSION="${{ github.ref_name }}"
-            TAGS="${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:${{ github.ref_name }}"
           fi
           
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "tags=${TAGS}" >> $GITHUB_OUTPUT
-          echo "buildtime=${BUILDTIME}" >> $GITHUB_OUTPUT
-          echo "revision=${REVISION}" >> $GITHUB_OUTPUT
+          # Clean version (remove 'v' prefix if present)
+          CLEAN_VERSION="${VERSION#v}"
           
-          echo "✅ Version: ${VERSION}"
-          echo "✅ Tags: ${TAGS}"
-          echo "✅ Build time: ${BUILDTIME}"
-          echo "✅ Revision: ${REVISION}"
+          echo "image_name=$IMAGE_NAME" >> $GITHUB_OUTPUT
+          echo "version=$CLEAN_VERSION" >> $GITHUB_OUTPUT
+          echo "tags=${{ env.REGISTRY }}/$IMAGE_NAME:$CLEAN_VERSION,${{ env.REGISTRY }}/$IMAGE_NAME:latest" >> $GITHUB_OUTPUT
 
-      - name: Build and push Docker image
+      - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.version.outputs.tags }}
-          labels: |
-            org.opencontainers.image.title=Changerawr
-            org.opencontainers.image.description=Ship, Change, Rawr 🦖 - Changelog management made cute and simple
-            org.opencontainers.image.vendor=Supernova3339
-            org.opencontainers.image.url=https://github.com/${{ github.repository }}
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.documentation=https://github.com/${{ github.repository }}#readme
-            org.opencontainers.image.version=${{ steps.version.outputs.version }}
-            org.opencontainers.image.revision=${{ steps.version.outputs.revision }}
-            org.opencontainers.image.created=${{ steps.version.outputs.buildtime }}
+          tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          build-args: |
-            BUILDTIME=${{ steps.version.outputs.buildtime }}
-            VERSION=${{ steps.version.outputs.version }}
-            REVISION=${{ steps.version.outputs.revision }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+            org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
 
-      - name: Generate image summary
+      - name: Summary
         run: |
-          echo "## Docker Image Built Successfully! 🦖" >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 Docker Image Built!" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`${{ env.REGISTRY }}/${{ steps.meta.outputs.image_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** \`${{ steps.meta.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Tags:** \`${{ steps.meta.outputs.version }}\`, \`latest\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
-          if [ "${{ needs.check-repository-visibility.outputs.is_public }}" = "false" ]; then
-            echo "⚠️ **Note:** Build was forced for private repository" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          echo "**Image:** \`${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Version:** \`${{ steps.version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Platform:** linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "${{ steps.version.outputs.tags }}" | tr ',' '\n' >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Pull Command:**" >> $GITHUB_STEP_SUMMARY
+          echo "**Pull:**" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-          echo "docker pull ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ${{ env.REGISTRY }}/${{ steps.meta.outputs.image_name }}:${{ steps.meta.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-
-  skip-build:
-    needs: check-repository-visibility
-    if: needs.check-repository-visibility.outputs.should_build == 'false'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Skip build notification
-        run: |
-          echo "## Build Skipped 🔒" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Docker image build was skipped because this repository is private." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**To enable Docker builds:**" >> $GITHUB_STEP_SUMMARY
-          echo "1. Make the repository public, or" >> $GITHUB_STEP_SUMMARY
-          echo "2. Run workflow manually with 'Force build' option enabled" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Repository:** \`${{ github.repository }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Trigger:** \`${{ github.event_name }}\`" >> $GITHUB_STEP_SUMMARY
