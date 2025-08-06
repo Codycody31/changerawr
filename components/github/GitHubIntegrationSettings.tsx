@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    Github,
     Settings,
     TestTube,
     CheckCircle,
@@ -14,6 +13,7 @@ import {
     Link,
     RefreshCw
 } from 'lucide-react';
+import {SiGithub} from '@icons-pack/react-simple-icons';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -295,7 +295,7 @@ export default function GitHubIntegrationSettings({ projectId }: { projectId: st
             {/* Header */}
             <div className="flex items-center gap-3">
                 <div className="p-2 bg-primary/10 rounded-lg">
-                    <Github className="h-5 w-5 text-primary" />
+                    <SiGithub className="h-5 w-5 text-primary" />
                 </div>
                 <div>
                     <h2 className="text-xl font-semibold">GitHub Integration</h2>

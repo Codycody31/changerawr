@@ -24,13 +24,13 @@ export async function GET(
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
 
     // Log full request details for comprehensive debugging
-    console.log('OAuth Callback Request Details:', {
-        url: request.url,
-        method: request.method,
-        headers: Object.fromEntries(request.headers),
-        params: params,
-        baseUrl
-    });
+    // console.log('OAuth Callback Request Details:', {
+    //     url: request.url,
+    //     method: request.method,
+    //     headers: Object.fromEntries(request.headers),
+    //     params: params,
+    //     baseUrl
+    // });
 
     try {
         const providerName = (await params).providerName;

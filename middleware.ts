@@ -1,8 +1,7 @@
-// middleware.ts
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
-import { verifyAccessToken } from '@/lib/auth/tokens'
-import { getAppDomain } from '@/lib/custom-domains/utils'
+import {NextResponse} from 'next/server'
+import type {NextRequest} from 'next/server'
+import {verifyAccessToken} from '@/lib/auth/tokens'
+import {getAppDomain} from '@/lib/custom-domains/utils'
 
 const ALWAYS_PUBLIC_PATHS = [
     '/_next/',
@@ -68,10 +67,10 @@ function handleCustomDomain(request: NextRequest, hostname: string, pathname: st
 }
 
 async function isSetupComplete(): Promise<boolean> {
-    const headers = new Headers({ 'x-middleware-check': 'true' })
+    const headers = new Headers({'x-middleware-check': 'true'})
     try {
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL
-        const response = await fetch(`${baseUrl}/api/check-setup`, { headers })
+        const response = await fetch(`${baseUrl}/api/check-setup`, {headers})
         if (!response.ok) return false
         const data = await response.json()
         return !!data.isComplete
@@ -81,7 +80,7 @@ async function isSetupComplete(): Promise<boolean> {
 }
 
 export async function middleware(request: NextRequest) {
-    const { pathname } = request.nextUrl
+    const {pathname} = request.nextUrl
     const hostname = request.headers.get('host') || ''
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -102,7 +101,7 @@ export async function middleware(request: NextRequest) {
             if (pathname.startsWith('/api/changelog/')) {
                 return NextResponse.next()
             }
-            return new NextResponse(null, { status: 404 })
+            return new NextResponse(null, {status: 404})
         }
 
         if (pathname === '/rss.xml') {
@@ -153,7 +152,8 @@ export async function middleware(request: NextRequest) {
                 if (userId) {
                     return NextResponse.redirect(new URL('/dashboard', request.url))
                 }
-            } catch {}
+            } catch {
+            }
         }
         return NextResponse.next()
     }

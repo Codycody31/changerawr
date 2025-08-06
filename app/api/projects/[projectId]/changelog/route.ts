@@ -68,7 +68,7 @@ export async function GET(
         const startDate = searchParams.get('startDate')
         const endDate = searchParams.get('endDate')
         const page = parseInt(searchParams.get('page') || '1')
-        const limit = parseInt(searchParams.get('limit') || '10')
+        const limit = parseInt(searchParams.get('limit') || '50')
         const skip = (page - 1) * limit
 
         // Log the changelog view attempt

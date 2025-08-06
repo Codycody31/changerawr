@@ -22,10 +22,10 @@ import {
     MailIcon,
     Rss,
     type LucideIcon,
-    Github,
     ChartNoAxesCombined,
     Globe
-} from 'lucide-react'
+} from 'lucide-react';
+import {SiGithub} from '@icons-pack/react-simple-icons';
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
@@ -461,7 +461,7 @@ export function ProjectSidebar({ projectId }: { projectId: string }) {
                         />
                         <NavItem
                             href={`/dashboard/projects/${projectId}/integrations/github`}
-                            icon={Github}
+                            icon={SiGithub}
                             label="GitHub"
                             active={pathname.includes(`/dashboard/projects/${projectId}/integrations/github`)}
                         />

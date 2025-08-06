@@ -1,7 +1,7 @@
-import { NextResponse } from 'next/server'
+import {NextResponse} from 'next/server'
 import {cookies, headers} from 'next/headers'
-import { verifyAccessToken } from '@/lib/auth/tokens'
-import { db } from '@/lib/db'
+import {verifyAccessToken} from '@/lib/auth/tokens'
+import {db} from '@/lib/db'
 
 /**
  * @method GET
@@ -30,7 +30,7 @@ export async function GET() {
             const apiKey = authHeader.substring(7);
 
             // Log the received API key for debugging
-            console.log('Received API key:', apiKey);
+            // console.log('Received API key:', apiKey);
 
             // First, let's check if the key exists at all ( used for debugging )
             // const checkKey = await db.apiKey.findFirst({
@@ -46,8 +46,8 @@ export async function GET() {
                 where: {
                     key: apiKey,
                     OR: [
-                        { expiresAt: null },
-                        { expiresAt: { gt: new Date() } }
+                        {expiresAt: null},
+                        {expiresAt: {gt: new Date()}}
                     ],
                     isRevoked: false
                 }
@@ -57,13 +57,13 @@ export async function GET() {
                 return NextResponse.json({
                     error: 'Invalid API key',
                     details: 'Key not found or invalid'
-                }, { status: 401 });
+                }, {status: 401});
             }
 
             // Update last used timestamp
             await db.apiKey.update({
-                where: { id: validApiKey.id },
-                data: { lastUsed: new Date() }
+                where: {id: validApiKey.id},
+                data: {lastUsed: new Date()}
             });
 
             // Return admin user data for API keys
@@ -80,18 +80,18 @@ export async function GET() {
         const accessToken = cookieStore.get('accessToken')?.value;
 
         if (!accessToken) {
-            return NextResponse.json({ error: 'No token' }, { status: 401 });
+            return NextResponse.json({error: 'No token'}, {status: 401});
         }
 
         // Verify token
         const userId = await verifyAccessToken(accessToken);
         if (!userId) {
-            return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+            return NextResponse.json({error: 'Invalid token'}, {status: 401});
         }
 
         // Fetch user data
         const user = await db.user.findUnique({
-            where: { id: userId },
+            where: {id: userId},
             select: {
                 id: true,
                 email: true,
@@ -101,12 +101,12 @@ export async function GET() {
         });
 
         if (!user) {
-            return NextResponse.json({ error: 'User not found' }, { status: 404 });
+            return NextResponse.json({error: 'User not found'}, {status: 404});
         }
 
         return NextResponse.json(user);
     } catch (error) {
         console.error('Authentication error:', error);
-        return NextResponse.json({ error: 'Authentication failed' }, { status: 500 });
+        return NextResponse.json({error: 'Authentication failed'}, {status: 500});
     }
 }

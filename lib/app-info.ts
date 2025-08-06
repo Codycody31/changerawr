@@ -5,7 +5,7 @@
 
 export const appInfo = {
     name: 'Changerawr',
-    version: '1.0.3',
+    version: '1.0.4',
     status: 'Stable',
     environment: process.env.NODE_ENV || 'development',
     license: 'Sponsorware',
@@ -13,6 +13,7 @@ export const appInfo = {
 
     framework: 'Next.js App Router',
     database: 'PostgreSQL with Prisma ORM',
+    cumEngine: '1.0.5',
 
     // Repository and documentation links
     repository: 'https://github.com/supernova3339/changerawr',

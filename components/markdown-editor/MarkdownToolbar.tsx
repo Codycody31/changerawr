@@ -1,36 +1,30 @@
+// components/markdown-editor/MarkdownToolbar.tsx
+
 'use client';
 
 import React, {memo, useState} from 'react';
 import {
     Bold,
-    Italic,
+    ChevronDown,
+    Code,
+    FileDown,
     Heading1,
     Heading2,
     Heading3,
+    Image,
+    Italic,
+    Link,
     List,
     ListOrdered,
+    Menu,
     Quote,
-    Code,
-    Image,
-    Link,
     RotateCcw,
     RotateCw,
-    Sparkles,
     Save,
-    FileDown,
-    EyeOff,
-    Split,
-    Eye,
-    Menu,
-    X,
+    Sparkles,
 } from 'lucide-react';
 
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-} from '@/components/ui/tooltip';
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,} from '@/components/ui/tooltip';
 
 import {
     DropdownMenu,
@@ -41,23 +35,13 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetHeader,
-    SheetTitle,
-    SheetTrigger,
-} from '@/components/ui/sheet';
+import {Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger,} from '@/components/ui/sheet';
 
-import {
-    Tabs,
-    TabsList,
-    TabsTrigger,
-} from '@/components/ui/tabs';
+import {Tabs, TabsList, TabsTrigger,} from '@/components/ui/tabs';
 
 import {Button} from '@/components/ui/button';
 import {Separator} from '@/components/ui/separator';
+import {ScrollArea} from '@/components/ui/scroll-area';
 
 export interface ToolbarAction {
     icon: React.ReactNode;
@@ -227,8 +211,6 @@ const MobileToolbarSheet = memo(({
                                      onRedo,
                                      onSave,
                                      onExport,
-                                     viewMode,
-                                     onViewModeChange,
                                      onAIAssist,
                                      enableAI,
                                      onBold,
@@ -242,7 +224,7 @@ const MobileToolbarSheet = memo(({
                                      onQuote,
                                      onCode,
                                      onImage,
-                                 }: Omit<MarkdownToolbarProps, 'className'>) => {
+                                 }: Omit<MarkdownToolbarProps, 'className' | 'viewMode' | 'onViewModeChange'>) => {
     const [isOpen, setIsOpen] = useState(false);
 
     const handleActionClick = (originalOnClick: () => void) => {
@@ -360,522 +342,405 @@ const MobileToolbarSheet = memo(({
     return (
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
             <SheetTrigger asChild>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 relative hover:bg-accent/80 transition-colors"
-                    type="button"
-                >
+                <Button variant="ghost" size="icon" className="md:hidden h-8 w-8">
                     <Menu size={16}/>
                 </Button>
             </SheetTrigger>
-            <SheetContent
-                side="bottom"
-                className="h-[85vh] rounded-t-3xl border-t-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
-            >
-                <div className="relative">
-                    {/* Drag handle */}
-                    <div
-                        className="absolute top-3 left-1/2 transform -translate-x-1/2 w-12 h-1.5 bg-muted-foreground/20 rounded-full"/>
+            <SheetContent side="left" className="w-80 flex flex-col">
+                <SheetHeader className="flex-shrink-0">
+                    <SheetTitle>Markdown Tools</SheetTitle>
+                    <SheetDescription>
+                        Format your text and insert content elements
+                    </SheetDescription>
+                </SheetHeader>
 
-                    <SheetHeader className="pt-8 pb-6 border-b border-border/50">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <SheetTitle className="text-xl font-semibold">Editor Tools</SheetTitle>
-                                <SheetDescription className="text-muted-foreground mt-1">
-                                    Formatting and editor options
-                                </SheetDescription>
-                            </div>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setIsOpen(false)}
-                                className="h-8 w-8 rounded-full"
-                            >
-                                <X size={16}/>
-                            </Button>
-                        </div>
-                    </SheetHeader>
-                </div>
-
-                <div className="mt-6 space-y-8 overflow-y-auto max-h-[calc(85vh-8rem)] pb-6">
-                    {/* History actions */}
-                    <div className="space-y-3">
-                        <div className="flex items-center space-x-3 px-4">
-                            <div className="p-2 bg-muted rounded-lg">
-                                <RotateCcw size={16}/>
-                            </div>
+                <ScrollArea className="flex-1 mt-6">
+                    <div className="space-y-6 pr-4">
+                        {/* History */}
+                        <div className="space-y-3">
                             <h3 className="font-semibold text-base text-foreground">History</h3>
+                            <div className="flex gap-2">
+                                <Button
+                                    variant="outline"
+                                    onClick={handleActionClick(onUndo || (() => {
+                                    }))}
+                                    disabled={!canUndo}
+                                    className="flex-1"
+                                >
+                                    <RotateCcw size={16} className="mr-2"/>
+                                    Undo
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={handleActionClick(onRedo || (() => {
+                                    }))}
+                                    disabled={!canRedo}
+                                    className="flex-1"
+                                >
+                                    <RotateCw size={16} className="mr-2"/>
+                                    Redo
+                                </Button>
+                            </div>
                         </div>
-                        <div className="space-y-1 px-2">
-                            <Button
-                                variant="ghost"
-                                onClick={handleActionClick(onUndo || (() => {
-                                }))}
-                                disabled={!canUndo}
-                                className="w-full justify-start h-14 font-normal hover:bg-accent/50 transition-colors disabled:opacity-50"
-                                type="button"
-                            >
-                                <RotateCcw size={16} className="mr-4 text-muted-foreground"/>
-                                <span className="flex-1 text-foreground">Undo</span>
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                onClick={handleActionClick(onRedo || (() => {
-                                }))}
-                                disabled={!canRedo}
-                                className="w-full justify-start h-14 font-normal hover:bg-accent/50 transition-colors disabled:opacity-50"
-                                type="button"
-                            >
-                                <RotateCw size={16} className="mr-4 text-muted-foreground"/>
-                                <span className="flex-1 text-foreground">Redo</span>
-                            </Button>
-                        </div>
+
+                        {/* Groups */}
+                        {allGroups.map((group, groupIndex) => (
+                            <div key={`mobile-group-${groupIndex}`} className="space-y-3">
+                                <div className="flex items-center space-x-3 px-4">
+                                    <div className="p-2 bg-muted rounded-lg">
+                                        {group.actions[0]?.icon}
+                                    </div>
+                                    <h3 className="font-semibold text-base text-foreground">{group.name}</h3>
+                                </div>
+                                <div className="space-y-1 px-2">
+                                    {group.actions.map((action, actionIndex) => (
+                                        <ToolbarAction
+                                            key={`mobile-action-${actionIndex}`}
+                                            action={{
+                                                ...action,
+                                                onClick: handleActionClick(action.onClick)
+                                            }}
+                                            isMobile={true}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+
+                        {/* Dropdowns */}
+                        {allDropdowns.map((dropdown, dropdownIndex) => (
+                            <ToolbarDropdownComponent
+                                key={`mobile-dropdown-${dropdownIndex}`}
+                                dropdown={{
+                                    ...dropdown,
+                                    actions: dropdown.actions.map(action => ({
+                                        ...action,
+                                        onClick: handleActionClick(action.onClick)
+                                    }))
+                                }}
+                                isMobile={true}
+                            />
+                        ))}
+
+                        {/* AI Assistant */}
+                        {enableAI && onAIAssist && (
+                            <div className="space-y-3">
+                                <div className="flex items-center space-x-3 px-4">
+                                    <div className="p-2 bg-muted rounded-lg">
+                                        <Sparkles size={16}/>
+                                    </div>
+                                    <h3 className="font-semibold text-base text-foreground">AI Assistant</h3>
+                                </div>
+                                <div className="px-2">
+                                    <Button
+                                        variant="outline"
+                                        onClick={handleActionClick(onAIAssist)}
+                                        className="w-full justify-start h-14 text-left font-normal hover:bg-accent/50 transition-colors"
+                                    >
+                                        <Sparkles size={16} className="mr-4 text-muted-foreground"/>
+                                        <span className="flex-1 text-foreground">Open AI Assistant</span>
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Save & Export */}
+                        {(onSave || onExport) && (
+                            <div className="space-y-3">
+                                <h3 className="font-semibold text-base text-foreground">Actions</h3>
+                                <div className="space-y-2 px-2">
+                                    {onSave && (
+                                        <Button
+                                            variant="outline"
+                                            onClick={handleActionClick(onSave)}
+                                            className="w-full justify-start h-14 text-left font-normal hover:bg-accent/50 transition-colors"
+                                        >
+                                            <Save size={16} className="mr-4 text-muted-foreground"/>
+                                            <span className="flex-1 text-foreground">Save</span>
+                                        </Button>
+                                    )}
+                                    {onExport && (
+                                        <Button
+                                            variant="outline"
+                                            onClick={handleActionClick(onExport)}
+                                            className="w-full justify-start h-14 text-left font-normal hover:bg-accent/50 transition-colors"
+                                        >
+                                            <FileDown size={16} className="mr-4 text-muted-foreground"/>
+                                            <span className="flex-1 text-foreground">Export</span>
+                                        </Button>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
-
-                    {/* Action groups */}
-                    {allGroups.map((group, groupIndex) => (
-                        <div key={`mobile-group-${groupIndex}`} className="space-y-3">
-                            <div className="flex items-center space-x-3 px-4">
-                                <div className="p-2 bg-muted rounded-lg">
-                                    {group.actions[0]?.icon}
-                                </div>
-                                <h3 className="font-semibold text-base text-foreground">{group.name}</h3>
-                            </div>
-                            <div className="space-y-1 px-2">
-                                {group.actions.map((action, actionIndex) => (
-                                    <ToolbarAction
-                                        key={`mobile-action-${actionIndex}`}
-                                        action={{
-                                            ...action,
-                                            onClick: handleActionClick(action.onClick)
-                                        }}
-                                        isMobile={true}
-                                    />
-                                ))}
-                            </div>
-                        </div>
-                    ))}
-
-                    {/* Dropdowns */}
-                    {allDropdowns.map((dropdown, dropdownIndex) => (
-                        <ToolbarDropdownComponent
-                            key={`mobile-dropdown-${dropdownIndex}`}
-                            dropdown={{
-                                ...dropdown,
-                                actions: dropdown.actions.map(action => ({
-                                    ...action,
-                                    onClick: handleActionClick(action.onClick)
-                                }))
-                            }}
-                            isMobile={true}
-                        />
-                    ))}
-
-                    {/* AI Assistant */}
-                    {enableAI && onAIAssist && (
-                        <div className="space-y-3">
-                            <div className="flex items-center space-x-3 px-4">
-                                <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg">
-                                    <Sparkles size={16} className="text-indigo-600 dark:text-indigo-400"/>
-                                </div>
-                                <h3 className="font-semibold text-base text-foreground">AI Tools</h3>
-                            </div>
-                            <div className="px-2">
-                                <Button
-                                    variant="ghost"
-                                    onClick={handleActionClick(onAIAssist)}
-                                    className="w-full justify-start h-14 font-normal text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors"
-                                    type="button"
-                                >
-                                    <Sparkles size={16} className="mr-4"/>
-                                    <span className="flex-1">AI Assistant</span>
-                                </Button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* File actions */}
-                    {(onSave || onExport) && (
-                        <div className="space-y-3">
-                            <div className="flex items-center space-x-3 px-4">
-                                <div className="p-2 bg-muted rounded-lg">
-                                    <Save size={16}/>
-                                </div>
-                                <h3 className="font-semibold text-base text-foreground">File Actions</h3>
-                            </div>
-                            <div className="space-y-1 px-2">
-                                {onSave && (
-                                    <Button
-                                        variant="ghost"
-                                        onClick={handleActionClick(onSave)}
-                                        className="w-full justify-start h-14 font-normal hover:bg-accent/50 transition-colors"
-                                        type="button"
-                                    >
-                                        <Save size={16} className="mr-4 text-muted-foreground"/>
-                                        <span className="flex-1 text-foreground">Save Document</span>
-                                    </Button>
-                                )}
-                                {onExport && (
-                                    <Button
-                                        variant="ghost"
-                                        onClick={handleActionClick(onExport)}
-                                        className="w-full justify-start h-14 font-normal hover:bg-accent/50 transition-colors"
-                                        type="button"
-                                    >
-                                        <FileDown size={16} className="mr-4 text-muted-foreground"/>
-                                        <span className="flex-1 text-foreground">Export Markdown</span>
-                                    </Button>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* View mode selector */}
-                    {onViewModeChange && (
-                        <div className="space-y-3">
-                            <div className="flex items-center space-x-3 px-4">
-                                <div className="p-2 bg-muted rounded-lg">
-                                    <Eye size={16}/>
-                                </div>
-                                <h3 className="font-semibold text-base text-foreground">View Mode</h3>
-                            </div>
-                            <div className="space-y-1 px-2">
-                                <Button
-                                    variant={viewMode === 'edit' ? 'default' : 'ghost'}
-                                    onClick={() => {
-                                        onViewModeChange('edit');
-                                        setIsOpen(false);
-                                    }}
-                                    className="w-full justify-start h-14 font-normal hover:bg-accent/50 transition-colors"
-                                    type="button"
-                                >
-                                    <EyeOff size={16} className="mr-4 text-muted-foreground"/>
-                                    <span className="flex-1 text-foreground">Edit Mode</span>
-                                    {viewMode === 'edit' && (
-                                        <div className="w-2 h-2 bg-primary rounded-full"/>
-                                    )}
-                                </Button>
-                                <Button
-                                    variant={viewMode === 'preview' ? 'default' : 'ghost'}
-                                    onClick={() => {
-                                        onViewModeChange('preview');
-                                        setIsOpen(false);
-                                    }}
-                                    className="w-full justify-start h-14 font-normal hover:bg-accent/50 transition-colors"
-                                    type="button"
-                                >
-                                    <Eye size={16} className="mr-4 text-muted-foreground"/>
-                                    <span className="flex-1 text-foreground">Preview Mode</span>
-                                    {viewMode === 'preview' && (
-                                        <div className="w-2 h-2 bg-primary rounded-full"/>
-                                    )}
-                                </Button>
-                                <Button
-                                    variant={viewMode === 'split' ? 'default' : 'ghost'}
-                                    onClick={() => {
-                                        onViewModeChange('split');
-                                        setIsOpen(false);
-                                    }}
-                                    className="w-full justify-start h-14 font-normal hover:bg-accent/50 transition-colors"
-                                    type="button"
-                                >
-                                    <Split size={16} className="mr-4 text-muted-foreground"/>
-                                    <span className="flex-1 text-foreground">Split View</span>
-                                    {viewMode === 'split' && (
-                                        <div className="w-2 h-2 bg-primary rounded-full"/>
-                                    )}
-                                </Button>
-                            </div>
-                        </div>
-                    )}
-                </div>
+                </ScrollArea>
             </SheetContent>
         </Sheet>
     );
 });
+
 MobileToolbarSheet.displayName = 'MobileToolbarSheet';
 
-/**
- * Toolbar component for the markdown editor with full mobile support
- */
-const MarkdownToolbar = memo(({
-                                  groups = [],
-                                  dropdowns = [],
-                                  canUndo = false,
-                                  canRedo = false,
-                                  onUndo,
-                                  onRedo,
-                                  onSave,
-                                  onExport,
-                                  viewMode = 'edit',
-                                  onViewModeChange,
-                                  onAIAssist,
-                                  enableAI = false,
-                                  className = '',
-                                  onBold,
-                                  onItalic,
-                                  onLink,
-                                  onHeading1,
-                                  onHeading2,
-                                  onHeading3,
-                                  onBulletList,
-                                  onNumberedList,
-                                  onQuote,
-                                  onCode,
-                                  onImage,
-                              }: MarkdownToolbarProps) => {
+// Main toolbar component
+const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
+                                                             groups = [],
+                                                             dropdowns = [],
+                                                             canUndo = false,
+                                                             canRedo = false,
+                                                             onUndo,
+                                                             onRedo,
+                                                             onSave,
+                                                             onExport,
+                                                             viewMode = 'edit',
+                                                             onViewModeChange,
+                                                             onAIAssist,
+                                                             enableAI = false,
+                                                             className = '',
+                                                             onBold,
+                                                             onItalic,
+                                                             onLink,
+                                                             onHeading1,
+                                                             onHeading2,
+                                                             onHeading3,
+                                                             onBulletList,
+                                                             onNumberedList,
+                                                             onQuote,
+                                                             onCode,
+                                                             onImage,
+                                                         }) => {
     return (
-        <div className={`flex items-center p-2 border-b bg-muted/10 ${className}`}>
-            {/* Mobile view */}
-            <div className="sm:hidden flex items-center justify-between w-full">
-                {/* Essential mobile actions */}
-                <div className="flex items-center space-x-1">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onUndo}
-                        disabled={!canUndo}
-                        className="h-8 w-8"
-                        type="button"
-                    >
-                        <RotateCcw size={16}/>
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onRedo}
-                        disabled={!canRedo}
-                        className="h-8 w-8"
-                        type="button"
-                    >
-                        <RotateCw size={16}/>
-                    </Button>
+        <div className={`flex items-center justify-between p-2 border-b bg-muted/10 ${className}`}>
+            {/* Left side - Tools */}
+            <div className="flex items-center space-x-1">
+                {/* Mobile toolbar */}
+                <MobileToolbarSheet
+                    groups={groups}
+                    dropdowns={dropdowns}
+                    canUndo={canUndo}
+                    canRedo={canRedo}
+                    onUndo={onUndo}
+                    onRedo={onRedo}
+                    onSave={onSave}
+                    onExport={onExport}
+                    onAIAssist={onAIAssist}
+                    enableAI={enableAI}
+                    onBold={onBold}
+                    onItalic={onItalic}
+                    onLink={onLink}
+                    onHeading1={onHeading1}
+                    onHeading2={onHeading2}
+                    onHeading3={onHeading3}
+                    onBulletList={onBulletList}
+                    onNumberedList={onNumberedList}
+                    onQuote={onQuote}
+                    onCode={onCode}
+                    onImage={onImage}
+                />
 
-                    <Separator orientation="vertical" className="mx-1 h-6"/>
+                {/* Desktop toolbar */}
+                <div className="hidden sm:flex items-center w-full">
+                    <div className="flex items-center space-x-1">
+                        {/* Undo/Redo */}
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={onUndo}
+                            disabled={!canUndo}
+                            className="h-8 w-8"
+                            title="Undo (Ctrl+Z)"
+                        >
+                            <RotateCcw size={16}/>
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={onRedo}
+                            disabled={!canRedo}
+                            className="h-8 w-8"
+                            title="Redo (Ctrl+Shift+Z)"
+                        >
+                            <RotateCw size={16}/>
+                        </Button>
 
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onBold}
-                        className="h-8 w-8"
-                        type="button"
-                    >
-                        <Bold size={16}/>
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onItalic}
-                        className="h-8 w-8"
-                        type="button"
-                    >
-                        <Italic size={16}/>
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onLink}
-                        className="h-8 w-8"
-                        type="button"
-                    >
-                        <Link size={16}/>
-                    </Button>
-                </div>
+                        <Separator orientation="vertical" className="mx-1 h-6"/>
 
-                {/* Right side actions */}
-                <div className="flex items-center space-x-1">
-                    {/* Mobile menu sheet */}
-                    <MobileToolbarSheet
-                        groups={groups}
-                        dropdowns={dropdowns}
-                        canUndo={canUndo}
-                        canRedo={canRedo}
-                        onUndo={onUndo}
-                        onRedo={onRedo}
-                        onSave={onSave}
-                        onExport={onExport}
-                        viewMode={viewMode}
-                        onViewModeChange={onViewModeChange}
-                        onAIAssist={onAIAssist}
-                        enableAI={enableAI}
-                        onBold={onBold}
-                        onItalic={onItalic}
-                        onLink={onLink}
-                        onHeading1={onHeading1}
-                        onHeading2={onHeading2}
-                        onHeading3={onHeading3}
-                        onBulletList={onBulletList}
-                        onNumberedList={onNumberedList}
-                        onQuote={onQuote}
-                        onCode={onCode}
-                        onImage={onImage}
-                    />
+                        {/* Text formatting */}
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={onBold}
+                            className="h-8 w-8"
+                            title="Bold (Ctrl+B)"
+                        >
+                            <Bold size={16}/>
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={onItalic}
+                            className="h-8 w-8"
+                            title="Italic (Ctrl+I)"
+                        >
+                            <Italic size={16}/>
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={onLink}
+                            className="h-8 w-8"
+                            title="Link (Ctrl+K)"
+                        >
+                            <Link size={16}/>
+                        </Button>
+
+                        <Separator orientation="vertical" className="mx-1 h-6"/>
+
+                        {/* Headings */}
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={onHeading1}
+                            className="h-8 w-8"
+                            title="Heading 1 (Ctrl+1)"
+                        >
+                            <Heading1 size={16}/>
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={onHeading2}
+                            className="h-8 w-8"
+                            title="Heading 2 (Ctrl+2)"
+                        >
+                            <Heading2 size={16}/>
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={onHeading3}
+                            className="h-8 w-8"
+                            title="Heading 3 (Ctrl+3)"
+                        >
+                            <Heading3 size={16}/>
+                        </Button>
+
+                        <Separator orientation="vertical" className="mx-1 h-6"/>
+
+                        {/* Lists and quotes */}
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={onBulletList}
+                            className="h-8 w-8"
+                            title="Bullet List"
+                        >
+                            <List size={16}/>
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={onNumberedList}
+                            className="h-8 w-8"
+                            title="Numbered List"
+                        >
+                            <ListOrdered size={16}/>
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={onQuote}
+                            className="h-8 w-8"
+                            title="Blockquote"
+                        >
+                            <Quote size={16}/>
+                        </Button>
+
+                        <Separator orientation="vertical" className="mx-1 h-6"/>
+
+                        {/* Code and images */}
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={onCode}
+                            className="h-8 w-8"
+                            title="Inline Code"
+                        >
+                            <Code size={16}/>
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={onImage}
+                            className="h-8 w-8"
+                            title="Image"
+                        >
+                            <Image size={16}/>
+                        </Button>
+
+                        {/* Dropdowns (including CUM Extensions) */}
+                        {dropdowns.length > 0 && (
+                            <>
+                                <Separator orientation="vertical" className="mx-1 h-6"/>
+                                {dropdowns.map((dropdown, index) => (
+                                    <DropdownMenu key={index}>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-8 gap-1"
+                                                title={dropdown.name}
+                                            >
+                                                {dropdown.icon}
+                                                <ChevronDown size={12}/>
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="start">
+                                            <DropdownMenuLabel>{dropdown.name}</DropdownMenuLabel>
+                                            <DropdownMenuSeparator/>
+                                            {dropdown.actions.map((action, actionIndex) => (
+                                                <DropdownMenuItem
+                                                    key={actionIndex}
+                                                    onClick={action.onClick}
+                                                >
+                                                    <span className="mr-2">{action.icon}</span>
+                                                    <span>{action.label}</span>
+                                                    {action.shortcut && (
+                                                        <span className="ml-auto text-xs text-muted-foreground">
+                                                        {action.shortcut}
+                                                    </span>
+                                                    )}
+                                                </DropdownMenuItem>
+                                            ))}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                ))}
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
 
-            {/* Desktop view - exact match to your original design */}
-            <div className="hidden sm:flex items-center w-full">
-                <div className="flex items-center space-x-1">
-                    {/* Undo/Redo */}
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onUndo}
-                        disabled={!canUndo}
-                        className="h-8 w-8"
-                        title="Undo (Ctrl+Z)"
-                    >
-                        <RotateCcw size={16}/>
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onRedo}
-                        disabled={!canRedo}
-                        className="h-8 w-8"
-                        title="Redo (Ctrl+Shift+Z)"
-                    >
-                        <RotateCw size={16}/>
-                    </Button>
+            {/* Right side - View modes */}
+            <div className="flex items-center">
+                {/* AI Assistant button (if enabled) */}
+                {enableAI && onAIAssist && (
+                    <>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={onAIAssist}
+                            className="h-8 gap-1 text-primary"
+                            title="AI Assistant (Alt+A)"
+                        >
+                            <Sparkles size={15}/>
+                            <span>AI</span>
+                        </Button>
+                        <Separator orientation="vertical" className="mx-1 h-6"/>
+                    </>
+                )}
 
-                    <Separator orientation="vertical" className="mx-1 h-6"/>
-
-                    {/* Text formatting */}
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onBold}
-                        className="h-8 w-8"
-                        title="Bold (Ctrl+B)"
-                    >
-                        <Bold size={16}/>
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onItalic}
-                        className="h-8 w-8"
-                        title="Italic (Ctrl+I)"
-                    >
-                        <Italic size={16}/>
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onLink}
-                        className="h-8 w-8"
-                        title="Link (Ctrl+K)"
-                    >
-                        <Link size={16}/>
-                    </Button>
-
-                    <Separator orientation="vertical" className="mx-1 h-6"/>
-
-                    {/* Headings */}
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onHeading1}
-                        className="h-8 w-8"
-                        title="Heading 1 (Ctrl+1)"
-                    >
-                        <Heading1 size={16}/>
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onHeading2}
-                        className="h-8 w-8"
-                        title="Heading 2 (Ctrl+2)"
-                    >
-                        <Heading2 size={16}/>
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onHeading3}
-                        className="h-8 w-8"
-                        title="Heading 3 (Ctrl+3)"
-                    >
-                        <Heading3 size={16}/>
-                    </Button>
-
-                    <Separator orientation="vertical" className="mx-1 h-6"/>
-
-                    {/* Lists and quotes */}
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onBulletList}
-                        className="h-8 w-8"
-                        title="Bullet List"
-                    >
-                        <List size={16}/>
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onNumberedList}
-                        className="h-8 w-8"
-                        title="Numbered List"
-                    >
-                        <ListOrdered size={16}/>
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onQuote}
-                        className="h-8 w-8"
-                        title="Blockquote"
-                    >
-                        <Quote size={16}/>
-                    </Button>
-
-                    <Separator orientation="vertical" className="mx-1 h-6"/>
-
-                    {/* Code and images */}
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onCode}
-                        className="h-8 w-8"
-                        title="Inline Code"
-                    >
-                        <Code size={16}/>
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onImage}
-                        className="h-8 w-8"
-                        title="Image"
-                    >
-                        <Image size={16}/>
-                    </Button>
-                </div>
-
-                {/* Right side toolbar */}
-                <div className="flex items-center space-x-1 ml-auto">
-                    {/* AI Assistant button (if enabled) */}
-                    {enableAI && onAIAssist && (
-                        <>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={onAIAssist}
-                                className="h-8 gap-1 text-primary"
-                                title="AI Assistant (Alt+A)"
-                            >
-                                <Sparkles size={15}/>
-                                <span>AI</span>
-                            </Button>
-
-                            <Separator orientation="vertical" className="mx-1 h-6"/>
-                        </>
-                    )}
-
-                    {/* Save and export */}
+                {/* Save & Export */}
+                {onSave && (
                     <Button
                         variant="ghost"
                         size="icon"
@@ -885,6 +750,8 @@ const MarkdownToolbar = memo(({
                     >
                         <Save size={16}/>
                     </Button>
+                )}
+                {onExport && (
                     <Button
                         variant="ghost"
                         size="icon"
@@ -894,36 +761,31 @@ const MarkdownToolbar = memo(({
                     >
                         <FileDown size={16}/>
                     </Button>
+                )}
 
-                    <Separator orientation="vertical" className="mx-1 h-6"/>
+                <Separator orientation="vertical" className="mx-1 h-6"/>
 
-                    {/* View mode selector */}
-                    {onViewModeChange && (
-                        <Tabs value={viewMode}
-                              onValueChange={(v: string) => onViewModeChange(v as 'edit' | 'preview' | 'split')}>
-                            <TabsList className="h-8">
-                                <TabsTrigger value="edit" className="h-7 px-2">
-                                    <EyeOff size={14} className="mr-1"/>
-                                    <span className="text-xs">Edit</span>
-                                </TabsTrigger>
-                                <TabsTrigger value="preview" className="h-7 px-2">
-                                    <Eye size={14} className="mr-1"/>
-                                    <span className="text-xs">Preview</span>
-                                </TabsTrigger>
-                                <TabsTrigger value="split" className="h-7 px-2">
-                                    <Split size={14} className="mr-1"/>
-                                    <span className="text-xs">Split</span>
-                                </TabsTrigger>
-                            </TabsList>
-                        </Tabs>
-                    )}
-                </div>
+                {/* View mode tabs */}
+                <Tabs
+                    value={viewMode}
+                    onValueChange={(value) => onViewModeChange?.(value as 'edit' | 'preview' | 'split')}
+                    className="w-auto"
+                >
+                    <TabsList className="grid w-full grid-cols-3 h-8">
+                        <TabsTrigger value="edit" className="h-6 px-3 text-xs">
+                            Edit
+                        </TabsTrigger>
+                        <TabsTrigger value="split" className="h-6 px-3 text-xs">
+                            Split
+                        </TabsTrigger>
+                        <TabsTrigger value="preview" className="h-6 px-3 text-xs">
+                            Preview
+                        </TabsTrigger>
+                    </TabsList>
+                </Tabs>
             </div>
         </div>
     );
-});
-
-// Display name for React DevTools
-MarkdownToolbar.displayName = 'MarkdownToolbar';
+};
 
 export default MarkdownToolbar;

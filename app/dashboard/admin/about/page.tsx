@@ -1,5 +1,3 @@
-// app/dashboard/admin/about/page.tsx (Redesigned)
-
 'use client'
 
 import React, {useEffect, useState} from 'react';
@@ -161,6 +159,10 @@ export default function AboutPage() {
                         <div className="flex justify-between py-1 border-b border-border/40">
                             <span>Database</span>
                             <span>PostgreSQL {databaseInfo?.databaseVersion || 'Unknown'}</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-border/40">
+                            <span>CUM Engine</span>
+                            <span>v{appInfo.cumEngine}</span>
                         </div>
                         <div className="flex justify-between py-1 border-b border-border/40">
                             <span>Environment</span>

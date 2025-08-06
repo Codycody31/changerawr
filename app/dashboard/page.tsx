@@ -8,9 +8,7 @@ import {
     Card,
     CardContent,
     CardDescription,
-    CardHeader,
-    CardTitle,
-    CardFooter,
+    CardHeader
 } from "@/components/ui/card"
 import {Button} from "@/components/ui/button"
 import {ScrollArea} from "@/components/ui/scroll-area"
@@ -22,35 +20,39 @@ import {
     ArrowRight,
     Activity,
     Settings,
-    Clock,
     Sparkles,
     BookOpen,
-    Rocket,
     ChevronRight,
     Code,
-    Lightbulb,
     LayoutDashboard,
+    TrendingUp,
+    Target,
+    PenTool
 } from 'lucide-react'
 import {formatDistanceToNow} from "date-fns"
-import type {DashboardStats, ProjectPreview, Activity as DashboardActivity} from '@/lib/types/dashboard'
-import {getGravatarUrl} from "@/lib/utils/gravatar";
-import React from "react";
+import type {
+    DashboardStats,
+    ProjectPreview,
+    Activity as DashboardActivity
+} from '@/lib/types/dashboard'
+import {getGravatarUrl} from "@/lib/utils/gravatar"
+import React from "react"
 
 const fadeIn = {
     initial: {opacity: 0, y: 10},
     animate: {opacity: 1, y: 0},
     exit: {opacity: 0, y: -10}
-};
+}
 
 const container = {
     hidden: {opacity: 0},
     show: {
         opacity: 1,
         transition: {
-            staggerChildren: 0.1
+            staggerChildren: 0.08
         }
     }
-};
+}
 
 const changelogMessages = [
     "You're doing rawrsome with these updates!",
@@ -165,9 +167,72 @@ const changelogMessages = [
     "CHORE: Un-hardcode the copyright year"
 ];
 
+interface StatsCardProps {
+    title: string
+    value: number | string
+    description: string
+    icon: React.ComponentType<{ className?: string }>
+}
+
+const StatsCard: React.FC<StatsCardProps> = ({
+                                                 title,
+                                                 value,
+                                                 description,
+                                                 icon: Icon
+                                             }) => (
+    <Card className="transition-all duration-200 hover:shadow-md dark:hover:shadow-lg/20">
+        <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+                <div className="space-y-2">
+                    <p className="text-sm font-medium text-muted-foreground">{title}</p>
+                    <div className="text-2xl font-semibold">{value}</div>
+                    <p className="text-xs text-muted-foreground">{description}</p>
+                </div>
+                <div className="p-2 rounded-lg bg-muted/50">
+                    <Icon className="h-5 w-5 text-muted-foreground"/>
+                </div>
+            </div>
+        </CardContent>
+    </Card>
+)
+
+interface QuickActionProps {
+    title: string
+    description: string
+    href: string
+    icon: React.ComponentType<{ className?: string }>
+}
+
+const QuickAction: React.FC<QuickActionProps> = ({
+                                                     title,
+                                                     description,
+                                                     href,
+                                                     icon: Icon
+                                                 }) => (
+    <Card className="transition-all duration-200 hover:shadow-md dark:hover:shadow-lg/20 group cursor-pointer">
+        <Link href={href}>
+            <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-md bg-muted/50 group-hover:bg-muted transition-colors">
+                        <Icon className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors"/>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-sm group-hover:text-primary transition-colors">
+                            {title}
+                        </h3>
+                        <p className="text-xs text-muted-foreground truncate">{description}</p>
+                    </div>
+                    <ChevronRight
+                        className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all"/>
+                </div>
+            </CardContent>
+        </Link>
+    </Card>
+)
+
 export default function DashboardPage() {
     const {user} = useAuth()
-    const randomMessage = changelogMessages[Math.floor(Math.random() * changelogMessages.length)];
+    const randomMessage = changelogMessages[Math.floor(Math.random() * changelogMessages.length)]
 
     const {data: stats, isLoading} = useQuery<DashboardStats>({
         queryKey: ['dashboard-stats'],
@@ -186,49 +251,57 @@ export default function DashboardPage() {
                     animate={{opacity: 1}}
                     className="space-y-4 text-center"
                 >
-                    <Sparkles className="h-12 w-12 mx-auto text-primary animate-pulse"/>
-                    <p className="text-lg font-medium text-muted-foreground">Loading your updates...</p>
+                    <Sparkles className="h-8 w-8 mx-auto text-primary animate-pulse"/>
+                    <p className="text-sm text-muted-foreground">Loading your dashboard...</p>
                 </motion.div>
             </div>
         )
     }
 
+    const totalEntries = stats?.projectPreviews?.reduce((acc, project) => acc + project.changelogCount, 0) || 0
+    const activeProjects = stats?.projectPreviews?.filter(project => !project.id.startsWith('placeholder')).length || 0
+
     return (
-        <div className="min-h-screen bg-gradient-to-b from-background to-background/50">
-            <div className="mx-auto max-w-7xl px-4 py-6 sm:py-8">
+        <div className="min-h-screen bg-background">
+            <div className="mx-auto max-w-6xl px-4 py-8">
                 <motion.div
                     initial="hidden"
                     animate="show"
                     variants={container}
-                    className="space-y-6"
+                    className="space-y-8"
                 >
-                    {/* Welcome Banner */}
+                    {/* Welcome Section */}
                     <motion.div variants={fadeIn}>
                         <Card
-                            className="overflow-hidden border-0 bg-gradient-to-r from-primary/10 via-background to-secondary/10 shadow-lg">
-                            <CardContent className="p-6 sm:p-8">
-                                <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-                                    <div className="space-y-2">
-                                        <div className="inline-flex items-center gap-2 mb-2">
-                                            <p className="h-5 w-5 text-primary">🦖</p>
-                                            <Badge variant="outline" className="bg-background/50 font-normal">
+                            className="overflow-hidden border-0 bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 shadow-lg">
+                            <div className="absolute inset-0 bg-grid-white/[0.1] bg-[size:24px_24px]"/>
+                            <CardContent className="relative p-8">
+                                <div
+                                    className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+                                    <div className="space-y-3 flex-1">
+                                        <div className="inline-flex items-center gap-2 mb-1">
+                                            <span className="text-xl">🦖</span>
+                                            <Badge variant="glass" className="bg-white/20 text-white border-white/30">
                                                 Changerawr
                                             </Badge>
                                         </div>
-                                        <h1 className="text-2xl sm:text-3xl font-bold">
+                                        <h1 className="text-3xl lg:text-4xl font-bold text-white leading-tight">
                                             Welcome back, {user?.name?.split(' ')[0] || 'there'}!
                                         </h1>
-                                        <p className="text-base text-muted-foreground">
+                                        <p className="text-blue-100 max-w-md">
                                             {randomMessage}
                                         </p>
                                     </div>
-                                    <div className="flex flex-shrink-0 items-center justify-center">
-                                        <Avatar className="h-16 w-16 border-2 border-background">
+
+                                    <div className="flex-shrink-0">
+                                        <Avatar className="h-16 w-16 border-2 border-white/30">
                                             <AvatarImage
                                                 src={user?.email ? getGravatarUrl(user?.email, 160) : undefined}
                                                 alt={user?.name || 'User avatar'}
                                             />
-                                            <AvatarFallback>{user?.name?.split(' ').map(n => n[0]).join('') || user?.email?.[0] || '?'}</AvatarFallback>
+                                            <AvatarFallback className="text-lg font-semibold bg-white/20 text-white">
+                                                {user?.name?.split(' ').map(n => n[0]).join('') || user?.email?.[0] || '?'}
+                                            </AvatarFallback>
                                         </Avatar>
                                     </div>
                                 </div>
@@ -236,199 +309,221 @@ export default function DashboardPage() {
                         </Card>
                     </motion.div>
 
-                    {/* Project Quick Access */}
+                    {/* Stats Overview */}
                     <motion.div variants={fadeIn} className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-xl font-semibold flex items-center gap-2">
-                                <Rocket className="h-5 w-5 text-primary"/>
-                                Recent Projects
-                            </h2>
-                            <Button variant="ghost" size="sm" asChild>
-                                <Link href="/dashboard/projects">View all</Link>
-                            </Button>
+                        <h2 className="text-xl font-semibold">Overview</h2>
+                        <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+                            <StatsCard
+                                title="Projects"
+                                value={stats?.totalProjects || 0}
+                                description="Total projects"
+                                icon={BookOpen}
+                            />
+                            <StatsCard
+                                title="Entries"
+                                value={totalEntries}
+                                description="All changelog entries"
+                                icon={FileText}
+                            />
+                            <StatsCard
+                                title="Active"
+                                value={activeProjects}
+                                description="Currently active"
+                                icon={Target}
+                            />
+                            <StatsCard
+                                title="This Month"
+                                value={stats?.recentActivity?.filter(activity => {
+                                    const activityDate = new Date(activity.timestamp)
+                                    const now = new Date()
+                                    return activityDate.getMonth() === now.getMonth() &&
+                                        activityDate.getFullYear() === now.getFullYear()
+                                })?.length || 0}
+                                description="Recent activity"
+                                icon={TrendingUp}
+                            />
                         </div>
+                    </motion.div>
 
-                        <motion.div
-                            variants={container}
-                            initial="hidden"
-                            animate="show"
-                            className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
-                        >
-                            {stats?.projectPreviews.map((project: ProjectPreview) => (
-                                <motion.div key={project.id} variants={fadeIn}>
-                                    <Link
-                                        href={project.id.startsWith('placeholder') ? '/dashboard/projects/new' : `/dashboard/projects/${project.id}`}
+                    {/* Quick Actions */}
+                    <motion.div variants={fadeIn} className="space-y-4">
+                        <h2 className="text-xl font-semibold">Quick Actions</h2>
+                        <div className="grid gap-3 grid-cols-1 md:grid-cols-3">
+                            <QuickAction
+                                title="Create Project"
+                                description="Start a new changelog project"
+                                href="/dashboard/projects/new"
+                                icon={Plus}
+                            />
+                            <QuickAction
+                                title="Write Entry"
+                                description="Add a changelog entry"
+                                href="/dashboard/projects"
+                                icon={PenTool}
+                            />
+                            <QuickAction
+                                title="Settings"
+                                description="Manage your account"
+                                href="/dashboard/settings"
+                                icon={Settings}
+                            />
+                        </div>
+                    </motion.div>
+
+                    <div className="grid gap-8 lg:grid-cols-3">
+                        {/* Recent Projects */}
+                        <motion.div variants={fadeIn} className="lg:col-span-2 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-xl font-semibold">Recent Projects</h2>
+                                <Button variant="ghost" size="sm" asChild>
+                                    <Link href="/dashboard/projects" className="text-sm">
+                                        View all
+                                        <ArrowRight className="h-4 w-4 ml-1"/>
+                                    </Link>
+                                </Button>
+                            </div>
+
+                            <div className="space-y-3">
+                                {stats?.projectPreviews?.slice(0, 4).map((project: ProjectPreview, index) => (
+                                    <motion.div
+                                        key={project.id}
+                                        variants={fadeIn}
+                                        custom={index}
                                     >
                                         <Card
-                                            className="h-full overflow-hidden hover:shadow-md transition-all duration-200 hover:border-primary/50 group">
-                                            <CardHeader className="p-4 pb-2">
-                                                <div className="flex justify-between items-start">
-                                                    <div
-                                                        className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center">
-                                                        <LayoutDashboard className="h-5 w-5 text-primary"/>
+                                            className="group hover:shadow-md dark:hover:shadow-lg/20 transition-all duration-200 hover:border-primary/50">
+                                            <Link
+                                                href={project.id.startsWith('placeholder') ?
+                                                    '/dashboard/projects/new' :
+                                                    `/dashboard/projects/${project.id}`
+                                                }
+                                                className="block"
+                                            >
+                                                <CardContent className="p-4">
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-3">
+                                                            <div
+                                                                className="h-8 w-8 rounded-md bg-muted/50 flex items-center justify-center">
+                                                                <LayoutDashboard
+                                                                    className="h-4 w-4 text-muted-foreground"/>
+                                                            </div>
+                                                            <div className="space-y-1">
+                                                                <h3 className="font-medium group-hover:text-primary transition-colors">
+                                                                    {project.name}
+                                                                </h3>
+                                                                <div
+                                                                    className="flex items-center gap-3 text-xs text-muted-foreground">
+                                                                    <span>{project.changelogCount} entries</span>
+                                                                    {!project.id.startsWith('placeholder') && (
+                                                                        <>
+                                                                            <span>•</span>
+                                                                            <span>
+                                                                                {formatDistanceToNow(new Date(project.lastUpdated))} ago
+                                                                            </span>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <ChevronRight
+                                                            className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors"/>
                                                     </div>
-                                                    <Badge variant="outline"
-                                                           className="bg-primary/5 group-hover:bg-primary/10 transition-colors">
-                                                        {project.changelogCount} updates
-                                                    </Badge>
-                                                </div>
-                                                <CardTitle
-                                                    className="mt-3 text-lg group-hover:text-primary transition-colors">
-                                                    {project.name}
-                                                </CardTitle>
-                                                {!project.id.startsWith('placeholder') && (
-                                                    <CardDescription className="flex items-center text-xs mt-1">
-                                                        <Clock className="h-3 w-3 mr-1"/>
-                                                        Updated {formatDistanceToNow(new Date(project.lastUpdated))} ago
-                                                    </CardDescription>
-                                                )}
-                                            </CardHeader>
-                                            <CardFooter className="p-4 pt-0 flex justify-end">
-                                                <ChevronRight
-                                                    className="h-5 w-5 text-muted-foreground/50 group-hover:text-primary transition-colors"/>
-                                            </CardFooter>
+                                                </CardContent>
+                                            </Link>
                                         </Card>
-                                    </Link>
-                                </motion.div>
-                            ))}
-                            <motion.div variants={fadeIn}>
-                                <Card className="h-full overflow-hidden border-dashed hover:border-primary/50 group">
-                                    <Link href="/dashboard/projects/new">
-                                        <CardContent
-                                            className="p-4 h-full flex flex-col items-center justify-center text-center gap-3 py-8">
-                                            <div
-                                                className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                                                <Plus className="h-6 w-6 text-primary"/>
-                                            </div>
-                                            <div className="space-y-1">
-                                                <h3 className="font-medium group-hover:text-primary transition-colors">
-                                                    Create New Project
-                                                </h3>
-                                                <p className="text-xs text-muted-foreground">
-                                                    Start tracking changes
-                                                </p>
-                                            </div>
-                                        </CardContent>
-                                    </Link>
-                                </Card>
-                            </motion.div>
-                        </motion.div>
-                    </motion.div>
-
-                    {/* Stats Row */}
-                    <motion.div variants={fadeIn} className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-                        <Card
-                            className="bg-gradient-to-br from-blue-50/50 to-blue-100/30 dark:from-blue-950/20 dark:to-blue-900/10 border-blue-100 dark:border-blue-800/30">
-                            <CardContent
-                                className="p-4 flex flex-col items-center justify-center text-center h-full py-6">
-                                <BookOpen className="h-8 w-8 text-blue-500 dark:text-blue-400 mb-2"/>
-                                <h3 className="text-2xl font-bold text-blue-700 dark:text-blue-300">{stats?.totalProjects || 0}</h3>
-                                <p className="text-sm text-blue-600/70 dark:text-blue-400/70">Projects</p>
-                            </CardContent>
-                        </Card>
-
-                        <Card
-                            className="bg-gradient-to-br from-purple-50/50 to-purple-100/30 dark:from-purple-950/20 dark:to-purple-900/10 border-purple-100 dark:border-purple-800/30">
-                            <CardContent
-                                className="p-4 flex flex-col items-center justify-center text-center h-full py-6">
-                                <FileText className="h-8 w-8 text-purple-500 dark:text-purple-400 mb-2"/>
-                                <h3 className="text-2xl font-bold text-purple-700 dark:text-purple-300">{stats?.totalChangelogs || 0}</h3>
-                                <p className="text-sm text-purple-600/70 dark:text-purple-400/70">Changelogs</p>
-                            </CardContent>
-                        </Card>
-
-                        <Card className="col-span-2">
-                            <CardContent className="p-4 flex flex-col h-full justify-center space-y-3 py-6">
-                                <div className="flex items-center gap-3">
-                                    <div
-                                        className="h-9 w-9 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center">
-                                        <Lightbulb className="h-5 w-5 text-green-600 dark:text-green-400"/>
-                                    </div>
-                                    <h3 className="text-lg font-semibold">Quick Actions</h3>
-                                </div>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <Button variant="outline" size="sm" className="h-10 justify-start" asChild>
-                                        <Link href="/dashboard/projects/new">
-                                            <Plus className="mr-2 h-4 w-4"/>
-                                            New Project
-                                        </Link>
-                                    </Button>
-                                    <Button variant="outline" size="sm" className="h-10 justify-start" asChild>
-                                        <Link href="/dashboard/settings">
-                                            <Settings className="mr-2 h-4 w-4"/>
-                                            Settings
-                                        </Link>
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </motion.div>
-
-                    {/* Recent Activity */}
-                    <motion.div variants={fadeIn}>
-                        <Card>
-                            <CardHeader className="p-4 pb-2">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <Activity className="h-5 w-5 text-primary"/>
-                                        <CardTitle className="text-lg">Activity Feed</CardTitle>
-                                    </div>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="p-4">
-                                <ScrollArea className="h-[280px] pr-4">
-                                    <motion.div
-                                        variants={container}
-                                        initial="hidden"
-                                        animate="show"
-                                        className="space-y-3"
-                                    >
-                                        {stats?.recentActivity?.length ? (
-                                            stats.recentActivity.map((activity: DashboardActivity) => (
-                                                <motion.div
-                                                    key={activity.id}
-                                                    variants={fadeIn}
-                                                    className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-muted"
-                                                >
-                                                    <div className="mt-1 flex-shrink-0">
-                                                        <div
-                                                            className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                                            <Code className="h-4 w-4 text-primary"/>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="text-sm">{activity.message}</p>
-                                                        <div className="flex items-center gap-2 mt-1">
-                                                            <Badge variant="outline"
-                                                                   className="text-xs font-normal bg-background/50">
-                                                                {formatDistanceToNow(new Date(activity.timestamp))} ago
-                                                            </Badge>
-                                                            <Link
-                                                                href={`/dashboard/projects/${activity.projectId}/`}
-                                                                className="text-xs text-primary hover:underline inline-flex items-center gap-1"
-                                                            >
-                                                                {activity.projectName}
-                                                                <ArrowRight className="h-3 w-3"/>
-                                                            </Link>
-                                                        </div>
-                                                    </div>
-                                                </motion.div>
-                                            ))
-                                        ) : (
-                                            <div
-                                                className="flex flex-col items-center justify-center h-[200px] text-center">
-                                                <Activity className="h-12 w-12 text-muted-foreground/40 mb-2"/>
-                                                <p className="text-muted-foreground">No recent activity to show</p>
-                                                <p className="text-xs text-muted-foreground/70 mt-1">
-                                                    Activity will appear here as you make changes
-                                                </p>
-                                            </div>
-                                        )}
                                     </motion.div>
-                                </ScrollArea>
-                            </CardContent>
-                        </Card>
-                    </motion.div>
+                                ))}
+
+                                {/* Create New Project Card */}
+                                <motion.div variants={fadeIn}>
+                                    <Card
+                                        className="border-dashed border-2 hover:border-primary/50 hover:bg-muted/20 transition-all duration-200 group">
+                                        <Link href="/dashboard/projects/new">
+                                            <CardContent className="p-4 flex items-center justify-center py-8">
+                                                <div className="text-center space-y-2">
+                                                    <div
+                                                        className="h-8 w-8 rounded-md bg-muted/50 flex items-center justify-center mx-auto group-hover:bg-muted transition-colors">
+                                                        <Plus
+                                                            className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors"/>
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-medium text-sm group-hover:text-primary transition-colors">
+                                                            Create New Project
+                                                        </p>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            Start tracking changes
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </CardContent>
+                                        </Link>
+                                    </Card>
+                                </motion.div>
+                            </div>
+                        </motion.div>
+
+                        {/* Activity Feed */}
+                        <motion.div variants={fadeIn} className="space-y-4">
+                            <h2 className="text-xl font-semibold">Recent Activity</h2>
+                            <Card>
+                                <CardHeader className="pb-3">
+                                    <CardDescription>
+                                        Latest updates across your projects
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <ScrollArea className="h-[400px] pr-3">
+                                        <div className="space-y-3">
+                                            {stats?.recentActivity?.length ? (
+                                                stats.recentActivity.slice(0, 10).map((activity: DashboardActivity) => (
+                                                    <motion.div
+                                                        key={activity.id}
+                                                        variants={fadeIn}
+                                                        className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors group"
+                                                    >
+                                                        <div className="mt-0.5 flex-shrink-0">
+                                                            <div
+                                                                className="h-6 w-6 rounded-md bg-muted/50 flex items-center justify-center">
+                                                                <Code className="h-3 w-3 text-muted-foreground"/>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex-1 min-w-0 space-y-1">
+                                                            <p className="text-sm font-medium leading-relaxed">{activity.message}</p>
+                                                            <div
+                                                                className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                                <span>{formatDistanceToNow(new Date(activity.timestamp))} ago</span>
+                                                                <span>•</span>
+                                                                <Link
+                                                                    href={`/dashboard/projects/${activity.projectId}/`}
+                                                                    className="text-primary hover:underline inline-flex items-center gap-1"
+                                                                >
+                                                                    {activity.projectName}
+                                                                </Link>
+                                                            </div>
+                                                        </div>
+                                                    </motion.div>
+                                                ))
+                                            ) : (
+                                                <div
+                                                    className="flex flex-col items-center justify-center h-[200px] text-center space-y-3">
+                                                    <div
+                                                        className="h-12 w-12 rounded-md bg-muted/50 flex items-center justify-center">
+                                                        <Activity className="h-6 w-6 text-muted-foreground"/>
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <p className="text-sm font-medium">No activity yet</p>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            Activity will appear here as you make changes
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </ScrollArea>
+                                </CardContent>
+                            </Card>
+                        </motion.div>
+                    </div>
                 </motion.div>
             </div>
         </div>

@@ -1,7 +1,7 @@
 import * as React from "react"
-import { cva, type VariantProps } from "class-variance-authority"
-import { AlertCircle, Info, CheckCircle2, AlertTriangle, XCircle } from "lucide-react"
-import { cn } from "@/lib/utils"
+import {cva, type VariantProps} from "class-variance-authority"
+import {AlertCircle, Info, CheckCircle2, AlertTriangle, XCircle} from "lucide-react"
+import {cn} from "@/lib/utils"
 
 const alertVariants = cva(
     "relative isolate w-full rounded-lg border p-4 transition-all duration-300 [&>svg~*]:pl-7 [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:text-foreground",
@@ -9,7 +9,7 @@ const alertVariants = cva(
         variants: {
             variant: {
                 default: [
-                    // Base styling with optical border
+                    // Base styling with an optical border
                     "border border-muted-foreground/20 bg-background text-foreground",
                     // Background layer for depth
                     "before:absolute before:inset-0 before:-z-10 before:rounded-[calc(theme(borderRadius.lg)-1px)] before:bg-gradient-to-b before:from-background/80 before:to-background/40",
@@ -144,7 +144,7 @@ const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
                 alertIcon = icon
             } else {
                 const IconComponent = iconMap[variant as keyof typeof iconMap]
-                alertIcon = <IconComponent className="h-4 w-4" />
+                alertIcon = <IconComponent className="h-4 w-4"/>
             }
         }
 
@@ -176,7 +176,7 @@ const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
                         className="absolute right-4 top-4 rounded-md p-1 text-muted-foreground/60 hover:text-foreground hover:bg-accent/30 transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                         aria-label="Dismiss alert"
                     >
-                        <XCircle className="h-4 w-4" />
+                        <XCircle className="h-4 w-4"/>
                     </button>
                 )}
             </div>
@@ -188,7 +188,7 @@ Alert.displayName = "Alert"
 const AlertTitle = React.forwardRef<
     HTMLParagraphElement,
     React.HTMLAttributes<HTMLHeadingElement>
->(({ className, ...props }, ref) => (
+>(({className, ...props}, ref) => (
     <h5
         ref={ref}
         className={cn(
@@ -203,7 +203,7 @@ AlertTitle.displayName = "AlertTitle"
 const AlertDescription = React.forwardRef<
     HTMLParagraphElement,
     React.HTMLAttributes<HTMLParagraphElement>
->(({ className, ...props }, ref) => (
+>(({className, ...props}, ref) => (
     <div
         ref={ref}
         className={cn("text-sm leading-relaxed [&_p]:leading-relaxed opacity-90", className)}
@@ -215,7 +215,7 @@ AlertDescription.displayName = "AlertDescription"
 const AlertActions = React.forwardRef<
     HTMLDivElement,
     React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
+>(({className, ...props}, ref) => (
     <div
         ref={ref}
         className={cn(
@@ -227,4 +227,4 @@ const AlertActions = React.forwardRef<
 ))
 AlertActions.displayName = "AlertActions"
 
-export { Alert, AlertTitle, AlertDescription, AlertActions }
+export {Alert, AlertTitle, AlertDescription, AlertActions}
