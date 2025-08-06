@@ -15,18 +15,15 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
-  build-and-push:
+  info:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    permissions:
-      contents: read
-      packages: write
-
+    outputs:
+      image_name: ${{ steps.meta.outputs.image_name }}
+      version: ${{ steps.meta.outputs.version }}
+      tags: ${{ steps.meta.outputs.tags }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: Show build info
+        id: meta
         run: |
           IMAGE_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           
@@ -38,6 +35,8 @@ jobs:
             VERSION="${{ github.ref_name }}"
             TRIGGER="Tag push"
           fi
+          
+          TAGS="${{ env.REGISTRY }}/$IMAGE_NAME:$VERSION,${{ env.REGISTRY }}/$IMAGE_NAME:latest"
           
           echo "🚀 Docker Build Starting"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -52,6 +51,21 @@ jobs:
           echo ""
           echo "🏗️  Platforms: linux/amd64, linux/arm64"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          echo "image_name=$IMAGE_NAME" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tags=$TAGS" >> $GITHUB_OUTPUT
+
+  build-amd64:
+    needs: info
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -63,50 +77,101 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set image name and version
-        id: meta
-        run: |
-          IMAGE_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          
-          # Determine version
-          if [ -n "${{ github.event.inputs.version }}" ]; then
-            VERSION="${{ github.event.inputs.version }}"
-          else
-            VERSION="${{ github.ref_name }}"
-          fi
-          
-          # Keep version as-is (don't trim 'v' prefix)
-          
-          echo "image_name=$IMAGE_NAME" >> $GITHUB_OUTPUT
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "tags=${{ env.REGISTRY }}/$IMAGE_NAME:$VERSION,${{ env.REGISTRY }}/$IMAGE_NAME:latest" >> $GITHUB_OUTPUT
-
-      - name: Build and push
+      - name: Build and push AMD64
         uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          cache-from: |
-            type=gha
-            type=registry,ref=${{ env.REGISTRY }}/${{ steps.meta.outputs.image_name }}:buildcache
-          cache-to: |
-            type=gha,mode=max
-            type=registry,ref=${{ env.REGISTRY }}/${{ steps.meta.outputs.image_name }}:buildcache,mode=max
+          tags: ${{ env.REGISTRY }}/${{ needs.info.outputs.image_name }}:${{ needs.info.outputs.version }}-amd64
+          cache-from: type=gha,scope=amd64
+          cache-to: type=gha,mode=max,scope=amd64
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
-            org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
+            org.opencontainers.image.version=${{ needs.info.outputs.version }}
+
+  build-arm64:
+    needs: info
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ARM64
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/arm64
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ needs.info.outputs.image_name }}:${{ needs.info.outputs.version }}-arm64
+          cache-from: type=gha,scope=arm64
+          cache-to: type=gha,mode=max,scope=arm64
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ needs.info.outputs.version }}
+
+  create-manifest:
+    needs: [info, build-amd64, build-arm64]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push multi-arch manifest
+        run: |
+          # Create manifest for version tag
+          docker buildx imagetools create \
+            -t ${{ env.REGISTRY }}/${{ needs.info.outputs.image_name }}:${{ needs.info.outputs.version }} \
+            ${{ env.REGISTRY }}/${{ needs.info.outputs.image_name }}:${{ needs.info.outputs.version }}-amd64 \
+            ${{ env.REGISTRY }}/${{ needs.info.outputs.image_name }}:${{ needs.info.outputs.version }}-arm64
+          
+          # Create manifest for latest tag
+          docker buildx imagetools create \
+            -t ${{ env.REGISTRY }}/${{ needs.info.outputs.image_name }}:latest \
+            ${{ env.REGISTRY }}/${{ needs.info.outputs.image_name }}:${{ needs.info.outputs.version }}-amd64 \
+            ${{ env.REGISTRY }}/${{ needs.info.outputs.image_name }}:${{ needs.info.outputs.version }}-arm64
+
+      - name: Clean up temporary tags
+        run: |
+          # Note: GitHub doesn't provide a direct way to delete tags via docker CLI
+          # The temporary architecture-specific tags will remain but won't interfere
+          echo "✅ Multi-arch manifests created successfully"
+          echo "⚠️  Architecture-specific tags remain as build artifacts"
 
       - name: Summary
         run: |
-          echo "## 🚀 Docker Image Built!" >> $GITHUB_STEP_SUMMARY
-          echo "**Image:** \`${{ env.REGISTRY }}/${{ steps.meta.outputs.image_name }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Version:** \`${{ steps.meta.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Tags:** \`${{ steps.meta.outputs.version }}\`, \`latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 Docker Image Built Successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`${{ env.REGISTRY }}/${{ needs.info.outputs.image_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** \`${{ needs.info.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Tags:** \`${{ needs.info.outputs.version }}\`, \`latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Platforms:** linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Pull:**" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-          echo "docker pull ${{ env.REGISTRY }}/${{ steps.meta.outputs.image_name }}:${{ steps.meta.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ${{ env.REGISTRY }}/${{ needs.info.outputs.image_name }}:${{ needs.info.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
