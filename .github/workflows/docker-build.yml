@@ -59,8 +59,6 @@ jobs:
       platform: 'linux/amd64'
       image_name: ${{ needs.info.outputs.image_name }}
       version: ${{ needs.info.outputs.version }}
-    secrets:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-arm64:
     needs: info
@@ -69,8 +67,6 @@ jobs:
       platform: 'linux/arm64'
       image_name: ${{ needs.info.outputs.image_name }}
       version: ${{ needs.info.outputs.version }}
-    secrets:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   create-manifest:
     needs: [info, build-amd64, build-arm64]
