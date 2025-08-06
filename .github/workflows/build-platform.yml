@@ -15,9 +15,7 @@ on:
         required: true
         type: string
         description: 'Version tag'
-    secrets:
-      GITHUB_TOKEN:
-        required: true
+
 
 env:
   REGISTRY: ghcr.io
