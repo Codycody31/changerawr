@@ -8,7 +8,7 @@
 - [x] custom domains (what a headache to implement!)
 - [x] scheduled publishing
 - [x] full-text search
-- [ ] version range comparison (catch-up) thinking a digest of what's been done from here-to-there, could be fun!
+- [ ] version range comparison (catch-up) thinking a digest of what's been done from here-to-there, could be fun! PLANNED FOR NEXT RELEASE <-
 - [ ] more changelog customization
   - set SEO for public changelog
   - custom scripting for public changelog ( custom js, CSS makes no sense due to changerawr being a CMS)
@@ -20,10 +20,13 @@
 
 - [ ] ability to specify a custom logo for an SSO provider (will be added when I get around to media storage!)
 - [ ] update the MCP server so it can use scheduled publishing
-- [ ] collaboration
+- [ ] collaboration ( real time, this is complicated! )
 - [ ] allow for inviting other staff members to work on the same changelog entry
 - [x] CLI for Changerawr
 - [ ] do stuff with the syncCommit and syncCommitMetadata (no ideas what I could do as of writing)
 - [x] extend markdown with custom elements (perhaps, can call it Changerawr Universal Markdown engine) - CUM
 - [x] allow for importing a full changelog.md into changerawr to jump-start a project from existing data. look into canny importing as well.
 - [ ] add a configuration option for project email notifications to allow emails to be sent out on publish
+
+### CLI Ideas
+- none as of now
