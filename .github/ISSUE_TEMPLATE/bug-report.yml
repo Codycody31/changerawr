@@ -202,12 +202,14 @@ body:
           required: true
         - label: I'd be willing to test a fix if provided
           required: false
-        - label: I am able to prodvide a reproduction video in the event that I can not provide reproduction steps ( youtube, loom, etc )
+        - label: I am able to provide a reproduction video in the event that I can not provide reproduction steps ( youtube, loom, etc )
           required: true
         - label: I have all required ENV variables configured.
           required: true
         - label: I am using docker ( only check this if you are deploying with docker! )
           required: false
+        - label: I am not using Cloudflare Zero Trust ( it breaks everything! )
+          required: true
 
   - type: markdown
     attributes:
