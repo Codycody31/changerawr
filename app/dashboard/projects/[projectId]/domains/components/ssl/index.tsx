@@ -177,15 +177,16 @@ export function SSLManagement({ domain, onUpdate, onError, onSuccess }: SSLManag
         }
     }
 
-    const handleVerifyDNS = async () => {
-        if (!certId) return
+    const handleVerifyDNS = async (id?: string) => {
+        const targetCertId = id || certId
+        if (!targetCertId) return
 
         setIsProcessing(true)
         try {
             const response = await fetch('/api/acme/verify-dns', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ certId }),
+                body: JSON.stringify({ certId: targetCertId }),
             })
 
             const result = await response.json()
