@@ -212,7 +212,7 @@ export async function completeDns01Certificate(certId: string): Promise<void> {
     const hostname = cert.domain.domain
 
     // Restore the existing order instead of creating a new one
-    const order = { url: cert.acmeOrderUrl }
+    const order = await (client as any).getOrder(cert.acmeOrderUrl)
 
     const authorizations = await client.getAuthorizations(order)
     const challenge = authorizations[0].challenges.find(c => c.type === 'dns-01')
