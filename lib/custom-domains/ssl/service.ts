@@ -102,19 +102,19 @@ async function completeHttp01Challenge(
     csr: Buffer,
 ): Promise<void> {
     try {
-        // Get certificate details
-        const cert = await db.domainCertificate.findUnique({
+        // Get certificate details for self-check
+        const certRecord = await db.domainCertificate.findUnique({
             where: { id: certId },
             include: { domain: true },
         })
 
-        if (!cert) {
+        if (!certRecord) {
             throw new Error('Certificate not found')
         }
 
-        const hostname = cert.domain.domain
-        const token = cert.challengeToken
-        const expectedKeyAuth = cert.challengeKeyAuth
+        const hostname = certRecord.domain.domain
+        const token = certRecord.challengeToken
+        const expectedKeyAuth = certRecord.challengeKeyAuth
 
         if (!token || !expectedKeyAuth) {
             throw new Error('Challenge token or key authorization missing')
@@ -180,14 +180,14 @@ async function completeHttp01Challenge(
         await client.waitForValidStatus(challenge)
         console.log(`[ssl/http01] ✅ Challenge validated successfully!`)
 
-        const cert = await db.domainCertificate.findUnique({ where: { id: certId } })
-        if (!cert?.acmeOrderUrl) {
+        const updatedCert = await db.domainCertificate.findUnique({ where: { id: certId } })
+        if (!updatedCert?.acmeOrderUrl) {
             console.log(`[ssl/http01] ❌ Order URL missing from database`)
             throw new Error('Order URL missing from DB')
         }
 
         console.log(`[ssl/http01] 📋 Finalizing order with Certificate Signing Request...`)
-        const currentOrder = await (client as any).getOrder(cert.acmeOrderUrl)
+        const currentOrder = await (client as any).getOrder(updatedCert.acmeOrderUrl)
         await client.finalizeOrder(currentOrder, csr)
 
         console.log(`[ssl/http01] 📜 Downloading certificate from Let's Encrypt...`)
@@ -220,7 +220,7 @@ async function completeHttp01Challenge(
         })
 
         const domain = await db.customDomain.update({
-            where: { id: cert.domainId },
+            where: { id: updatedCert.domainId },
             data: { sslMode: 'LETS_ENCRYPT' },
         })
 
