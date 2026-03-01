@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
         console.log('[acme/verify-dns] 🚀 Starting DNS-01 completion process...')
 
         try {
-            // Update status to show we're processing
+            // Update status to show we're processing (but keep PENDING_DNS01 status)
             await db.domainCertificate.update({
                 where: { id: body.certId },
                 data: { lastError: 'Verifying DNS TXT record...' },
@@ -90,15 +90,16 @@ export async function POST(request: NextRequest) {
             const message = error instanceof Error ? error.message : 'Unknown error'
             console.error('[acme/verify-dns] ⚠️  DNS completion error:', message)
 
-            // Update the certificate with the error message
-            await db.domainCertificate.update({
-                where: { id: body.certId },
-                data: { lastError: message },
-            }).catch(() => {})
-
-            // If TXT record not propagated, return specific message
+            // If TXT record not propagated, DON'T mark as failed - keep it PENDING so user can retry
             if (message.includes('TXT record') || message.includes('not propagated') || message.includes('DNS')) {
-                console.log('[acme/verify-dns] 💤 DNS not propagated yet, user should retry')
+                console.log('[acme/verify-dns] 💤 DNS not propagated yet, keeping status as PENDING_DNS01')
+
+                // Update error message but keep status as PENDING_DNS01
+                await db.domainCertificate.update({
+                    where: { id: body.certId },
+                    data: { lastError: 'DNS TXT record not yet propagated. Click verify again after a few minutes.' },
+                }).catch(() => {})
+
                 return NextResponse.json(
                     {
                         success: false,
@@ -109,8 +110,17 @@ export async function POST(request: NextRequest) {
                 )
             }
 
+            // For other errors (expired orders, etc), mark as FAILED
+            console.error('[acme/verify-dns] ❌ Marking certificate as FAILED')
+            await db.domainCertificate.update({
+                where: { id: body.certId },
+                data: {
+                    status: 'FAILED',
+                    lastError: message,
+                },
+            }).catch(() => {})
+
             // Other errors are actual failures
-            console.error('[acme/verify-dns] ❌ Throwing error to outer handler')
             throw error
         }
     } catch (error) {
