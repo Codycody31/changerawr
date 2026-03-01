@@ -202,16 +202,17 @@ export function SSLManagement({ domain, onUpdate, onError, onSuccess }: SSLManag
             const result = await response.json()
             console.log('[SSL UI] DNS verification result:', result)
 
-            if (response.ok) {
-                console.log('[SSL UI] DNS verification successful, certificate issued!')
-                onSuccess('SSL certificate issued successfully!')
-                await onUpdate() // Refresh the domain data
-                setStep('mode-select')
-            } else if (response.status === 202 && result.retry) {
+            // Check for 202 (retry) BEFORE checking response.ok
+            if (response.status === 202 && result.retry) {
                 // DNS not propagated yet - show friendly retry message
                 console.log('[SSL UI] DNS not propagated, user should retry')
                 onError(result.message || 'DNS TXT record not yet propagated. Please wait and try again.')
                 setStep('dns-instructions') // Go back to instructions
+            } else if (response.ok && result.success) {
+                console.log('[SSL UI] DNS verification successful, certificate issued!')
+                onSuccess('SSL certificate issued successfully!')
+                await onUpdate() // Refresh the domain data
+                setStep('mode-select')
             } else {
                 console.error('[SSL UI] DNS verification failed:', result.error)
                 onError(result.error || result.message || 'DNS verification failed')
