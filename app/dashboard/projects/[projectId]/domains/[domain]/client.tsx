@@ -313,11 +313,13 @@ export function DomainSettingsClient({ projectId, domain: domainName }: DomainSe
                     </Card>
 
                     {/* DNS Configuration Card */}
-                    {dnsInstructions && !domain.verified && (
+                    {dnsInstructions && (
                         <Card>
                             <CardHeader>
                                 <CardTitle>DNS Configuration</CardTitle>
-                                <CardDescription>Add these DNS records to verify your domain</CardDescription>
+                                <CardDescription>
+                                    {domain.verified ? 'Current DNS records for your domain' : 'Add these DNS records to verify your domain'}
+                                </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 {/* CNAME Record */}

@@ -365,21 +365,42 @@ export function SSLManagement({ domain, onUpdate, onError, onSuccess }: SSLManag
                 />
 
                 {pendingCert && (
-                    <Button
-                        variant="outline"
-                        onClick={async () => {
-                            try {
-                                await fetch(`/api/acme/cancel/${pendingCert.id}`, { method: 'POST' })
-                                onSuccess('Certificate issuance cancelled')
-                                await onUpdate()
-                            } catch {
-                                onError('Failed to cancel')
-                            }
-                        }}
-                        className="w-full"
-                    >
-                        Cancel Issuance
-                    </Button>
+                    <>
+                        {pendingCert.status === 'PENDING_DNS01' && pendingCert.dnsTxtValue && (
+                            <SSLDNSInstructions
+                                txtName={`_acme-challenge.${domain.domain}`}
+                                txtValue={pendingCert.dnsTxtValue}
+                                onVerify={() => handleVerifyDNS(pendingCert.id)}
+                                onBack={handleCancelSetup}
+                                onCopy={(text) => {
+                                    navigator.clipboard.writeText(text)
+                                    onSuccess('Copied to clipboard!')
+                                }}
+                                isProcessing={isProcessing}
+                            />
+                        )}
+                        {pendingCert.status === 'PENDING_HTTP01' && (
+                            <SSLVerificationProgress
+                                domain={domain.domain}
+                                onCancel={handleCancelSetup}
+                            />
+                        )}
+                        <Button
+                            variant="outline"
+                            onClick={async () => {
+                                try {
+                                    await fetch(`/api/acme/cancel/${pendingCert.id}`, { method: 'POST' })
+                                    onSuccess('Certificate issuance cancelled')
+                                    await onUpdate()
+                                } catch {
+                                    onError('Failed to cancel')
+                                }
+                            }}
+                            className="w-full"
+                        >
+                            Cancel Issuance
+                        </Button>
+                    </>
                 )}
 
                 {/* Domain-specific features (browser rules, rate limiting) */}
