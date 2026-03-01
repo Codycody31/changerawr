@@ -202,8 +202,10 @@ export async function proxy(request: NextRequest) {
     }
 
     // ACME HTTP-01 challenge passthrough — MUST be first, before ANY redirects or auth checks.
-    // Let's Encrypt validates challenges over plain HTTP. Any redirect here breaks certificate issuance.
+    // Let's Encrypt validates challenges over both HTTP and HTTPS.
     if (pathname.startsWith('/.well-known/acme-challenge/')) {
+        console.log(`[proxy] 🔐 ACME challenge request: ${hostname}${pathname}`)
+        console.log(`[proxy]    Protocol: ${request.headers.get('x-forwarded-proto') || 'unknown'}`)
         return NextResponse.next()
     }
 

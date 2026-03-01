@@ -11,7 +11,10 @@ interface VerifyDnsRequest {
 }
 
 export async function POST(request: NextRequest) {
+    console.log('[acme/verify-dns] 🔵 DNS verification request received')
+
     if (!sslSupported) {
+        console.log('[acme/verify-dns] ❌ SSL not supported (not in Docker deployment)')
         return NextResponse.json(
             { error: 'SSL certificate management is only available in Docker deployments' },
             { status: 503 },
@@ -20,13 +23,17 @@ export async function POST(request: NextRequest) {
 
     try {
         const body: VerifyDnsRequest = await request.json()
+        console.log('[acme/verify-dns] 📋 Request body:', body)
 
         if (!body.certId) {
+            console.log('[acme/verify-dns] ❌ Missing certId in request')
             return NextResponse.json(
                 { error: 'Missing required field: certId' },
                 { status: 400 },
             )
         }
+
+        console.log(`[acme/verify-dns] 🔍 Looking up certificate: ${body.certId}`)
 
         // Verify cert exists and is in the right state
         const cert = await db.domainCertificate.findUnique({
@@ -37,22 +44,30 @@ export async function POST(request: NextRequest) {
         })
 
         if (!cert) {
+            console.log(`[acme/verify-dns] ❌ Certificate not found: ${body.certId}`)
             return NextResponse.json(
                 { error: 'Certificate not found' },
                 { status: 404 },
             )
         }
 
+        console.log(`[acme/verify-dns] ✅ Found certificate for ${cert.domain.domain}`)
+        console.log(`[acme/verify-dns] 📊 Certificate status: ${cert.status}`)
+
         if (cert.status !== 'PENDING_DNS01') {
+            console.log(`[acme/verify-dns] ❌ Invalid certificate state: ${cert.status} (expected: PENDING_DNS01)`)
             return NextResponse.json(
                 { error: `Certificate is not in PENDING_DNS01 state (current: ${cert.status})` },
                 { status: 400 },
             )
         }
 
+        console.log('[acme/verify-dns] 🚀 Starting DNS-01 completion process...')
+
         try {
             await completeDns01Certificate(body.certId)
 
+            console.log('[acme/verify-dns] 📤 Notifying nginx-agent...')
             // Notify nginx-agent about the new certificate
             await notifyAgent({
                 event: 'cert.issued',
@@ -60,15 +75,18 @@ export async function POST(request: NextRequest) {
                 certId: cert.id,
             })
 
+            console.log('[acme/verify-dns] ✅ DNS verification successful!')
             return NextResponse.json({
                 success: true,
                 message: 'Certificate issued successfully',
             })
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Unknown error'
+            console.error('[acme/verify-dns] ⚠️  DNS completion error:', message)
 
             // If TXT record not propagated, return 202 (not an error, just retry later)
             if (message.includes('TXT record not found') || message.includes('not propagated')) {
+                console.log('[acme/verify-dns] 💤 DNS not propagated yet, user should retry')
                 return NextResponse.json(
                     {
                         success: false,
@@ -80,10 +98,15 @@ export async function POST(request: NextRequest) {
             }
 
             // Other errors are actual failures
+            console.error('[acme/verify-dns] ❌ Throwing error to outer handler')
             throw error
         }
     } catch (error) {
-        console.error('[acme/verify-dns] Error:', error)
+        console.error('[acme/verify-dns] ❌ Fatal error:', error)
+        if (error instanceof Error) {
+            console.error('[acme/verify-dns]    Message:', error.message)
+            console.error('[acme/verify-dns]    Stack:', error.stack)
+        }
 
         const message = error instanceof Error ? error.message : 'Unknown error'
 

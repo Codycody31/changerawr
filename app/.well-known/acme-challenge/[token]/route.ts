@@ -11,13 +11,17 @@ export async function GET(
 ) {
     const { token } = await params
 
+    console.log(`[acme-challenge] 🔍 Incoming challenge request for token: ${token}`)
+
     // Validate token format to prevent directory traversal or injection
     if (!TOKEN_REGEX.test(token)) {
+        console.log(`[acme-challenge] ❌ Invalid token format: ${token}`)
         return new NextResponse('Invalid token format', { status: 400 })
     }
 
     // Get the hostname from the request
     const hostname = request.headers.get('host')?.split(':')[0] || ''
+    console.log(`[acme-challenge] 🌐 Request from hostname: ${hostname}`)
 
     try {
         // Debug: Log all pending HTTP01 challenges
@@ -29,7 +33,10 @@ export async function GET(
                 domain: { select: { domain: true } },
             },
         })
-        console.log(`[acme-challenge] All pending HTTP01 challenges:`, JSON.stringify(allPending, null, 2))
+        console.log(`[acme-challenge] 📋 Found ${allPending.length} pending HTTP-01 challenges in database:`)
+        allPending.forEach(p => {
+            console.log(`[acme-challenge]    - ${p.domain.domain}: token=${p.challengeToken}`)
+        })
 
         // Find the certificate challenge for this specific domain and token
         const cert = await db.domainCertificate.findFirst({
@@ -50,12 +57,13 @@ export async function GET(
         })
 
         if (!cert?.challengeKeyAuth) {
-            console.log(`[acme-challenge] Challenge NOT FOUND - hostname: ${hostname}, token: ${token}`)
-            console.log(`[acme-challenge] Looked for domain=${hostname}, status=PENDING_HTTP01, token=${token}`)
+            console.log(`[acme-challenge] ❌ Challenge NOT FOUND`)
+            console.log(`[acme-challenge]    Looking for: domain=${hostname}, status=PENDING_HTTP01, token=${token}`)
             return new NextResponse('Challenge not found', { status: 404 })
         }
 
-        console.log(`[acme-challenge] Serving challenge for ${cert.domain.domain}, token: ${token}`)
+        console.log(`[acme-challenge] ✅ Found matching challenge for ${cert.domain.domain}`)
+        console.log(`[acme-challenge] 📤 Serving key authorization: ${cert.challengeKeyAuth.substring(0, 20)}...`)
 
         // Let's Encrypt expects exactly this response with no extra whitespace
         return new NextResponse(cert.challengeKeyAuth, {
@@ -66,7 +74,7 @@ export async function GET(
             },
         })
     } catch (error) {
-        console.error('[acme-challenge] Database error:', error)
+        console.error('[acme-challenge] ❌ Database error:', error)
         return new NextResponse('Internal server error', { status: 500 })
     }
 }

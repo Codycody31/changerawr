@@ -102,6 +102,35 @@ async function completeHttp01Challenge(
     csr: Buffer,
 ): Promise<void> {
     try {
+        // Verify challenge is retrievable from database before telling Let's Encrypt to check
+        console.log(`[ssl/http01] 🔄 Verifying challenge is retrievable from database...`)
+        let attempt = 0
+        const maxAttempts = 10
+        let challengeReady = false
+
+        while (attempt < maxAttempts && !challengeReady) {
+            const cert = await db.domainCertificate.findUnique({
+                where: { id: certId },
+                select: { challengeToken: true, challengeKeyAuth: true, status: true },
+            })
+
+            if (cert?.challengeToken && cert?.challengeKeyAuth && cert.status === 'PENDING_HTTP01') {
+                console.log(`[ssl/http01] ✅ Challenge verified in database (attempt ${attempt + 1})`)
+                challengeReady = true
+            } else {
+                attempt++
+                if (attempt < maxAttempts) {
+                    console.log(`[ssl/http01] ⏳ Challenge not ready yet, waiting 500ms... (attempt ${attempt}/${maxAttempts})`)
+                    await new Promise(resolve => setTimeout(resolve, 500))
+                }
+            }
+        }
+
+        if (!challengeReady) {
+            console.log(`[ssl/http01] ❌ Challenge not retrievable from database after ${maxAttempts} attempts`)
+            throw new Error('Challenge not retrievable from database')
+        }
+
         console.log(`[ssl/http01] 🚀 Telling Let's Encrypt to verify the challenge...`)
         await client.completeChallenge(challenge)
 
