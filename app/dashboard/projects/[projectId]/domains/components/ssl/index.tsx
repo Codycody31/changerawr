@@ -187,6 +187,8 @@ export function SSLManagement({ domain, onUpdate, onError, onSuccess }: SSLManag
         }
 
         setIsProcessing(true)
+        setStep('dns01-progress') // Show progress UI immediately
+
         try {
             console.log('[SSL UI] Sending DNS verification request...')
             const response = await fetch('/api/acme/verify-dns', {
@@ -200,16 +202,24 @@ export function SSLManagement({ domain, onUpdate, onError, onSuccess }: SSLManag
             console.log('[SSL UI] DNS verification result:', result)
 
             if (response.ok) {
-                console.log('[SSL UI] DNS verification successful, starting polling')
-                setStep('dns01-progress')
-                startPolling(targetCertId)
+                console.log('[SSL UI] DNS verification successful, certificate issued!')
+                onSuccess('SSL certificate issued successfully!')
+                await onUpdate() // Refresh the domain data
+                setStep('mode-select')
+            } else if (response.status === 202 && result.retry) {
+                // DNS not propagated yet - show friendly retry message
+                console.log('[SSL UI] DNS not propagated, user should retry')
+                onError(result.message || 'DNS TXT record not yet propagated. Please wait and try again.')
+                setStep('dns-instructions') // Go back to instructions
             } else {
                 console.error('[SSL UI] DNS verification failed:', result.error)
-                onError(result.error || 'DNS verification failed')
+                onError(result.error || result.message || 'DNS verification failed')
+                setStep('dns-instructions') // Go back to instructions
             }
         } catch (error) {
             console.error('[SSL UI] DNS verification exception:', error)
-            onError('Failed to verify DNS challenge')
+            onError('Failed to verify DNS challenge - please check your network connection')
+            setStep('dns-instructions') // Go back to instructions
         } finally {
             setIsProcessing(false)
         }

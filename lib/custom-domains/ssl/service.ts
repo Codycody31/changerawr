@@ -102,33 +102,75 @@ async function completeHttp01Challenge(
     csr: Buffer,
 ): Promise<void> {
     try {
-        // Verify challenge is retrievable from database before telling Let's Encrypt to check
-        console.log(`[ssl/http01] 🔄 Verifying challenge is retrievable from database...`)
+        // Get certificate details
+        const cert = await db.domainCertificate.findUnique({
+            where: { id: certId },
+            include: { domain: true },
+        })
+
+        if (!cert) {
+            throw new Error('Certificate not found')
+        }
+
+        const hostname = cert.domain.domain
+        const token = cert.challengeToken
+        const expectedKeyAuth = cert.challengeKeyAuth
+
+        if (!token || !expectedKeyAuth) {
+            throw new Error('Challenge token or key authorization missing')
+        }
+
+        // Self-check: verify we can retrieve the challenge via HTTP before telling Let's Encrypt
+        console.log(`[ssl/http01] 🔍 Self-checking challenge endpoint...`)
+        const challengeUrl = `http://${hostname}/.well-known/acme-challenge/${token}`
+        console.log(`[ssl/http01]    URL: ${challengeUrl}`)
+
+        let selfCheckPassed = false
+        const maxAttempts = 5
         let attempt = 0
-        const maxAttempts = 10
-        let challengeReady = false
 
-        while (attempt < maxAttempts && !challengeReady) {
-            const cert = await db.domainCertificate.findUnique({
-                where: { id: certId },
-                select: { challengeToken: true, challengeKeyAuth: true, status: true },
-            })
+        while (attempt < maxAttempts && !selfCheckPassed) {
+            const backoffMs = Math.min(1000 * Math.pow(2, attempt), 5000) // Exponential backoff: 1s, 2s, 4s, 5s, 5s
 
-            if (cert?.challengeToken && cert?.challengeKeyAuth && cert.status === 'PENDING_HTTP01') {
-                console.log(`[ssl/http01] ✅ Challenge verified in database (attempt ${attempt + 1})`)
-                challengeReady = true
-            } else {
-                attempt++
-                if (attempt < maxAttempts) {
-                    console.log(`[ssl/http01] ⏳ Challenge not ready yet, waiting 500ms... (attempt ${attempt}/${maxAttempts})`)
-                    await new Promise(resolve => setTimeout(resolve, 500))
+            if (attempt > 0) {
+                console.log(`[ssl/http01] ⏳ Waiting ${backoffMs}ms before retry (attempt ${attempt + 1}/${maxAttempts})...`)
+                await new Promise(resolve => setTimeout(resolve, backoffMs))
+            }
+
+            try {
+                console.log(`[ssl/http01] 📡 Attempt ${attempt + 1}/${maxAttempts}: Fetching challenge endpoint...`)
+                const response = await fetch(challengeUrl, {
+                    headers: { 'Host': hostname },
+                    signal: AbortSignal.timeout(5000),
+                })
+
+                console.log(`[ssl/http01]    Response status: ${response.status}`)
+
+                if (response.status === 200) {
+                    const body = await response.text()
+                    console.log(`[ssl/http01]    Response body length: ${body.length} bytes`)
+                    console.log(`[ssl/http01]    Expected: ${expectedKeyAuth.substring(0, 20)}...`)
+                    console.log(`[ssl/http01]    Received: ${body.substring(0, 20)}...`)
+
+                    if (body === expectedKeyAuth) {
+                        console.log(`[ssl/http01] ✅ Self-check PASSED - challenge is accessible and correct!`)
+                        selfCheckPassed = true
+                    } else {
+                        console.log(`[ssl/http01] ❌ Self-check FAILED - key authorization mismatch`)
+                        attempt++
+                    }
+                } else {
+                    console.log(`[ssl/http01] ❌ Self-check FAILED - HTTP ${response.status}`)
+                    attempt++
                 }
+            } catch (error) {
+                console.error(`[ssl/http01] ❌ Self-check error:`, error instanceof Error ? error.message : error)
+                attempt++
             }
         }
 
-        if (!challengeReady) {
-            console.log(`[ssl/http01] ❌ Challenge not retrievable from database after ${maxAttempts} attempts`)
-            throw new Error('Challenge not retrievable from database')
+        if (!selfCheckPassed) {
+            throw new Error(`Challenge self-check failed after ${maxAttempts} attempts - cannot verify challenge is accessible`)
         }
 
         console.log(`[ssl/http01] 🚀 Telling Let's Encrypt to verify the challenge...`)

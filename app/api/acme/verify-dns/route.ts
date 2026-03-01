@@ -65,6 +65,12 @@ export async function POST(request: NextRequest) {
         console.log('[acme/verify-dns] 🚀 Starting DNS-01 completion process...')
 
         try {
+            // Update status to show we're processing
+            await db.domainCertificate.update({
+                where: { id: body.certId },
+                data: { lastError: 'Verifying DNS TXT record...' },
+            })
+
             await completeDns01Certificate(body.certId)
 
             console.log('[acme/verify-dns] 📤 Notifying nginx-agent...')
@@ -84,8 +90,14 @@ export async function POST(request: NextRequest) {
             const message = error instanceof Error ? error.message : 'Unknown error'
             console.error('[acme/verify-dns] ⚠️  DNS completion error:', message)
 
-            // If TXT record not propagated, return 202 (not an error, just retry later)
-            if (message.includes('TXT record not found') || message.includes('not propagated')) {
+            // Update the certificate with the error message
+            await db.domainCertificate.update({
+                where: { id: body.certId },
+                data: { lastError: message },
+            }).catch(() => {})
+
+            // If TXT record not propagated, return specific message
+            if (message.includes('TXT record') || message.includes('not propagated') || message.includes('DNS')) {
                 console.log('[acme/verify-dns] 💤 DNS not propagated yet, user should retry')
                 return NextResponse.json(
                     {
