@@ -6,15 +6,6 @@ import { assertNotInternal } from '@/lib/custom-domains/ssl/ssrf-guard'
 import { notifyAgent } from '@/lib/custom-domains/ssl/webhook'
 import type { DomainCertificate } from '@prisma/client'
 
-// ─── Sandbox Mode ─────────────────────────────────────────────────────────────
-// When ACME_SANDBOX_MODE=true, simulate the entire SSL flow without real certs.
-// This allows testing the challenge flow, database updates, and nginx-agent
-// webhooks without hitting Let's Encrypt rate limits.
-
-function isSandboxMode(): boolean {
-    return process.env.ACME_SANDBOX_MODE === 'true'
-}
-
 // ─── Rate limiting ────────────────────────────────────────────────────────────
 // In-memory per-registered-domain counter. Move to Redis for multi-instance.
 
@@ -51,10 +42,6 @@ export async function initiateHttp01Certificate(
     hostname: string,
 ): Promise<string> {
     await assertNotInternal(hostname)
-
-    if (isSandboxMode()) {
-        return await initiateSandboxHttp01Certificate(domainId, hostname)
-    }
 
     checkRateLimit(hostname)
 
@@ -96,86 +83,6 @@ export async function initiateHttp01Certificate(
         .catch(err => markFailed(cert.id, err))
 
     return cert.id
-}
-
-// Sandbox version of HTTP-01 - simulates the flow without real ACME calls
-async function initiateSandboxHttp01Certificate(
-    domainId: string,
-    hostname: string,
-): Promise<string> {
-    // Generate dummy keys and CSR for sandbox
-    const [certKeyBuffer, csrBuffer] = await acme.crypto.createCsr({
-        altNames: [hostname],
-    })
-
-    const cert = await db.domainCertificate.create({
-        data: {
-            domainId,
-            status: 'PENDING_HTTP01',
-            challengeType: 'HTTP01',
-            privateKeyPem: encrypt(certKeyBuffer.toString()),
-            csrPem: csrBuffer.toString(),
-            challengeToken: `sandbox_token_${Date.now()}`,
-            challengeKeyAuth: `sandbox_keyauth_${Date.now()}`,
-        },
-    })
-
-    // Simulate async completion after 3 seconds
-    void completeSandboxHttp01Challenge(cert.id, hostname, certKeyBuffer.toString())
-        .catch(err => markFailed(cert.id, err))
-
-    return cert.id
-}
-
-async function completeSandboxHttp01Challenge(
-    certId: string,
-    hostname: string,
-    privateKey: string,
-): Promise<void> {
-    // Wait 3 seconds to simulate ACME validation
-    await new Promise(resolve => setTimeout(resolve, 3000))
-
-    // Generate fake certificate PEM
-    const now = new Date()
-    const expiresAt = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000) // 90 days
-
-    const fakeCert = `-----BEGIN CERTIFICATE-----
-SANDBOX CERTIFICATE FOR ${hostname}
-This is a fake certificate generated in sandbox mode.
-Issued: ${now.toISOString()}
-Expires: ${expiresAt.toISOString()}
------END CERTIFICATE-----`
-
-    await db.domainCertificate.update({
-        where: { id: certId },
-        data: {
-            status: 'ISSUED',
-            certificatePem: fakeCert,
-            fullChainPem: fakeCert,
-            issuedAt: now,
-            expiresAt: expiresAt,
-            challengeToken: null,
-            challengeKeyAuth: null,
-        },
-    })
-
-    const cert = await db.domainCertificate.findUnique({
-        where: { id: certId },
-    })
-
-    if (!cert) throw new Error('Certificate not found')
-
-    const domain = await db.customDomain.update({
-        where: { id: cert.domainId },
-        data: { sslMode: 'LETS_ENCRYPT' },
-    })
-
-    // Notify nginx-agent about the new certificate (agent will handle sandbox mode)
-    await notifyAgent({
-        event: 'cert.issued',
-        domain: domain.domain,
-        certId: certId,
-    })
 }
 
 async function completeHttp01Challenge(
@@ -245,10 +152,6 @@ export async function initiateDns01Certificate(
     domainId: string,
     hostname: string,
 ): Promise<Dns01ChallengeInfo> {
-    if (isSandboxMode()) {
-        return await initiateSandboxDns01Certificate(domainId, hostname)
-    }
-
     checkRateLimit(hostname)
 
     const client = await getAcmeClient()
@@ -290,89 +193,8 @@ export async function initiateDns01Certificate(
     }
 }
 
-// Sandbox version of DNS-01 - simulates the flow without real ACME calls
-async function initiateSandboxDns01Certificate(
-    domainId: string,
-    hostname: string,
-): Promise<Dns01ChallengeInfo> {
-    const [certKeyBuffer, csrBuffer] = await acme.crypto.createCsr({
-        altNames: [hostname],
-    })
-
-    const dnsTxtValue = `sandbox_dns_value_${Date.now()}`
-
-    const cert = await db.domainCertificate.create({
-        data: {
-            domainId,
-            status: 'PENDING_DNS01',
-            challengeType: 'DNS01',
-            privateKeyPem: encrypt(certKeyBuffer.toString()),
-            csrPem: csrBuffer.toString(),
-            dnsTxtValue,
-        },
-    })
-
-    return {
-        certId: cert.id,
-        txtName: `_acme-challenge.${hostname}`,
-        txtValue: dnsTxtValue,
-    }
-}
-
-async function completeSandboxDns01Certificate(certId: string): Promise<void> {
-    const cert = await db.domainCertificate.findUnique({
-        where: { id: certId },
-        include: { domain: true },
-    })
-
-    if (!cert) throw new Error('Certificate record not found')
-    if (cert.status !== 'PENDING_DNS01') {
-        throw new Error(`Certificate is in unexpected state: ${cert.status}`)
-    }
-
-    // Simulate 2 second DNS validation delay
-    await new Promise(resolve => setTimeout(resolve, 2000))
-
-    const now = new Date()
-    const expiresAt = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000) // 90 days
-
-    const fakeCert = `-----BEGIN CERTIFICATE-----
-SANDBOX CERTIFICATE FOR ${cert.domain.domain}
-This is a fake certificate generated in sandbox mode (DNS-01).
-Issued: ${now.toISOString()}
-Expires: ${expiresAt.toISOString()}
------END CERTIFICATE-----`
-
-    await db.domainCertificate.update({
-        where: { id: certId },
-        data: {
-            status: 'ISSUED',
-            certificatePem: fakeCert,
-            fullChainPem: fakeCert,
-            issuedAt: now,
-            expiresAt: expiresAt,
-            dnsTxtValue: null,
-        },
-    })
-
-    const domain = await db.customDomain.update({
-        where: { id: cert.domainId },
-        data: { sslMode: 'LETS_ENCRYPT' },
-    })
-
-    // Notify nginx-agent about the new certificate (agent will handle sandbox mode)
-    await notifyAgent({
-        event: 'cert.issued',
-        domain: domain.domain,
-        certId: certId,
-    })
-}
-
 // Called after the user has added the DNS TXT record.
 export async function completeDns01Certificate(certId: string): Promise<void> {
-    if (isSandboxMode()) {
-        return await completeSandboxDns01Certificate(certId)
-    }
     const cert = await db.domainCertificate.findUnique({
         where: { id: certId },
         include: { domain: true },
