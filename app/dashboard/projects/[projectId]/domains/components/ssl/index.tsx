@@ -241,8 +241,20 @@ export function SSLManagement({ domain, onUpdate, onError, onSuccess }: SSLManag
 
         const result = await response.json()
         if (response.ok) {
-            onSuccess(`Certificate removed successfully. You can now issue a new certificate.`)
+            // Reset local state immediately
+            setStep('mode-select')
+            setCertId(null)
+            setDnsChallenge(null)
+            if (pollingInterval) {
+                clearInterval(pollingInterval)
+                setPollingInterval(null)
+            }
+
+            // Wait a moment for database transaction to complete, then refresh
+            await new Promise(resolve => setTimeout(resolve, 500))
             await onUpdate()
+
+            onSuccess(`Certificate removed successfully. You can now issue a new certificate.`)
         } else {
             throw new Error(result.error || 'Failed to remove certificate')
         }
