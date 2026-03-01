@@ -79,7 +79,7 @@ export function SSLDNSInstructions({
                     </CardContent>
                 </Card>
 
-                <Alert variant="info">
+                <Alert>
                     <AlertDescription className="text-xs">
                         DNS changes can take 5-60 minutes to propagate. Click "Verify" once you've added the record.
                     </AlertDescription>

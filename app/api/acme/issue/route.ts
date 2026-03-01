@@ -76,19 +76,23 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // Check for pending certificates
-        const pendingCert = await db.domainCertificate.findFirst({
+        // Check for pending certificates and auto-nuke them
+        // This allows retrying failed attempts without manual cleanup
+        const pendingCerts = await db.domainCertificate.findMany({
             where: {
                 domainId: body.domainId,
-                status: { in: ['PENDING_HTTP01', 'PENDING_DNS01'] },
+                status: { in: ['PENDING_HTTP01', 'PENDING_DNS01', 'FAILED'] },
             },
         })
 
-        if (pendingCert) {
-            return NextResponse.json(
-                { error: 'Certificate issuance already in progress' },
-                { status: 409 },
-            )
+        if (pendingCerts.length > 0) {
+            console.log(`[acme/issue] Deleting ${pendingCerts.length} stale certificates for domain ${domain.domain}`)
+            await db.domainCertificate.deleteMany({
+                where: {
+                    domainId: body.domainId,
+                    status: { in: ['PENDING_HTTP01', 'PENDING_DNS01', 'FAILED'] },
+                },
+            })
         }
 
         if (body.challengeType === 'HTTP01') {
