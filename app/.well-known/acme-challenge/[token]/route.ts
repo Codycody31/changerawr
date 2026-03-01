@@ -23,7 +23,6 @@ export async function GET(
         // Debug: Log all pending HTTP01 challenges
         const allPending = await db.domainCertificate.findMany({
             where: { status: 'PENDING_HTTP01' },
-            include: { domain: true },
             select: {
                 id: true,
                 challengeToken: true,
