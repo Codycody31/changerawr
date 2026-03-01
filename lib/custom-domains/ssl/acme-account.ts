@@ -2,10 +2,13 @@ import * as acme from 'acme-client'
 import {db} from '@/lib/db'
 import {encrypt, decrypt} from '@/lib/custom-domains/ssl/encryption'
 
-const getDirectoryUrl = () =>
-    process.env.ACME_STAGING === 'true'
+const getDirectoryUrl = () => {
+    // ACME_SANDBOX_MODE is a legacy alias for ACME_STAGING (backward compatibility)
+    const useStaging = process.env.ACME_STAGING === 'true' || process.env.ACME_SANDBOX_MODE === 'true'
+    return useStaging
         ? acme.directory.letsencrypt.staging
         : acme.directory.letsencrypt.production
+}
 
 // Creates and persists the global ACME account on first call,
 // loads it from DB on every subsequent call.

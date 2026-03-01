@@ -22,9 +22,10 @@ export async function notifyAgent(event: AgentEvent): Promise<void> {
     if (!agentUrl || !agentSecret) return
 
     // Add mode field for cert.issued and cert.renewed events
-    const isSandbox = process.env.ACME_SANDBOX_MODE === 'true'
+    // Check both ACME_STAGING and ACME_SANDBOX_MODE (legacy) for staging mode
+    const isStaging = process.env.ACME_STAGING === 'true' || process.env.ACME_SANDBOX_MODE === 'true'
     const enrichedEvent = (event.event === 'cert.issued' || event.event === 'cert.renewed')
-        ? { ...event, mode: isSandbox ? 'sandbox' as const : 'live' as const }
+        ? { ...event, mode: isStaging ? 'sandbox' as const : 'live' as const }
         : event
 
     const body = JSON.stringify(enrichedEvent)
