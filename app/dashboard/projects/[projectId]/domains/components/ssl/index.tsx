@@ -29,6 +29,7 @@ type FlowStep = 'mode-select' | 'method-select' | 'dns-instructions' | 'http01-p
 export function SSLManagement({ domain, onUpdate, onError, onSuccess }: SSLManagementProps) {
     const [step, setStep] = useState<FlowStep>('mode-select')
     const [isProcessing, setIsProcessing] = useState(false)
+    const [isCancelling, setIsCancelling] = useState(false)
     const [certId, setCertId] = useState<string | null>(null)
     const [dnsChallenge, setDnsChallenge] = useState<{ txtName: string; txtValue: string } | null>(null)
     const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null)
@@ -226,18 +227,52 @@ export function SSLManagement({ domain, onUpdate, onError, onSuccess }: SSLManag
     }
 
     const handleCancel = async () => {
-        if (certId && pollingInterval) {
-            try {
-                await fetch(`/api/acme/cancel/${certId}`, { method: 'POST' })
-            } catch (error) {
-                console.error('Failed to cancel:', error)
+        console.log('[SSL UI] Cancel button clicked')
+        setIsCancelling(true)
+
+        try {
+            // Stop polling first
+            if (pollingInterval) {
+                console.log('[SSL UI] Clearing polling interval')
+                clearInterval(pollingInterval)
+                setPollingInterval(null)
             }
-            clearInterval(pollingInterval)
-            setPollingInterval(null)
+
+            // Cancel the certificate if we have a certId
+            if (certId) {
+                console.log(`[SSL UI] Cancelling certificate: ${certId}`)
+                try {
+                    const response = await fetch(`/api/acme/cancel/${certId}`, { method: 'POST' })
+                    console.log('[SSL UI] Cancel response:', response.status)
+
+                    if (!response.ok) {
+                        const result = await response.json()
+                        console.error('[SSL UI] Cancel failed:', result)
+                    } else {
+                        console.log('[SSL UI] Certificate cancelled successfully')
+                    }
+                } catch (error) {
+                    console.error('[SSL UI] Cancel request error:', error)
+                }
+            }
+
+            // Reset all state
+            console.log('[SSL UI] Resetting state')
+            setStep('mode-select')
+            setCertId(null)
+            setDnsChallenge(null)
+
+            // Refresh domain data to update UI
+            console.log('[SSL UI] Refreshing domain data')
+            await onUpdate()
+
+            onSuccess('Certificate issuance cancelled')
+        } catch (error) {
+            console.error('[SSL UI] Error during cancel:', error)
+            onError('Failed to cancel certificate issuance')
+        } finally {
+            setIsCancelling(false)
         }
-        setStep('mode-select')
-        setCertId(null)
-        setDnsChallenge(null)
     }
 
     const handleToggleForceHttps = async (enabled: boolean) => {
@@ -478,6 +513,7 @@ export function SSLManagement({ domain, onUpdate, onError, onSuccess }: SSLManag
                             onSuccess('Copied to clipboard!')
                         }}
                         isProcessing={isProcessing}
+                        isCancelling={isCancelling}
                     />
                 )}
 

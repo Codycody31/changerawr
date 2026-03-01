@@ -328,14 +328,34 @@ export async function completeDns01Certificate(certId: string): Promise<void> {
         }
         if (!cert.acmeOrderUrl) {
             console.log(`[ssl/dns01] ❌ Missing ACME order URL`)
-            throw new Error('Missing ACME order URL')
+            throw new Error('Missing ACME order URL - certificate may need to be re-issued')
         }
 
         const client = await getAcmeClient()
         const hostname = cert.domain.domain
 
         console.log(`[ssl/dns01] 🔍 Restoring existing ACME order from: ${cert.acmeOrderUrl}`)
-        const order = await (client as any).getOrder(cert.acmeOrderUrl)
+
+        let order
+        try {
+            order = await (client as any).getOrder(cert.acmeOrderUrl)
+            console.log(`[ssl/dns01] ✅ Order retrieved successfully, status: ${order.status}`)
+        } catch (error) {
+            console.error(`[ssl/dns01] ❌ Failed to retrieve ACME order:`, error)
+            console.log(`[ssl/dns01]    Order URL: ${cert.acmeOrderUrl}`)
+            console.log(`[ssl/dns01]    This usually means the order has expired (orders expire after ~1 hour)`)
+
+            // Mark as failed and suggest re-issuing
+            await db.domainCertificate.update({
+                where: { id: certId },
+                data: {
+                    status: 'FAILED',
+                    lastError: 'ACME order expired. Please delete this certificate and issue a new one.'
+                }
+            })
+
+            throw new Error('ACME order has expired. Please delete this certificate and start the DNS-01 process again.')
+        }
 
         const authorizations = await client.getAuthorizations(order)
         const challenge = authorizations[0].challenges.find(c => c.type === 'dns-01')

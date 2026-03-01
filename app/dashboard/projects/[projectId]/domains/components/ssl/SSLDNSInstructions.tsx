@@ -13,6 +13,7 @@ interface SSLDNSInstructionsProps {
     onBack: () => void
     onCopy: (text: string) => void
     isProcessing: boolean
+    isCancelling?: boolean
 }
 
 export function SSLDNSInstructions({
@@ -22,6 +23,7 @@ export function SSLDNSInstructions({
     onBack,
     onCopy,
     isProcessing,
+    isCancelling = false,
 }: SSLDNSInstructionsProps) {
     return (
         <div className="space-y-4">
@@ -29,10 +31,20 @@ export function SSLDNSInstructions({
                 variant="ghost"
                 size="sm"
                 onClick={onBack}
+                disabled={isCancelling || isProcessing}
                 className="mb-2"
             >
-                <X className="w-4 h-4 mr-2" />
-                Cancel
+                {isCancelling ? (
+                    <>
+                        <div className="w-4 h-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                        Cancelling...
+                    </>
+                ) : (
+                    <>
+                        <X className="w-4 h-4 mr-2" />
+                        Cancel
+                    </>
+                )}
             </Button>
 
             <div className="space-y-3">
