@@ -382,7 +382,7 @@ export function SSLManagement({ domain, onUpdate, onError, onSuccess }: SSLManag
                         )}
                         {pendingCert.status === 'PENDING_HTTP01' && (
                             <SSLVerificationProgress
-                                domain={domain.domain}
+                                type="http01"
                                 onCancel={handleCancel}
                             />
                         )}
