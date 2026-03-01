@@ -179,24 +179,36 @@ export function SSLManagement({ domain, onUpdate, onError, onSuccess }: SSLManag
 
     const handleVerifyDNS = async (id?: string) => {
         const targetCertId = id || certId
-        if (!targetCertId) return
+        console.log('[SSL UI] handleVerifyDNS called with certId:', targetCertId)
+
+        if (!targetCertId) {
+            console.error('[SSL UI] No certId provided to handleVerifyDNS')
+            return
+        }
 
         setIsProcessing(true)
         try {
+            console.log('[SSL UI] Sending DNS verification request...')
             const response = await fetch('/api/acme/verify-dns', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ certId: targetCertId }),
             })
 
+            console.log('[SSL UI] DNS verification response:', response.status, response.statusText)
             const result = await response.json()
+            console.log('[SSL UI] DNS verification result:', result)
+
             if (response.ok) {
+                console.log('[SSL UI] DNS verification successful, starting polling')
                 setStep('dns01-progress')
                 startPolling(targetCertId)
             } else {
+                console.error('[SSL UI] DNS verification failed:', result.error)
                 onError(result.error || 'DNS verification failed')
             }
         } catch (error) {
+            console.error('[SSL UI] DNS verification exception:', error)
             onError('Failed to verify DNS challenge')
         } finally {
             setIsProcessing(false)

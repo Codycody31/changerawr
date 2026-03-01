@@ -139,8 +139,10 @@ export default function ChangelogEntries({projectId}: ChangelogEntriesProps) {
     const [activeEntry, setActiveEntry] = useState<string | null>(null)
     const pathname = usePathname()
 
-    // Determine if we're on a custom domain (pathname will be /changelog/custom-domain/[domain])
-    const isCustomDomain = pathname?.includes('/changelog/custom-domain/')
+    // Determine if we're on a custom domain
+    // On custom domains, pathname will be like "/" or "/entryId", NOT "/changelog/custom-domain/..."
+    // We're on a custom domain if pathname does NOT start with /changelog/ or /dashboard/
+    const isCustomDomain = pathname ? !pathname.startsWith('/changelog/') && !pathname.startsWith('/dashboard/') : false
 
     // New state for filters and search
     const [filters, setFilters] = useState<FilterState>({

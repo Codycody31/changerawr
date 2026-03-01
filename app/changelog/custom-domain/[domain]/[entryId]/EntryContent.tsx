@@ -83,7 +83,7 @@ export function EntryContent({ domain, projectId, projectName, entry }: EntryCon
                             {entry.version && (
                                 <div className="flex items-center gap-1.5">
                                     <Badge variant="outline" className="font-mono">
-                                        v{entry.version}
+                                        {entry.version}
                                     </Badge>
                                 </div>
                             )}
