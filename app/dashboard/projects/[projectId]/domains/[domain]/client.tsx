@@ -74,6 +74,9 @@ export function DomainSettingsClient({ projectId, domain: domainName }: DomainSe
     }
 
     const loadDnsInstructions = async () => {
+        // Only load DNS instructions if domain is not verified
+        if (domain && domain.verified) return
+
         try {
             const response = await fetch(`/api/custom-domains/${encodeURIComponent(domainName)}/dns-instructions`)
             const result = await response.json()
@@ -325,13 +328,11 @@ export function DomainSettingsClient({ projectId, domain: domainName }: DomainSe
                     </Card>
 
                     {/* DNS Configuration Card */}
-                    {dnsInstructions && (
+                    {dnsInstructions && !domain.verified && (
                         <Card>
                             <CardHeader>
                                 <CardTitle>DNS Configuration</CardTitle>
-                                <CardDescription>
-                                    {domain.verified ? 'Current DNS records for your domain' : 'Add these DNS records to verify your domain'}
-                                </CardDescription>
+                                <CardDescription>Add these DNS records to verify your domain</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 {/* CNAME Record */}

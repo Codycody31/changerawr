@@ -41,27 +41,34 @@ export async function initiateHttp01Certificate(
     domainId: string,
     hostname: string,
 ): Promise<string> {
-    await assertNotInternal(hostname)
+    console.log(`[ssl/http01] 🔵 Starting HTTP-01 certificate issuance for ${hostname}`)
 
+    await assertNotInternal(hostname)
     checkRateLimit(hostname)
 
+    console.log(`[ssl/http01] 📡 Requesting certificate order from Let's Encrypt...`)
     const client = await getAcmeClient()
 
     const order = await client.createOrder({
         identifiers: [{ type: 'dns', value: hostname }],
     })
+    console.log(`[ssl/http01] ✅ Order created: ${order.url}`)
 
     const authorizations = await client.getAuthorizations(order)
     const authz = authorizations[0]
     const challenge = authz.challenges.find(c => c.type === 'http-01')
 
     if (!challenge) {
+        console.log(`[ssl/http01] ❌ HTTP-01 challenge not available from Let's Encrypt`)
         throw new Error(
             'HTTP-01 challenge not available for this domain. Try DNS-01 instead.',
         )
     }
 
     const keyAuthorization = await client.getChallengeKeyAuthorization(challenge)
+    console.log(`[ssl/http01] 🔑 Challenge token: ${challenge.token}`)
+    console.log(`[ssl/http01] 📝 Challenge will be served at: http://${hostname}/.well-known/acme-challenge/${challenge.token}`)
+
     const [certKeyBuffer, csrBuffer] = await acme.crypto.createCsr({
         altNames: [hostname],
     })
@@ -78,6 +85,8 @@ export async function initiateHttp01Certificate(
             challengeKeyAuth: keyAuthorization,
         },
     })
+    console.log(`[ssl/http01] 💾 Certificate record saved to database (ID: ${cert.id})`)
+    console.log(`[ssl/http01] ⏳ Waiting for Let's Encrypt to verify the challenge...`)
 
     void completeHttp01Challenge(cert.id, client, authz, challenge, csrBuffer)
         .catch(err => markFailed(cert.id, err))
@@ -92,50 +101,75 @@ async function completeHttp01Challenge(
     challenge: any,
     csr: Buffer,
 ): Promise<void> {
-    await client.completeChallenge(challenge)
-    await client.waitForValidStatus(challenge)
+    try {
+        console.log(`[ssl/http01] 🚀 Telling Let's Encrypt to verify the challenge...`)
+        await client.completeChallenge(challenge)
 
-    const cert = await db.domainCertificate.findUnique({ where: { id: certId } })
-    if (!cert?.acmeOrderUrl) throw new Error('Order URL missing from DB')
+        console.log(`[ssl/http01] ⏳ Waiting for Let's Encrypt to validate...`)
+        await client.waitForValidStatus(challenge)
+        console.log(`[ssl/http01] ✅ Challenge validated successfully!`)
 
-    const currentOrder = await (client as any).getOrder(cert.acmeOrderUrl)
-    await client.finalizeOrder(currentOrder, csr)
-    const certificate = await client.getCertificate(currentOrder)
-    const info = acme.crypto.readCertificateInfo(certificate)
+        const cert = await db.domainCertificate.findUnique({ where: { id: certId } })
+        if (!cert?.acmeOrderUrl) {
+            console.log(`[ssl/http01] ❌ Order URL missing from database`)
+            throw new Error('Order URL missing from DB')
+        }
 
-    // ACME getCertificate returns the full chain (leaf + intermediates)
-    // Split to get just the leaf cert
-    const certs = certificate.split(/(?=-----BEGIN CERTIFICATE-----)/g).filter(Boolean)
-    const leafCert = certs[0] || certificate
-    const fullChain = certificate
+        console.log(`[ssl/http01] 📋 Finalizing order with Certificate Signing Request...`)
+        const currentOrder = await (client as any).getOrder(cert.acmeOrderUrl)
+        await client.finalizeOrder(currentOrder, csr)
 
-    console.log(`[ssl] HTTP-01 cert issued - leaf: ${leafCert.length}b, chain: ${fullChain.length}b`)
+        console.log(`[ssl/http01] 📜 Downloading certificate from Let's Encrypt...`)
+        const certificate = await client.getCertificate(currentOrder)
+        const info = acme.crypto.readCertificateInfo(certificate)
 
-    await db.domainCertificate.update({
-        where: { id: certId },
-        data: {
-            status: 'ISSUED',
-            certificatePem: leafCert,
-            fullChainPem: fullChain,
-            issuedAt: new Date(),
-            expiresAt: info.notAfter,
-            acmeOrderUrl: null,
-            challengeToken: null,
-            challengeKeyAuth: null,
-        },
-    })
+        // ACME getCertificate returns the full chain (leaf + intermediates)
+        // Split to get just the leaf cert
+        const certs = certificate.split(/(?=-----BEGIN CERTIFICATE-----)/g).filter(Boolean)
+        const leafCert = certs[0] || certificate
+        const fullChain = certificate
 
-    const domain = await db.customDomain.update({
-        where: { id: cert.domainId },
-        data: { sslMode: 'LETS_ENCRYPT' },
-    })
+        console.log(`[ssl/http01] ✅ Certificate issued successfully!`)
+        console.log(`[ssl/http01]    Leaf cert: ${leafCert.length} bytes`)
+        console.log(`[ssl/http01]    Full chain: ${fullChain.length} bytes`)
+        console.log(`[ssl/http01]    Expires: ${info.notAfter.toISOString()}`)
 
-    // Notify nginx-agent about the new certificate
-    await notifyAgent({
-        event: 'cert.issued',
-        domain: domain.domain,
-        certId: certId,
-    })
+        await db.domainCertificate.update({
+            where: { id: certId },
+            data: {
+                status: 'ISSUED',
+                certificatePem: leafCert,
+                fullChainPem: fullChain,
+                issuedAt: new Date(),
+                expiresAt: info.notAfter,
+                acmeOrderUrl: null,
+                challengeToken: null,
+                challengeKeyAuth: null,
+            },
+        })
+
+        const domain = await db.customDomain.update({
+            where: { id: cert.domainId },
+            data: { sslMode: 'LETS_ENCRYPT' },
+        })
+
+        console.log(`[ssl/http01] 📤 Notifying nginx-agent about new certificate...`)
+        await notifyAgent({
+            event: 'cert.issued',
+            domain: domain.domain,
+            certId: certId,
+        })
+        console.log(`[ssl/http01] 🎉 HTTP-01 certificate issuance complete!`)
+    } catch (error) {
+        console.error(`[ssl/http01] ❌ Certificate issuance failed:`, error)
+        if (error instanceof Error) {
+            console.error(`[ssl/http01]    Error: ${error.message}`)
+            if (error.stack) {
+                console.error(`[ssl/http01]    Stack: ${error.stack}`)
+            }
+        }
+        throw error
+    }
 }
 
 // ─── DNS-01 ───────────────────────────────────────────────────────────────────
@@ -152,23 +186,31 @@ export async function initiateDns01Certificate(
     domainId: string,
     hostname: string,
 ): Promise<Dns01ChallengeInfo> {
+    console.log(`[ssl/dns01] 🔵 Starting DNS-01 certificate issuance for ${hostname}`)
+
     checkRateLimit(hostname)
 
+    console.log(`[ssl/dns01] 📡 Requesting certificate order from Let's Encrypt...`)
     const client = await getAcmeClient()
 
     const order = await client.createOrder({
         identifiers: [{ type: 'dns', value: hostname }],
     })
+    console.log(`[ssl/dns01] ✅ Order created: ${order.url}`)
 
     const authorizations = await client.getAuthorizations(order)
     const authz = authorizations[0]
     const challenge = authz.challenges.find(c => c.type === 'dns-01')
 
     if (!challenge) {
+        console.log(`[ssl/dns01] ❌ DNS-01 challenge not available from Let's Encrypt`)
         throw new Error('DNS-01 challenge not available')
     }
 
     const dnsTxtValue = await client.getChallengeKeyAuthorization(challenge)
+    console.log(`[ssl/dns01] 📝 TXT record required:`)
+    console.log(`[ssl/dns01]    Name: _acme-challenge.${hostname}`)
+    console.log(`[ssl/dns01]    Value: ${dnsTxtValue}`)
 
     const [certKeyBuffer, csrBuffer] = await acme.crypto.createCsr({
         altNames: [hostname],
@@ -185,6 +227,8 @@ export async function initiateDns01Certificate(
             dnsTxtValue,
         },
     })
+    console.log(`[ssl/dns01] 💾 Certificate record saved to database (ID: ${cert.id})`)
+    console.log(`[ssl/dns01] ⏸️  Waiting for user to add DNS TXT record...`)
 
     return {
         certId: cert.id,
@@ -195,71 +239,103 @@ export async function initiateDns01Certificate(
 
 // Called after the user has added the DNS TXT record.
 export async function completeDns01Certificate(certId: string): Promise<void> {
-    const cert = await db.domainCertificate.findUnique({
-        where: { id: certId },
-        include: { domain: true },
-    })
+    try {
+        console.log(`[ssl/dns01] 🔄 Attempting to complete DNS-01 verification for cert ${certId}`)
 
-    if (!cert) throw new Error('Certificate record not found')
-    if (cert.status !== 'PENDING_DNS01') {
-        throw new Error(`Certificate is in unexpected state: ${cert.status}`)
+        const cert = await db.domainCertificate.findUnique({
+            where: { id: certId },
+            include: { domain: true },
+        })
+
+        if (!cert) {
+            console.log(`[ssl/dns01] ❌ Certificate record not found in database`)
+            throw new Error('Certificate record not found')
+        }
+        if (cert.status !== 'PENDING_DNS01') {
+            console.log(`[ssl/dns01] ❌ Certificate in unexpected state: ${cert.status} (expected PENDING_DNS01)`)
+            throw new Error(`Certificate is in unexpected state: ${cert.status}`)
+        }
+        if (!cert.acmeOrderUrl) {
+            console.log(`[ssl/dns01] ❌ Missing ACME order URL`)
+            throw new Error('Missing ACME order URL')
+        }
+
+        const client = await getAcmeClient()
+        const hostname = cert.domain.domain
+
+        console.log(`[ssl/dns01] 🔍 Restoring existing ACME order from: ${cert.acmeOrderUrl}`)
+        const order = await (client as any).getOrder(cert.acmeOrderUrl)
+
+        const authorizations = await client.getAuthorizations(order)
+        const challenge = authorizations[0].challenges.find(c => c.type === 'dns-01')
+
+        if (!challenge) {
+            console.log(`[ssl/dns01] ❌ DNS-01 challenge not found in order`)
+            throw new Error('DNS-01 challenge not found')
+        }
+
+        console.log(`[ssl/dns01] 🚀 Telling Let's Encrypt to verify DNS TXT record...`)
+        console.log(`[ssl/dns01]    Expected TXT record: _acme-challenge.${hostname} = ${cert.dnsTxtValue}`)
+        await client.completeChallenge(challenge)
+
+        console.log(`[ssl/dns01] ⏳ Waiting for Let's Encrypt to validate DNS record...`)
+        await client.waitForValidStatus(challenge)
+        console.log(`[ssl/dns01] ✅ DNS challenge validated successfully!`)
+
+        const csr = Buffer.from(cert.csrPem)
+        console.log(`[ssl/dns01] 📋 Finalizing order with Certificate Signing Request...`)
+        await client.finalizeOrder(order, csr)
+
+        console.log(`[ssl/dns01] 📜 Downloading certificate from Let's Encrypt...`)
+        const certificate = await client.getCertificate(order)
+        const info = acme.crypto.readCertificateInfo(certificate)
+
+        // ACME getCertificate returns the full chain (leaf + intermediates)
+        // Split to get just the leaf cert
+        const certs = certificate.split(/(?=-----BEGIN CERTIFICATE-----)/g).filter(Boolean)
+        const leafCert = certs[0] || certificate
+        const fullChain = certificate
+
+        console.log(`[ssl/dns01] ✅ Certificate issued successfully!`)
+        console.log(`[ssl/dns01]    Leaf cert: ${leafCert.length} bytes`)
+        console.log(`[ssl/dns01]    Full chain: ${fullChain.length} bytes`)
+        console.log(`[ssl/dns01]    Expires: ${info.notAfter.toISOString()}`)
+
+        await db.domainCertificate.update({
+            where: { id: certId },
+            data: {
+                status: 'ISSUED',
+                certificatePem: leafCert,
+                fullChainPem: fullChain,
+                issuedAt: new Date(),
+                expiresAt: info.notAfter,
+                acmeOrderUrl: null,
+                dnsTxtValue: null,
+            },
+        })
+
+        const domain = await db.customDomain.update({
+            where: { id: cert.domainId },
+            data: { sslMode: 'LETS_ENCRYPT' },
+        })
+
+        console.log(`[ssl/dns01] 📤 Notifying nginx-agent about new certificate...`)
+        await notifyAgent({
+            event: 'cert.issued',
+            domain: domain.domain,
+            certId: certId,
+        })
+        console.log(`[ssl/dns01] 🎉 DNS-01 certificate issuance complete!`)
+    } catch (error) {
+        console.error(`[ssl/dns01] ❌ Certificate issuance failed:`, error)
+        if (error instanceof Error) {
+            console.error(`[ssl/dns01]    Error: ${error.message}`)
+            if (error.stack) {
+                console.error(`[ssl/dns01]    Stack: ${error.stack}`)
+            }
+        }
+        throw error
     }
-    if (!cert.acmeOrderUrl) {
-        throw new Error('Missing ACME order URL')
-    }
-
-    const client = await getAcmeClient()
-    const hostname = cert.domain.domain
-
-    // Restore the existing order instead of creating a new one
-    const order = await (client as any).getOrder(cert.acmeOrderUrl)
-
-    const authorizations = await client.getAuthorizations(order)
-    const challenge = authorizations[0].challenges.find(c => c.type === 'dns-01')
-
-    if (!challenge) throw new Error('DNS-01 challenge not found')
-
-    // Complete the challenge and wait for Let's Encrypt to validate it
-    await client.completeChallenge(challenge)
-    await client.waitForValidStatus(challenge)
-
-    const csr = Buffer.from(cert.csrPem)
-    await client.finalizeOrder(order, csr)
-    const certificate = await client.getCertificate(order)
-    const info = acme.crypto.readCertificateInfo(certificate)
-
-    // ACME getCertificate returns the full chain (leaf + intermediates)
-    // Split to get just the leaf cert
-    const certs = certificate.split(/(?=-----BEGIN CERTIFICATE-----)/g).filter(Boolean)
-    const leafCert = certs[0] || certificate
-    const fullChain = certificate
-
-    console.log(`[ssl] DNS-01 cert issued - leaf: ${leafCert.length}b, chain: ${fullChain.length}b`)
-
-    await db.domainCertificate.update({
-        where: { id: certId },
-        data: {
-            status: 'ISSUED',
-            certificatePem: leafCert,
-            fullChainPem: fullChain,
-            issuedAt: new Date(),
-            expiresAt: info.notAfter,
-            acmeOrderUrl: null,
-            dnsTxtValue: null,
-        },
-    })
-
-    const domain = await db.customDomain.update({
-        where: { id: cert.domainId },
-        data: { sslMode: 'LETS_ENCRYPT' },
-    })
-
-    // Notify nginx-agent about the new certificate
-    await notifyAgent({
-        event: 'cert.issued',
-        domain: domain.domain,
-        certId: certId,
-    })
 }
 
 // ─── Cert bundle retrieval ────────────────────────────────────────────────────
