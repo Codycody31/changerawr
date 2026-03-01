@@ -365,13 +365,48 @@ export async function completeDns01Certificate(certId: string): Promise<void> {
             throw new Error('DNS-01 challenge not found')
         }
 
+        // Self-check: verify the DNS TXT record exists before telling Let's Encrypt to check
+        console.log(`[ssl/dns01] 🔍 Self-check: verifying DNS TXT record is propagated...`)
+        console.log(`[ssl/dns01]    Looking for: _acme-challenge.${hostname} = ${cert.dnsTxtValue}`)
+
+        const { Resolver } = await import('dns').then(m => m.promises)
+        const resolver = new Resolver()
+
+        try {
+            const txtRecords = await resolver.resolveTxt(`_acme-challenge.${hostname}`)
+            const flatRecords = txtRecords.flat()
+            console.log(`[ssl/dns01]    Found TXT records:`, flatRecords)
+
+            if (!flatRecords.includes(cert.dnsTxtValue || '')) {
+                console.log(`[ssl/dns01] ❌ Expected TXT value not found in DNS`)
+                throw new Error(`DNS TXT record not yet propagated. Expected value: ${cert.dnsTxtValue}`)
+            }
+
+            console.log(`[ssl/dns01] ✅ Self-check passed! TXT record found in DNS`)
+        } catch (dnsError: any) {
+            console.error(`[ssl/dns01] ❌ DNS self-check failed:`, dnsError.code || dnsError.message)
+            if (dnsError.code === 'ENOTFOUND' || dnsError.code === 'ENODATA') {
+                throw new Error(`DNS TXT record not yet propagated. Please wait a few minutes and try again.`)
+            }
+            throw new Error(`DNS lookup failed: ${dnsError.message}`)
+        }
+
         console.log(`[ssl/dns01] 🚀 Telling Let's Encrypt to verify DNS TXT record...`)
-        console.log(`[ssl/dns01]    Expected TXT record: _acme-challenge.${hostname} = ${cert.dnsTxtValue}`)
         await client.completeChallenge(challenge)
 
         console.log(`[ssl/dns01] ⏳ Waiting for Let's Encrypt to validate DNS record...`)
-        await client.waitForValidStatus(challenge)
-        console.log(`[ssl/dns01] ✅ DNS challenge validated successfully!`)
+        try {
+            await client.waitForValidStatus(challenge)
+            console.log(`[ssl/dns01] ✅ DNS challenge validated successfully!`)
+        } catch (validationError) {
+            console.error(`[ssl/dns01] ❌ DNS validation failed:`, validationError)
+            if (validationError instanceof Error) {
+                console.error(`[ssl/dns01]    Error message: ${validationError.message}`)
+                console.error(`[ssl/dns01]    Error name: ${validationError.name}`)
+            }
+            // Re-throw with more context about DNS validation
+            throw new Error(`DNS validation failed: ${validationError instanceof Error ? validationError.message : 'Unknown error'}`)
+        }
 
         const csr = Buffer.from(cert.csrPem)
         console.log(`[ssl/dns01] 📋 Finalizing order with Certificate Signing Request...`)

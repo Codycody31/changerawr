@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
             console.error('[acme/verify-dns] ⚠️  DNS completion error:', message)
 
             // If TXT record not propagated, DON'T mark as failed - keep it PENDING so user can retry
-            if (message.includes('TXT record') || message.includes('not propagated') || message.includes('DNS')) {
+            if (message.includes('not yet propagated') || message.includes('not propagated') || message.includes('DNS validation failed') || message.includes('DNS lookup failed')) {
                 console.log('[acme/verify-dns] 💤 DNS not propagated yet, keeping status as PENDING_DNS01')
 
                 // Update error message but keep status as PENDING_DNS01
