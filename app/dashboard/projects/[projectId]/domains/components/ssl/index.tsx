@@ -372,7 +372,7 @@ export function SSLManagement({ domain, onUpdate, onError, onSuccess }: SSLManag
                                 txtName={`_acme-challenge.${domain.domain}`}
                                 txtValue={pendingCert.dnsTxtValue}
                                 onVerify={() => handleVerifyDNS(pendingCert.id)}
-                                onBack={handleCancelSetup}
+                                onBack={handleCancel}
                                 onCopy={(text) => {
                                     navigator.clipboard.writeText(text)
                                     onSuccess('Copied to clipboard!')
@@ -383,7 +383,7 @@ export function SSLManagement({ domain, onUpdate, onError, onSuccess }: SSLManag
                         {pendingCert.status === 'PENDING_HTTP01' && (
                             <SSLVerificationProgress
                                 domain={domain.domain}
-                                onCancel={handleCancelSetup}
+                                onCancel={handleCancel}
                             />
                         )}
                         <Button
