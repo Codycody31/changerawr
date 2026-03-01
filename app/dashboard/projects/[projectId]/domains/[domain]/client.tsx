@@ -43,10 +43,12 @@ export function DomainSettingsClient({ projectId, domain: domainName }: DomainSe
     const [error, setError] = useState<string | null>(null)
     const [success, setSuccess] = useState<string | null>(null)
     const [sslEnabled, setSslEnabled] = useState(false)
+    const [dnsInstructions, setDnsInstructions] = useState<DNSInstructions | null>(null)
 
     useEffect(() => {
         loadDomain()
         loadRuntimeConfig()
+        loadDnsInstructions()
     }, [])
 
     useEffect(() => {
@@ -68,6 +70,18 @@ export function DomainSettingsClient({ projectId, domain: domainName }: DomainSe
             console.error('Failed to load runtime config:', error)
             // Default to false if config fetch fails
             setSslEnabled(false)
+        }
+    }
+
+    const loadDnsInstructions = async () => {
+        try {
+            const response = await fetch(`/api/custom-domains/${encodeURIComponent(domainName)}/dns-instructions`)
+            const result = await response.json()
+            if (result.success) {
+                setDnsInstructions(result.dnsInstructions)
+            }
+        } catch (error) {
+            console.error('Failed to load DNS instructions:', error)
         }
     }
 
@@ -190,8 +204,6 @@ export function DomainSettingsClient({ projectId, domain: domainName }: DomainSe
             </div>
         )
     }
-
-    const dnsInstructions: DNSInstructions | undefined = domain.dnsInstructions
 
     return (
         <div className="space-y-6">
