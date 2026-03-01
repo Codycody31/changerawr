@@ -192,7 +192,7 @@ export function SSLManagement({ domain, onUpdate, onError, onSuccess }: SSLManag
             const result = await response.json()
             if (response.ok) {
                 setStep('dns01-progress')
-                startPolling(certId)
+                startPolling(targetCertId)
             } else {
                 onError(result.error || 'DNS verification failed')
             }
