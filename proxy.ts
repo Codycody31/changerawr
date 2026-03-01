@@ -247,6 +247,11 @@ export async function proxy(request: NextRequest) {
     }
 
     if (isCustomDomain(hostname)) {
+        // ACME challenges must pass through for ALL domains (already handled above, but double-check)
+        if (pathname.startsWith('/.well-known/acme-challenge/')) {
+            return NextResponse.next()
+        }
+
         if (pathname.startsWith('/api/')) {
             if (pathname.startsWith('/api/changelog/')) {
                 return NextResponse.next()
