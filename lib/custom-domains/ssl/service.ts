@@ -204,13 +204,15 @@ export async function completeDns01Certificate(certId: string): Promise<void> {
     if (cert.status !== 'PENDING_DNS01') {
         throw new Error(`Certificate is in unexpected state: ${cert.status}`)
     }
+    if (!cert.acmeOrderUrl) {
+        throw new Error('Missing ACME order URL')
+    }
 
     const client = await getAcmeClient()
     const hostname = cert.domain.domain
 
-    const order = await client.createOrder({
-        identifiers: [{ type: 'dns', value: hostname }],
-    })
+    // Restore the existing order instead of creating a new one
+    const order = { url: cert.acmeOrderUrl }
 
     const authorizations = await client.getAuthorizations(order)
     const challenge = authorizations[0].challenges.find(c => c.type === 'dns-01')
