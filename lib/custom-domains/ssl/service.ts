@@ -219,14 +219,7 @@ export async function completeDns01Certificate(certId: string): Promise<void> {
 
     if (!challenge) throw new Error('DNS-01 challenge not found')
 
-    try {
-        await client.verifyChallenge(authorizations[0], challenge)
-    } catch {
-        throw new Error(
-            'TXT record not found or not propagated yet — wait a few minutes and try again.',
-        )
-    }
-
+    // Complete the challenge and wait for Let's Encrypt to validate it
     await client.completeChallenge(challenge)
     await client.waitForValidStatus(challenge)
 
