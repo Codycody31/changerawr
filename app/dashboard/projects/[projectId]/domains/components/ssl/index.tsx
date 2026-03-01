@@ -150,6 +150,22 @@ export function SSLManagement({ domain, onUpdate, onError, onSuccess }: SSLManag
                     setStep('dns-instructions')
                 }
             } else {
+                // Check if this is a "certificate already exists" error
+                if (result.canForceDelete && result.certificateId) {
+                    const shouldForceDelete = confirm(
+                        'A certificate already exists for this domain. This might be a stale certificate from a previous attempt.\n\n' +
+                        'Would you like to force delete the existing certificate and try again?'
+                    )
+
+                    if (shouldForceDelete) {
+                        // Force delete and retry
+                        await handleRevoke()
+                        // Retry the issuance after a short delay
+                        setTimeout(() => handleSelectMethod(method), 1000)
+                        return
+                    }
+                }
+
                 onError(result.error || 'Failed to start certificate issuance')
                 setStep('method-select')
             }

@@ -67,7 +67,11 @@ export async function POST(request: NextRequest) {
 
         if (existingCert) {
             return NextResponse.json(
-                { error: 'Domain already has an active certificate' },
+                {
+                    error: 'Domain already has an active certificate',
+                    certificateId: existingCert.id,
+                    canForceDelete: true
+                },
                 { status: 409 },
             )
         }

@@ -7,6 +7,8 @@ export const runtime = 'nodejs'
  * DELETE /api/custom-domains/:domain/ssl/revoke
  * Completely removes the current SSL certificate from the database.
  * This allows re-issuing a fresh certificate.
+ *
+ * Also attempts to notify nginx-agent to clean up SSL files (non-blocking).
  */
 export async function DELETE(
     request: NextRequest,
@@ -42,6 +44,26 @@ export async function DELETE(
         })
 
         console.log(`[ssl/revoke] Deleted ${deleteResult.count} certificates for ${domainName}`)
+
+        // Try to notify nginx-agent to clean up (don't fail if this doesn't work)
+        try {
+            const agentUrl = process.env.NGINX_AGENT_URL
+            const internalSecret = process.env.INTERNAL_API_SECRET
+
+            if (agentUrl && internalSecret) {
+                await fetch(`${agentUrl}/domain/${encodeURIComponent(domainName)}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-Internal-Secret': internalSecret,
+                    },
+                    signal: AbortSignal.timeout(5000),
+                })
+                console.log(`[ssl/revoke] Notified nginx-agent to clean up ${domainName}`)
+            }
+        } catch (agentError) {
+            // Log but don't fail the operation
+            console.warn(`[ssl/revoke] Failed to notify nginx-agent (non-critical):`, agentError)
+        }
 
         return NextResponse.json({
             success: true,
