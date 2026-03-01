@@ -76,23 +76,47 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // Check for pending certificates and auto-nuke them
-        // This allows retrying failed attempts without manual cleanup
-        const pendingCerts = await db.domainCertificate.findMany({
+        // Check for pending/failed certificates and delete ONLY stale ones
+        // Don't delete recent pending certs (< 2 minutes old) as they might be in the middle of validation
+        const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000)
+
+        const staleCerts = await db.domainCertificate.findMany({
             where: {
                 domainId: body.domainId,
                 status: { in: ['PENDING_HTTP01', 'PENDING_DNS01', 'FAILED'] },
+                createdAt: { lt: twoMinutesAgo },
             },
         })
 
-        if (pendingCerts.length > 0) {
-            console.log(`[acme/issue] Deleting ${pendingCerts.length} stale certificates for domain ${domain.domain}`)
+        if (staleCerts.length > 0) {
+            console.log(`[acme/issue] Deleting ${staleCerts.length} stale certificates (older than 2 minutes) for domain ${domain.domain}`)
             await db.domainCertificate.deleteMany({
                 where: {
                     domainId: body.domainId,
                     status: { in: ['PENDING_HTTP01', 'PENDING_DNS01', 'FAILED'] },
+                    createdAt: { lt: twoMinutesAgo },
                 },
             })
+        }
+
+        // Check if there's STILL a recent pending cert (created in last 2 minutes)
+        const recentPendingCert = await db.domainCertificate.findFirst({
+            where: {
+                domainId: body.domainId,
+                status: { in: ['PENDING_HTTP01', 'PENDING_DNS01'] },
+                createdAt: { gte: twoMinutesAgo },
+            },
+        })
+
+        if (recentPendingCert) {
+            console.log(`[acme/issue] Recent pending certificate already exists (created ${Math.floor((Date.now() - recentPendingCert.createdAt.getTime()) / 1000)}s ago)`)
+            return NextResponse.json(
+                {
+                    error: 'A certificate issuance is already in progress. Please wait 2 minutes before trying again.',
+                    certId: recentPendingCert.id,
+                },
+                { status: 409 },
+            )
         }
 
         if (body.challengeType === 'HTTP01') {
