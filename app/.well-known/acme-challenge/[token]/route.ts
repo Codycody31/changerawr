@@ -20,6 +20,18 @@ export async function GET(
     const hostname = request.headers.get('host')?.split(':')[0] || ''
 
     try {
+        // Debug: Log all pending HTTP01 challenges
+        const allPending = await db.domainCertificate.findMany({
+            where: { status: 'PENDING_HTTP01' },
+            include: { domain: true },
+            select: {
+                id: true,
+                challengeToken: true,
+                domain: { select: { domain: true } },
+            },
+        })
+        console.log(`[acme-challenge] All pending HTTP01 challenges:`, JSON.stringify(allPending, null, 2))
+
         // Find the certificate challenge for this specific domain and token
         const cert = await db.domainCertificate.findFirst({
             where: {
@@ -39,7 +51,8 @@ export async function GET(
         })
 
         if (!cert?.challengeKeyAuth) {
-            console.log(`[acme-challenge] Challenge not found for domain: ${hostname}, token: ${token}`)
+            console.log(`[acme-challenge] Challenge NOT FOUND - hostname: ${hostname}, token: ${token}`)
+            console.log(`[acme-challenge] Looked for domain=${hostname}, status=PENDING_HTTP01, token=${token}`)
             return new NextResponse('Challenge not found', { status: 404 })
         }
 
