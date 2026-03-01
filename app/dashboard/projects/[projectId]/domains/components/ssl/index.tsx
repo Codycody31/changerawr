@@ -471,7 +471,7 @@ export function SSLManagement({ domain, onUpdate, onError, onSuccess }: SSLManag
                     <SSLDNSInstructions
                         txtName={dnsChallenge.txtName}
                         txtValue={dnsChallenge.txtValue}
-                        onVerify={handleVerifyDNS}
+                        onVerify={() => handleVerifyDNS()}
                         onBack={handleCancel}
                         onCopy={(text) => {
                             navigator.clipboard.writeText(text)
