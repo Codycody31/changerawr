@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useDebounce } from 'use-debounce'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -63,6 +64,56 @@ export function ExternalSSLManagement({
     const [showAddRule, setShowAddRule] = useState(false)
     const [newRulePattern, setNewRulePattern] = useState('')
     const [newRuleType, setNewRuleType] = useState<'BLOCK' | 'ALLOW'>('BLOCK')
+
+    // Local state for throttle inputs with debouncing
+    const [requestsPerSecond, setRequestsPerSecond] = useState(throttleConfig?.requestsPerSecond || 60)
+    const [burstSize, setBurstSize] = useState(throttleConfig?.burstSize || 20)
+
+    // Debounced values (wait 1 second after user stops typing)
+    const [debouncedRequestsPerSecond] = useDebounce(requestsPerSecond, 1000)
+    const [debouncedBurstSize] = useDebounce(burstSize, 1000)
+
+    // Sync local state when props change
+    useEffect(() => {
+        if (throttleConfig) {
+            setRequestsPerSecond(throttleConfig.requestsPerSecond)
+            setBurstSize(throttleConfig.burstSize)
+        }
+    }, [throttleConfig])
+
+    // Update API when debounced values change
+    useEffect(() => {
+        if (!throttleConfig?.enabled) return
+
+        const updateThrottle = async () => {
+            try {
+                const response = await fetch(`/api/custom-domains/${domain}/throttle`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        enabled: true,
+                        requestsPerSecond: debouncedRequestsPerSecond,
+                        burstSize: debouncedBurstSize,
+                    }),
+                })
+
+                if (response.ok) {
+                    // Silently update - no need to call onUpdate() which causes scroll
+                    // The debounced values are already shown in the UI
+                } else {
+                    onError('Failed to update rate limiting')
+                }
+            } catch (error) {
+                onError('Failed to update rate limiting')
+            }
+        }
+
+        // Only update if values actually changed from the server
+        if (debouncedRequestsPerSecond !== throttleConfig.requestsPerSecond ||
+            debouncedBurstSize !== throttleConfig.burstSize) {
+            updateThrottle()
+        }
+    }, [debouncedRequestsPerSecond, debouncedBurstSize])
 
     return (
         <div className="space-y-6">
@@ -304,66 +355,41 @@ export function ExternalSSLManagement({
                                 <Label>Requests Per Second</Label>
                                 <Input
                                     type="number"
-                                    value={throttleConfig.requestsPerSecond}
-                                    onChange={async (e) => {
+                                    value={requestsPerSecond}
+                                    onChange={(e) => {
                                         const value = parseInt(e.target.value)
-                                        if (value < 1) return
-
-                                        try {
-                                            const response = await fetch(`/api/custom-domains/${domain}/throttle`, {
-                                                method: 'POST',
-                                                headers: { 'Content-Type': 'application/json' },
-                                                body: JSON.stringify({
-                                                    enabled: true,
-                                                    requestsPerSecond: value,
-                                                    burstSize: throttleConfig.burstSize,
-                                                }),
-                                            })
-
-                                            if (response.ok) {
-                                                onUpdate()
-                                            }
-                                        } catch (error) {
-                                            console.error('Failed to update throttle config')
+                                        if (value >= 1) {
+                                            setRequestsPerSecond(value)
                                         }
                                     }}
+                                    min={1}
                                 />
+                                <p className="text-xs text-muted-foreground">
+                                    Changes save automatically after 1 second
+                                </p>
                             </div>
                             <div className="space-y-2">
                                 <Label>Burst Size</Label>
                                 <Input
                                     type="number"
-                                    value={throttleConfig.burstSize}
-                                    onChange={async (e) => {
+                                    value={burstSize}
+                                    onChange={(e) => {
                                         const value = parseInt(e.target.value)
-                                        if (value < 1) return
-
-                                        try {
-                                            const response = await fetch(`/api/custom-domains/${domain}/throttle`, {
-                                                method: 'POST',
-                                                headers: { 'Content-Type': 'application/json' },
-                                                body: JSON.stringify({
-                                                    enabled: true,
-                                                    requestsPerSecond: throttleConfig.requestsPerSecond,
-                                                    burstSize: value,
-                                                }),
-                                            })
-
-                                            if (response.ok) {
-                                                onUpdate()
-                                            }
-                                        } catch (error) {
-                                            console.error('Failed to update throttle config')
+                                        if (value >= 1) {
+                                            setBurstSize(value)
                                         }
                                     }}
+                                    min={1}
                                 />
+                                <p className="text-xs text-muted-foreground">
+                                    Changes save automatically after 1 second
+                                </p>
                             </div>
                             <div className="col-span-2">
                                 <Alert>
-                                    <Info className="h-4 w-4" />
                                     <AlertDescription className="text-xs">
-                                        Requests exceeding {throttleConfig.requestsPerSecond}/sec will be rate limited.
-                                        Burst allows temporary spikes up to {throttleConfig.burstSize} requests.
+                                        Requests exceeding {requestsPerSecond}/sec will be rate limited.
+                                        Burst allows temporary spikes up to {burstSize} requests.
                                     </AlertDescription>
                                 </Alert>
                             </div>

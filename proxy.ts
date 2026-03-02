@@ -215,12 +215,16 @@ export async function proxy(request: NextRequest) {
 
         if (securityConfig?.forceHttps) {
             const proto = request.headers.get('x-forwarded-proto')
+            console.log(`[proxy] HTTPS check for ${hostname}: proto=${proto}, pathname=${pathname}`)
 
-            // Redirect HTTP to HTTPS with 308 (preserves POST method)
+            // Only redirect if explicitly on HTTP (not https, not null/undefined)
             if (proto === 'http') {
-                const url = request.nextUrl.clone()
-                url.protocol = 'https:'
-                return NextResponse.redirect(url, 308)
+                console.log(`[proxy] Redirecting ${hostname} from HTTP to HTTPS`)
+                // Construct the HTTPS URL using the original host and path
+                const httpsUrl = new URL(request.url)
+                httpsUrl.protocol = 'https:'
+                httpsUrl.host = hostname
+                return NextResponse.redirect(httpsUrl, 308)
             }
         }
     }

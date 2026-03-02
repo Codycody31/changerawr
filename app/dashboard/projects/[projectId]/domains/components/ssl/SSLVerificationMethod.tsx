@@ -45,36 +45,36 @@ export function SSLVerificationMethod({
                 </div>
             ) : (
                 <>
-                    {/* HTTP-01 Option */}
-                    <button
-                        onClick={() => onSelectMethod('HTTP01')}
-                        className="w-full text-left p-4 rounded-xl border-2 border-border hover:border-blue-500 transition-all group bg-card"
-                    >
-                <div className="flex items-start gap-3">
-                    <div className="w-11 h-11 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-                        <Zap className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                            <p className="font-semibold">HTTP-01 (Automatic)</p>
-                            <Badge variant="secondary" className="text-xs">Recommended</Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground mb-2">
-                            Fully automatic verification. Completes in seconds with no manual steps.
-                        </p>
-                        <div className="flex gap-2">
-                            <Badge variant="outline" className="text-xs">
-                                <Check className="w-3 h-3 mr-1" />
-                                Instant
-                            </Badge>
-                            <Badge variant="outline" className="text-xs">
-                                <Check className="w-3 h-3 mr-1" />
-                                Auto-Renewal
-                            </Badge>
-                        </div>
-                    </div>
-                </div>
-            </button>
+                    {/* HTTP-01 Option - TEMPORARILY DISABLED */}
+                    {/*<button*/}
+                    {/*    onClick={() => onSelectMethod('HTTP01')}*/}
+                    {/*    className="w-full text-left p-4 rounded-xl border-2 border-border hover:border-blue-500 transition-all group bg-card"*/}
+                    {/*>*/}
+                    {/*<div className="flex items-start gap-3">*/}
+                    {/*    <div className="w-11 h-11 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">*/}
+                    {/*        <Zap className="w-5 h-5 text-blue-600 dark:text-blue-400" />*/}
+                    {/*    </div>*/}
+                    {/*    <div className="flex-1 min-w-0">*/}
+                    {/*        <div className="flex items-center gap-2 mb-1">*/}
+                    {/*            <p className="font-semibold">HTTP-01 (Automatic)</p>*/}
+                    {/*            <Badge variant="secondary" className="text-xs">Recommended</Badge>*/}
+                    {/*        </div>*/}
+                    {/*        <p className="text-sm text-muted-foreground mb-2">*/}
+                    {/*            Fully automatic verification. Completes in seconds with no manual steps.*/}
+                    {/*        </p>*/}
+                    {/*        <div className="flex gap-2">*/}
+                    {/*            <Badge variant="outline" className="text-xs">*/}
+                    {/*                <Check className="w-3 h-3 mr-1" />*/}
+                    {/*                Instant*/}
+                    {/*            </Badge>*/}
+                    {/*            <Badge variant="outline" className="text-xs">*/}
+                    {/*                <Check className="w-3 h-3 mr-1" />*/}
+                    {/*                Auto-Renewal*/}
+                    {/*            </Badge>*/}
+                    {/*        </div>*/}
+                    {/*    </div>*/}
+                    {/*</div>*/}
+                    {/*</button>*/}
 
                     {/* DNS-01 Option */}
                     <button
