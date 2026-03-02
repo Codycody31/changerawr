@@ -119,7 +119,7 @@ function isAllowedExternalDomain(hostname: string): boolean {
 
 function isCustomDomain(hostname: string): boolean {
     try {
-        const appDomain = getAppDomain()
+        const appDomain = normalizeHostname(getAppDomain())
 
         if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
             return false
@@ -129,6 +129,12 @@ function isCustomDomain(hostname: string): boolean {
     } catch {
         return false
     }
+}
+
+
+function normalizeHostname(rawHost: string): string {
+    const firstHost = rawHost.split(',')[0]?.trim().toLowerCase() || ''
+    return firstHost.replace(/:\d+$/, '')
 }
 
 function handleCustomDomain(request: NextRequest, hostname: string, pathname: string): NextResponse {
@@ -161,7 +167,8 @@ async function isSetupComplete(): Promise<boolean> {
 
 export async function proxy(request: NextRequest) {
     const {pathname} = request.nextUrl
-    const hostname = request.headers.get('host') || ''
+    const rawHost = request.headers.get('x-forwarded-host') || request.headers.get('host') || ''
+    const hostname = normalizeHostname(rawHost)
 
     // 🍯 HONEYPOT: Catch server action exploit attempts
     const nextAction = request.headers.get('next-action')
@@ -211,32 +218,20 @@ export async function proxy(request: NextRequest) {
 
     // Force HTTPS redirect for custom domains (production only)
     if (isCustomDomain(hostname) && process.env.NODE_ENV === 'production') {
-        const proto = request.headers.get('x-forwarded-proto')
-        const forwardedHost = request.headers.get('x-forwarded-host')
-
-        console.log(`[proxy] Custom domain request: ${hostname}`)
-        console.log(`[proxy]   x-forwarded-proto: ${proto}`)
-        console.log(`[proxy]   x-forwarded-host: ${forwardedHost}`)
-        console.log(`[proxy]   pathname: ${pathname}`)
-
         const securityConfig = await getDomainSecurityConfig(hostname)
 
         if (securityConfig?.forceHttps) {
-            // Only redirect if explicitly on HTTP (not https, not null/undefined)
+            const proto = request.headers.get('x-forwarded-proto')
+
+            // Redirect HTTP to HTTPS with 308 (preserves POST method)
             if (proto === 'http') {
-                console.log(`[proxy] ⚡ Redirecting ${hostname} from HTTP to HTTPS`)
-                // Build the HTTPS URL properly - don't use request.url as it has the internal host
-                const search = request.nextUrl.search
-                const httpsUrl = `https://${hostname}${pathname}${search}`
-                console.log(`[proxy]   Target: ${httpsUrl}`)
-                return NextResponse.redirect(httpsUrl, 308)
-            } else if (proto === 'https') {
-                console.log(`[proxy] ✓ Already on HTTPS, continuing`)
-            } else {
-                console.log(`[proxy] ⚠ Unknown proto (${proto}), assuming HTTPS`)
+                const url = request.nextUrl.clone()
+                url.protocol = 'https:'
+                // Ensure we redirect to the external custom hostname without internal app ports.
+                url.host = hostname
+                url.port = ''
+                return NextResponse.redirect(url, 308)
             }
-        } else {
-            console.log(`[proxy] forceHttps disabled for ${hostname}`)
         }
     }
 
@@ -264,6 +259,13 @@ export async function proxy(request: NextRequest) {
     }
 
     if (isCustomDomain(hostname)) {
+        const encodedHostname = encodeURIComponent(hostname)
+
+        // Prevent rewrite loops when middleware sees an already-rewritten internal pathname.
+        if (pathname.startsWith(`/changelog/custom-domain/${encodedHostname}`)) {
+            return NextResponse.next()
+        }
+
         // ACME challenges must pass through for ALL domains (already handled above, but double-check)
         if (pathname.startsWith('/.well-known/acme-challenge/')) {
             return NextResponse.next()
@@ -278,7 +280,7 @@ export async function proxy(request: NextRequest) {
 
         if (pathname === '/rss.xml') {
             const url = request.nextUrl.clone()
-            url.pathname = `/changelog/custom-domain/${encodeURIComponent(hostname)}/rss.xml`
+            url.pathname = `/changelog/custom-domain/${encodedHostname}/rss.xml`
             return NextResponse.rewrite(url)
         }
 
