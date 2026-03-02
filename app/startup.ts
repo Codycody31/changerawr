@@ -30,8 +30,8 @@ function checkRequirements(): void {
         'DATABASE_URL',
         'JWT_ACCESS_SECRET',
         'ANALYTICS_SALT',
-        'GITHUB_ENCRYPTION_KEY',
-        'ENCRYPTION_KEY'
+        'GITHUB_ENCRYPTION_KEY'
+        // 'ENCRYPTION_KEY' - we do not need this actually.
     ];
 
     const missing: string[] = [];
