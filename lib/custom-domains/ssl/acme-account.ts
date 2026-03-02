@@ -2,19 +2,28 @@ import * as acme from 'acme-client'
 import {db} from '@/lib/db'
 import {encrypt, decrypt} from '@/lib/custom-domains/ssl/encryption'
 
+const isAcmeStagingEnabled = () => (
+    process.env.ACME_STAGING === 'true' || process.env.ACME_SANDBOX_MODE === 'true'
+)
+
 const getDirectoryUrl = () => {
-    // ACME_SANDBOX_MODE is a legacy alias for ACME_STAGING (backward compatibility)
-    const useStaging = process.env.ACME_STAGING === 'true' || process.env.ACME_SANDBOX_MODE === 'true'
-    return useStaging
+    return isAcmeStagingEnabled()
         ? acme.directory.letsencrypt.staging
         : acme.directory.letsencrypt.production
+}
+
+const getAccountId = (directoryUrl: string) => {
+    return directoryUrl === acme.directory.letsencrypt.staging
+        ? 'global-staging'
+        : 'global-production'
 }
 
 // Creates and persists the global ACME account on first call,
 // loads it from DB on every subsequent call.
 export async function getAcmeClient(): Promise<acme.Client> {
     const directoryUrl = getDirectoryUrl()
-    const existing = await db.acmeAccount.findUnique({where: {id: 'global'}})
+    const accountId = getAccountId(directoryUrl)
+    const existing = await db.acmeAccount.findUnique({where: {id: accountId}})
 
     if (existing) {
         const accountKey = Buffer.from(decrypt(existing.accountKeyPem))
@@ -43,7 +52,7 @@ export async function getAcmeClient(): Promise<acme.Client> {
 
     await db.acmeAccount.create({
         data: {
-            id: 'global',
+            id: accountId,
             accountKeyPem: encrypt(accountKey.toString()),
             accountUrl,
             email,
@@ -52,3 +61,5 @@ export async function getAcmeClient(): Promise<acme.Client> {
 
     return client
 }
+
+export {isAcmeStagingEnabled}

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sslSupported } from '@/lib/custom-domains/ssl/is-supported'
 import { completeDns01Certificate } from '@/lib/custom-domains/ssl/service'
-import { notifyAgent } from '@/lib/custom-domains/ssl/webhook'
 import { db } from '@/lib/db'
 
 export const runtime = 'nodejs'
@@ -73,13 +72,6 @@ export async function POST(request: NextRequest) {
 
             await completeDns01Certificate(body.certId)
 
-            console.log('[acme/verify-dns] 📤 Notifying nginx-agent...')
-            // Notify nginx-agent about the new certificate
-            await notifyAgent({
-                event: 'cert.issued',
-                domain: cert.domain.domain,
-                certId: cert.id,
-            })
 
             console.log('[acme/verify-dns] ✅ DNS verification successful!')
             return NextResponse.json({
@@ -91,19 +83,20 @@ export async function POST(request: NextRequest) {
             console.error('[acme/verify-dns] ⚠️  DNS completion error:', message)
 
             // If TXT record not propagated, DON'T mark as failed - keep it PENDING so user can retry
-            if (message.includes('not yet propagated') || message.includes('not propagated') || message.includes('DNS validation failed') || message.includes('DNS lookup failed')) {
+            if (message.includes('not yet propagated') || message.includes('not propagated') || message.includes('DNS validation failed') || message.includes('DNS lookup failed') || message.includes('new order has been created') || message.includes('new TXT value') || message.includes('transient upstream error')) {
                 console.log('[acme/verify-dns] 💤 DNS not propagated yet, keeping status as PENDING_DNS01')
 
                 // Update error message but keep status as PENDING_DNS01
                 await db.domainCertificate.update({
                     where: { id: body.certId },
-                    data: { lastError: 'DNS TXT record not yet propagated. Click verify again after a few minutes.' },
+                    data: { lastError: message },
                 }).catch(() => {})
 
                 return NextResponse.json(
                     {
                         success: false,
-                        message: 'DNS TXT record not yet propagated. Please wait a few minutes and try again.',
+                        message: message,
+                        hint: 'Refresh SSL setup to see the latest TXT value before retrying.',
                         retry: true,
                     },
                     { status: 202 },

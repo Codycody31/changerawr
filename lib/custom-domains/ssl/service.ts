@@ -1,10 +1,122 @@
 import * as acme from 'acme-client'
-import { db } from '@/lib/db'
-import { encrypt, decrypt } from '@/lib/custom-domains/ssl/encryption'
-import { getAcmeClient } from '@/lib/custom-domains/ssl/acme-account'
-import { assertNotInternal } from '@/lib/custom-domains/ssl/ssrf-guard'
-import { notifyAgent } from '@/lib/custom-domains/ssl/webhook'
-import type { DomainCertificate } from '@prisma/client'
+import {db} from '@/lib/db'
+import {encrypt, decrypt} from '@/lib/custom-domains/ssl/encryption'
+import {getAcmeClient} from '@/lib/custom-domains/ssl/acme-account'
+import {assertNotInternal} from '@/lib/custom-domains/ssl/ssrf-guard'
+import {notifyAgent} from '@/lib/custom-domains/ssl/webhook'
+import type {DomainCertificate} from '@prisma/client'
+
+function getOrderByUrl(client: acme.Client, orderUrl: string): Promise<acme.Order> {
+    // acme-client#getOrder expects an order-like object ({ url }), not a raw URL string.
+    // Passing a string causes `order.url` to be undefined and the lookup to fail.
+    return client.getOrder({url: orderUrl} as acme.Order)
+}
+
+async function createDns01Order(client: acme.Client, hostname: string) {
+    const order = await client.createOrder({
+        identifiers: [{type: 'dns', value: hostname}],
+    })
+
+    const authorizations = await client.getAuthorizations(order)
+    const authz = authorizations[0]
+    if (!authz) {
+        throw new Error('No ACME authorization found for DNS-01 order')
+    }
+
+    const challenge = authz.challenges.find(c => c.type === 'dns-01')
+    if (!challenge) {
+        throw new Error('DNS-01 challenge not available')
+    }
+
+    const dnsTxtValue = await client.getChallengeKeyAuthorization(challenge)
+    return {order, dnsTxtValue}
+}
+
+
+function isOrderExpired(order: acme.Order): boolean {
+    const expiresAt = (order as { expires?: string | Date }).expires
+    if (!expiresAt) return false
+
+    const expiresTime = new Date(expiresAt).getTime()
+    if (Number.isNaN(expiresTime)) return false
+
+    return expiresTime <= Date.now()
+}
+
+function isUnusableDnsOrder(order: acme.Order): boolean {
+    const status = (order as { status?: string }).status
+    return status === 'invalid' || isOrderExpired(order)
+}
+
+
+function shouldReplaceOrderAfterLookupFailure(error: unknown): boolean {
+    const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase()
+
+    return (
+        message.includes('order not found') ||
+        message.includes('urn:ietf:params:acme:error:malformed') ||
+        message.includes('urn:ietf:params:acme:error:unauthorized') ||
+        message.includes('404') ||
+        message.includes('expired') ||
+        message.includes('invalid')
+    )
+}
+
+async function verifyDnsTxtPropagation(hostname: string, expectedValue: string): Promise<void> {
+    const {Resolver} = await import('dns').then(m => m.promises)
+    const recordName = `_acme-challenge.${hostname}`
+
+    // Check multiple resolvers to reduce false negatives from stale local DNS caches.
+    const resolverConfigs = [
+        {name: 'system', servers: null as string[] | null},
+        {name: 'cloudflare', servers: ['1.1.1.1', '1.0.0.1']},
+        {name: 'google', servers: ['8.8.8.8', '8.8.4.4']},
+    ]
+
+    const maxAttempts = 4
+    let lastError = ''
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const matchedResolvers: string[] = []
+        const observedByResolver: string[] = []
+
+        for (const cfg of resolverConfigs) {
+            const resolver = new Resolver()
+            if (cfg.servers) {
+                resolver.setServers(cfg.servers)
+            }
+
+            try {
+                const txtRecords = await resolver.resolveTxt(recordName)
+                const flatRecords = txtRecords.flat()
+                observedByResolver.push(`${cfg.name}=[${flatRecords.join(', ')}]`)
+
+                if (flatRecords.includes(expectedValue)) {
+                    matchedResolvers.push(cfg.name)
+                }
+            } catch (error) {
+                const message = error instanceof Error ? error.message : String(error)
+                observedByResolver.push(`${cfg.name}=<lookup-error:${message}>`)
+            }
+        }
+
+        console.log(`[ssl/dns01]    DNS attempt ${attempt}/${maxAttempts} observations: ${observedByResolver.join(' | ')}`)
+
+        if (matchedResolvers.length > 0) {
+            console.log(`[ssl/dns01] ✅ Self-check passed! TXT record visible via resolver(s): ${matchedResolvers.join(', ')}`)
+            return
+        }
+
+        lastError = `Expected TXT value not yet visible for ${recordName}`
+        if (attempt < maxAttempts) {
+            const waitMs = attempt * 3000
+            console.log(`[ssl/dns01] ⏳ TXT not visible yet, retrying in ${waitMs}ms...`)
+            await new Promise(resolve => setTimeout(resolve, waitMs))
+        }
+    }
+
+    throw new Error(`DNS TXT record not yet propagated. ${lastError}. Please wait a few minutes and try again.`)
+}
 
 // ─── Rate limiting ────────────────────────────────────────────────────────────
 // In-memory per-registered-domain counter. Move to Redis for multi-instance.
@@ -50,12 +162,16 @@ export async function initiateHttp01Certificate(
     const client = await getAcmeClient()
 
     const order = await client.createOrder({
-        identifiers: [{ type: 'dns', value: hostname }],
+        identifiers: [{type: 'dns', value: hostname}],
     })
     console.log(`[ssl/http01] ✅ Order created: ${order.url}`)
 
     const authorizations = await client.getAuthorizations(order)
     const authz = authorizations[0]
+    if (!authz) {
+        throw new Error('No ACME authorization found for HTTP-01 order')
+    }
+
     const challenge = authz.challenges.find(c => c.type === 'http-01')
 
     if (!challenge) {
@@ -104,8 +220,8 @@ async function completeHttp01Challenge(
     try {
         // Get certificate details for self-check
         const certRecord = await db.domainCertificate.findUnique({
-            where: { id: certId },
-            include: { domain: true },
+            where: {id: certId},
+            include: {domain: true},
         })
 
         if (!certRecord) {
@@ -140,7 +256,7 @@ async function completeHttp01Challenge(
             try {
                 console.log(`[ssl/http01] 📡 Attempt ${attempt + 1}/${maxAttempts}: Fetching challenge endpoint...`)
                 const response = await fetch(challengeUrl, {
-                    headers: { 'Host': hostname },
+                    headers: {'Host': hostname},
                     signal: AbortSignal.timeout(5000),
                 })
 
@@ -180,18 +296,25 @@ async function completeHttp01Challenge(
         await client.waitForValidStatus(challenge)
         console.log(`[ssl/http01] ✅ Challenge validated successfully!`)
 
-        const updatedCert = await db.domainCertificate.findUnique({ where: { id: certId } })
+        const updatedCert = await db.domainCertificate.findUnique({where: {id: certId}})
         if (!updatedCert?.acmeOrderUrl) {
             console.log(`[ssl/http01] ❌ Order URL missing from database`)
             throw new Error('Order URL missing from DB')
         }
 
         console.log(`[ssl/http01] 📋 Finalizing order with Certificate Signing Request...`)
-        const currentOrder = await (client as any).getOrder(updatedCert.acmeOrderUrl)
-        await client.finalizeOrder(currentOrder, csr)
+        const currentOrder = await getOrderByUrl(client, updatedCert.acmeOrderUrl)
+
+        if (currentOrder.status !== 'valid') {
+            await client.finalizeOrder(currentOrder, csr)
+        } else {
+            console.log('[ssl/http01] ℹ️ Order already valid; skipping finalizeOrder')
+        }
+
+        const finalizedOrder = await getOrderByUrl(client, currentOrder.url)
 
         console.log(`[ssl/http01] 📜 Downloading certificate from Let's Encrypt...`)
-        const certificate = await client.getCertificate(currentOrder)
+        const certificate = await client.getCertificate(finalizedOrder)
         const info = acme.crypto.readCertificateInfo(certificate)
 
         // ACME getCertificate returns the full chain (leaf + intermediates)
@@ -206,7 +329,7 @@ async function completeHttp01Challenge(
         console.log(`[ssl/http01]    Expires: ${info.notAfter.toISOString()}`)
 
         await db.domainCertificate.update({
-            where: { id: certId },
+            where: {id: certId},
             data: {
                 status: 'ISSUED',
                 certificatePem: leafCert,
@@ -220,8 +343,8 @@ async function completeHttp01Challenge(
         })
 
         const domain = await db.customDomain.update({
-            where: { id: updatedCert.domainId },
-            data: { sslMode: 'LETS_ENCRYPT' },
+            where: {id: updatedCert.domainId},
+            data: {sslMode: 'LETS_ENCRYPT'},
         })
 
         console.log(`[ssl/http01] 📤 Notifying nginx-agent about new certificate...`)
@@ -259,26 +382,14 @@ export async function initiateDns01Certificate(
 ): Promise<Dns01ChallengeInfo> {
     console.log(`[ssl/dns01] 🔵 Starting DNS-01 certificate issuance for ${hostname}`)
 
+    await assertNotInternal(hostname)
     checkRateLimit(hostname)
 
     console.log(`[ssl/dns01] 📡 Requesting certificate order from Let's Encrypt...`)
     const client = await getAcmeClient()
 
-    const order = await client.createOrder({
-        identifiers: [{ type: 'dns', value: hostname }],
-    })
+    const {order, dnsTxtValue} = await createDns01Order(client, hostname)
     console.log(`[ssl/dns01] ✅ Order created: ${order.url}`)
-
-    const authorizations = await client.getAuthorizations(order)
-    const authz = authorizations[0]
-    const challenge = authz.challenges.find(c => c.type === 'dns-01')
-
-    if (!challenge) {
-        console.log(`[ssl/dns01] ❌ DNS-01 challenge not available from Let's Encrypt`)
-        throw new Error('DNS-01 challenge not available')
-    }
-
-    const dnsTxtValue = await client.getChallengeKeyAuthorization(challenge)
     console.log(`[ssl/dns01] 📝 TXT record required:`)
     console.log(`[ssl/dns01]    Name: _acme-challenge.${hostname}`)
     console.log(`[ssl/dns01]    Value: ${dnsTxtValue}`)
@@ -314,8 +425,8 @@ export async function completeDns01Certificate(certId: string): Promise<void> {
         console.log(`[ssl/dns01] 🔄 Attempting to complete DNS-01 verification for cert ${certId}`)
 
         const cert = await db.domainCertificate.findUnique({
-            where: { id: certId },
-            include: { domain: true },
+            where: {id: certId},
+            include: {domain: true},
         })
 
         if (!cert) {
@@ -338,27 +449,61 @@ export async function completeDns01Certificate(certId: string): Promise<void> {
 
         let order
         try {
-            order = await (client as any).getOrder(cert.acmeOrderUrl)
+            order = await getOrderByUrl(client, cert.acmeOrderUrl)
             console.log(`[ssl/dns01] ✅ Order retrieved successfully, status: ${order.status}`)
         } catch (error) {
             console.error(`[ssl/dns01] ❌ Failed to retrieve ACME order:`, error)
             console.log(`[ssl/dns01]    Order URL: ${cert.acmeOrderUrl}`)
-            console.log(`[ssl/dns01]    This usually means the order has expired (orders expire after ~1 hour)`)
 
-            // Mark as failed and suggest re-issuing
+            if (!shouldReplaceOrderAfterLookupFailure(error)) {
+                throw new Error('Unable to retrieve ACME order due to a transient upstream error. Please wait a moment and verify again.')
+            }
+
+            console.log(`[ssl/dns01]    Attempting to create a fresh DNS-01 order for seamless retry...`)
+
+            const {
+                order: replacementOrder,
+                dnsTxtValue: replacementDnsTxtValue
+            } = await createDns01Order(client, hostname)
+
             await db.domainCertificate.update({
-                where: { id: certId },
+                where: {id: certId},
                 data: {
-                    status: 'FAILED',
-                    lastError: 'ACME order expired. Please delete this certificate and issue a new one.'
-                }
+                    acmeOrderUrl: replacementOrder.url,
+                    dnsTxtValue: replacementDnsTxtValue,
+                    lastError: 'Previous ACME order expired or became invalid. Please update the TXT record to the new value and verify again.',
+                },
             })
 
-            throw new Error('ACME order has expired. Please delete this certificate and start the DNS-01 process again.')
+            throw new Error('ACME order expired or became invalid. A new order has been created with a new TXT value. Update your DNS TXT record from the latest instructions and verify again.')
+        }
+
+        if (isUnusableDnsOrder(order)) {
+            console.log(`[ssl/dns01] ⚠️ Existing order is unusable (status=${order.status}); creating replacement order...`)
+            const {
+                order: replacementOrder,
+                dnsTxtValue: replacementDnsTxtValue
+            } = await createDns01Order(client, hostname)
+
+            await db.domainCertificate.update({
+                where: {id: certId},
+                data: {
+                    acmeOrderUrl: replacementOrder.url,
+                    dnsTxtValue: replacementDnsTxtValue,
+                    lastError: 'ACME order was no longer usable. Please update the TXT record to the new value and verify again.',
+                },
+            })
+
+            throw new Error('ACME order is no longer usable. A new order has been created with a new TXT value. Update your DNS TXT record from the latest instructions and verify again.')
         }
 
         const authorizations = await client.getAuthorizations(order)
-        const challenge = authorizations[0].challenges.find(c => c.type === 'dns-01')
+        const authz = authorizations[0]
+        if (!authz) {
+            throw new Error('No ACME authorization found while completing DNS-01 order')
+        }
+
+        const challenge = authz.challenges.find(c => c.type === 'dns-01')
 
         if (!challenge) {
             console.log(`[ssl/dns01] ❌ DNS-01 challenge not found in order`)
@@ -369,51 +514,71 @@ export async function completeDns01Certificate(certId: string): Promise<void> {
         console.log(`[ssl/dns01] 🔍 Self-check: verifying DNS TXT record is propagated...`)
         console.log(`[ssl/dns01]    Looking for: _acme-challenge.${hostname} = ${cert.dnsTxtValue}`)
 
-        const { Resolver } = await import('dns').then(m => m.promises)
-        const resolver = new Resolver()
-
-        try {
-            const txtRecords = await resolver.resolveTxt(`_acme-challenge.${hostname}`)
-            const flatRecords = txtRecords.flat()
-            console.log(`[ssl/dns01]    Found TXT records:`, flatRecords)
-
-            if (!flatRecords.includes(cert.dnsTxtValue || '')) {
-                console.log(`[ssl/dns01] ❌ Expected TXT value not found in DNS`)
-                throw new Error(`DNS TXT record not yet propagated. Expected value: ${cert.dnsTxtValue}`)
-            }
-
-            console.log(`[ssl/dns01] ✅ Self-check passed! TXT record found in DNS`)
-        } catch (dnsError: any) {
-            console.error(`[ssl/dns01] ❌ DNS self-check failed:`, dnsError.code || dnsError.message)
-            if (dnsError.code === 'ENOTFOUND' || dnsError.code === 'ENODATA') {
-                throw new Error(`DNS TXT record not yet propagated. Please wait a few minutes and try again.`)
-            }
-            throw new Error(`DNS lookup failed: ${dnsError.message}`)
+        if (!cert.dnsTxtValue) {
+            throw new Error('DNS TXT challenge value is missing from certificate record')
         }
 
-        console.log(`[ssl/dns01] 🚀 Telling Let's Encrypt to verify DNS TXT record...`)
-        await client.completeChallenge(challenge)
-
-        console.log(`[ssl/dns01] ⏳ Waiting for Let's Encrypt to validate DNS record...`)
         try {
-            await client.waitForValidStatus(challenge)
-            console.log(`[ssl/dns01] ✅ DNS challenge validated successfully!`)
-        } catch (validationError) {
-            console.error(`[ssl/dns01] ❌ DNS validation failed:`, validationError)
-            if (validationError instanceof Error) {
-                console.error(`[ssl/dns01]    Error message: ${validationError.message}`)
-                console.error(`[ssl/dns01]    Error name: ${validationError.name}`)
+            await verifyDnsTxtPropagation(hostname, cert.dnsTxtValue)
+        } catch (dnsError) {
+            const message = dnsError instanceof Error ? dnsError.message : String(dnsError)
+            console.error(`[ssl/dns01] ❌ DNS self-check failed: ${message}`)
+            throw new Error(message)
+        }
+
+        const challengeStatus = (challenge as { status?: string }).status
+        if (challengeStatus === 'invalid') {
+            console.log('[ssl/dns01] ❌ Existing DNS challenge is invalid; creating replacement order...')
+            const {
+                order: replacementOrder,
+                dnsTxtValue: replacementDnsTxtValue
+            } = await createDns01Order(client, hostname)
+
+            await db.domainCertificate.update({
+                where: {id: certId},
+                data: {
+                    acmeOrderUrl: replacementOrder.url,
+                    dnsTxtValue: replacementDnsTxtValue,
+                    lastError: 'ACME DNS challenge became invalid. Please update the TXT record to the new value and verify again.',
+                },
+            })
+
+            throw new Error('ACME DNS challenge is invalid. A new order has been created with a new TXT value. Update your DNS TXT record from the latest instructions and verify again.')
+        }
+
+        if (challengeStatus === 'valid') {
+            console.log('[ssl/dns01] ✅ DNS challenge already valid; skipping challenge completion step')
+        } else {
+            console.log(`[ssl/dns01] 🚀 Telling Let's Encrypt to verify DNS TXT record...`)
+            await client.completeChallenge(challenge)
+
+            console.log(`[ssl/dns01] ⏳ Waiting for Let's Encrypt to validate DNS record...`)
+            try {
+                await client.waitForValidStatus(challenge)
+                console.log(`[ssl/dns01] ✅ DNS challenge validated successfully!`)
+            } catch (validationError) {
+                console.error(`[ssl/dns01] ❌ DNS validation failed:`, validationError)
+                if (validationError instanceof Error) {
+                    console.error(`[ssl/dns01]    Error message: ${validationError.message}`)
+                    console.error(`[ssl/dns01]    Error name: ${validationError.name}`)
+                }
+                // Re-throw with more context about DNS validation
+                throw new Error(`DNS validation failed: ${validationError instanceof Error ? validationError.message : 'Unknown error'}`)
             }
-            // Re-throw with more context about DNS validation
-            throw new Error(`DNS validation failed: ${validationError instanceof Error ? validationError.message : 'Unknown error'}`)
         }
 
         const csr = Buffer.from(cert.csrPem)
         console.log(`[ssl/dns01] 📋 Finalizing order with Certificate Signing Request...`)
-        await client.finalizeOrder(order, csr)
+        if (order.status !== 'valid') {
+            await client.finalizeOrder(order, csr)
+        } else {
+            console.log('[ssl/dns01] ℹ️ Order already valid; skipping finalizeOrder')
+        }
+
+        const finalizedOrder = await getOrderByUrl(client, order.url)
 
         console.log(`[ssl/dns01] 📜 Downloading certificate from Let's Encrypt...`)
-        const certificate = await client.getCertificate(order)
+        const certificate = await client.getCertificate(finalizedOrder)
         const info = acme.crypto.readCertificateInfo(certificate)
 
         // ACME getCertificate returns the full chain (leaf + intermediates)
@@ -428,7 +593,7 @@ export async function completeDns01Certificate(certId: string): Promise<void> {
         console.log(`[ssl/dns01]    Expires: ${info.notAfter.toISOString()}`)
 
         await db.domainCertificate.update({
-            where: { id: certId },
+            where: {id: certId},
             data: {
                 status: 'ISSUED',
                 certificatePem: leafCert,
@@ -441,8 +606,8 @@ export async function completeDns01Certificate(certId: string): Promise<void> {
         })
 
         const domain = await db.customDomain.update({
-            where: { id: cert.domainId },
-            data: { sslMode: 'LETS_ENCRYPT' },
+            where: {id: cert.domainId},
+            data: {sslMode: 'LETS_ENCRYPT'},
         })
 
         console.log(`[ssl/dns01] 📤 Notifying nginx-agent about new certificate...`)
@@ -467,17 +632,17 @@ export async function completeDns01Certificate(certId: string): Promise<void> {
 // ─── Cert bundle retrieval ────────────────────────────────────────────────────
 
 export interface CertBundle {
-    privateKey:  string  // decrypted PEM
+    privateKey: string  // decrypted PEM
     certificate: string  // PEM
-    fullChain:   string  // PEM
-    expiresAt:   Date
+    fullChain: string  // PEM
+    expiresAt: Date
 }
 
 export async function getActiveCertBundle(
     hostname: string,
 ): Promise<CertBundle | null> {
     const domain = await db.customDomain.findUnique({
-        where: { domain: hostname },
+        where: {domain: hostname},
     })
 
     if (!domain || domain.sslMode !== 'LETS_ENCRYPT') return null
@@ -486,9 +651,9 @@ export async function getActiveCertBundle(
         where: {
             domainId: domain.id,
             status: 'ISSUED',
-            certificatePem: { not: null },
+            certificatePem: {not: null},
         },
-        orderBy: { issuedAt: 'desc' },
+        orderBy: {issuedAt: 'desc'},
     })
 
     if (!cert?.certificatePem || !cert.fullChainPem || !cert.expiresAt) {
@@ -496,10 +661,10 @@ export async function getActiveCertBundle(
     }
 
     return {
-        privateKey:  decrypt(cert.privateKeyPem),
+        privateKey: decrypt(cert.privateKeyPem),
         certificate: cert.certificatePem,
-        fullChain:   cert.fullChainPem,
-        expiresAt:   cert.expiresAt,
+        fullChain: cert.fullChainPem,
+        expiresAt: cert.expiresAt,
     }
 }
 
@@ -519,7 +684,7 @@ export async function renewCertificate(cert: DomainCertificate & {
         // DNS-01 can't renew automatically — notify the user instead
         // TODO: send notification email to domain owner
         await db.domainCertificate.update({
-            where: { id: cert.id },
+            where: {id: cert.id},
             data: {
                 lastError: 'DNS-01 certificate requires manual renewal via domain settings.',
             },
@@ -532,11 +697,12 @@ export async function renewCertificate(cert: DomainCertificate & {
 async function markFailed(certId: string, error: unknown): Promise<void> {
     const message = error instanceof Error ? error.message : String(error)
     await db.domainCertificate.update({
-        where: { id: certId },
+        where: {id: certId},
         data: {
             status: 'FAILED',
             lastError: message,
-            renewalAttempts: { increment: 1 },
+            renewalAttempts: {increment: 1},
         },
-    }).catch(() => {})
+    }).catch(() => {
+    })
 }

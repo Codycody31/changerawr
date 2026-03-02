@@ -204,9 +204,19 @@ export function SSLManagement({ domain, onUpdate, onError, onSuccess }: SSLManag
 
             // Check for 202 (retry) BEFORE checking response.ok
             if (response.status === 202 && result.retry) {
-                // DNS not propagated yet - show friendly retry message
-                console.log('[SSL UI] DNS not propagated, user should retry')
-                onError(result.message || 'DNS TXT record not yet propagated. Please wait and try again.')
+                // Check if TXT value changed
+                if (result.txtValueChanged && result.newTxtValue) {
+                    console.log('[SSL UI] TXT value changed, updating dnsChallenge state')
+                    setDnsChallenge({
+                        txtName: dnsChallenge?.txtName || `_acme-challenge.${domain.domain}`,
+                        txtValue: result.newTxtValue,
+                    })
+                    onError(result.message || 'DNS TXT value has changed. Please update your DNS record.')
+                } else {
+                    // DNS not propagated yet - show friendly retry message
+                    console.log('[SSL UI] DNS not propagated, user should retry')
+                    onError(result.message || 'DNS TXT record not yet propagated. Please wait and try again.')
+                }
                 setStep('dns-instructions') // Go back to instructions
             } else if (response.ok && result.success) {
                 console.log('[SSL UI] DNS verification successful, certificate issued!')
