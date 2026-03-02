@@ -72,3 +72,6 @@ null
 
 # sponsorer server
 /sponsor-server
+
+# user requests to add
+CLAUDE.md
