@@ -211,21 +211,32 @@ export async function proxy(request: NextRequest) {
 
     // Force HTTPS redirect for custom domains (production only)
     if (isCustomDomain(hostname) && process.env.NODE_ENV === 'production') {
+        const proto = request.headers.get('x-forwarded-proto')
+        const forwardedHost = request.headers.get('x-forwarded-host')
+
+        console.log(`[proxy] Custom domain request: ${hostname}`)
+        console.log(`[proxy]   x-forwarded-proto: ${proto}`)
+        console.log(`[proxy]   x-forwarded-host: ${forwardedHost}`)
+        console.log(`[proxy]   pathname: ${pathname}`)
+
         const securityConfig = await getDomainSecurityConfig(hostname)
 
         if (securityConfig?.forceHttps) {
-            const proto = request.headers.get('x-forwarded-proto')
-            console.log(`[proxy] HTTPS check for ${hostname}: proto=${proto}, pathname=${pathname}`)
-
             // Only redirect if explicitly on HTTP (not https, not null/undefined)
             if (proto === 'http') {
-                console.log(`[proxy] Redirecting ${hostname} from HTTP to HTTPS`)
-                // Construct the HTTPS URL using the original host and path
-                const httpsUrl = new URL(request.url)
-                httpsUrl.protocol = 'https:'
-                httpsUrl.host = hostname
+                console.log(`[proxy] ⚡ Redirecting ${hostname} from HTTP to HTTPS`)
+                // Build the HTTPS URL properly - don't use request.url as it has the internal host
+                const search = request.nextUrl.search
+                const httpsUrl = `https://${hostname}${pathname}${search}`
+                console.log(`[proxy]   Target: ${httpsUrl}`)
                 return NextResponse.redirect(httpsUrl, 308)
+            } else if (proto === 'https') {
+                console.log(`[proxy] ✓ Already on HTTPS, continuing`)
+            } else {
+                console.log(`[proxy] ⚠ Unknown proto (${proto}), assuming HTTPS`)
             }
+        } else {
+            console.log(`[proxy] forceHttps disabled for ${hostname}`)
         }
     }
 
