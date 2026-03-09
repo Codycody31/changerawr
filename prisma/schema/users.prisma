@@ -18,6 +18,7 @@ model User {
   auditLogs         AuditLog[]         @relation("AuditLogUser")
   targetAuditLogs   AuditLog[]         @relation("AuditLogTarget")
   oauthConnections  OAuthConnection[]
+  samlConnections   SAMLConnection[]
   passwordResets    PasswordReset[]
   passkeys          Passkey[]
   lastChallenge     String?
@@ -157,4 +158,38 @@ model CliAuthCode {
   @@index([code])
   @@index([userId])
   @@index([expiresAt])
+}
+
+model SAMLProvider {
+  id             String           @id @default(cuid())
+  name           String           @unique
+  entityId       String
+  ssoUrl         String
+  certificate    String
+  spEntityId     String?
+  nameIdFormat   String           @default("urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress")
+  emailAttribute String           @default("email")
+  nameAttribute  String           @default("name")
+  enabled        Boolean          @default(true)
+  isDefault      Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  connections    SAMLConnection[]
+}
+
+model SAMLConnection {
+  id           String       @id @default(cuid())
+  providerId   String
+  provider     SAMLProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  nameId       String
+  sessionIndex String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@unique([providerId, userId])
+  @@unique([providerId, nameId])
+  @@index([userId])
+  @@index([providerId])
 }

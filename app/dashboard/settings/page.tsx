@@ -62,9 +62,27 @@ interface OAuthConnection {
     updatedAt: string;
 }
 
+interface SAMLProvider {
+    id: string;
+    name: string;
+    enabled: boolean;
+    isDefault: boolean;
+}
+
+interface SAMLConnection {
+    id: string;
+    providerId: string;
+    provider: SAMLProvider;
+    nameId: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
 interface SsoData {
     connections: OAuthConnection[];
     allProviders: OAuthProvider[];
+    samlConnections: SAMLConnection[];
+    allSAMLProviders: SAMLProvider[];
 }
 
 export default function SettingsPage() {
@@ -81,7 +99,9 @@ export default function SettingsPage() {
     // SSO connections state
     const [ssoData, setSsoData] = useState<SsoData>({
         connections: [],
-        allProviders: []
+        allProviders: [],
+        samlConnections: [],
+        allSAMLProviders: [],
     });
     const [isSsoLoading, setIsSsoLoading] = useState(true);
 
@@ -495,6 +515,8 @@ export default function SettingsPage() {
                 <ConnectedSsoProviders
                     connections={ssoData.connections}
                     allProviders={ssoData.allProviders}
+                    samlConnections={ssoData.samlConnections}
+                    allSAMLProviders={ssoData.allSAMLProviders}
                     isLoading={isSsoLoading}
                 />
 

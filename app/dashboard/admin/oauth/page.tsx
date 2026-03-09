@@ -300,6 +300,36 @@ const ProviderLogo: React.FC<{ providerName: string }> = ({providerName}) => {
     );
 };
 
+// SAML provider interface
+interface SAMLProvider {
+    id: string;
+    name: string;
+    entityId: string;
+    ssoUrl: string;
+    certificate: string;
+    spEntityId?: string | null;
+    nameIdFormat: string;
+    emailAttribute: string;
+    nameAttribute: string;
+    enabled: boolean;
+    isDefault: boolean;
+}
+
+const samlProviderSchema = z.object({
+    name: z.string().min(1, 'Name is required'),
+    entityId: z.string().min(1, 'IdP Entity ID is required'),
+    ssoUrl: z.string().url('SSO URL must be valid'),
+    certificate: z.string().min(1, 'Certificate is required'),
+    spEntityId: z.string().optional(),
+    nameIdFormat: z.string().default('urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress'),
+    emailAttribute: z.string().default('email'),
+    nameAttribute: z.string().default('name'),
+    enabled: z.boolean().default(true),
+    isDefault: z.boolean().default(false),
+});
+
+type SAMLProviderFormValues = z.infer<typeof samlProviderSchema>;
+
 export default function OAuthProvidersPage() {
     const {user} = useAuth();
     const queryClient = useQueryClient();
@@ -308,6 +338,13 @@ export default function OAuthProvidersPage() {
     const [selectedProvider, setSelectedProvider] = useState<OAuthProvider | null>(null);
     const [providerToDelete, setProviderToDelete] = useState<OAuthProvider | null>(null);
     const [activeTab, setActiveTab] = useState('active');
+    const [ssoType, setSsoType] = useState<'oauth' | 'saml'>('oauth');
+
+    // SAML provider state
+    const [isSAMLAddDialogOpen, setIsSAMLAddDialogOpen] = useState(false);
+    const [isSAMLEditDialogOpen, setIsSAMLEditDialogOpen] = useState(false);
+    const [selectedSAMLProvider, setSelectedSAMLProvider] = useState<SAMLProvider | null>(null);
+    const [samlProviderToDelete, setSAMLProviderToDelete] = useState<SAMLProvider | null>(null);
 
     // Get all OAuth providers
     const {data: providers, isLoading} = useQuery({
@@ -581,6 +618,138 @@ export default function OAuthProvidersPage() {
         if (activeTab === 'disabled') return !provider.enabled;
         return true; // "all" tab
     });
+
+    // ── SAML ──────────────────────────────────────────────────────────────────
+
+    const {data: samlData, isLoading: isSAMLLoading} = useQuery({
+        queryKey: ['saml-providers'],
+        queryFn: async () => {
+            const response = await fetch('/api/admin/saml/providers?includeAll=true');
+            if (!response.ok) throw new Error('Failed to fetch SAML providers');
+            return response.json();
+        }
+    });
+
+    const samlCreateForm = useForm<SAMLProviderFormValues>({
+        resolver: zodResolver(samlProviderSchema),
+        defaultValues: {
+            name: '',
+            entityId: '',
+            ssoUrl: '',
+            certificate: '',
+            spEntityId: '',
+            nameIdFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+            emailAttribute: 'email',
+            nameAttribute: 'name',
+            enabled: true,
+            isDefault: false,
+        }
+    });
+
+    const samlEditForm = useForm<SAMLProviderFormValues>({
+        resolver: zodResolver(samlProviderSchema),
+        defaultValues: {
+            name: '',
+            entityId: '',
+            ssoUrl: '',
+            certificate: '',
+            spEntityId: '',
+            nameIdFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+            emailAttribute: 'email',
+            nameAttribute: 'name',
+            enabled: true,
+            isDefault: false,
+        }
+    });
+
+    const addSAMLProvider = useMutation({
+        mutationFn: async (data: SAMLProviderFormValues) => {
+            const response = await fetch('/api/admin/saml/providers', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error || 'Failed to add SAML provider');
+            }
+            return response.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({queryKey: ['saml-providers']});
+            toast({title: 'SAML Provider Added', description: 'The SAML provider has been added successfully.'});
+            setIsSAMLAddDialogOpen(false);
+            samlCreateForm.reset();
+        },
+        onError: (error: Error) => {
+            toast({title: 'Failed to Add SAML Provider', description: error.message, variant: 'destructive'});
+        }
+    });
+
+    const updateSAMLProvider = useMutation({
+        mutationFn: async (data: SAMLProviderFormValues & {id: string}) => {
+            const response = await fetch(`/api/admin/saml/providers/${data.id}`, {
+                method: 'PATCH',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error || 'Failed to update SAML provider');
+            }
+            return response.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({queryKey: ['saml-providers']});
+            toast({title: 'SAML Provider Updated', description: 'The SAML provider has been updated successfully.'});
+            setIsSAMLEditDialogOpen(false);
+            setSelectedSAMLProvider(null);
+        },
+        onError: (error: Error) => {
+            toast({title: 'Failed to Update SAML Provider', description: error.message, variant: 'destructive'});
+        }
+    });
+
+    const deleteSAMLProvider = useMutation({
+        mutationFn: async (id: string) => {
+            const response = await fetch(`/api/admin/saml/providers/${id}`, {method: 'DELETE'});
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error || 'Failed to delete SAML provider');
+            }
+            return response.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({queryKey: ['saml-providers']});
+            toast({title: 'SAML Provider Deleted', description: 'The SAML provider has been deleted successfully.'});
+            setSAMLProviderToDelete(null);
+        },
+        onError: (error: Error) => {
+            toast({title: 'Failed to Delete SAML Provider', description: error.message, variant: 'destructive'});
+        }
+    });
+
+    const handleEditSAMLProvider = (provider: SAMLProvider) => {
+        setSelectedSAMLProvider(provider);
+        samlEditForm.reset({
+            name: provider.name,
+            entityId: provider.entityId,
+            ssoUrl: provider.ssoUrl,
+            certificate: provider.certificate,
+            spEntityId: provider.spEntityId || '',
+            nameIdFormat: provider.nameIdFormat,
+            emailAttribute: provider.emailAttribute,
+            nameAttribute: provider.nameAttribute,
+            enabled: provider.enabled,
+            isDefault: provider.isDefault,
+        });
+        setIsSAMLEditDialogOpen(true);
+    };
+
+    const copySAMLUrl = (url: string, label: string) => {
+        navigator.clipboard.writeText(url);
+        toast({title: 'Copied', description: `${label} copied to clipboard.`});
+    };
 
     // Only allow admins to access this page
     if (user?.role !== 'ADMIN') {
@@ -1344,21 +1513,41 @@ export default function OAuthProvidersPage() {
             </AlertDialog>
 
             {/* Page Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">OAuth Providers</h1>
-                    <p className="text-muted-foreground mt-2">
-                        Manage single sign-on providers for Changerawr with custom URLs support
-                    </p>
-                </div>
-                <Button onClick={() => setIsAddDialogOpen(true)} className="sm:self-start">
-                    <Plus className="mr-2 h-4 w-4"/>
-                    Add Provider
-                </Button>
+            <div>
+                <h1 className="text-3xl font-bold tracking-tight">SSO Providers</h1>
+                <p className="text-muted-foreground mt-2">
+                    Manage OAuth/OIDC and SAML single sign-on providers for Changerawr
+                </p>
             </div>
 
-            {/* Filter tabs */}
-            <Tabs defaultValue="active" value={activeTab} onValueChange={setActiveTab} className="w-full">
+            {/* Outer SSO type tabs */}
+            <Tabs value={ssoType} onValueChange={(v) => setSsoType(v as 'oauth' | 'saml')} className="w-full">
+                <TabsList className="grid w-full sm:w-auto grid-cols-2 mb-4">
+                    <TabsTrigger value="oauth" className="flex items-center gap-1">
+                        <KeyRound className="h-4 w-4"/>
+                        <span>OAuth / OIDC</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="saml" className="flex items-center gap-1">
+                        <Fingerprint className="h-4 w-4"/>
+                        <span>SAML</span>
+                    </TabsTrigger>
+                </TabsList>
+
+                {/* OAuth Tab Content */}
+                <TabsContent value="oauth" className="space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div>
+                            <h2 className="text-xl font-semibold">OAuth / OpenID Connect</h2>
+                            <p className="text-sm text-muted-foreground">Manage OAuth 2.0 and OpenID Connect providers</p>
+                        </div>
+                        <Button onClick={() => setIsAddDialogOpen(true)} className="sm:self-start">
+                            <Plus className="mr-2 h-4 w-4"/>
+                            Add OAuth Provider
+                        </Button>
+                    </div>
+
+                {/* Filter tabs */}
+                <Tabs defaultValue="active" value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="grid w-full sm:w-auto grid-cols-3">
                     <TabsTrigger value="active" className="flex items-center gap-1">
                         <Check className="h-4 w-4"/>
@@ -1417,6 +1606,386 @@ export default function OAuthProvidersPage() {
                         onDelete={setProviderToDelete}
                         setIsAddDialogOpen={setIsAddDialogOpen}
                     />
+                </TabsContent>
+            </Tabs>
+                </TabsContent>
+
+                {/* SAML Tab Content */}
+                <TabsContent value="saml" className="space-y-4">
+                    {/* SAML Add Dialog */}
+                    <Dialog open={isSAMLAddDialogOpen} onOpenChange={setIsSAMLAddDialogOpen}>
+                        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+                            <DialogHeader>
+                                <DialogTitle className="flex items-center gap-2">
+                                    <Plus className="h-5 w-5"/>
+                                    Add SAML Provider
+                                </DialogTitle>
+                                <DialogDescription>
+                                    Configure a new SAML 2.0 identity provider for enterprise SSO.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <Form {...samlCreateForm}>
+                                <form onSubmit={samlCreateForm.handleSubmit((d) => addSAMLProvider.mutate(d))} className="space-y-5">
+                                    <div className="grid grid-cols-1 gap-4">
+                                        <FormField control={samlCreateForm.control} name="name" render={({field}) => (
+                                            <FormItem>
+                                                <FormLabel>Provider Name</FormLabel>
+                                                <FormControl><Input placeholder="Okta SAML" {...field}/></FormControl>
+                                                <FormDescription>Unique display name for this provider.</FormDescription>
+                                                <FormMessage/>
+                                            </FormItem>
+                                        )}/>
+                                        <FormField control={samlCreateForm.control} name="entityId" render={({field}) => (
+                                            <FormItem>
+                                                <FormLabel>IdP Entity ID / Issuer</FormLabel>
+                                                <FormControl><Input placeholder="https://idp.example.com/entity" {...field}/></FormControl>
+                                                <FormDescription>The Entity ID or Issuer of the Identity Provider.</FormDescription>
+                                                <FormMessage/>
+                                            </FormItem>
+                                        )}/>
+                                        <FormField control={samlCreateForm.control} name="ssoUrl" render={({field}) => (
+                                            <FormItem>
+                                                <FormLabel>IdP SSO URL</FormLabel>
+                                                <FormControl><Input placeholder="https://idp.example.com/sso/saml" {...field}/></FormControl>
+                                                <FormDescription>The IdP single sign-on URL (HTTP-Redirect binding).</FormDescription>
+                                                <FormMessage/>
+                                            </FormItem>
+                                        )}/>
+                                        <FormField control={samlCreateForm.control} name="certificate" render={({field}) => (
+                                            <FormItem>
+                                                <FormLabel>IdP Signing Certificate (PEM)</FormLabel>
+                                                <FormControl>
+                                                    <textarea
+                                                        className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 font-mono"
+                                                        placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
+                                                        {...field}
+                                                    />
+                                                </FormControl>
+                                                <FormDescription>Paste the full PEM certificate from your IdP.</FormDescription>
+                                                <FormMessage/>
+                                            </FormItem>
+                                        )}/>
+                                    </div>
+                                    <Separator/>
+                                    <div className="space-y-2 border rounded-md p-4 bg-muted/30">
+                                        <p className="text-sm font-medium">SP URLs (register these with your IdP)</p>
+                                        <div className="space-y-2 text-xs">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className="text-muted-foreground">ACS URL:</span>
+                                                <div className="flex items-center gap-1 flex-1 justify-end">
+                                                    <code className="p-1 bg-background rounded border text-xs truncate max-w-xs">
+                                                        {`${typeof window !== 'undefined' ? window.location.origin : ''}/api/auth/saml/callback/${samlCreateForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`}
+                                                    </code>
+                                                    <Button type="button" variant="ghost" size="sm" onClick={() => copySAMLUrl(`${window.location.origin}/api/auth/saml/callback/${samlCreateForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`, 'ACS URL')}>
+                                                        <Copy className="h-3 w-3"/>
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className="text-muted-foreground">Metadata URL:</span>
+                                                <div className="flex items-center gap-1 flex-1 justify-end">
+                                                    <code className="p-1 bg-background rounded border text-xs truncate max-w-xs">
+                                                        {`${typeof window !== 'undefined' ? window.location.origin : ''}/api/auth/saml/metadata/${samlCreateForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`}
+                                                    </code>
+                                                    <Button type="button" variant="ghost" size="sm" onClick={() => copySAMLUrl(`${window.location.origin}/api/auth/saml/metadata/${samlCreateForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`, 'Metadata URL')}>
+                                                        <Copy className="h-3 w-3"/>
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <Separator/>
+                                    <div className="grid grid-cols-1 gap-4">
+                                        <FormField control={samlCreateForm.control} name="spEntityId" render={({field}) => (
+                                            <FormItem>
+                                                <FormLabel>SP Entity ID Override (optional)</FormLabel>
+                                                <FormControl><Input placeholder="Defaults to metadata URL" {...field}/></FormControl>
+                                                <FormMessage/>
+                                            </FormItem>
+                                        )}/>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <FormField control={samlCreateForm.control} name="emailAttribute" render={({field}) => (
+                                                <FormItem>
+                                                    <FormLabel>Email Attribute</FormLabel>
+                                                    <FormControl><Input placeholder="email" {...field}/></FormControl>
+                                                    <FormMessage/>
+                                                </FormItem>
+                                            )}/>
+                                            <FormField control={samlCreateForm.control} name="nameAttribute" render={({field}) => (
+                                                <FormItem>
+                                                    <FormLabel>Name Attribute</FormLabel>
+                                                    <FormControl><Input placeholder="name" {...field}/></FormControl>
+                                                    <FormMessage/>
+                                                </FormItem>
+                                            )}/>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <FormField control={samlCreateForm.control} name="enabled" render={({field}) => (
+                                                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                                                    <div className="space-y-0.5">
+                                                        <FormLabel>Enabled</FormLabel>
+                                                        <FormDescription className="text-xs">Show on login page</FormDescription>
+                                                    </div>
+                                                    <FormControl><Switch checked={field.value} onCheckedChange={field.onChange}/></FormControl>
+                                                </FormItem>
+                                            )}/>
+                                            <FormField control={samlCreateForm.control} name="isDefault" render={({field}) => (
+                                                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                                                    <div className="space-y-0.5">
+                                                        <FormLabel>Default</FormLabel>
+                                                        <FormDescription className="text-xs">Primary SAML provider</FormDescription>
+                                                    </div>
+                                                    <FormControl><Switch checked={field.value} onCheckedChange={field.onChange}/></FormControl>
+                                                </FormItem>
+                                            )}/>
+                                        </div>
+                                    </div>
+                                    <DialogFooter>
+                                        <Button type="button" variant="outline" onClick={() => setIsSAMLAddDialogOpen(false)}>Cancel</Button>
+                                        <Button type="submit" disabled={addSAMLProvider.isPending}>
+                                            {addSAMLProvider.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Adding...</> : 'Add Provider'}
+                                        </Button>
+                                    </DialogFooter>
+                                </form>
+                            </Form>
+                        </DialogContent>
+                    </Dialog>
+
+                    {/* SAML Edit Dialog */}
+                    <Dialog open={isSAMLEditDialogOpen} onOpenChange={setIsSAMLEditDialogOpen}>
+                        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+                            <DialogHeader>
+                                <DialogTitle className="flex items-center gap-2">
+                                    <Pencil className="h-5 w-5"/>
+                                    Edit SAML Provider
+                                </DialogTitle>
+                                <DialogDescription>Update the SAML identity provider configuration.</DialogDescription>
+                            </DialogHeader>
+                            <Form {...samlEditForm}>
+                                <form onSubmit={samlEditForm.handleSubmit((d) => selectedSAMLProvider && updateSAMLProvider.mutate({...d, id: selectedSAMLProvider.id}))} className="space-y-5">
+                                    <div className="grid grid-cols-1 gap-4">
+                                        <FormField control={samlEditForm.control} name="name" render={({field}) => (
+                                            <FormItem><FormLabel>Provider Name</FormLabel><FormControl><Input {...field}/></FormControl><FormMessage/></FormItem>
+                                        )}/>
+                                        <FormField control={samlEditForm.control} name="entityId" render={({field}) => (
+                                            <FormItem><FormLabel>IdP Entity ID / Issuer</FormLabel><FormControl><Input {...field}/></FormControl><FormMessage/></FormItem>
+                                        )}/>
+                                        <FormField control={samlEditForm.control} name="ssoUrl" render={({field}) => (
+                                            <FormItem><FormLabel>IdP SSO URL</FormLabel><FormControl><Input {...field}/></FormControl><FormMessage/></FormItem>
+                                        )}/>
+                                        <FormField control={samlEditForm.control} name="certificate" render={({field}) => (
+                                            <FormItem>
+                                                <FormLabel>IdP Signing Certificate (PEM)</FormLabel>
+                                                <FormControl>
+                                                    <textarea
+                                                        className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 font-mono"
+                                                        {...field}
+                                                    />
+                                                </FormControl>
+                                                <FormMessage/>
+                                            </FormItem>
+                                        )}/>
+                                    </div>
+                                    <Separator/>
+                                    <div className="space-y-2 border rounded-md p-4 bg-muted/30">
+                                        <p className="text-sm font-medium">SP URLs</p>
+                                        <div className="space-y-2 text-xs">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className="text-muted-foreground">ACS URL:</span>
+                                                <div className="flex items-center gap-1 flex-1 justify-end">
+                                                    <code className="p-1 bg-background rounded border text-xs truncate max-w-xs">
+                                                        {`${typeof window !== 'undefined' ? window.location.origin : ''}/api/auth/saml/callback/${selectedSAMLProvider?.name.toLowerCase().replace(/\s+/g, '-') || 'provider'}`}
+                                                    </code>
+                                                    <Button type="button" variant="ghost" size="sm" onClick={() => copySAMLUrl(`${window.location.origin}/api/auth/saml/callback/${selectedSAMLProvider?.name.toLowerCase().replace(/\s+/g, '-') || 'provider'}`, 'ACS URL')}>
+                                                        <Copy className="h-3 w-3"/>
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className="text-muted-foreground">Metadata URL:</span>
+                                                <div className="flex items-center gap-1 flex-1 justify-end">
+                                                    <code className="p-1 bg-background rounded border text-xs truncate max-w-xs">
+                                                        {`${typeof window !== 'undefined' ? window.location.origin : ''}/api/auth/saml/metadata/${selectedSAMLProvider?.name.toLowerCase().replace(/\s+/g, '-') || 'provider'}`}
+                                                    </code>
+                                                    <Button type="button" variant="ghost" size="sm" onClick={() => copySAMLUrl(`${window.location.origin}/api/auth/saml/metadata/${selectedSAMLProvider?.name.toLowerCase().replace(/\s+/g, '-') || 'provider'}`, 'Metadata URL')}>
+                                                        <Copy className="h-3 w-3"/>
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <Separator/>
+                                    <div className="grid grid-cols-1 gap-4">
+                                        <FormField control={samlEditForm.control} name="spEntityId" render={({field}) => (
+                                            <FormItem><FormLabel>SP Entity ID Override (optional)</FormLabel><FormControl><Input placeholder="Defaults to metadata URL" {...field}/></FormControl><FormMessage/></FormItem>
+                                        )}/>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <FormField control={samlEditForm.control} name="emailAttribute" render={({field}) => (
+                                                <FormItem><FormLabel>Email Attribute</FormLabel><FormControl><Input {...field}/></FormControl><FormMessage/></FormItem>
+                                            )}/>
+                                            <FormField control={samlEditForm.control} name="nameAttribute" render={({field}) => (
+                                                <FormItem><FormLabel>Name Attribute</FormLabel><FormControl><Input {...field}/></FormControl><FormMessage/></FormItem>
+                                            )}/>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <FormField control={samlEditForm.control} name="enabled" render={({field}) => (
+                                                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                                                    <div className="space-y-0.5"><FormLabel>Enabled</FormLabel></div>
+                                                    <FormControl><Switch checked={field.value} onCheckedChange={field.onChange}/></FormControl>
+                                                </FormItem>
+                                            )}/>
+                                            <FormField control={samlEditForm.control} name="isDefault" render={({field}) => (
+                                                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                                                    <div className="space-y-0.5"><FormLabel>Default</FormLabel></div>
+                                                    <FormControl><Switch checked={field.value} onCheckedChange={field.onChange}/></FormControl>
+                                                </FormItem>
+                                            )}/>
+                                        </div>
+                                    </div>
+                                    <DialogFooter>
+                                        <Button type="button" variant="outline" onClick={() => setIsSAMLEditDialogOpen(false)}>Cancel</Button>
+                                        <Button type="submit" disabled={updateSAMLProvider.isPending}>
+                                            {updateSAMLProvider.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Updating...</> : 'Update Provider'}
+                                        </Button>
+                                    </DialogFooter>
+                                </form>
+                            </Form>
+                        </DialogContent>
+                    </Dialog>
+
+                    {/* SAML Delete Dialog */}
+                    <AlertDialog open={!!samlProviderToDelete} onOpenChange={(open) => !open && setSAMLProviderToDelete(null)}>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle className="flex items-center gap-2">
+                                    <Trash2 className="h-5 w-5 text-destructive"/>
+                                    Delete {samlProviderToDelete?.name || 'SAML Provider'}
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Are you sure you want to delete this SAML provider? This action cannot be undone.
+                                    Users who previously signed in with this provider may lose access.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                    onClick={() => samlProviderToDelete && deleteSAMLProvider.mutate(samlProviderToDelete.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                    {deleteSAMLProvider.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Trash2 className="mr-2 h-4 w-4"/>}
+                                    Delete
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+
+                    {/* SAML Providers list */}
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div>
+                            <h2 className="text-xl font-semibold">SAML 2.0</h2>
+                            <p className="text-sm text-muted-foreground">Configure SAML identity providers for enterprise SSO</p>
+                        </div>
+                        <Button onClick={() => setIsSAMLAddDialogOpen(true)} className="sm:self-start">
+                            <Plus className="mr-2 h-4 w-4"/>
+                            Add SAML Provider
+                        </Button>
+                    </div>
+
+                    {isSAMLLoading ? (
+                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                            {Array.from({length: 2}).map((_, i) => (
+                                <Card key={i} className="animate-pulse">
+                                    <CardHeader className="pb-2">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-md bg-muted"></div>
+                                            <div>
+                                                <div className="h-6 w-24 bg-muted rounded"></div>
+                                                <div className="h-4 w-32 bg-muted rounded mt-1"></div>
+                                            </div>
+                                        </div>
+                                    </CardHeader>
+                                </Card>
+                            ))}
+                        </div>
+                    ) : !samlData?.providers?.length ? (
+                        <Card className="border-dashed">
+                            <CardContent className="pt-6 pb-6 flex flex-col items-center justify-center text-center">
+                                <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                                    <Fingerprint className="h-8 w-8 text-muted-foreground"/>
+                                </div>
+                                <h3 className="text-lg font-medium mb-2">No SAML Providers</h3>
+                                <p className="text-sm text-muted-foreground mb-4 max-w-sm">
+                                    Add a SAML identity provider to enable enterprise single sign-on.
+                                </p>
+                                <Button onClick={() => setIsSAMLAddDialogOpen(true)}>
+                                    <Plus className="mr-2 h-4 w-4"/>
+                                    Add SAML Provider
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        <AnimatePresence>
+                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                {samlData.providers.map((provider: SAMLProvider, index: number) => (
+                                    <motion.div
+                                        key={provider.id}
+                                        initial={{opacity: 0, y: 20}}
+                                        animate={{opacity: 1, y: 0}}
+                                        exit={{opacity: 0, y: -20}}
+                                        transition={{duration: 0.2, delay: index * 0.05}}
+                                    >
+                                        <Card className="h-full flex flex-col">
+                                            <CardHeader className="pb-2">
+                                                <div className="flex items-start justify-between">
+                                                    <div className="flex items-center gap-3">
+                                                        <ProviderLogo providerName={provider.name}/>
+                                                        <div>
+                                                            <CardTitle className="text-base">{provider.name}</CardTitle>
+                                                            <div className="flex items-center gap-1 mt-1">
+                                                                <Badge variant={provider.enabled ? 'secondary' : 'outline'} className={provider.enabled ? 'text-xs bg-green-50 text-green-700' : 'text-xs'}>
+                                                                    {provider.enabled ? 'Active' : 'Disabled'}
+                                                                </Badge>
+                                                                {provider.isDefault && <Badge variant="outline" className="text-xs">Default</Badge>}
+                                                                <Badge variant="outline" className="text-xs">SAML 2.0</Badge>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </CardHeader>
+                                            <CardContent className="flex-1 space-y-2">
+                                                <div className="text-xs text-muted-foreground space-y-1">
+                                                    <div className="truncate"><span className="font-medium">SSO URL: </span>{provider.ssoUrl}</div>
+                                                    <div className="truncate"><span className="font-medium">Entity ID: </span>{provider.entityId}</div>
+                                                </div>
+                                                <div className="flex items-center gap-2 pt-1">
+                                                    <Button
+                                                        type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs"
+                                                        onClick={() => copySAMLUrl(`${window.location.origin}/api/auth/saml/callback/${provider.name.toLowerCase().replace(/\s+/g, '-')}`, 'ACS URL')}
+                                                    >
+                                                        <Copy className="h-3 w-3 mr-1"/>ACS URL
+                                                    </Button>
+                                                    <Button
+                                                        type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs"
+                                                        onClick={() => copySAMLUrl(`${window.location.origin}/api/auth/saml/metadata/${provider.name.toLowerCase().replace(/\s+/g, '-')}`, 'Metadata URL')}
+                                                    >
+                                                        <Copy className="h-3 w-3 mr-1"/>Metadata
+                                                    </Button>
+                                                </div>
+                                            </CardContent>
+                                            <CardFooter className="flex justify-between">
+                                                <Button variant="outline" size="sm" onClick={() => handleEditSAMLProvider(provider)}>
+                                                    <Pencil className="h-4 w-4 mr-2"/>Edit
+                                                </Button>
+                                                <Button variant="destructive" size="sm" onClick={() => setSAMLProviderToDelete(provider)}>
+                                                    <Trash2 className="h-4 w-4 mr-2"/>Delete
+                                                </Button>
+                                            </CardFooter>
+                                        </Card>
+                                    </motion.div>
+                                ))}
+                            </div>
+                        </AnimatePresence>
+                    )}
                 </TabsContent>
             </Tabs>
         </motion.div>
