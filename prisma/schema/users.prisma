@@ -40,20 +40,22 @@ model RefreshToken {
 }
 
 model OAuthProvider {
-  id               String            @id @default(cuid())
-  name             String
-  clientId         String
-  clientSecret     String
-  authorizationUrl String
-  tokenUrl         String
-  userInfoUrl      String
-  callbackUrl      String
-  scopes           String[]
-  enabled          Boolean           @default(true)
-  isDefault        Boolean           @default(false)
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  connections      OAuthConnection[]
+  id                      String            @id @default(cuid())
+  name                    String
+  clientId                String
+  clientSecret            String
+  authorizationUrl        String
+  tokenUrl                String
+  userInfoUrl             String
+  callbackUrl             String
+  scopes                  String[]
+  enabled                 Boolean           @default(true)
+  isDefault               Boolean           @default(false)
+  allowedEmailDomains     String[]          @default([])
+  blockExistingUsers      Boolean           @default(false)
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+  connections             OAuthConnection[]
 }
 
 model OAuthConnection {
@@ -161,20 +163,22 @@ model CliAuthCode {
 }
 
 model SAMLProvider {
-  id             String           @id @default(cuid())
-  name           String           @unique
-  entityId       String
-  ssoUrl         String
-  certificate    String
-  spEntityId     String?
-  nameIdFormat   String           @default("urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress")
-  emailAttribute String           @default("email")
-  nameAttribute  String           @default("name")
-  enabled        Boolean          @default(true)
-  isDefault      Boolean          @default(false)
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  connections    SAMLConnection[]
+  id                  String           @id @default(cuid())
+  name                String           @unique
+  entityId            String
+  ssoUrl              String
+  certificate         String
+  spEntityId          String?
+  nameIdFormat        String           @default("urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress")
+  emailAttribute      String           @default("email")
+  nameAttribute       String           @default("name")
+  enabled             Boolean          @default(true)
+  isDefault           Boolean          @default(false)
+  allowedEmailDomains String[]         @default([])
+  blockExistingUsers  Boolean          @default(false)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  connections         SAMLConnection[]
 }
 
 model SAMLConnection {

@@ -14,7 +14,9 @@ const updateProviderSchema = z.object({
     clientSecret: z.string().min(1, 'Client Secret is required').optional(),
     scopes: z.array(z.string()).min(1, 'At least one scope is required').optional(),
     enabled: z.boolean().optional(),
-    isDefault: z.boolean().optional()
+    isDefault: z.boolean().optional(),
+    allowedEmailDomains: z.array(z.string()).optional(),
+    blockExistingUsers: z.boolean().optional(),
 });
 
 /**
@@ -127,6 +129,14 @@ export async function PATCH(
 
         if (validatedData.userInfoUrl !== undefined) {
             updateData.userInfoUrl = validatedData.userInfoUrl;
+        }
+
+        if (validatedData.allowedEmailDomains !== undefined) {
+            updateData.allowedEmailDomains = validatedData.allowedEmailDomains;
+        }
+
+        if (validatedData.blockExistingUsers !== undefined) {
+            updateData.blockExistingUsers = validatedData.blockExistingUsers;
         }
 
         // Update callback URL if name changes

@@ -15,7 +15,9 @@ const providerSchema = z.object({
     userInfoUrl: z.string().url('User Info URL must be valid'),
     scopes: z.array(z.string()).min(1, 'At least one scope is required'),
     enabled: z.boolean().default(true),
-    isDefault: z.boolean().default(false)
+    isDefault: z.boolean().default(false),
+    allowedEmailDomains: z.array(z.string()).default([]),
+    blockExistingUsers: z.boolean().default(false),
 });
 
 /**
@@ -179,7 +181,9 @@ export async function POST(request: Request) {
                 callbackUrl: `${appUrl}/api/auth/oauth/callback/${validatedData.name.toLowerCase().replace(/\s+/g, '-')}`,
                 scopes: validatedData.scopes,
                 enabled: validatedData.enabled,
-                isDefault: validatedData.isDefault
+                isDefault: validatedData.isDefault,
+                allowedEmailDomains: validatedData.allowedEmailDomains,
+                blockExistingUsers: validatedData.blockExistingUsers,
             }
         });
 

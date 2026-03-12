@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { generateTokens } from '@/lib/auth/tokens';
 import { Role } from '@prisma/client';
 import { SAMLUserInfo } from '@/lib/types/saml';
+import { validateEmailDomain } from '@/lib/auth/email-domain-validator';
 
 function getAppUrl(): string {
     return process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
@@ -161,6 +162,20 @@ export async function handleSAMLCallback(providerName: string, samlResponse: str
 
     // Find or create user by email
     let user = await db.user.findUnique({ where: { email: userInfo.email } });
+
+    // Validate email domain restrictions
+    const validation = validateEmailDomain(
+        userInfo.email,
+        {
+            allowedEmailDomains: provider.allowedEmailDomains,
+            blockExistingUsers: provider.blockExistingUsers,
+        },
+        !!user
+    );
+
+    if (!validation.allowed) {
+        throw new Error(validation.reason || 'Email domain not allowed for this SSO provider');
+    }
 
     if (!user) {
         user = await db.user.create({

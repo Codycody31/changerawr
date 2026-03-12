@@ -17,6 +17,8 @@ const providerSchema = z.object({
     nameAttribute: z.string().default('name'),
     enabled: z.boolean().default(true),
     isDefault: z.boolean().default(false),
+    allowedEmailDomains: z.array(z.string()).default([]),
+    blockExistingUsers: z.boolean().default(false),
 });
 
 export async function GET(request: Request) {
@@ -80,6 +82,8 @@ export async function POST(request: Request) {
                 nameAttribute: validatedData.nameAttribute,
                 enabled: validatedData.enabled,
                 isDefault: validatedData.isDefault,
+                allowedEmailDomains: validatedData.allowedEmailDomains,
+                blockExistingUsers: validatedData.blockExistingUsers,
             },
         });
 

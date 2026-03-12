@@ -23,6 +23,8 @@ export type OAuthProviderUpdateData = {
     authorizationUrl?: string;
     tokenUrl?: string;
     userInfoUrl?: string;
+    allowedEmailDomains?: string[];
+    blockExistingUsers?: boolean;
 };
 
 export interface OAuthUserInfo {
