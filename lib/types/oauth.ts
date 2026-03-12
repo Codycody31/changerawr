@@ -25,6 +25,7 @@ export type OAuthProviderUpdateData = {
     userInfoUrl?: string;
     allowedEmailDomains?: string[];
     blockExistingUsers?: boolean;
+    requiredClaims?: any; // Prisma InputJsonValue
 };
 
 export interface OAuthUserInfo {

@@ -17,6 +17,7 @@ const updateProviderSchema = z.object({
     isDefault: z.boolean().optional(),
     allowedEmailDomains: z.array(z.string()).optional(),
     blockExistingUsers: z.boolean().optional(),
+    requiredClaims: z.record(z.string()).optional().nullable(),
 });
 
 /**
@@ -137,6 +138,10 @@ export async function PATCH(
 
         if (validatedData.blockExistingUsers !== undefined) {
             updateData.blockExistingUsers = validatedData.blockExistingUsers;
+        }
+
+        if (validatedData.requiredClaims !== undefined) {
+            updateData.requiredClaims = validatedData.requiredClaims || {};
         }
 
         // Update callback URL if name changes

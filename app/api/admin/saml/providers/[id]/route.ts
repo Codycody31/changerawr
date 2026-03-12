@@ -17,6 +17,7 @@ const updateSchema = z.object({
     isDefault: z.boolean().optional(),
     allowedEmailDomains: z.array(z.string()).optional(),
     blockExistingUsers: z.boolean().optional(),
+    requiredClaims: z.record(z.string()).optional().nullable(),
 });
 
 export async function PATCH(
@@ -61,6 +62,7 @@ export async function PATCH(
                 ...(validatedData.isDefault !== undefined && { isDefault: validatedData.isDefault }),
                 ...(validatedData.allowedEmailDomains !== undefined && { allowedEmailDomains: validatedData.allowedEmailDomains }),
                 ...(validatedData.blockExistingUsers !== undefined && { blockExistingUsers: validatedData.blockExistingUsers }),
+                ...(validatedData.requiredClaims !== undefined && { requiredClaims: validatedData.requiredClaims || {} }),
             },
         });
 

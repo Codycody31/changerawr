@@ -40,22 +40,23 @@ model RefreshToken {
 }
 
 model OAuthProvider {
-  id                      String            @id @default(cuid())
-  name                    String
-  clientId                String
-  clientSecret            String
-  authorizationUrl        String
-  tokenUrl                String
-  userInfoUrl             String
-  callbackUrl             String
-  scopes                  String[]
-  enabled                 Boolean           @default(true)
-  isDefault               Boolean           @default(false)
-  allowedEmailDomains     String[]          @default([])
-  blockExistingUsers      Boolean           @default(false)
-  createdAt               DateTime          @default(now())
-  updatedAt               DateTime          @updatedAt
-  connections             OAuthConnection[]
+  id                  String            @id @default(cuid())
+  name                String
+  clientId            String
+  clientSecret        String
+  authorizationUrl    String
+  tokenUrl            String
+  userInfoUrl         String
+  callbackUrl         String
+  scopes              String[]
+  enabled             Boolean           @default(true)
+  isDefault           Boolean           @default(false)
+  allowedEmailDomains String[]          @default([])
+  blockExistingUsers  Boolean           @default(false)
+  requiredClaims      Json?             @default("{}")
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  connections         OAuthConnection[]
 }
 
 model OAuthConnection {
@@ -176,6 +177,7 @@ model SAMLProvider {
   isDefault           Boolean          @default(false)
   allowedEmailDomains String[]         @default([])
   blockExistingUsers  Boolean          @default(false)
+  requiredClaims      Json?            @default("{}")
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
   connections         SAMLConnection[]

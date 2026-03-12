@@ -30,6 +30,7 @@ export interface SAMLUserInfo {
     email: string;
     name?: string;
     sessionIndex?: string;
+    rawProfile?: Record<string, unknown>;
 }
 
 export interface SAMLCallbackParams {
@@ -48,4 +49,7 @@ export type SAMLProviderUpdateData = {
     nameAttribute?: string;
     enabled?: boolean;
     isDefault?: boolean;
+    allowedEmailDomains?: string[];
+    blockExistingUsers?: boolean;
+    requiredClaims?: any; // Prisma InputJsonValue
 };

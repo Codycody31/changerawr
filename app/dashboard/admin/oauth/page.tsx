@@ -63,7 +63,8 @@ import {
     Globe,
     Link2,
     Info,
-    Shield
+    Shield,
+    User
 } from 'lucide-react';
 import {motion, AnimatePresence} from 'framer-motion';
 import {z} from 'zod';
@@ -176,6 +177,9 @@ interface OAuthProvider {
     scopes: string[];
     enabled: boolean;
     isDefault: boolean;
+    allowedEmailDomains?: string[];
+    blockExistingUsers?: boolean;
+    requiredClaims?: Record<string, string>;
 }
 
 // Type for the API request body
@@ -191,6 +195,7 @@ interface ProviderApiData {
     userInfoUrl: string;
     allowedEmailDomains?: string[];
     blockExistingUsers?: boolean;
+    requiredClaims?: Record<string, string>;
 }
 
 // Provider logo component that handles placeholders
@@ -321,6 +326,7 @@ interface SAMLProvider {
     isDefault: boolean;
     allowedEmailDomains: string[];
     blockExistingUsers: boolean;
+    requiredClaims?: Record<string, string>;
 }
 
 const samlProviderSchema = z.object({
@@ -355,6 +361,12 @@ export default function OAuthProvidersPage() {
     const [isSAMLEditDialogOpen, setIsSAMLEditDialogOpen] = useState(false);
     const [selectedSAMLProvider, setSelectedSAMLProvider] = useState<SAMLProvider | null>(null);
     const [samlProviderToDelete, setSAMLProviderToDelete] = useState<SAMLProvider | null>(null);
+
+    // Required claims state for OAuth and SAML
+    const [oauthCreateClaims, setOauthCreateClaims] = useState<Record<string, string>>({});
+    const [oauthEditClaims, setOauthEditClaims] = useState<Record<string, string>>({});
+    const [samlCreateClaims, setSamlCreateClaims] = useState<Record<string, string>>({});
+    const [samlEditClaims, setSamlEditClaims] = useState<Record<string, string>>({});
 
     // Get all OAuth providers
     const {data: providers, isLoading} = useQuery({
@@ -444,6 +456,7 @@ export default function OAuthProvidersPage() {
                 userInfoUrl: '',
                 allowedEmailDomains: data.allowedEmailDomains ? data.allowedEmailDomains.split(',').map(d => d.trim()).filter(Boolean) : [],
                 blockExistingUsers: data.blockExistingUsers,
+                requiredClaims: oauthCreateClaims,
             };
 
             if (data.urlMode === 'preset' && data.preset) {
@@ -478,6 +491,7 @@ export default function OAuthProvidersPage() {
             });
             setIsAddDialogOpen(false);
             createForm.reset();
+            setOauthCreateClaims({});
         },
         onError: (error: Error) => {
             toast({
@@ -503,6 +517,7 @@ export default function OAuthProvidersPage() {
                 userInfoUrl: '',
                 allowedEmailDomains: data.allowedEmailDomains ? data.allowedEmailDomains.split(',').map(d => d.trim()).filter(Boolean) : [],
                 blockExistingUsers: data.blockExistingUsers,
+                requiredClaims: oauthEditClaims,
             };
 
             if (data.urlMode === 'preset' && data.preset) {
@@ -620,9 +635,12 @@ export default function OAuthProvidersPage() {
             clientSecret: provider.clientSecret,
             scopes: provider.scopes.join(','),
             enabled: provider.enabled,
-            isDefault: provider.isDefault
+            isDefault: provider.isDefault,
+            allowedEmailDomains: provider.allowedEmailDomains?.join(', ') || '',
+            blockExistingUsers: provider.blockExistingUsers || false
         });
 
+        setOauthEditClaims(provider.requiredClaims || {});
         setIsEditDialogOpen(true);
     };
 
@@ -681,6 +699,7 @@ export default function OAuthProvidersPage() {
             const apiData = {
                 ...data,
                 allowedEmailDomains: data.allowedEmailDomains ? data.allowedEmailDomains.split(',').map(d => d.trim()).filter(Boolean) : [],
+                requiredClaims: samlCreateClaims,
             };
             const response = await fetch('/api/admin/saml/providers', {
                 method: 'POST',
@@ -698,6 +717,7 @@ export default function OAuthProvidersPage() {
             toast({title: 'SAML Provider Added', description: 'The SAML provider has been added successfully.'});
             setIsSAMLAddDialogOpen(false);
             samlCreateForm.reset();
+            setSamlCreateClaims({});
         },
         onError: (error: Error) => {
             toast({title: 'Failed to Add SAML Provider', description: error.message, variant: 'destructive'});
@@ -709,6 +729,7 @@ export default function OAuthProvidersPage() {
             const apiData = {
                 ...data,
                 allowedEmailDomains: data.allowedEmailDomains ? data.allowedEmailDomains.split(',').map(d => d.trim()).filter(Boolean) : [],
+                requiredClaims: samlEditClaims,
             };
             const response = await fetch(`/api/admin/saml/providers/${data.id}`, {
                 method: 'PATCH',
@@ -767,6 +788,7 @@ export default function OAuthProvidersPage() {
             allowedEmailDomains: provider.allowedEmailDomains?.join(', ') || '',
             blockExistingUsers: provider.blockExistingUsers,
         });
+        setSamlEditClaims(provider.requiredClaims || {});
         setIsSAMLEditDialogOpen(true);
     };
 
@@ -774,6 +796,13 @@ export default function OAuthProvidersPage() {
         navigator.clipboard.writeText(url);
         toast({title: 'Copied', description: `${label} copied to clipboard.`});
     };
+
+    // Filter SAML providers based on active tab
+    const filteredSAMLProviders = samlData?.providers?.filter((provider: SAMLProvider) => {
+        if (activeTab === 'active') return provider.enabled;
+        if (activeTab === 'disabled') return !provider.enabled;
+        return true; // "all" tab
+    });
 
     // Only allow admins to access this page
     if (user?.role !== 'ADMIN') {
@@ -815,21 +844,16 @@ export default function OAuthProvidersPage() {
                     <Form {...createForm}>
                         <form onSubmit={createForm.handleSubmit(onCreateSubmit)} className="space-y-6">
                             <Tabs defaultValue="basic" className="w-full">
-                                <TabsList className="grid w-full grid-cols-3">
+                                <TabsList className="grid w-full grid-cols-2">
                                     <TabsTrigger value="basic" className="flex items-center gap-1">
-                                        <Info className="h-4 w-4"/>
-                                        <span className="hidden sm:inline">Basic Info</span>
-                                        <span className="sm:hidden">Basic</span>
+                                        <Settings className="h-4 w-4"/>
+                                        <span className="hidden sm:inline">Configuration</span>
+                                        <span className="sm:hidden">Config</span>
                                     </TabsTrigger>
                                     <TabsTrigger value="security" className="flex items-center gap-1">
                                         <Shield className="h-4 w-4"/>
-                                        <span className="hidden sm:inline">Security</span>
+                                        <span className="hidden sm:inline">Security & Access</span>
                                         <span className="sm:hidden">Security</span>
-                                    </TabsTrigger>
-                                    <TabsTrigger value="advanced" className="flex items-center gap-1">
-                                        <Settings className="h-4 w-4"/>
-                                        <span className="hidden sm:inline">Advanced</span>
-                                        <span className="sm:hidden">Advanced</span>
                                     </TabsTrigger>
                                 </TabsList>
 
@@ -1058,6 +1082,39 @@ export default function OAuthProvidersPage() {
                                             </FormItem>
                                         )}
                                     />
+
+                                    {/* Callback URL section */}
+                                    <div className="space-y-2 border rounded-md p-4 bg-muted/30">
+                                        <div className="flex items-center justify-between">
+                                            <FormLabel className="text-sm font-medium">Callback URL</FormLabel>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => {
+                                                    const url = `${window.location.origin}/api/auth/oauth/callback/${createForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`;
+                                                    navigator.clipboard.writeText(url);
+                                                    toast({
+                                                        title: 'Copied to clipboard',
+                                                        description: 'Callback URL has been copied to your clipboard.'
+                                                    });
+                                                }}
+                                            >
+                                                <Copy className="h-4 w-4 mr-1"/>
+                                                Copy
+                                            </Button>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <code
+                                                className="flex-1 p-2 text-xs bg-background rounded border overflow-x-auto text-muted-foreground">
+                                                {`${window.location.origin}/api/auth/oauth/callback/${createForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`}
+                                            </code>
+                                        </div>
+                                        <FormDescription>
+                                            Use this URL as the callback URL (redirect URI) in your OAuth provider
+                                            configuration.
+                                        </FormDescription>
+                                    </div>
                                 </TabsContent>
 
                                 <TabsContent value="security" className="space-y-4 mt-4">
@@ -1098,6 +1155,73 @@ export default function OAuthProvidersPage() {
                                             </FormItem>
                                         )}
                                     />
+
+                                    <div className="space-y-4 rounded-lg border p-4">
+                                        <div className="space-y-2">
+                                            <FormLabel>Required Claims / Attributes</FormLabel>
+                                            <FormDescription>
+                                                Validate specific claims from OAuth userInfo or SAML attributes. Users must have matching values to sign in.
+                                                Example: Require users to be in a specific organization or have a certain role.
+                                            </FormDescription>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            {Object.entries(oauthCreateClaims).map(([key, value], index) => (
+                                                <div key={index} className="flex gap-2">
+                                                    <Input
+                                                        placeholder="Claim name (e.g., organization)"
+                                                        value={key}
+                                                        onChange={(e) => {
+                                                            const newClaims = {...oauthCreateClaims};
+                                                            delete newClaims[key];
+                                                            newClaims[e.target.value] = value;
+                                                            setOauthCreateClaims(newClaims);
+                                                        }}
+                                                        className="flex-1"
+                                                    />
+                                                    <Input
+                                                        placeholder="Required value (e.g., my-company)"
+                                                        value={value}
+                                                        onChange={(e) => {
+                                                            setOauthCreateClaims({...oauthCreateClaims, [key]: e.target.value});
+                                                        }}
+                                                        className="flex-1"
+                                                    />
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => {
+                                                            const newClaims = {...oauthCreateClaims};
+                                                            delete newClaims[key];
+                                                            setOauthCreateClaims(newClaims);
+                                                        }}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            ))}
+
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => {
+                                                    const newKey = `claim_${Object.keys(oauthCreateClaims).length + 1}`;
+                                                    setOauthCreateClaims({...oauthCreateClaims, [newKey]: ''});
+                                                }}
+                                            >
+                                                <Plus className="h-4 w-4 mr-2" />
+                                                Add Claim Rule
+                                            </Button>
+                                        </div>
+
+                                        <div className="text-xs text-muted-foreground space-y-1">
+                                            <p><strong>For OAuth:</strong> Claim names like <code>organizations</code>, <code>groups</code>, <code>role</code></p>
+                                            <p><strong>For SAML:</strong> Attribute names from your IdP (e.g., <code>memberOf</code>, <code>department</code>)</p>
+                                            <p><strong>Note:</strong> Matching is case-insensitive. Array claims (groups, etc.) are supported.</p>
+                                        </div>
+                                    </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <FormField
@@ -1145,41 +1269,6 @@ export default function OAuthProvidersPage() {
                                         />
                                     </div>
                                 </TabsContent>
-
-                                <TabsContent value="advanced" className="space-y-4 mt-4">
-                                    {/* Callback URL section */}
-                                    <div className="space-y-2 border rounded-md p-4 bg-muted/30">
-                                        <div className="flex items-center justify-between">
-                                            <FormLabel className="text-sm font-medium">Callback URL</FormLabel>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => {
-                                                    const url = `${window.location.origin}/api/auth/oauth/callback/${createForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`;
-                                                    navigator.clipboard.writeText(url);
-                                                    toast({
-                                                        title: 'Copied to clipboard',
-                                                        description: 'Callback URL has been copied to your clipboard.'
-                                                    });
-                                                }}
-                                            >
-                                                <Copy className="h-4 w-4 mr-1"/>
-                                                Copy
-                                            </Button>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <code
-                                                className="flex-1 p-2 text-xs bg-background rounded border overflow-x-auto text-muted-foreground">
-                                                {`${window.location.origin}/api/auth/oauth/callback/${createForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`}
-                                            </code>
-                                        </div>
-                                        <FormDescription>
-                                            Use this URL as the callback URL (redirect URI) in your OAuth provider
-                                            configuration.
-                                        </FormDescription>
-                                    </div>
-                                </TabsContent>
                             </Tabs>
 
                             <DialogFooter>
@@ -1221,21 +1310,16 @@ export default function OAuthProvidersPage() {
                     <Form {...editForm}>
                         <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-6">
                             <Tabs defaultValue="basic" className="w-full">
-                                <TabsList className="grid w-full grid-cols-3">
+                                <TabsList className="grid w-full grid-cols-2">
                                     <TabsTrigger value="basic" className="flex items-center gap-1">
-                                        <Info className="h-4 w-4"/>
-                                        <span className="hidden sm:inline">Basic Info</span>
-                                        <span className="sm:hidden">Basic</span>
+                                        <Settings className="h-4 w-4"/>
+                                        <span className="hidden sm:inline">Configuration</span>
+                                        <span className="sm:hidden">Config</span>
                                     </TabsTrigger>
                                     <TabsTrigger value="security" className="flex items-center gap-1">
                                         <Shield className="h-4 w-4"/>
-                                        <span className="hidden sm:inline">Security</span>
+                                        <span className="hidden sm:inline">Security & Access</span>
                                         <span className="sm:hidden">Security</span>
-                                    </TabsTrigger>
-                                    <TabsTrigger value="advanced" className="flex items-center gap-1">
-                                        <Settings className="h-4 w-4"/>
-                                        <span className="hidden sm:inline">Advanced</span>
-                                        <span className="sm:hidden">Advanced</span>
                                     </TabsTrigger>
                                 </TabsList>
 
@@ -1464,6 +1548,39 @@ export default function OAuthProvidersPage() {
                                             </FormItem>
                                         )}
                                     />
+
+                                    {/* Callback URL section */}
+                                    <div className="space-y-2 border rounded-md p-4 bg-muted/30">
+                                        <div className="flex items-center justify-between">
+                                            <FormLabel className="text-sm font-medium">Callback URL</FormLabel>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => {
+                                                    const url = `${window.location.origin}/api/auth/oauth/callback/${editForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`;
+                                                    navigator.clipboard.writeText(url);
+                                                    toast({
+                                                        title: 'Copied to clipboard',
+                                                        description: 'Callback URL has been copied to your clipboard.'
+                                                    });
+                                                }}
+                                            >
+                                                <Copy className="h-4 w-4 mr-1"/>
+                                                Copy
+                                            </Button>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <code
+                                                className="flex-1 p-2 text-xs bg-background rounded border overflow-x-auto text-muted-foreground">
+                                                {`${window.location.origin}/api/auth/oauth/callback/${editForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`}
+                                            </code>
+                                        </div>
+                                        <FormDescription>
+                                            Use this URL as the callback URL (redirect URI) in your OAuth provider
+                                            configuration.
+                                        </FormDescription>
+                                    </div>
                                 </TabsContent>
 
                                 <TabsContent value="security" className="space-y-4 mt-4">
@@ -1504,6 +1621,73 @@ export default function OAuthProvidersPage() {
                                             </FormItem>
                                         )}
                                     />
+
+                                    <div className="space-y-4 rounded-lg border p-4">
+                                        <div className="space-y-2">
+                                            <FormLabel>Required Claims / Attributes</FormLabel>
+                                            <FormDescription>
+                                                Validate specific claims from OAuth userInfo or SAML attributes. Users must have matching values to sign in.
+                                                Example: Require users to be in a specific organization or have a certain role.
+                                            </FormDescription>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            {Object.entries(oauthEditClaims).map(([key, value], index) => (
+                                                <div key={index} className="flex gap-2">
+                                                    <Input
+                                                        placeholder="Claim name (e.g., organization)"
+                                                        value={key}
+                                                        onChange={(e) => {
+                                                            const newClaims = {...oauthEditClaims};
+                                                            delete newClaims[key];
+                                                            newClaims[e.target.value] = value;
+                                                            setOauthEditClaims(newClaims);
+                                                        }}
+                                                        className="flex-1"
+                                                    />
+                                                    <Input
+                                                        placeholder="Required value (e.g., my-company)"
+                                                        value={value}
+                                                        onChange={(e) => {
+                                                            setOauthEditClaims({...oauthEditClaims, [key]: e.target.value});
+                                                        }}
+                                                        className="flex-1"
+                                                    />
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => {
+                                                            const newClaims = {...oauthEditClaims};
+                                                            delete newClaims[key];
+                                                            setOauthEditClaims(newClaims);
+                                                        }}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            ))}
+
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => {
+                                                    const newKey = `claim_${Object.keys(oauthEditClaims).length + 1}`;
+                                                    setOauthEditClaims({...oauthEditClaims, [newKey]: ''});
+                                                }}
+                                            >
+                                                <Plus className="h-4 w-4 mr-2" />
+                                                Add Claim Rule
+                                            </Button>
+                                        </div>
+
+                                        <div className="text-xs text-muted-foreground space-y-1">
+                                            <p><strong>For OAuth:</strong> Claim names like <code>organizations</code>, <code>groups</code>, <code>role</code></p>
+                                            <p><strong>For SAML:</strong> Attribute names from your IdP (e.g., <code>memberOf</code>, <code>department</code>)</p>
+                                            <p><strong>Note:</strong> Matching is case-insensitive. Array claims (groups, etc.) are supported.</p>
+                                        </div>
+                                    </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <FormField
@@ -1549,41 +1733,6 @@ export default function OAuthProvidersPage() {
                                                 </FormItem>
                                             )}
                                         />
-                                    </div>
-                                </TabsContent>
-
-                                <TabsContent value="advanced" className="space-y-4 mt-4">
-                                    {/* Callback URL section */}
-                                    <div className="space-y-2 border rounded-md p-4 bg-muted/30">
-                                        <div className="flex items-center justify-between">
-                                            <FormLabel className="text-sm font-medium">Callback URL</FormLabel>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => {
-                                                    const url = `${window.location.origin}/api/auth/oauth/callback/${editForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`;
-                                                    navigator.clipboard.writeText(url);
-                                                    toast({
-                                                        title: 'Copied to clipboard',
-                                                        description: 'Callback URL has been copied to your clipboard.'
-                                                    });
-                                                }}
-                                            >
-                                                <Copy className="h-4 w-4 mr-1"/>
-                                                Copy
-                                            </Button>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <code
-                                                className="flex-1 p-2 text-xs bg-background rounded border overflow-x-auto text-muted-foreground">
-                                                {`${window.location.origin}/api/auth/oauth/callback/${editForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`}
-                                            </code>
-                                        </div>
-                                        <FormDescription>
-                                            Use this URL as the callback URL (redirect URI) in your OAuth provider
-                                            configuration.
-                                        </FormDescription>
                                     </div>
                                 </TabsContent>
                             </Tabs>
@@ -1758,19 +1907,19 @@ export default function OAuthProvidersPage() {
                                     <Tabs defaultValue="basic" className="w-full">
                                         <TabsList className="grid w-full grid-cols-3">
                                             <TabsTrigger value="basic" className="flex items-center gap-1">
-                                                <Info className="h-4 w-4"/>
-                                                <span className="hidden sm:inline">Basic Info</span>
-                                                <span className="sm:hidden">Basic</span>
+                                                <Settings className="h-4 w-4"/>
+                                                <span className="hidden sm:inline">Configuration</span>
+                                                <span className="sm:hidden">Config</span>
                                             </TabsTrigger>
                                             <TabsTrigger value="security" className="flex items-center gap-1">
                                                 <Shield className="h-4 w-4"/>
-                                                <span className="hidden sm:inline">Security</span>
+                                                <span className="hidden sm:inline">Security & Access</span>
                                                 <span className="sm:hidden">Security</span>
                                             </TabsTrigger>
                                             <TabsTrigger value="advanced" className="flex items-center gap-1">
-                                                <Settings className="h-4 w-4"/>
-                                                <span className="hidden sm:inline">Advanced</span>
-                                                <span className="sm:hidden">Advanced</span>
+                                                <User className="h-4 w-4"/>
+                                                <span className="hidden sm:inline">Attribute Mapping</span>
+                                                <span className="sm:hidden">Attributes</span>
                                             </TabsTrigger>
                                         </TabsList>
 
@@ -1820,6 +1969,37 @@ export default function OAuthProvidersPage() {
                                                     <FormMessage/>
                                                 </FormItem>
                                             )}/>
+
+                                            {/* SP URLs section */}
+                                            <div className="space-y-2 border rounded-md p-4 bg-muted/30">
+                                                <p className="text-sm font-medium">SP URLs (register these with your IdP)</p>
+                                                <div className="space-y-3">
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center justify-between">
+                                                            <FormLabel className="text-xs text-muted-foreground">ACS URL</FormLabel>
+                                                            <Button type="button" variant="ghost" size="sm" onClick={() => copySAMLUrl(`${window.location.origin}/api/auth/saml/callback/${samlCreateForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`, 'ACS URL')}>
+                                                                <Copy className="h-3 w-3 mr-1"/>
+                                                                Copy
+                                                            </Button>
+                                                        </div>
+                                                        <code className="block p-2 text-xs bg-background rounded border overflow-x-auto text-muted-foreground">
+                                                            {`${typeof window !== 'undefined' ? window.location.origin : ''}/api/auth/saml/callback/${samlCreateForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`}
+                                                        </code>
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center justify-between">
+                                                            <FormLabel className="text-xs text-muted-foreground">Metadata URL</FormLabel>
+                                                            <Button type="button" variant="ghost" size="sm" onClick={() => copySAMLUrl(`${window.location.origin}/api/auth/saml/metadata/${samlCreateForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`, 'Metadata URL')}>
+                                                                <Copy className="h-3 w-3 mr-1"/>
+                                                                Copy
+                                                            </Button>
+                                                        </div>
+                                                        <code className="block p-2 text-xs bg-background rounded border overflow-x-auto text-muted-foreground">
+                                                            {`${typeof window !== 'undefined' ? window.location.origin : ''}/api/auth/saml/metadata/${samlCreateForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`}
+                                                        </code>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </TabsContent>
 
                                         <TabsContent value="security" className="space-y-4 mt-4">
@@ -1847,6 +2027,73 @@ export default function OAuthProvidersPage() {
                                                     </FormControl>
                                                 </FormItem>
                                             )}/>
+
+                                            <div className="space-y-4 rounded-lg border p-4">
+                                                <div className="space-y-2">
+                                                    <FormLabel>Required Claims / Attributes</FormLabel>
+                                                    <FormDescription>
+                                                        Validate specific claims from OAuth userInfo or SAML attributes. Users must have matching values to sign in.
+                                                        Example: Require users to be in a specific organization or have a certain role.
+                                                    </FormDescription>
+                                                </div>
+
+                                                <div className="space-y-2">
+                                                    {Object.entries(samlCreateClaims).map(([key, value], index) => (
+                                                        <div key={index} className="flex gap-2">
+                                                            <Input
+                                                                placeholder="Claim name (e.g., organization)"
+                                                                value={key}
+                                                                onChange={(e) => {
+                                                                    const newClaims = {...samlCreateClaims};
+                                                                    delete newClaims[key];
+                                                                    newClaims[e.target.value] = value;
+                                                                    setSamlCreateClaims(newClaims);
+                                                                }}
+                                                                className="flex-1"
+                                                            />
+                                                            <Input
+                                                                placeholder="Required value (e.g., my-company)"
+                                                                value={value}
+                                                                onChange={(e) => {
+                                                                    setSamlCreateClaims({...samlCreateClaims, [key]: e.target.value});
+                                                                }}
+                                                                className="flex-1"
+                                                            />
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                onClick={() => {
+                                                                    const newClaims = {...samlCreateClaims};
+                                                                    delete newClaims[key];
+                                                                    setSamlCreateClaims(newClaims);
+                                                                }}
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </div>
+                                                    ))}
+
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => {
+                                                            const newKey = `claim_${Object.keys(samlCreateClaims).length + 1}`;
+                                                            setSamlCreateClaims({...samlCreateClaims, [newKey]: ''});
+                                                        }}
+                                                    >
+                                                        <Plus className="h-4 w-4 mr-2" />
+                                                        Add Claim Rule
+                                                    </Button>
+                                                </div>
+
+                                                <div className="text-xs text-muted-foreground space-y-1">
+                                                    <p><strong>For OAuth:</strong> Claim names like <code>organizations</code>, <code>groups</code>, <code>role</code></p>
+                                                    <p><strong>For SAML:</strong> Attribute names from your IdP (e.g., <code>memberOf</code>, <code>department</code>)</p>
+                                                    <p><strong>Note:</strong> Matching is case-insensitive. Array claims (groups, etc.) are supported.</p>
+                                                </div>
+                                            </div>
 
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <FormField control={samlCreateForm.control} name="enabled" render={({field}) => (
@@ -1897,36 +2144,6 @@ export default function OAuthProvidersPage() {
                                                     </FormItem>
                                                 )}/>
                                             </div>
-
-                                            <div className="space-y-2 border rounded-md p-4 bg-muted/30">
-                                                <p className="text-sm font-medium">SP URLs (register these with your IdP)</p>
-                                                <div className="space-y-3">
-                                                    <div className="space-y-1">
-                                                        <div className="flex items-center justify-between">
-                                                            <FormLabel className="text-xs text-muted-foreground">ACS URL</FormLabel>
-                                                            <Button type="button" variant="ghost" size="sm" onClick={() => copySAMLUrl(`${window.location.origin}/api/auth/saml/callback/${samlCreateForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`, 'ACS URL')}>
-                                                                <Copy className="h-3 w-3 mr-1"/>
-                                                                Copy
-                                                            </Button>
-                                                        </div>
-                                                        <code className="block p-2 text-xs bg-background rounded border overflow-x-auto text-muted-foreground">
-                                                            {`${typeof window !== 'undefined' ? window.location.origin : ''}/api/auth/saml/callback/${samlCreateForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`}
-                                                        </code>
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <div className="flex items-center justify-between">
-                                                            <FormLabel className="text-xs text-muted-foreground">Metadata URL</FormLabel>
-                                                            <Button type="button" variant="ghost" size="sm" onClick={() => copySAMLUrl(`${window.location.origin}/api/auth/saml/metadata/${samlCreateForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`, 'Metadata URL')}>
-                                                                <Copy className="h-3 w-3 mr-1"/>
-                                                                Copy
-                                                            </Button>
-                                                        </div>
-                                                        <code className="block p-2 text-xs bg-background rounded border overflow-x-auto text-muted-foreground">
-                                                            {`${typeof window !== 'undefined' ? window.location.origin : ''}/api/auth/saml/metadata/${samlCreateForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`}
-                                                        </code>
-                                                    </div>
-                                                </div>
-                                            </div>
                                         </TabsContent>
                                     </Tabs>
 
@@ -1956,19 +2173,19 @@ export default function OAuthProvidersPage() {
                                     <Tabs defaultValue="basic" className="w-full">
                                         <TabsList className="grid w-full grid-cols-3">
                                             <TabsTrigger value="basic" className="flex items-center gap-1">
-                                                <Info className="h-4 w-4"/>
-                                                <span className="hidden sm:inline">Basic Info</span>
-                                                <span className="sm:hidden">Basic</span>
+                                                <Settings className="h-4 w-4"/>
+                                                <span className="hidden sm:inline">Configuration</span>
+                                                <span className="sm:hidden">Config</span>
                                             </TabsTrigger>
                                             <TabsTrigger value="security" className="flex items-center gap-1">
                                                 <Shield className="h-4 w-4"/>
-                                                <span className="hidden sm:inline">Security</span>
+                                                <span className="hidden sm:inline">Security & Access</span>
                                                 <span className="sm:hidden">Security</span>
                                             </TabsTrigger>
                                             <TabsTrigger value="advanced" className="flex items-center gap-1">
-                                                <Settings className="h-4 w-4"/>
-                                                <span className="hidden sm:inline">Advanced</span>
-                                                <span className="sm:hidden">Advanced</span>
+                                                <User className="h-4 w-4"/>
+                                                <span className="hidden sm:inline">Attribute Mapping</span>
+                                                <span className="sm:hidden">Attributes</span>
                                             </TabsTrigger>
                                         </TabsList>
 
@@ -2017,6 +2234,37 @@ export default function OAuthProvidersPage() {
                                                     <FormMessage/>
                                                 </FormItem>
                                             )}/>
+
+                                            {/* SP URLs section */}
+                                            <div className="space-y-2 border rounded-md p-4 bg-muted/30">
+                                                <p className="text-sm font-medium">SP URLs (register these with your IdP)</p>
+                                                <div className="space-y-3">
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center justify-between">
+                                                            <FormLabel className="text-xs text-muted-foreground">ACS URL</FormLabel>
+                                                            <Button type="button" variant="ghost" size="sm" onClick={() => copySAMLUrl(`${window.location.origin}/api/auth/saml/callback/${samlEditForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`, 'ACS URL')}>
+                                                                <Copy className="h-3 w-3 mr-1"/>
+                                                                Copy
+                                                            </Button>
+                                                        </div>
+                                                        <code className="block p-2 text-xs bg-background rounded border overflow-x-auto text-muted-foreground">
+                                                            {`${typeof window !== 'undefined' ? window.location.origin : ''}/api/auth/saml/callback/${samlEditForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`}
+                                                        </code>
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center justify-between">
+                                                            <FormLabel className="text-xs text-muted-foreground">Metadata URL</FormLabel>
+                                                            <Button type="button" variant="ghost" size="sm" onClick={() => copySAMLUrl(`${window.location.origin}/api/auth/saml/metadata/${samlEditForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`, 'Metadata URL')}>
+                                                                <Copy className="h-3 w-3 mr-1"/>
+                                                                Copy
+                                                            </Button>
+                                                        </div>
+                                                        <code className="block p-2 text-xs bg-background rounded border overflow-x-auto text-muted-foreground">
+                                                            {`${typeof window !== 'undefined' ? window.location.origin : ''}/api/auth/saml/metadata/${samlEditForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`}
+                                                        </code>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </TabsContent>
 
                                         <TabsContent value="security" className="space-y-4 mt-4">
@@ -2044,6 +2292,73 @@ export default function OAuthProvidersPage() {
                                                     </FormControl>
                                                 </FormItem>
                                             )}/>
+
+                                            <div className="space-y-4 rounded-lg border p-4">
+                                                <div className="space-y-2">
+                                                    <FormLabel>Required Claims / Attributes</FormLabel>
+                                                    <FormDescription>
+                                                        Validate specific claims from OAuth userInfo or SAML attributes. Users must have matching values to sign in.
+                                                        Example: Require users to be in a specific organization or have a certain role.
+                                                    </FormDescription>
+                                                </div>
+
+                                                <div className="space-y-2">
+                                                    {Object.entries(samlEditClaims).map(([key, value], index) => (
+                                                        <div key={index} className="flex gap-2">
+                                                            <Input
+                                                                placeholder="Claim name (e.g., organization)"
+                                                                value={key}
+                                                                onChange={(e) => {
+                                                                    const newClaims = {...samlEditClaims};
+                                                                    delete newClaims[key];
+                                                                    newClaims[e.target.value] = value;
+                                                                    setSamlEditClaims(newClaims);
+                                                                }}
+                                                                className="flex-1"
+                                                            />
+                                                            <Input
+                                                                placeholder="Required value (e.g., my-company)"
+                                                                value={value}
+                                                                onChange={(e) => {
+                                                                    setSamlEditClaims({...samlEditClaims, [key]: e.target.value});
+                                                                }}
+                                                                className="flex-1"
+                                                            />
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                onClick={() => {
+                                                                    const newClaims = {...samlEditClaims};
+                                                                    delete newClaims[key];
+                                                                    setSamlEditClaims(newClaims);
+                                                                }}
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </div>
+                                                    ))}
+
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => {
+                                                            const newKey = `claim_${Object.keys(samlEditClaims).length + 1}`;
+                                                            setSamlEditClaims({...samlEditClaims, [newKey]: ''});
+                                                        }}
+                                                    >
+                                                        <Plus className="h-4 w-4 mr-2" />
+                                                        Add Claim Rule
+                                                    </Button>
+                                                </div>
+
+                                                <div className="text-xs text-muted-foreground space-y-1">
+                                                    <p><strong>For OAuth:</strong> Claim names like <code>organizations</code>, <code>groups</code>, <code>role</code></p>
+                                                    <p><strong>For SAML:</strong> Attribute names from your IdP (e.g., <code>memberOf</code>, <code>department</code>)</p>
+                                                    <p><strong>Note:</strong> Matching is case-insensitive. Array claims (groups, etc.) are supported.</p>
+                                                </div>
+                                            </div>
 
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <FormField control={samlEditForm.control} name="enabled" render={({field}) => (
@@ -2093,36 +2408,6 @@ export default function OAuthProvidersPage() {
                                                         <FormMessage/>
                                                     </FormItem>
                                                 )}/>
-                                            </div>
-
-                                            <div className="space-y-2 border rounded-md p-4 bg-muted/30">
-                                                <p className="text-sm font-medium">SP URLs</p>
-                                                <div className="space-y-3">
-                                                    <div className="space-y-1">
-                                                        <div className="flex items-center justify-between">
-                                                            <FormLabel className="text-xs text-muted-foreground">ACS URL</FormLabel>
-                                                            <Button type="button" variant="ghost" size="sm" onClick={() => copySAMLUrl(`${window.location.origin}/api/auth/saml/callback/${selectedSAMLProvider?.name.toLowerCase().replace(/\s+/g, '-') || 'provider'}`, 'ACS URL')}>
-                                                                <Copy className="h-3 w-3 mr-1"/>
-                                                                Copy
-                                                            </Button>
-                                                        </div>
-                                                        <code className="block p-2 text-xs bg-background rounded border overflow-x-auto text-muted-foreground">
-                                                            {`${typeof window !== 'undefined' ? window.location.origin : ''}/api/auth/saml/callback/${selectedSAMLProvider?.name.toLowerCase().replace(/\s+/g, '-') || 'provider'}`}
-                                                        </code>
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <div className="flex items-center justify-between">
-                                                            <FormLabel className="text-xs text-muted-foreground">Metadata URL</FormLabel>
-                                                            <Button type="button" variant="ghost" size="sm" onClick={() => copySAMLUrl(`${window.location.origin}/api/auth/saml/metadata/${selectedSAMLProvider?.name.toLowerCase().replace(/\s+/g, '-') || 'provider'}`, 'Metadata URL')}>
-                                                                <Copy className="h-3 w-3 mr-1"/>
-                                                                Copy
-                                                            </Button>
-                                                        </div>
-                                                        <code className="block p-2 text-xs bg-background rounded border overflow-x-auto text-muted-foreground">
-                                                            {`${typeof window !== 'undefined' ? window.location.origin : ''}/api/auth/saml/metadata/${selectedSAMLProvider?.name.toLowerCase().replace(/\s+/g, '-') || 'provider'}`}
-                                                        </code>
-                                                    </div>
-                                                </div>
                                             </div>
                                         </TabsContent>
                                     </Tabs>
@@ -2176,101 +2461,71 @@ export default function OAuthProvidersPage() {
                         </Button>
                     </div>
 
-                    {isSAMLLoading ? (
-                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                            {Array.from({length: 2}).map((_, i) => (
-                                <Card key={i} className="animate-pulse">
-                                    <CardHeader className="pb-2">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-md bg-muted"></div>
-                                            <div>
-                                                <div className="h-6 w-24 bg-muted rounded"></div>
-                                                <div className="h-4 w-32 bg-muted rounded mt-1"></div>
-                                            </div>
-                                        </div>
-                                    </CardHeader>
-                                </Card>
-                            ))}
-                        </div>
-                    ) : !samlData?.providers?.length ? (
-                        <Card className="border-dashed">
-                            <CardContent className="pt-6 pb-6 flex flex-col items-center justify-center text-center">
-                                <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-                                    <Fingerprint className="h-8 w-8 text-muted-foreground"/>
-                                </div>
-                                <h3 className="text-lg font-medium mb-2">No SAML Providers</h3>
-                                <p className="text-sm text-muted-foreground mb-4 max-w-sm">
-                                    Add a SAML identity provider to enable enterprise single sign-on.
-                                </p>
-                                <Button onClick={() => setIsSAMLAddDialogOpen(true)}>
-                                    <Plus className="mr-2 h-4 w-4"/>
-                                    Add SAML Provider
-                                </Button>
-                            </CardContent>
-                        </Card>
-                    ) : (
-                        <AnimatePresence>
-                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                                {samlData.providers.map((provider: SAMLProvider, index: number) => (
-                                    <motion.div
-                                        key={provider.id}
-                                        initial={{opacity: 0, y: 20}}
-                                        animate={{opacity: 1, y: 0}}
-                                        exit={{opacity: 0, y: -20}}
-                                        transition={{duration: 0.2, delay: index * 0.05}}
-                                    >
-                                        <Card className="h-full flex flex-col">
-                                            <CardHeader className="pb-2">
-                                                <div className="flex items-start justify-between">
-                                                    <div className="flex items-center gap-3">
-                                                        <ProviderLogo providerName={provider.name}/>
-                                                        <div>
-                                                            <CardTitle className="text-base">{provider.name}</CardTitle>
-                                                            <div className="flex items-center gap-1 mt-1">
-                                                                <Badge variant={provider.enabled ? 'secondary' : 'outline'} className={provider.enabled ? 'text-xs bg-green-50 text-green-700' : 'text-xs'}>
-                                                                    {provider.enabled ? 'Active' : 'Disabled'}
-                                                                </Badge>
-                                                                {provider.isDefault && <Badge variant="outline" className="text-xs">Default</Badge>}
-                                                                <Badge variant="outline" className="text-xs">SAML 2.0</Badge>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </CardHeader>
-                                            <CardContent className="flex-1 space-y-2">
-                                                <div className="text-xs text-muted-foreground space-y-1">
-                                                    <div className="truncate"><span className="font-medium">SSO URL: </span>{provider.ssoUrl}</div>
-                                                    <div className="truncate"><span className="font-medium">Entity ID: </span>{provider.entityId}</div>
-                                                </div>
-                                                <div className="flex items-center gap-2 pt-1">
-                                                    <Button
-                                                        type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs"
-                                                        onClick={() => copySAMLUrl(`${window.location.origin}/api/auth/saml/callback/${provider.name.toLowerCase().replace(/\s+/g, '-')}`, 'ACS URL')}
-                                                    >
-                                                        <Copy className="h-3 w-3 mr-1"/>ACS URL
-                                                    </Button>
-                                                    <Button
-                                                        type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs"
-                                                        onClick={() => copySAMLUrl(`${window.location.origin}/api/auth/saml/metadata/${provider.name.toLowerCase().replace(/\s+/g, '-')}`, 'Metadata URL')}
-                                                    >
-                                                        <Copy className="h-3 w-3 mr-1"/>Metadata
-                                                    </Button>
-                                                </div>
-                                            </CardContent>
-                                            <CardFooter className="flex justify-between">
-                                                <Button variant="outline" size="sm" onClick={() => handleEditSAMLProvider(provider)}>
-                                                    <Pencil className="h-4 w-4 mr-2"/>Edit
-                                                </Button>
-                                                <Button variant="destructive" size="sm" onClick={() => setSAMLProviderToDelete(provider)}>
-                                                    <Trash2 className="h-4 w-4 mr-2"/>Delete
-                                                </Button>
-                                            </CardFooter>
-                                        </Card>
-                                    </motion.div>
-                                ))}
-                            </div>
-                        </AnimatePresence>
-                    )}
+                    {/* Filter tabs */}
+                    <Tabs defaultValue="active" value={activeTab} onValueChange={setActiveTab} className="w-full">
+                        <TabsList className="grid w-full sm:w-auto grid-cols-3">
+                            <TabsTrigger value="active" className="flex items-center gap-1">
+                                <Check className="h-4 w-4"/>
+                                <span>Active</span>
+                                {samlData?.providers && (
+                                    <Badge variant="secondary" className="ml-1 text-xs">
+                                        {samlData.providers.filter((p: SAMLProvider) => p.enabled).length}
+                                    </Badge>
+                                )}
+                            </TabsTrigger>
+                            <TabsTrigger value="disabled" className="flex items-center gap-1">
+                                <X className="h-4 w-4"/>
+                                <span>Disabled</span>
+                                {samlData?.providers && (
+                                    <Badge variant="secondary" className="ml-1 text-xs">
+                                        {samlData.providers.filter((p: SAMLProvider) => !p.enabled).length}
+                                    </Badge>
+                                )}
+                            </TabsTrigger>
+                            <TabsTrigger value="all" className="flex items-center gap-1">
+                                <Settings className="h-4 w-4"/>
+                                <span>All</span>
+                                {samlData?.providers && (
+                                    <Badge variant="secondary" className="ml-1 text-xs">
+                                        {samlData.providers.length}
+                                    </Badge>
+                                )}
+                            </TabsTrigger>
+                        </TabsList>
+
+                        <TabsContent value="active" className="mt-4">
+                            <SAMLProvidersList
+                                providers={filteredSAMLProviders}
+                                isLoading={isSAMLLoading}
+                                onEdit={handleEditSAMLProvider}
+                                onDelete={setSAMLProviderToDelete}
+                                setIsAddDialogOpen={setIsSAMLAddDialogOpen}
+                                copySAMLUrl={copySAMLUrl}
+                            />
+                        </TabsContent>
+
+                        <TabsContent value="disabled" className="mt-4">
+                            <SAMLProvidersList
+                                providers={filteredSAMLProviders}
+                                isLoading={isSAMLLoading}
+                                onEdit={handleEditSAMLProvider}
+                                onDelete={setSAMLProviderToDelete}
+                                setIsAddDialogOpen={setIsSAMLAddDialogOpen}
+                                copySAMLUrl={copySAMLUrl}
+                            />
+                        </TabsContent>
+
+                        <TabsContent value="all" className="mt-4">
+                            <SAMLProvidersList
+                                providers={filteredSAMLProviders}
+                                isLoading={isSAMLLoading}
+                                onEdit={handleEditSAMLProvider}
+                                onDelete={setSAMLProviderToDelete}
+                                setIsAddDialogOpen={setIsSAMLAddDialogOpen}
+                                copySAMLUrl={copySAMLUrl}
+                            />
+                        </TabsContent>
+                    </Tabs>
                 </TabsContent>
             </Tabs>
         </motion.div>
@@ -2475,6 +2730,128 @@ const ProvidersList: React.FC<ProvidersListProps> = ({
                                 >
                                     <Trash2 className="h-4 w-4 mr-2"/>
                                     Delete
+                                </Button>
+                            </CardFooter>
+                        </Card>
+                    </motion.div>
+                ))}
+            </AnimatePresence>
+        </div>
+    );
+};
+
+interface SAMLProvidersListProps {
+    providers: SAMLProvider[];
+    isLoading: boolean;
+    onEdit: (provider: SAMLProvider) => void;
+    onDelete: (provider: SAMLProvider) => void;
+    setIsAddDialogOpen: (open: boolean) => void;
+    copySAMLUrl: (url: string, label: string) => void;
+}
+
+const SAMLProvidersList: React.FC<SAMLProvidersListProps> = ({
+                                                                 providers,
+                                                                 isLoading,
+                                                                 onEdit,
+                                                                 onDelete,
+                                                                 setIsAddDialogOpen,
+                                                                 copySAMLUrl
+                                                             }) => {
+    if (isLoading) {
+        return (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {Array.from({length: 2}).map((_, i) => (
+                    <Card key={i} className="animate-pulse">
+                        <CardHeader className="pb-2">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-md bg-muted"></div>
+                                <div>
+                                    <div className="h-6 w-24 bg-muted rounded"></div>
+                                    <div className="h-4 w-32 bg-muted rounded mt-1"></div>
+                                </div>
+                            </div>
+                        </CardHeader>
+                    </Card>
+                ))}
+            </div>
+        );
+    }
+
+    if (!providers?.length) {
+        return (
+            <Card className="border-dashed">
+                <CardContent className="pt-6 pb-6 flex flex-col items-center justify-center text-center">
+                    <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                        <Fingerprint className="h-8 w-8 text-muted-foreground"/>
+                    </div>
+                    <h3 className="text-lg font-medium mb-2">No SAML Providers</h3>
+                    <p className="text-sm text-muted-foreground mb-4 max-w-sm">
+                        Add a SAML identity provider to enable enterprise single sign-on.
+                    </p>
+                    <Button onClick={() => setIsAddDialogOpen(true)}>
+                        <Plus className="mr-2 h-4 w-4"/>
+                        Add SAML Provider
+                    </Button>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    return (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <AnimatePresence>
+                {providers.map((provider: SAMLProvider, index: number) => (
+                    <motion.div
+                        key={provider.id}
+                        initial={{opacity: 0, y: 20}}
+                        animate={{opacity: 1, y: 0}}
+                        exit={{opacity: 0, y: -20}}
+                        transition={{duration: 0.2, delay: index * 0.05}}
+                    >
+                        <Card className={!provider.enabled ? "h-full flex flex-col opacity-80 border-dashed" : "h-full flex flex-col"}>
+                            <CardHeader className="pb-2">
+                                <div className="flex items-start justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <ProviderLogo providerName={provider.name}/>
+                                        <div>
+                                            <CardTitle className="text-base">{provider.name}</CardTitle>
+                                            <div className="flex items-center gap-1 mt-1">
+                                                <Badge variant={provider.enabled ? 'secondary' : 'outline'} className={provider.enabled ? 'text-xs bg-green-50 text-green-700' : 'text-xs'}>
+                                                    {provider.enabled ? 'Active' : 'Disabled'}
+                                                </Badge>
+                                                {provider.isDefault && <Badge variant="outline" className="text-xs">Default</Badge>}
+                                                <Badge variant="outline" className="text-xs">SAML 2.0</Badge>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="flex-1 space-y-2">
+                                <div className="text-xs text-muted-foreground space-y-1">
+                                    <div className="truncate"><span className="font-medium">SSO URL: </span>{provider.ssoUrl}</div>
+                                    <div className="truncate"><span className="font-medium">Entity ID: </span>{provider.entityId}</div>
+                                </div>
+                                <div className="flex items-center gap-2 pt-1">
+                                    <Button
+                                        type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs"
+                                        onClick={() => copySAMLUrl(`${window.location.origin}/api/auth/saml/callback/${provider.name.toLowerCase().replace(/\s+/g, '-')}`, 'ACS URL')}
+                                    >
+                                        <Copy className="h-3 w-3 mr-1"/>ACS URL
+                                    </Button>
+                                    <Button
+                                        type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs"
+                                        onClick={() => copySAMLUrl(`${window.location.origin}/api/auth/saml/metadata/${provider.name.toLowerCase().replace(/\s+/g, '-')}`, 'Metadata URL')}
+                                    >
+                                        <Copy className="h-3 w-3 mr-1"/>Metadata
+                                    </Button>
+                                </div>
+                            </CardContent>
+                            <CardFooter className="flex justify-between">
+                                <Button variant="outline" size="sm" onClick={() => onEdit(provider)}>
+                                    <Pencil className="h-4 w-4 mr-2"/>Edit
+                                </Button>
+                                <Button variant="destructive" size="sm" onClick={() => onDelete(provider)}>
+                                    <Trash2 className="h-4 w-4 mr-2"/>Delete
                                 </Button>
                             </CardFooter>
                         </Card>

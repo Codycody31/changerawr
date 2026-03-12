@@ -18,6 +18,7 @@ const providerSchema = z.object({
     isDefault: z.boolean().default(false),
     allowedEmailDomains: z.array(z.string()).default([]),
     blockExistingUsers: z.boolean().default(false),
+    requiredClaims: z.record(z.string()).optional().nullable(),
 });
 
 /**
@@ -184,6 +185,7 @@ export async function POST(request: Request) {
                 isDefault: validatedData.isDefault,
                 allowedEmailDomains: validatedData.allowedEmailDomains,
                 blockExistingUsers: validatedData.blockExistingUsers,
+                requiredClaims: validatedData.requiredClaims || {},
             }
         });
 

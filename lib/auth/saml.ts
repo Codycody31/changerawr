@@ -4,6 +4,7 @@ import { generateTokens } from '@/lib/auth/tokens';
 import { Role } from '@prisma/client';
 import { SAMLUserInfo } from '@/lib/types/saml';
 import { validateEmailDomain } from '@/lib/auth/email-domain-validator';
+import { validateClaims, parseRequiredClaims } from '@/lib/auth/claim-validator';
 
 function getAppUrl(): string {
     return process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
@@ -111,6 +112,7 @@ export async function validateSAMLResponse(
         email,
         name,
         sessionIndex: profile.sessionIndex || undefined,
+        rawProfile,
     };
 }
 
@@ -175,6 +177,14 @@ export async function handleSAMLCallback(providerName: string, samlResponse: str
 
     if (!validation.allowed) {
         throw new Error(validation.reason || 'Email domain not allowed for this SSO provider');
+    }
+
+    // Validate required claims from SAML attributes
+    const requiredClaims = parseRequiredClaims(provider.requiredClaims);
+    const claimValidation = validateClaims(userInfo.rawProfile || {}, requiredClaims);
+
+    if (!claimValidation.allowed) {
+        throw new Error(claimValidation.reason || 'Required SAML attributes validation failed');
     }
 
     if (!user) {
