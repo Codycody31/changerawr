@@ -1830,29 +1830,14 @@ export default function OAuthProvidersPage() {
                     <TabsTrigger value="active" className="flex items-center gap-1">
                         <Check className="h-4 w-4"/>
                         <span>Active</span>
-                        {providers?.providers && (
-                            <Badge variant="secondary" className="ml-1 text-xs">
-                                {providers.providers.filter((p: OAuthProvider) => p.enabled).length}
-                            </Badge>
-                        )}
                     </TabsTrigger>
                     <TabsTrigger value="disabled" className="flex items-center gap-1">
                         <X className="h-4 w-4"/>
                         <span>Disabled</span>
-                        {providers?.providers && (
-                            <Badge variant="secondary" className="ml-1 text-xs">
-                                {providers.providers.filter((p: OAuthProvider) => !p.enabled).length}
-                            </Badge>
-                        )}
                     </TabsTrigger>
                     <TabsTrigger value="all" className="flex items-center gap-1">
                         <Settings className="h-4 w-4"/>
                         <span>All</span>
-                        {providers?.providers && (
-                            <Badge variant="secondary" className="ml-1 text-xs">
-                                {providers.providers.length}
-                            </Badge>
-                        )}
                     </TabsTrigger>
                 </TabsList>
 
@@ -2467,29 +2452,14 @@ export default function OAuthProvidersPage() {
                             <TabsTrigger value="active" className="flex items-center gap-1">
                                 <Check className="h-4 w-4"/>
                                 <span>Active</span>
-                                {samlData?.providers && (
-                                    <Badge variant="secondary" className="ml-1 text-xs">
-                                        {samlData.providers.filter((p: SAMLProvider) => p.enabled).length}
-                                    </Badge>
-                                )}
                             </TabsTrigger>
                             <TabsTrigger value="disabled" className="flex items-center gap-1">
                                 <X className="h-4 w-4"/>
                                 <span>Disabled</span>
-                                {samlData?.providers && (
-                                    <Badge variant="secondary" className="ml-1 text-xs">
-                                        {samlData.providers.filter((p: SAMLProvider) => !p.enabled).length}
-                                    </Badge>
-                                )}
                             </TabsTrigger>
                             <TabsTrigger value="all" className="flex items-center gap-1">
                                 <Settings className="h-4 w-4"/>
                                 <span>All</span>
-                                {samlData?.providers && (
-                                    <Badge variant="secondary" className="ml-1 text-xs">
-                                        {samlData.providers.length}
-                                    </Badge>
-                                )}
                             </TabsTrigger>
                         </TabsList>
 
