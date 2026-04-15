@@ -72,6 +72,9 @@ model SystemConfig {
   slackOAuthClientSecret        String? // Slack app client secret (encrypted)
   slackOAuthEnabled             Boolean        @default(false) // Enable/disable Slack integration
   slackSigningSecret            String? // Slack app signing secret (encrypted) - for API verification
+  // IP Whitelisting for panel access
+  panelIpWhitelistEnabled       Boolean        @default(false)
+  panelIpWhitelist              String[]
   createdAt                     DateTime       @default(now())
   updatedAt                     DateTime       @updatedAt
 }

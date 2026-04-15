@@ -2780,19 +2780,30 @@ const SAMLProvidersList: React.FC<SAMLProvidersListProps> = ({
                     >
                         <Card className={!provider.enabled ? "h-full flex flex-col opacity-80 border-dashed" : "h-full flex flex-col"}>
                             <CardHeader className="pb-2">
-                                <div className="flex items-start justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <ProviderLogo providerName={provider.name}/>
-                                        <div>
-                                            <CardTitle className="text-base">{provider.name}</CardTitle>
-                                            <div className="flex items-center gap-1 mt-1">
-                                                <Badge variant={provider.enabled ? 'secondary' : 'outline'} className={provider.enabled ? 'text-xs bg-green-50 text-green-700' : 'text-xs'}>
-                                                    {provider.enabled ? 'Active' : 'Disabled'}
+                                <div className="flex items-center gap-3">
+                                    <ProviderLogo providerName={provider.name}/>
+                                    <div>
+                                        <CardTitle className="flex items-center text-base">
+                                            {provider.name}
+                                            {provider.isDefault && (
+                                                <Badge variant="secondary" className="ml-2 text-xs">
+                                                    Default
                                                 </Badge>
-                                                {provider.isDefault && <Badge variant="outline" className="text-xs">Default</Badge>}
-                                                <Badge variant="outline" className="text-xs">SAML 2.0</Badge>
-                                            </div>
-                                        </div>
+                                            )}
+                                        </CardTitle>
+                                        <CardDescription>
+                                            {provider.enabled ? (
+                                                <span className="flex items-center text-green-600 text-xs">
+                                                    <Check className="mr-1 h-3 w-3"/>
+                                                    Active
+                                                </span>
+                                            ) : (
+                                                <span className="flex items-center text-muted-foreground text-xs">
+                                                    <X className="mr-1 h-3 w-3"/>
+                                                    Disabled
+                                                </span>
+                                            )}
+                                        </CardDescription>
                                     </div>
                                 </div>
                             </CardHeader>

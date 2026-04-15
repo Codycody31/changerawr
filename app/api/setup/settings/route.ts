@@ -136,6 +136,17 @@ const settingsSchema = z.object({
  */
 export async function POST(request: Request) {
     try {
+        // Block access once setup is complete (admin user exists)
+        const userCount = await db.user.count({
+            where: { email: { not: { endsWith: '@changerawr.sys' } } }
+        })
+        if (userCount > 0) {
+            return NextResponse.json(
+                { error: 'Setup already completed. Use the admin panel to manage system settings.' },
+                { status: 403 }
+            )
+        }
+
         // Validate request data first
         const body = await request.json()
         const validatedData = settingsSchema.parse(body)

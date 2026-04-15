@@ -96,7 +96,13 @@ export async function GET() {
             // Continue execution even if audit log creation fails
         }
 
-        return NextResponse.json(apiKeys);
+        // Mask the key value — full key is only shown on creation
+        const safeApiKeys = apiKeys.map(({ key, ...rest }) => ({
+            ...rest,
+            keyPrefix: key.slice(0, 12) + '...'
+        }));
+
+        return NextResponse.json(safeApiKeys);
     } catch (error) {
         console.error('Failed to fetch API keys:', error);
         return NextResponse.json(

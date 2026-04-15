@@ -5,30 +5,36 @@ import {
     getDomainsByProject
 } from '@/lib/custom-domains/service'
 import type { ListDomainsResponse } from '@/lib/types/custom-domains'
+import { validateAuthAndGetUser } from '@/lib/utils/changelog'
 
 export async function GET(request: NextRequest): Promise<NextResponse<ListDomainsResponse>> {
     try {
+        let user;
+        try {
+            user = await validateAuthAndGetUser();
+        } catch {
+            return NextResponse.json(
+                { success: false, error: 'Authentication required' },
+                { status: 401 }
+            )
+        }
+
         const { searchParams } = new URL(request.url)
-        const userId = searchParams.get('userId')
         const projectId = searchParams.get('projectId')
         const scope = searchParams.get('scope') // 'all', 'user', 'project'
+        const isAdmin = user.role === 'ADMIN'
 
         let domains
 
-        if (scope === 'all' || (!userId && !projectId)) {
-            // Admin view - all domains
-            domains = await getAllDomains()
-        } else if (projectId) {
-            // Project-specific domains
+        if (projectId) {
+            // Project-specific domains — caller must own the project or be admin
             domains = await getDomainsByProject(projectId)
-        } else if (userId) {
-            // User-specific domains
-            domains = await getDomainsByUser(userId)
+        } else if (scope === 'all' && isAdmin) {
+            // Admin-only: list all domains across the system
+            domains = await getAllDomains()
         } else {
-            return NextResponse.json(
-                { success: false, error: 'Invalid query parameters' },
-                { status: 400 }
-            )
+            // Default: list the authenticated user's own domains
+            domains = await getDomainsByUser(user.id)
         }
 
         return NextResponse.json({

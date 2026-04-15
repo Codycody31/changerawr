@@ -6,6 +6,7 @@ import {
     verifyAutoSetupConfiguration,
     getOAuthServerInfo
 } from '@/lib/auth/providers/easypanel/auto-setup';
+import { db } from '@/lib/db';
 
 /**
  * Schema for validating auto OAuth setup request body.
@@ -71,6 +72,17 @@ const autoSetupSchema = z.object({
  */
 export async function POST(request: Request) {
     try {
+        // Block access once setup is complete
+        const userCount = await db.user.count({
+            where: { email: { not: { endsWith: '@changerawr.sys' } } }
+        })
+        if (userCount > 0) {
+            return NextResponse.json(
+                { success: false, error: 'Setup already completed. Use the admin panel to manage OAuth providers.' },
+                { status: 403 }
+            )
+        }
+
         console.log('🦖 Auto OAuth setup request received');
 
         // Check if environment variables are set first
@@ -214,6 +226,14 @@ export async function POST(request: Request) {
  */
 export async function GET() {
     try {
+        // Block access once setup is complete
+        const userCount = await db.user.count({
+            where: { email: { not: { endsWith: '@changerawr.sys' } } }
+        })
+        if (userCount > 0) {
+            return NextResponse.json({ error: 'Setup already completed' }, { status: 403 })
+        }
+
         // Get server configuration info
         const serverInfo = getOAuthServerInfo();
 

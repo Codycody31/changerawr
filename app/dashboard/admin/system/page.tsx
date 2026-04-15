@@ -85,6 +85,8 @@ function buildConfigSchema(sponsored: boolean) {
         adminOnlyApiKeyCreation: z.boolean(),
         timezone: z.string().min(1).max(100),
         allowUserTimezone: z.boolean(),
+        panelIpWhitelistEnabled: z.boolean(),
+        panelIpWhitelist: z.array(z.string()),
     })
 }
 
@@ -101,6 +103,9 @@ type SystemConfig = {
     customDateTemplates?: { format: string; label: string }[] | null
     sponsorActive?: boolean
     telemetryInstanceId?: string
+    panelIpWhitelistEnabled: boolean
+    panelIpWhitelist: string[]
+    nginxAgentConfigured?: boolean
 }
 
 export default function SystemConfigPage() {
@@ -150,9 +155,11 @@ export default function SystemConfigPage() {
             maxChangelogEntriesPerProject: 100,
             enableAnalytics: true,
             enableNotifications: true,
-            allowTelemetry: 'prompt',
+            allowTelemetry: 'prompt' as const,
             timezone: 'UTC',
             allowUserTimezone: true,
+            panelIpWhitelistEnabled: false,
+            panelIpWhitelist: [],
         },
         values: config ? {
             defaultInvitationExpiry: config.defaultInvitationExpiry,
@@ -164,6 +171,8 @@ export default function SystemConfigPage() {
             adminOnlyApiKeyCreation: config.adminOnlyApiKeyCreation,
             timezone: config.timezone,
             allowUserTimezone: config.allowUserTimezone,
+            panelIpWhitelistEnabled: config.panelIpWhitelistEnabled ?? false,
+            panelIpWhitelist: config.panelIpWhitelist ?? [],
         } : undefined,
     })
 
@@ -390,11 +399,12 @@ export default function SystemConfigPage() {
                             </div>
                         ) : (
                             <Tabs defaultValue="general" className="w-full">
-                                <TabsList className="grid grid-cols-5 mb-6">
+                                <TabsList className="grid grid-cols-6 mb-6">
                                     <TabsTrigger value="general">General</TabsTrigger>
                                     <TabsTrigger value="features">Features</TabsTrigger>
                                     <TabsTrigger value="privacy">Privacy</TabsTrigger>
                                     <TabsTrigger value="integrations">Integrations</TabsTrigger>
+                                    <TabsTrigger value="security">Security</TabsTrigger>
                                     <TabsTrigger value="license">License</TabsTrigger>
                                 </TabsList>
 
@@ -955,6 +965,98 @@ export default function SystemConfigPage() {
                                                     </Link>
                                                 </Button>
                                             </motion.div>
+                                        </TabsContent>
+
+                                        <TabsContent value="security" className="space-y-6">
+                                            <Card>
+                                                <CardHeader>
+                                                    <CardTitle className="flex items-center gap-2">
+                                                        <Shield className="h-5 w-5"/>
+                                                        Panel IP Whitelist
+                                                    </CardTitle>
+                                                    <CardDescription>
+                                                        Restrict access to the dashboard and API to specific IP
+                                                        addresses or CIDR ranges. When enabled, requests from
+                                                        unlisted IPs receive a 403 response. Public changelog pages
+                                                        are never affected.
+                                                    </CardDescription>
+                                                </CardHeader>
+                                                <CardContent className="space-y-6">
+                                                    {config && !config.nginxAgentConfigured && (
+                                                        <div className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-900 dark:bg-amber-950/30">
+                                                            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400"/>
+                                                            <div className="space-y-1">
+                                                                <p className="font-medium text-amber-800 dark:text-amber-300">nginx-agent not configured</p>
+                                                                <p className="text-amber-700 dark:text-amber-400">
+                                                                    IP whitelisting requires the nginx-agent to be set up. Add the following to your <code className="bg-amber-100 dark:bg-amber-900 px-1 rounded">.env</code>:
+                                                                </p>
+                                                                <pre className="mt-2 rounded bg-amber-100 dark:bg-amber-900 px-3 py-2 font-mono text-xs text-amber-900 dark:text-amber-200 whitespace-pre-wrap">{`NGINX_AGENT_URL=http://localhost:7842\nNGINX_AGENT_SECRET=your-agent-secret\nINTERNAL_API_SECRET=your-internal-secret`}</pre>
+                                                                <p className="text-amber-700 dark:text-amber-400">
+                                                                    See the <a href="https://github.com/changerawr/nginx-agent" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">nginx-agent docs</a> for setup instructions.
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    <FormField
+                                                        control={form.control}
+                                                        name="panelIpWhitelistEnabled"
+                                                        render={({field}) => (
+                                                            <FormItem
+                                                                className="flex items-center justify-between rounded-lg border p-4">
+                                                                <div className="space-y-0.5">
+                                                                    <FormLabel className="text-base">
+                                                                        Enable IP Whitelist
+                                                                    </FormLabel>
+                                                                    <FormDescription>
+                                                                        Only allow listed IPs to access the panel.
+                                                                        Make sure your own IP is listed before enabling.
+                                                                    </FormDescription>
+                                                                </div>
+                                                                <FormControl>
+                                                                    <Switch
+                                                                        checked={field.value}
+                                                                        onCheckedChange={field.onChange}
+                                                                        disabled={!config?.nginxAgentConfigured}
+                                                                    />
+                                                                </FormControl>
+                                                            </FormItem>
+                                                        )}
+                                                    />
+
+                                                    <FormField
+                                                        control={form.control}
+                                                        name="panelIpWhitelist"
+                                                        render={({field}) => (
+                                                            <FormItem>
+                                                                <FormLabel>Allowed IPs / CIDR Ranges</FormLabel>
+                                                                <FormControl>
+                                                                    <textarea
+                                                                        className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-mono"
+                                                                        placeholder={"192.168.1.1\n10.0.0.0/8\n172.16.0.0/12"}
+                                                                        value={field.value.join('\n')}
+                                                                        disabled={!config?.nginxAgentConfigured}
+                                                                        onChange={(e) => {
+                                                                            const lines = e.target.value
+                                                                                .split('\n')
+                                                                                .map(l => l.trim())
+                                                                                .filter(Boolean)
+                                                                            field.onChange(lines)
+                                                                        }}
+                                                                    />
+                                                                </FormControl>
+                                                                <FormDescription>
+                                                                    One IP address or CIDR range per line.
+                                                                    Examples: <code className="text-xs bg-muted px-1 rounded">203.0.113.5</code>,{' '}
+                                                                    <code className="text-xs bg-muted px-1 rounded">10.0.0.0/8</code>.
+                                                                    Changes take effect within 30 seconds.
+                                                                </FormDescription>
+                                                                <FormMessage/>
+                                                            </FormItem>
+                                                        )}
+                                                    />
+                                                </CardContent>
+                                            </Card>
                                         </TabsContent>
 
                                         <TabsContent value="license" className="space-y-6">

@@ -128,8 +128,8 @@ export async function GET(
             );
         }
 
-        // Only allow access if project is public or user is admin
-        if (!project.isPublic && user.role !== 'ADMIN') {
+        // Analytics is internal data — viewers cannot access it regardless of project visibility
+        if (user.role === 'VIEWER') {
             return NextResponse.json(
                 {
                     success: false,

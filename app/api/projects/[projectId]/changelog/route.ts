@@ -307,6 +307,14 @@ export async function POST(
 ) {
     try {
         const user = await validateAuthAndGetUser()
+
+        if (user.role === 'VIEWER') {
+            return NextResponse.json(
+                { error: 'Insufficient permissions to create changelog entries' },
+                { status: 403 }
+            )
+        }
+
         const projectId = (await params).projectId;
         const requestBody = await request.json();
         const { title, content, version, tags } = requestBody;

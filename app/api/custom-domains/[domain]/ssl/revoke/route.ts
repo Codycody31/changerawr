@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { validateAuthAndGetUser } from '@/lib/utils/changelog'
+import { canUserManageDomain } from '@/lib/custom-domains/service'
 
 export const runtime = 'nodejs'
 
@@ -15,7 +17,20 @@ export async function DELETE(
     { params }: { params: Promise<{ domain: string }> }
 ) {
     try {
+        let user;
+        try {
+            user = await validateAuthAndGetUser();
+        } catch {
+            return NextResponse.json({ success: false, error: 'Authentication required' }, { status: 401 })
+        }
+
         const { domain: domainName } = await params
+
+        const isAdmin = user.role === 'ADMIN'
+        const canManage = await canUserManageDomain(domainName, user.id, isAdmin)
+        if (!canManage) {
+            return NextResponse.json({ success: false, error: 'Unauthorized to manage this domain' }, { status: 403 })
+        }
 
         // Find the domain
         const domain = await db.customDomain.findUnique({

@@ -4,6 +4,7 @@ import {
     getOAuthServerInfo
 } from '@/lib/auth/providers/easypanel/auto-setup';
 import {isAutoOAuthAvailable} from "@/lib/auth/providers/easypanel/client";
+import { db } from '@/lib/db';
 
 /**
  * @method GET
@@ -12,6 +13,14 @@ import {isAutoOAuthAvailable} from "@/lib/auth/providers/easypanel/client";
  */
 export async function GET() {
     try {
+        // Only accessible during initial setup
+        const userCount = await db.user.count({
+            where: { email: { not: { endsWith: '@changerawr.sys' } } }
+        })
+        if (userCount > 0) {
+            return NextResponse.json({ error: 'Setup already completed' }, { status: 403 })
+        }
+
         const serverInfo = getOAuthServerInfo();
         const isAvailable = isAutoOAuthAvailable();
 
@@ -52,6 +61,14 @@ export async function GET() {
  */
 export async function POST(request: Request) {
     try {
+        // Only accessible during initial setup
+        const userCount = await db.user.count({
+            where: { email: { not: { endsWith: '@changerawr.sys' } } }
+        })
+        if (userCount > 0) {
+            return NextResponse.json({ success: false, error: 'Setup already completed' }, { status: 403 })
+        }
+
         const body = await request.json();
 
         // Import the schema from the main route

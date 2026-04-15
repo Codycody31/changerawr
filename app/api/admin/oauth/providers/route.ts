@@ -91,7 +91,13 @@ export async function GET(request: Request) {
             console.error('Failed to create audit log:', auditLogError);
         }
 
-        return NextResponse.json({ providers });
+        // Never send secrets to the client — return a masked indicator instead
+        const safeProviders = providers.map(({ clientSecret, ...rest }) => ({
+            ...rest,
+            hasSecret: !!clientSecret,
+        }));
+
+        return NextResponse.json({ providers: safeProviders });
     } catch (error) {
         console.error('Failed to fetch OAuth providers:', error);
         return NextResponse.json(

@@ -1,11 +1,12 @@
 import crypto from 'crypto'
 
 type AgentEvent =
-    | { event: 'cert.issued';    domain: string; certId: string; mode?: 'live' | 'sandbox' }
-    | { event: 'cert.renewed';   domain: string; certId: string; mode?: 'live' | 'sandbox' }
-    | { event: 'cert.revoked';   domain: string }
-    | { event: 'domain.added';   domain: string }
-    | { event: 'domain.removed'; domain: string }
+    | { event: 'cert.issued';          domain: string; certId: string; mode?: 'live' | 'sandbox' }
+    | { event: 'cert.renewed';         domain: string; certId: string; mode?: 'live' | 'sandbox' }
+    | { event: 'cert.revoked';         domain: string }
+    | { event: 'domain.added';         domain: string }
+    | { event: 'domain.removed';       domain: string }
+    | { event: 'ip_whitelist.updated'; enabled: boolean; whitelist: string[] }
 
 function sign(body: string, secret: string): string {
     return 'sha256=' + crypto

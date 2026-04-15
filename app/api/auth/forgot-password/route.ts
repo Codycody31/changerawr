@@ -1,6 +1,7 @@
-import {NextResponse} from 'next/server';
+import {NextRequest, NextResponse} from 'next/server';
 import {z} from 'zod';
 import {createPasswordResetAndSendEmail} from '@/lib/services/auth/password-reset';
+import {checkRateLimit} from '@/lib/utils/rate-limit';
 
 // Validation schema for forgot password request
 const forgotPasswordSchema = z.object({
@@ -51,8 +52,16 @@ const forgotPasswordSchema = z.object({
  *   }
  * }
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
     try {
+        // Rate limit: 5 requests per hour per IP to prevent email spam
+        const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() || request.headers.get('x-real-ip') || 'unknown'
+        const rateLimit = checkRateLimit(`forgot-password:${ip}`, 5, 60 * 60 * 1000)
+        if (!rateLimit.allowed) {
+            // Return 200 to avoid leaking whether the IP is rate-limited
+            return NextResponse.json({ message: 'If an account exists with that email, a reset link has been sent.' })
+        }
+
         const body = await request.json();
         const {email} = forgotPasswordSchema.parse(body);
 

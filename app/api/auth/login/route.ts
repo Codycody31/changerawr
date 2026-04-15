@@ -6,6 +6,7 @@ import {db} from '@/lib/db'
 import {createAuditLog} from '@/lib/utils/auditLog'
 import {checkPasswordBreach} from '@/lib/services/auth/password-breach'
 import {shouldUseSecureCookies} from '@/lib/utils/cookies'
+import {checkRateLimit} from '@/lib/utils/rate-limit'
 
 const loginSchema = z.object({
     email: z.string().email(),
@@ -69,8 +70,21 @@ type RequestBody = z.infer<typeof loginSchema>
  * @secure cookieAuth
  */
 export async function POST(request: NextRequest) {
-    const ipAddress = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
+    const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0].trim() || request.headers.get('x-real-ip') || 'unknown'
     const userAgent = request.headers.get('user-agent') || 'unknown'
+
+    // Rate limit: 10 attempts per 15 minutes per IP
+    const rateLimit = checkRateLimit(`login:${ipAddress}`, 10, 15 * 60 * 1000)
+    if (!rateLimit.allowed) {
+        return NextResponse.json(
+            { error: 'Too many login attempts. Please try again later.' },
+            {
+                status: 429,
+                headers: { 'Retry-After': String(Math.ceil((rateLimit.resetAt - Date.now()) / 1000)) }
+            }
+        )
+    }
+
     let attemptLogId: string | undefined
     let userId: string | undefined
 

@@ -35,7 +35,15 @@ export async function GET() {
             );
         }
 
-        return NextResponse.json(config);
+        // Never return raw secrets to the client — mask with boolean indicators
+        return NextResponse.json({
+            slackOAuthEnabled: config.slackOAuthEnabled,
+            slackOAuthClientId: config.slackOAuthClientId,
+            slackOAuthClientSecret: config.slackOAuthClientSecret ? '***' : null,
+            slackSigningSecret: config.slackSigningSecret ? '***' : null,
+            hasClientSecret: !!config.slackOAuthClientSecret,
+            hasSigningSecret: !!config.slackSigningSecret,
+        });
     } catch (error) {
         console.error('Error fetching Slack config:', error);
         return NextResponse.json(

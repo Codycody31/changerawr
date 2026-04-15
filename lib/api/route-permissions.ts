@@ -364,11 +364,14 @@ export const ROUTE_PERMISSIONS: Record<string, RoutePermissionConfig> = {
     // Analytics tracking (user actions)
     '/api/analytics/track': {},
 
-    // Custom domains
+    // Custom domains (auth enforced directly in route handlers)
     '/api/custom-domains/list': {},
     '/api/custom-domains/add': {},
     '/api/custom-domains/verify': {},
     '/api/custom-domains/:domain': {},
+
+    // Internal endpoints (protected by INTERNAL_API_SECRET header, not JWT)
+    '/api/internal/ip-config': {public: true},
 };
 
 /**

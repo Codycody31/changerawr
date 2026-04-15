@@ -1,11 +1,22 @@
 import {NextRequest, NextResponse} from 'next/server'
-import {getDomainByDomain, updateDomainVerification} from '@/lib/custom-domains/service'
+import {getDomainByDomain, updateDomainVerification, canUserManageDomain} from '@/lib/custom-domains/service'
 import {verifyDNSRecords} from '@/lib/custom-domains/dns'
 import {getAppDomain} from '@/lib/custom-domains/utils'
 import type {VerifyDomainRequest, VerifyDomainResponse} from '@/lib/types/custom-domains'
+import {validateAuthAndGetUser} from '@/lib/utils/changelog'
 
 export async function POST(request: NextRequest): Promise<NextResponse<VerifyDomainResponse>> {
     try {
+        let user;
+        try {
+            user = await validateAuthAndGetUser();
+        } catch {
+            return NextResponse.json(
+                { success: false, error: 'Authentication required' },
+                { status: 401 }
+            )
+        }
+
         const body: VerifyDomainRequest = await request.json()
         const {domain} = body
 
@@ -21,6 +32,15 @@ export async function POST(request: NextRequest): Promise<NextResponse<VerifyDom
             return NextResponse.json(
                 {success: false, error: 'Domain configuration not found'},
                 {status: 404}
+            )
+        }
+
+        const isAdmin = user.role === 'ADMIN'
+        const canManage = await canUserManageDomain(domain, user.id, isAdmin)
+        if (!canManage) {
+            return NextResponse.json(
+                {success: false, error: 'Unauthorized to manage this domain'},
+                {status: 403}
             )
         }
 

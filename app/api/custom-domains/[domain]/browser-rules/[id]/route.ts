@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { validateAuthAndGetUser } from '@/lib/utils/changelog'
+import { canUserManageDomain } from '@/lib/custom-domains/service'
 
 export const runtime = 'nodejs'
 
@@ -10,6 +12,19 @@ export async function PATCH(
     const { domain, id } = await params
 
     try {
+        let user;
+        try {
+            user = await validateAuthAndGetUser();
+        } catch {
+            return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+        }
+
+        const isAdmin = user.role === 'ADMIN'
+        const canManage = await canUserManageDomain(domain, user.id, isAdmin)
+        if (!canManage) {
+            return NextResponse.json({ error: 'Unauthorized to manage this domain' }, { status: 403 })
+        }
+
         const body = await request.json()
         const { isEnabled } = body
 
@@ -63,6 +78,19 @@ export async function DELETE(
     const { domain, id } = await params
 
     try {
+        let user;
+        try {
+            user = await validateAuthAndGetUser();
+        } catch {
+            return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+        }
+
+        const isAdmin = user.role === 'ADMIN'
+        const canManage = await canUserManageDomain(domain, user.id, isAdmin)
+        if (!canManage) {
+            return NextResponse.json({ error: 'Unauthorized to manage this domain' }, { status: 403 })
+        }
+
         // Verify the rule exists and belongs to this domain
         const rule = await db.domainBrowserRule.findFirst({
             where: {

@@ -4,6 +4,64 @@ import {verifyAccessToken} from '@/lib/auth/tokens'
 import {getAppDomain} from '@/lib/custom-domains/utils'
 import {db} from '@/lib/db'
 
+// ─── IP Whitelist ────────────────────────────────────────────────────────────
+
+interface IpConfig { enabled: boolean; whitelist: string[] }
+let cachedIpConfig: IpConfig = { enabled: false, whitelist: [] }
+let ipCacheExpiry = 0
+const IP_CACHE_TTL_MS = 30_000
+
+async function getIpConfig(baseUrl: string): Promise<IpConfig> {
+    const now = Date.now()
+    if (now < ipCacheExpiry) return cachedIpConfig
+    const secret = process.env.INTERNAL_API_SECRET
+    if (!secret) return { enabled: false, whitelist: [] }
+    try {
+        const res = await fetch(`${baseUrl}/api/internal/ip-config`, {
+            headers: { 'x-internal-secret': secret },
+            signal: AbortSignal.timeout(3000),
+        })
+        if (res.ok) {
+            cachedIpConfig = await res.json() as IpConfig
+            ipCacheExpiry = now + IP_CACHE_TTL_MS
+        }
+    } catch { /* fail open */ }
+    return cachedIpConfig
+}
+
+function getClientIp(req: NextRequest): string {
+    return req.headers.get('x-forwarded-for')?.split(',')[0].trim()
+        ?? req.headers.get('x-real-ip')
+        ?? '127.0.0.1'
+}
+
+function ipMatchesCidr(ip: string, cidr: string): boolean {
+    const entry = cidr.trim()
+    if (!entry) return false
+    if (!entry.includes('/')) return ip === entry
+    if (!ip.includes('.')) return false
+    const [network, prefixStr] = entry.split('/')
+    const prefix = parseInt(prefixStr, 10)
+    if (isNaN(prefix) || prefix < 0 || prefix > 32) return false
+    const ipToU32 = (s: string) => s.split('.').reduce((a, p) => (a * 256 + parseInt(p, 10)), 0) >>> 0
+    const mask = prefix === 0 ? 0 : (~0 << (32 - prefix)) >>> 0
+    return (ipToU32(ip) & mask) === (ipToU32(network) & mask)
+}
+
+const IP_WHITELIST_PUBLIC_PREFIXES = [
+    '/api/internal/', '/api/health', '/api/check-setup', '/api/system/version',
+    '/api/config/', '/api/setup/', '/api/auth/', '/api/changelog/',
+    '/api/integrations/widget/', '/api/avatar/', '/api/analytics/track',
+    '/_next/', '/favicon.ico',
+]
+
+function isIpProtectedPath(pathname: string): boolean {
+    for (const p of IP_WHITELIST_PUBLIC_PREFIXES) {
+        if (pathname.startsWith(p)) return false
+    }
+    return pathname.startsWith('/dashboard') || pathname.startsWith('/api/')
+}
+
 const ALWAYS_PUBLIC_PATHS = [
     '/_next/',
     '/favicon.ico',
@@ -214,6 +272,23 @@ export async function proxy(request: NextRequest) {
         console.log(`[proxy] 🔐 ACME challenge request: ${hostname}${pathname}`)
         console.log(`[proxy]    Protocol: ${request.headers.get('x-forwarded-proto') || 'unknown'}`)
         return NextResponse.next()
+    }
+
+    // IP whitelist check — only applies to dashboard + API paths, never custom domains
+    if (!isCustomDomain(hostname) && isIpProtectedPath(pathname)) {
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? request.nextUrl.origin
+        const ipConfig = await getIpConfig(baseUrl)
+        if (ipConfig.enabled) {
+            const clientIp = getClientIp(request)
+            const allowed = ipConfig.whitelist.length === 0
+                || ipConfig.whitelist.some(entry => ipMatchesCidr(clientIp, entry))
+            if (!allowed) {
+                return new NextResponse('Access denied', {
+                    status: 403,
+                    headers: { 'Content-Type': 'text/plain' },
+                })
+            }
+        }
     }
 
     // Force HTTPS redirect for custom domains (production only)
