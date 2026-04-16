@@ -20,18 +20,21 @@ jobs:
     outputs:
       image_name: ${{ steps.meta.outputs.image_name }}
       version: ${{ steps.meta.outputs.version }}
+      ref: ${{ steps.meta.outputs.ref }}
     steps:
       - name: Show build info
         id: meta
         run: |
           IMAGE_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          
-          # Determine version
+
+          # Determine version and git ref
           if [ -n "${{ github.event.inputs.version }}" ]; then
             VERSION="${{ github.event.inputs.version }}"
+            REF="${{ github.event.inputs.version }}"
             TRIGGER="Manual (workflow_dispatch)"
           else
             VERSION="${{ github.ref_name }}"
+            REF="${{ github.ref }}"
             TRIGGER="Tag push"
           fi
           
@@ -51,6 +54,7 @@ jobs:
           
           echo "image_name=$IMAGE_NAME" >> $GITHUB_OUTPUT
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "ref=$REF" >> $GITHUB_OUTPUT
 
   build-amd64:
     needs: info
@@ -59,6 +63,7 @@ jobs:
       platform: 'linux/amd64'
       image_name: ${{ needs.info.outputs.image_name }}
       version: ${{ needs.info.outputs.version }}
+      ref: ${{ needs.info.outputs.ref }}
 
   build-arm64:
     needs: info
@@ -67,6 +72,7 @@ jobs:
       platform: 'linux/arm64'
       image_name: ${{ needs.info.outputs.image_name }}
       version: ${{ needs.info.outputs.version }}
+      ref: ${{ needs.info.outputs.ref }}
 
   create-manifest:
     needs: [info, build-amd64, build-arm64]

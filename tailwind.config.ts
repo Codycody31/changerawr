@@ -1,8 +1,9 @@
 import type {Config} from "tailwindcss";
-import changerawrMarkdownPlugin from "@changerawr/markdown/tailwind";
+import { MARKDOWN_SAFELIST } from "@changerawr/markdown/tailwind";
 
 export default {
     darkMode: ["class"],
+    safelist: MARKDOWN_SAFELIST,
     content: [
         "./pages/**/*.{js,ts,jsx,tsx,mdx}",
         "./components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -82,5 +83,5 @@ export default {
             }
         }
     },
-    plugins: [require("tailwindcss-animate"), require('@tailwindcss/forms'), changerawrMarkdownPlugin()],
+    plugins: [require("tailwindcss-animate"), require('@tailwindcss/forms')],
 } satisfies Config;
