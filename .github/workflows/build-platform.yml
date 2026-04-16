@@ -19,6 +19,11 @@ on:
         required: true
         type: string
         description: 'Git ref to checkout (tag, branch, or SHA)'
+      no_cache:
+        required: false
+        type: boolean
+        default: false
+        description: 'Disable Docker layer cache'
 
 
 env:
@@ -63,9 +68,10 @@ jobs:
           context: .
           platforms: ${{ inputs.platform }}
           push: true
+          no-cache: ${{ inputs.no_cache }}
           tags: ${{ env.REGISTRY }}/${{ inputs.image_name }}:${{ inputs.version }}-${{ steps.platform.outputs.suffix }}
-          cache-from: type=gha,scope=${{ steps.platform.outputs.suffix }}
-          cache-to: type=gha,mode=max,scope=${{ steps.platform.outputs.suffix }}
+          cache-from: ${{ inputs.no_cache && '' || format('type=gha,scope={0}', steps.platform.outputs.suffix) }}
+          cache-to: ${{ inputs.no_cache && '' || format('type=gha,mode=max,scope={0}', steps.platform.outputs.suffix) }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.version=${{ inputs.version }}

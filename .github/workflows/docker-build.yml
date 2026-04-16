@@ -10,6 +10,11 @@ on:
         description: 'Version to build (e.g., v1.0.4)'
         required: true
         type: string
+      force_rebuild:
+        description: 'Force rebuild (ignore cache)'
+        required: false
+        type: boolean
+        default: false
 
 env:
   REGISTRY: ghcr.io
@@ -64,6 +69,7 @@ jobs:
       image_name: ${{ needs.info.outputs.image_name }}
       version: ${{ needs.info.outputs.version }}
       ref: ${{ needs.info.outputs.ref }}
+      no_cache: ${{ inputs.force_rebuild || false }}
 
   build-arm64:
     needs: info
@@ -73,6 +79,7 @@ jobs:
       image_name: ${{ needs.info.outputs.image_name }}
       version: ${{ needs.info.outputs.version }}
       ref: ${{ needs.info.outputs.ref }}
+      no_cache: ${{ inputs.force_rebuild || false }}
 
   create-manifest:
     needs: [info, build-amd64, build-arm64]

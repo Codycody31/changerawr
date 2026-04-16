@@ -1,5 +1,7 @@
 import type {Config} from "tailwindcss";
-import { MARKDOWN_SAFELIST } from "@changerawr/markdown/tailwind";
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { MARKDOWN_SAFELIST } = require("@changerawr/markdown/tailwind") as { MARKDOWN_SAFELIST: string[] };
 
 export default {
     darkMode: ["class"],
