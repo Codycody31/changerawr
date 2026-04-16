@@ -6,7 +6,9 @@ WORKDIR /app
 
 # Copy package files
 COPY package.json package-lock.json* ./
-RUN npm install --legacy-peer-deps
+# CACHEBUST forces npm install to re-run even when package files are unchanged
+ARG CACHEBUST=1
+RUN echo "Cache bust: $CACHEBUST" && npm install --legacy-peer-deps
 
 # Rebuild the source code only when needed
 FROM base AS builder

@@ -25,24 +25,20 @@ jobs:
     outputs:
       image_name: ${{ steps.meta.outputs.image_name }}
       version: ${{ steps.meta.outputs.version }}
-      ref: ${{ steps.meta.outputs.ref }}
     steps:
       - name: Show build info
         id: meta
         run: |
           IMAGE_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
 
-          # Determine version and git ref
           if [ -n "${{ github.event.inputs.version }}" ]; then
             VERSION="${{ github.event.inputs.version }}"
-            REF="${{ github.event.inputs.version }}"
             TRIGGER="Manual (workflow_dispatch)"
           else
             VERSION="${{ github.ref_name }}"
-            REF="${{ github.ref }}"
             TRIGGER="Tag push"
           fi
-          
+
           echo "🚀 Docker Build Starting"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "📦 Repository: ${{ github.repository }}"
@@ -56,10 +52,9 @@ jobs:
           echo ""
           echo "🏗️  Platforms: linux/amd64, linux/arm64"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          
+
           echo "image_name=$IMAGE_NAME" >> $GITHUB_OUTPUT
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "ref=$REF" >> $GITHUB_OUTPUT
 
   build-amd64:
     needs: info
@@ -68,7 +63,6 @@ jobs:
       platform: 'linux/amd64'
       image_name: ${{ needs.info.outputs.image_name }}
       version: ${{ needs.info.outputs.version }}
-      ref: ${{ needs.info.outputs.ref }}
       no_cache: ${{ inputs.force_rebuild || false }}
 
   build-arm64:
@@ -78,7 +72,6 @@ jobs:
       platform: 'linux/arm64'
       image_name: ${{ needs.info.outputs.image_name }}
       version: ${{ needs.info.outputs.version }}
-      ref: ${{ needs.info.outputs.ref }}
       no_cache: ${{ inputs.force_rebuild || false }}
 
   create-manifest:
@@ -98,13 +91,11 @@ jobs:
 
       - name: Create and push multi-arch manifest
         run: |
-          # Create manifest for version tag
           docker buildx imagetools create \
             -t ${{ env.REGISTRY }}/${{ needs.info.outputs.image_name }}:${{ needs.info.outputs.version }} \
             ${{ env.REGISTRY }}/${{ needs.info.outputs.image_name }}:${{ needs.info.outputs.version }}-amd64 \
             ${{ env.REGISTRY }}/${{ needs.info.outputs.image_name }}:${{ needs.info.outputs.version }}-arm64
-          
-          # Create manifest for latest tag
+
           docker buildx imagetools create \
             -t ${{ env.REGISTRY }}/${{ needs.info.outputs.image_name }}:latest \
             ${{ env.REGISTRY }}/${{ needs.info.outputs.image_name }}:${{ needs.info.outputs.version }}-amd64 \

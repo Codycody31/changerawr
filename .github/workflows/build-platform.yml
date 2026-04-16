@@ -14,17 +14,12 @@ on:
       version:
         required: true
         type: string
-        description: 'Version tag'
-      ref:
-        required: true
-        type: string
-        description: 'Git ref to checkout (tag, branch, or SHA)'
+        description: 'Version label for the Docker image tag'
       no_cache:
         required: false
         type: boolean
         default: false
         description: 'Disable Docker layer cache'
-
 
 env:
   REGISTRY: ghcr.io
@@ -38,10 +33,8 @@ jobs:
       packages: write
       actions: write
     steps:
-      - name: Checkout
+      - name: Checkout (HEAD of current branch)
         uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.ref }}
 
       - name: Set up QEMU (for ARM builds)
         if: inputs.platform == 'linux/arm64'
@@ -81,6 +74,8 @@ jobs:
           platforms: ${{ inputs.platform }}
           push: true
           no-cache: ${{ inputs.no_cache }}
+          build-args: |
+            CACHEBUST=${{ inputs.no_cache && github.run_id || '1' }}
           tags: ${{ env.REGISTRY }}/${{ inputs.image_name }}:${{ inputs.version }}-${{ steps.platform.outputs.suffix }}
           cache-from: ${{ inputs.no_cache == false && format('type=gha,scope={0}', steps.platform.outputs.suffix) || '' }}
           cache-to: ${{ inputs.no_cache == false && format('type=gha,mode=max,scope={0}', steps.platform.outputs.suffix) || '' }}
