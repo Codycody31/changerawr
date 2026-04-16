@@ -49,7 +49,7 @@ const tabs = [
     },
     {
         id: 'oauth',
-        label: 'OAuth Providers',
+        label: 'SSO Providers',
         icon: Fingerprint,
         path: '/dashboard/admin/oauth',
         pattern: /^\/dashboard\/admin\/oauth/

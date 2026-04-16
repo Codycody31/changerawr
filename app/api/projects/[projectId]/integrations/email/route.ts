@@ -55,10 +55,14 @@ export async function GET(
             });
         }
 
-        // Don't return password in the response for security reasons
-        const { ...safeConfig } = project.emailConfig;
+        // Strip the SMTP password — never send it to the client
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { smtpPassword: _, ...safeConfig } = project.emailConfig;
 
-        return NextResponse.json(safeConfig);
+        return NextResponse.json({
+            ...safeConfig,
+            hasPassword: !!project.emailConfig.smtpPassword,
+        });
     } catch (error) {
         console.error('Failed to fetch email configuration:', error);
         return NextResponse.json(
@@ -125,10 +129,14 @@ export async function POST(
             },
         });
 
-        // Don't return password in the response
-        const { ...safeConfig } = emailConfig;
+        // Strip SMTP password — never return secrets to the client
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { smtpPassword: _pw, ...safeConfig } = emailConfig;
 
-        return NextResponse.json(safeConfig);
+        return NextResponse.json({
+            ...safeConfig,
+            hasPassword: !!emailConfig.smtpPassword,
+        });
     } catch (error) {
         console.error('Failed to update email configuration:', error);
 

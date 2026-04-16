@@ -6,6 +6,7 @@ import {ProviderLogo} from '@/components/sso/ProviderLogo';
 import {Alert, AlertDescription} from '@/components/ui/alert';
 import {CheckCircle2, Clock, AlertTriangle, Shield} from 'lucide-react';
 import {motion} from 'framer-motion';
+import {useTimezone} from '@/hooks/use-timezone';
 
 interface OAuthProvider {
     id: string;
@@ -24,9 +25,27 @@ interface OAuthConnection {
     updatedAt: string;
 }
 
+interface SAMLProvider {
+    id: string;
+    name: string;
+    enabled: boolean;
+    isDefault: boolean;
+}
+
+interface SAMLConnection {
+    id: string;
+    providerId: string;
+    provider: SAMLProvider;
+    nameId: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
 interface ConnectedSsoProvidersProps {
     connections: OAuthConnection[];
     allProviders: OAuthProvider[];
+    samlConnections?: SAMLConnection[];
+    allSAMLProviders?: SAMLProvider[];
     isLoading?: boolean;
 }
 
@@ -35,8 +54,12 @@ type ConnectionStatus = 'connected' | 'expired' | 'disabled';
 const ConnectedSsoProviders: React.FC<ConnectedSsoProvidersProps> = ({
                                                                          connections,
                                                                          allProviders,
+                                                                         samlConnections = [],
+                                                                         allSAMLProviders = [],
                                                                          isLoading = false
                                                                      }) => {
+    const timezone = useTimezone();
+
     const getConnectionStatus = (connection: OAuthConnection): ConnectionStatus => {
         if (!connection.provider.enabled) {
             return 'disabled';
@@ -81,7 +104,8 @@ const ConnectedSsoProviders: React.FC<ConnectedSsoProvidersProps> = ({
         return new Date(dateString).toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'short',
-            day: 'numeric'
+            day: 'numeric',
+            timeZone: timezone,
         });
     };
 
@@ -104,6 +128,8 @@ const ConnectedSsoProviders: React.FC<ConnectedSsoProvidersProps> = ({
     const removedProviders = connections.filter(conn =>
         !allProviders.some(provider => provider.id === conn.providerId)
     );
+
+    const hasAnything = connections.length > 0 || samlConnections.length > 0;
 
     if (isLoading) {
         return (
@@ -139,7 +165,7 @@ const ConnectedSsoProviders: React.FC<ConnectedSsoProvidersProps> = ({
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-                {connections.length === 0 ? (
+                {!hasAnything ? (
                     <Alert>
                         <AlertDescription className="text-sm">
                             You haven&apos;t connected any SSO providers yet. You can still log in using your email and
@@ -148,7 +174,7 @@ const ConnectedSsoProviders: React.FC<ConnectedSsoProvidersProps> = ({
                     </Alert>
                 ) : (
                     <>
-                        {/* Active Connections */}
+                        {/* OAuth Active Connections */}
                         <div className="space-y-3">
                             {connections
                                 .filter(conn => allProviders.some(provider => provider.id === conn.providerId))
@@ -228,6 +254,50 @@ const ConnectedSsoProviders: React.FC<ConnectedSsoProvidersProps> = ({
                                     </AlertDescription>
                                 </Alert>
                             </motion.div>
+                        )}
+
+                        {/* SAML Connections */}
+                        {samlConnections.length > 0 && (
+                            <div className="space-y-3">
+                                {connections.length > 0 && (
+                                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide pt-1">
+                                        SAML / Enterprise SSO
+                                    </p>
+                                )}
+                                {samlConnections.map((connection, index) => {
+                                    const providerEnabled = allSAMLProviders.some(p => p.id === connection.providerId && p.enabled);
+                                    const status: ConnectionStatus = providerEnabled ? 'connected' : 'disabled';
+                                    return (
+                                        <motion.div
+                                            key={connection.id}
+                                            initial={{opacity: 0, y: 20}}
+                                            animate={{opacity: 1, y: 0}}
+                                            transition={{duration: 0.2, delay: index * 0.1}}
+                                            className="flex items-center justify-between p-4 border rounded-lg bg-card/50 hover:bg-card transition-colors"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <ProviderLogo providerName={connection.provider.name} size="md"/>
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <h4 className="font-medium text-sm md:text-base">{connection.provider.name}</h4>
+                                                        <Badge variant="outline" className="text-xs">SAML</Badge>
+                                                        {connection.provider.isDefault && (
+                                                            <Badge variant="outline" className="text-xs">Default</Badge>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-xs md:text-sm text-muted-foreground">
+                                                        Connected {formatRelativeTime(connection.createdAt)}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                {getStatusIcon(status)}
+                                                {getStatusBadge(status)}
+                                            </div>
+                                        </motion.div>
+                                    );
+                                })}
+                            </div>
                         )}
                     </>
                 )}

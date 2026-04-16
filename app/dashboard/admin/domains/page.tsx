@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useTimezone } from '@/hooks/use-timezone'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -55,10 +56,12 @@ interface DomainStats {
     total: number
     verified: number
     pending: number
-    failed: number
+    sslEnabled: number
+    expiringSoon: number
 }
 
 export default function AdminDomainsPage() {
+    const timezone = useTimezone()
     const [domains, setDomains] = useState<CustomDomain[]>([])
     const [filteredDomains, setFilteredDomains] = useState<CustomDomain[]>([])
     const [isLoading, setIsLoading] = useState(true)
@@ -71,17 +74,36 @@ export default function AdminDomainsPage() {
     const [success, setSuccess] = useState<string | null>(null)
     const [searchQuery, setSearchQuery] = useState('')
     const [statusFilter, setStatusFilter] = useState<'all' | 'verified' | 'pending'>('all')
+    const [sslEnabled, setSslEnabled] = useState(false)
 
     const stats: DomainStats = {
         total: domains.length,
         verified: domains.filter(d => d.verified).length,
         pending: domains.filter(d => !d.verified).length,
-        failed: 0
+        sslEnabled: domains.filter(d => d.sslMode === 'LETS_ENCRYPT').length,
+        expiringSoon: domains.filter(d => {
+            const activeCert = d.certificates?.find(c => c.status === 'ISSUED')
+            if (!activeCert?.expiresAt) return false
+            const daysUntilExpiry = (new Date(activeCert.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+            return daysUntilExpiry <= 30 && daysUntilExpiry > 0
+        }).length,
     }
 
     useEffect(() => {
         loadDomains()
+        loadRuntimeConfig()
     }, [])
+
+    const loadRuntimeConfig = async () => {
+        try {
+            const response = await fetch('/api/config/runtime')
+            const config = await response.json()
+            setSslEnabled(config.sslEnabled)
+        } catch (error) {
+            console.error('Failed to load runtime config:', error)
+            setSslEnabled(false)
+        }
+    }
 
     useEffect(() => {
         let filtered = domains
@@ -227,7 +249,8 @@ export default function AdminDomainsPage() {
             month: 'short',
             day: 'numeric',
             hour: '2-digit',
-            minute: '2-digit'
+            minute: '2-digit',
+            timeZone: timezone,
         })
     }
 
@@ -246,6 +269,79 @@ export default function AdminDomainsPage() {
                 Pending
             </Badge>
         )
+    }
+
+    const getSSLModeBadge = (sslMode: string) => {
+        if (sslMode === 'LETS_ENCRYPT') {
+            return (
+                <Badge variant="default" className="text-purple-700 bg-purple-50 border-purple-200 hover:bg-purple-100">
+                    <Shield className="w-3 h-3 mr-1" />
+                    Let's Encrypt
+                </Badge>
+            )
+        }
+        if (sslMode === 'EXTERNAL') {
+            return (
+                <Badge variant="default" className="text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100">
+                    <Shield className="w-3 h-3 mr-1" />
+                    External
+                </Badge>
+            )
+        }
+        return (
+            <Badge variant="outline" className="text-gray-500">
+                None
+            </Badge>
+        )
+    }
+
+    const getCertificateStatusBadge = (domain: CustomDomain) => {
+        if (domain.sslMode === 'NONE') {
+            return <span className="text-xs text-muted-foreground">—</span>
+        }
+
+        const activeCert = domain.certificates?.find(c => c.status === 'ISSUED')
+        const pendingCert = domain.certificates?.find(c =>
+            c.status === 'PENDING_HTTP01' || c.status === 'PENDING_DNS01'
+        )
+
+        if (activeCert) {
+            const expiresAt = new Date(activeCert.expiresAt!)
+            const daysUntilExpiry = (expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+
+            if (daysUntilExpiry <= 30 && daysUntilExpiry > 0) {
+                return (
+                    <Badge variant="default" className="text-orange-700 bg-orange-50 border-orange-200 hover:bg-orange-100">
+                        Expiring Soon
+                    </Badge>
+                )
+            }
+
+            return (
+                <Badge variant="default" className="text-green-700 bg-green-50 border-green-200 hover:bg-green-100">
+                    Active
+                </Badge>
+            )
+        }
+
+        if (pendingCert) {
+            return (
+                <Badge variant="secondary" className="text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100">
+                    Pending
+                </Badge>
+            )
+        }
+
+        const failedCert = domain.certificates?.find(c => c.status === 'FAILED')
+        if (failedCert) {
+            return (
+                <Badge variant="destructive" className="text-xs">
+                    Failed
+                </Badge>
+            )
+        }
+
+        return <span className="text-xs text-muted-foreground">No Certificate</span>
     }
 
     useEffect(() => {
@@ -338,7 +434,7 @@ export default function AdminDomainsPage() {
             </div>
 
             {/* Improved Stats Cards - More compact and informative */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className={`grid grid-cols-2 ${sslEnabled ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-4`}>
                 <Card>
                     <CardContent className="p-4">
                         <div className="flex items-center justify-between">
@@ -381,21 +477,21 @@ export default function AdminDomainsPage() {
                     </CardContent>
                 </Card>
 
-                <Card>
-                    <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-xs font-medium text-purple-700 uppercase tracking-wide">Success Rate</p>
-                                <p className="text-2xl font-bold text-purple-900">
-                                    {stats.total > 0 ? Math.round((stats.verified / stats.total) * 100) : 0}%
-                                </p>
+                {sslEnabled && (
+                    <Card>
+                        <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-xs font-medium text-purple-700 uppercase tracking-wide">SSL Enabled</p>
+                                    <p className="text-2xl font-bold text-purple-900">{stats.sslEnabled}</p>
+                                </div>
+                                <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                                    <Shield className="w-5 h-5 text-purple-600" />
+                                </div>
                             </div>
-                            <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                                <TrendingUp className="w-5 h-5 text-purple-600" />
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
+                        </CardContent>
+                    </Card>
+                )}
             </div>
 
             {/* Alerts with better positioning */}
@@ -572,6 +668,12 @@ export default function AdminDomainsPage() {
                                     <TableRow className="hover:bg-transparent border-b">
                                         <TableHead className="font-semibold text-xs uppercase tracking-wider">Domain</TableHead>
                                         <TableHead className="font-semibold text-xs uppercase tracking-wider">Status</TableHead>
+                                        {sslEnabled && (
+                                            <>
+                                                <TableHead className="font-semibold text-xs uppercase tracking-wider">SSL Mode</TableHead>
+                                                <TableHead className="font-semibold text-xs uppercase tracking-wider">Certificate</TableHead>
+                                            </>
+                                        )}
                                         <TableHead className="font-semibold text-xs uppercase tracking-wider">Project ID</TableHead>
                                         <TableHead className="font-semibold text-xs uppercase tracking-wider">Created</TableHead>
                                         <TableHead className="font-semibold text-xs uppercase tracking-wider">Verified</TableHead>
@@ -606,6 +708,16 @@ export default function AdminDomainsPage() {
                                             <TableCell className="py-4">
                                                 {getStatusBadge(domain)}
                                             </TableCell>
+                                            {sslEnabled && (
+                                                <>
+                                                    <TableCell className="py-4">
+                                                        {getSSLModeBadge(domain.sslMode)}
+                                                    </TableCell>
+                                                    <TableCell className="py-4">
+                                                        {getCertificateStatusBadge(domain)}
+                                                    </TableCell>
+                                                </>
+                                            )}
                                             <TableCell className="py-4">
                                                 <code className="bg-muted/60 px-2 py-1 rounded text-xs text-foreground font-mono">
                                                     {domain.projectId}

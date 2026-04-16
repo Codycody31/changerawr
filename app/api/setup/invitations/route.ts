@@ -63,6 +63,17 @@ const createInvitationSchema = z.object({
  */
 export async function POST(request: Request) {
     try {
+        // Block access once setup is complete
+        const userCount = await db.user.count({
+            where: { email: { not: { endsWith: '@changerawr.sys' } } }
+        })
+        if (userCount > 0) {
+            return NextResponse.json(
+                { error: 'Setup already completed. Use the admin panel to manage invitations.' },
+                { status: 403 }
+            )
+        }
+
         // Validate request data
         const body = await request.json()
         const validatedData = createInvitationSchema.parse(body)
@@ -174,6 +185,17 @@ export async function POST(request: Request) {
  */
 export async function GET() {
     try {
+        // Block access once setup is complete
+        const userCount = await db.user.count({
+            where: { email: { not: { endsWith: '@changerawr.sys' } } }
+        })
+        if (userCount > 0) {
+            return NextResponse.json(
+                { error: 'Setup already completed. Use the admin panel to manage invitations.' },
+                { status: 403 }
+            )
+        }
+
         const invitations = await db.invitationLink.findMany({
             select: {
                 id: true,

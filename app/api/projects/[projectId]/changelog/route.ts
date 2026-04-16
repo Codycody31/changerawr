@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
 import { validateAuthAndGetUser, generateExcerpt } from '@/lib/utils/changelog'
-import { createAuditLog } from '@/lib/utils/auditLog' // Add this import
+import { createAuditLog } from '@/lib/utils/auditLog'
 import { db } from '@/lib/db'
+import { postToSlack } from '@/lib/services/slack'
+import { SponsorService } from '@/lib/services/sponsor/service'
 
 /**
  * @method GET
@@ -305,6 +307,14 @@ export async function POST(
 ) {
     try {
         const user = await validateAuthAndGetUser()
+
+        if (user.role === 'VIEWER') {
+            return NextResponse.json(
+                { error: 'Insufficient permissions to create changelog entries' },
+                { status: 403 }
+            )
+        }
+
         const projectId = (await params).projectId;
         const requestBody = await request.json();
         const { title, content, version, tags } = requestBody;
@@ -390,7 +400,14 @@ export async function POST(
             )
         }
 
-        // Create the entry with its tags
+        const entryAllowed = await SponsorService.checkEntryAllowed(projectId);
+        if (!entryAllowed) {
+            return NextResponse.json(
+                { error: 'Maximum changelog entries reached for this project' },
+                { status: 403 }
+            )
+        }
+
         const entry = await db.changelogEntry.create({
             data: {
                 title,
@@ -434,6 +451,35 @@ export async function POST(
             );
         } catch (auditLogError) {
             console.error('Failed to create success audit log:', auditLogError);
+        }
+
+        // Auto-send to Slack if integration is configured and auto-send is enabled
+        try {
+            const slackIntegration = await db.slackIntegration.findUnique({
+                where: {projectId},
+                select: {
+                    enabled: true,
+                    autoSend: true,
+                    channelId: true,
+                }
+            })
+
+            if (slackIntegration?.enabled && slackIntegration?.autoSend && slackIntegration?.channelId) {
+                const entryUrl = `${new URL(request.url).origin.replace('/api', '')}/dashboard/projects/${projectId}/changelog/${entry.id}`
+
+                await postToSlack({
+                    projectId,
+                    entryId: entry.id,
+                    channelId: slackIntegration.channelId,
+                    title: entry.title,
+                    description: entry.excerpt || entry.content.substring(0, 200),
+                    url: entryUrl,
+                    color: '#0099ff'
+                })
+            }
+        } catch (slackError) {
+            console.error('Failed to auto-send to Slack:', slackError)
+            // Don't fail the request if Slack posting fails
         }
 
         return NextResponse.json(entry, { status: 201 })

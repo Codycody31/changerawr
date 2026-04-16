@@ -1,5 +1,14 @@
 import { db } from '@/lib/db'
 import { validateAuthAndGetUser } from '@/lib/utils/changelog'
+import { z } from 'zod'
+
+const projectUpdateSchema = z.object({
+    name: z.string().min(1).max(200).optional(),
+    isPublic: z.boolean().optional(),
+    allowAutoPublish: z.boolean().optional(),
+    requireApproval: z.boolean().optional(),
+    defaultTags: z.array(z.string()).optional(),
+})
 
 /**
  * @method GET
@@ -109,12 +118,18 @@ export async function PATCH(
     { params }: { params: Promise<{ projectId: string }> }
 ) {
     try {
-        await validateAuthAndGetUser()
+        const user = await validateAuthAndGetUser()
+
+        if (user.role === 'VIEWER') {
+            return Response.json({ error: 'Insufficient permissions' }, { status: 403 })
+        }
+
         const json = await request.json()
+        const validatedData = projectUpdateSchema.parse(json)
 
         const updated = await db.project.update({
             where: { id: (await params).projectId },
-            data: json,
+            data: validatedData,
             include: {
                 changelog: true
             }
@@ -122,6 +137,9 @@ export async function PATCH(
 
         return Response.json(updated)
     } catch (error) {
+        if (error instanceof z.ZodError) {
+            return Response.json({ error: 'Invalid fields', details: error.errors }, { status: 400 })
+        }
         console.error('Failed to update project:', error)
         return Response.json({ error: 'Failed to update project' }, { status: 500 })
     }
@@ -141,7 +159,12 @@ export async function DELETE(
     { params }: { params: Promise<{ projectId: string }> }
 ) {
     try {
-        await validateAuthAndGetUser()
+        const user = await validateAuthAndGetUser()
+
+        // Only admins can delete projects
+        if (user.role !== 'ADMIN') {
+            return Response.json({ error: 'Admin access required to delete projects' }, { status: 403 })
+        }
 
         await db.project.delete({
             where: { id: (await params).projectId }

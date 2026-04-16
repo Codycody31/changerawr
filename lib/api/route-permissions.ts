@@ -30,6 +30,7 @@ export const ROUTE_PERMISSIONS: Record<string, RoutePermissionConfig> = {
     '/api/health': {public: true},
     '/api/check-setup': {public: true},
     '/api/system/version': {public: true},
+    '/api/config/timezone': {public: true},
 
     // Setup routes (initial installation)
     '/api/setup': {public: true},
@@ -77,6 +78,9 @@ export const ROUTE_PERMISSIONS: Record<string, RoutePermissionConfig> = {
     '/api/admin/config/system-email': {requiresAdmin: true},
     '/api/admin/oauth/providers': {requiresAdmin: true},
     '/api/admin/oauth/providers/:id': {requiresAdmin: true},
+
+    // License
+    '/api/admin/sponsor': {requiresAdmin: true},
 
     // AI settings
     '/api/admin/ai-settings': {requiresAdmin: true},
@@ -360,11 +364,14 @@ export const ROUTE_PERMISSIONS: Record<string, RoutePermissionConfig> = {
     // Analytics tracking (user actions)
     '/api/analytics/track': {},
 
-    // Custom domains
+    // Custom domains (auth enforced directly in route handlers)
     '/api/custom-domains/list': {},
     '/api/custom-domains/add': {},
     '/api/custom-domains/verify': {},
     '/api/custom-domains/:domain': {},
+
+    // Internal endpoints (protected by INTERNAL_API_SECRET header, not JWT)
+    '/api/internal/ip-config': {public: true},
 };
 
 /**

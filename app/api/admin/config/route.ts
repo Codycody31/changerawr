@@ -1,20 +1,32 @@
-import {NextResponse} from 'next/server'
+import {NextRequest, NextResponse} from 'next/server'
 import {validateAuthAndGetUser} from '@/lib/utils/changelog'
 import {createAuditLog} from '@/lib/utils/auditLog'
 import {db} from '@/lib/db'
 import {z} from 'zod'
 import {TelemetryService} from '@/lib/services/telemetry/service'
 import {TelemetryState} from '@prisma/client'
+import {SponsorService} from '@/lib/services/sponsor/service'
+import {notifyAgent} from '@/lib/custom-domains/ssl/webhook'
 
-const systemConfigSchema = z.object({
-    defaultInvitationExpiry: z.number().min(1).max(30),
-    requireApprovalForChangelogs: z.boolean(),
-    maxChangelogEntriesPerProject: z.number().min(10).max(1000),
-    enableAnalytics: z.boolean(),
-    enableNotifications: z.boolean(),
-    allowTelemetry: z.enum(['prompt', 'enabled', 'disabled']),
-    adminOnlyApiKeyCreation: z.boolean(),
-})
+function buildConfigSchema(sponsored: boolean) {
+    return z.object({
+        defaultInvitationExpiry: z.number().min(1).max(30),
+        requireApprovalForChangelogs: z.boolean(),
+        maxChangelogEntriesPerProject: z.number().min(10).max(sponsored ? 999999 : 10000),
+        enableAnalytics: z.boolean(),
+        enableNotifications: z.boolean(),
+        allowTelemetry: z.enum(['prompt', 'enabled', 'disabled']),
+        adminOnlyApiKeyCreation: z.boolean(),
+        timezone: z.string().min(1).max(100).default('UTC'),
+        allowUserTimezone: z.boolean(),
+        customDateTemplates: z.array(z.object({
+            format: z.string().min(1).max(200),
+            label: z.string().min(1).max(100),
+        })).nullable().optional(),
+        panelIpWhitelistEnabled: z.boolean().default(false),
+        panelIpWhitelist: z.array(z.string()).default([]),
+    })
+}
 
 // Helper functions to map telemetry states
 function mapTelemetryStateToString(state: TelemetryState): 'prompt' | 'enabled' | 'disabled' {
@@ -70,8 +82,15 @@ export async function GET() {
                 enableNotifications: true,
                 allowTelemetry: 'prompt',
                 adminOnlyApiKeyCreation: false,
+                timezone: 'UTC',
+                allowUserTimezone: true,
+                customDateTemplates: null,
+                nginxAgentConfigured: !!(process.env.INTERNAL_API_SECRET && process.env.NGINX_AGENT_URL),
             })
         }
+
+        // Check sponsor/license status
+        const sponsorStatus = await SponsorService.getLicenseStatus()
 
         // Map database telemetry state to frontend format
         const mappedConfig = {
@@ -82,6 +101,14 @@ export async function GET() {
             enableNotifications: config.enableNotifications,
             allowTelemetry: mapTelemetryStateToString(config.allowTelemetry),
             adminOnlyApiKeyCreation: config.adminOnlyApiKeyCreation,
+            timezone: config.timezone,
+            allowUserTimezone: config.allowUserTimezone,
+            customDateTemplates: config.customDateTemplates as { format: string; label: string }[] | null,
+            sponsorActive: sponsorStatus.active,
+            telemetryInstanceId: config.telemetryInstanceId,
+            panelIpWhitelistEnabled: config.panelIpWhitelistEnabled,
+            panelIpWhitelist: config.panelIpWhitelist,
+            nginxAgentConfigured: !!(process.env.INTERNAL_API_SECRET && process.env.NGINX_AGENT_URL),
         }
 
         return NextResponse.json(mappedConfig)
@@ -98,7 +125,7 @@ export async function GET() {
  * @method PATCH
  * @description Updates the system configuration for the authenticated user
  */
-export async function PATCH(request: Request) {
+export async function PATCH(request: NextRequest) {
     try {
         const user = await validateAuthAndGetUser()
 
@@ -109,8 +136,30 @@ export async function PATCH(request: Request) {
             )
         }
 
+        // Extract the requesting admin's IP for the whitelist fail-safe
+        const adminIp = request.headers.get('x-forwarded-for')?.split(',')[0].trim()
+            || request.headers.get('x-real-ip')
+            || null
+
         const body = await request.json()
+
+        const sponsorStatus = await SponsorService.getLicenseStatus()
+        const systemConfigSchema = buildConfigSchema(sponsorStatus.active)
         const validatedData = systemConfigSchema.parse(body)
+
+        // Fail-safe: if enabling the whitelist, ensure the admin's own IP is included.
+        // This prevents an admin from accidentally locking themselves out.
+        let whitelistAutoAdded = false
+        if (validatedData.panelIpWhitelistEnabled && adminIp) {
+            const alreadyIncluded = validatedData.panelIpWhitelist.some(entry => {
+                // Simple exact-match check (CIDR ranges handled by the middleware)
+                return entry === adminIp || entry.startsWith(adminIp + '/')
+            })
+            if (!alreadyIncluded) {
+                validatedData.panelIpWhitelist = [...validatedData.panelIpWhitelist, adminIp]
+                whitelistAutoAdded = true
+            }
+        }
 
         // Get current config to track changes
         const existingConfig = await db.systemConfig.findFirst()
@@ -161,6 +210,35 @@ export async function PATCH(request: Request) {
                 changes.allowTelemetry = {
                     from: currentTelemetryState,
                     to: validatedData.allowTelemetry
+                }
+            }
+
+            if (validatedData.timezone !== existingConfig.timezone) {
+                changes.timezone = {
+                    from: existingConfig.timezone,
+                    to: validatedData.timezone
+                }
+            }
+
+            if (validatedData.allowUserTimezone !== existingConfig.allowUserTimezone) {
+                changes.allowUserTimezone = {
+                    from: existingConfig.allowUserTimezone,
+                    to: validatedData.allowUserTimezone
+                }
+            }
+
+            if (validatedData.panelIpWhitelistEnabled !== existingConfig.panelIpWhitelistEnabled) {
+                changes.panelIpWhitelistEnabled = {
+                    from: existingConfig.panelIpWhitelistEnabled,
+                    to: validatedData.panelIpWhitelistEnabled
+                }
+            }
+
+            if (JSON.stringify([...validatedData.panelIpWhitelist].sort()) !==
+                JSON.stringify([...existingConfig.panelIpWhitelist].sort())) {
+                changes.panelIpWhitelist = {
+                    from: existingConfig.panelIpWhitelist,
+                    to: validatedData.panelIpWhitelist
                 }
             }
         }
@@ -270,6 +348,11 @@ export async function PATCH(request: Request) {
             enableNotifications: validatedData.enableNotifications,
             allowTelemetry: dbTelemetryState,
             adminOnlyApiKeyCreation: validatedData.adminOnlyApiKeyCreation,
+            timezone: validatedData.timezone,
+            allowUserTimezone: validatedData.allowUserTimezone,
+            customDateTemplates: validatedData.customDateTemplates ?? undefined,
+            panelIpWhitelistEnabled: validatedData.panelIpWhitelistEnabled,
+            panelIpWhitelist: validatedData.panelIpWhitelist,
         }
 
         // Update the system config in database
@@ -327,10 +410,32 @@ export async function PATCH(request: Request) {
             enableNotifications: config.enableNotifications,
             allowTelemetry: mapTelemetryStateToString(config.allowTelemetry),
             adminOnlyApiKeyCreation: config.adminOnlyApiKeyCreation,
+            timezone: config.timezone,
+            allowUserTimezone: config.allowUserTimezone,
+            customDateTemplates: config.customDateTemplates as { format: string; label: string }[] | null,
+            panelIpWhitelistEnabled: config.panelIpWhitelistEnabled,
+            panelIpWhitelist: config.panelIpWhitelist,
+        }
+
+        // Notify nginx-agent if the IP whitelist changed (fire-and-forget — never fail the request)
+        const whitelistChanged = changes.panelIpWhitelistEnabled !== undefined
+            || changes.panelIpWhitelist !== undefined
+            || isNewConfig
+        if (whitelistChanged) {
+            notifyAgent({
+                event: 'ip_whitelist.updated',
+                enabled: config.panelIpWhitelistEnabled,
+                whitelist: config.panelIpWhitelist,
+            }).catch(err => console.warn('[ip-whitelist] Failed to notify nginx-agent:', err))
         }
 
         console.log('System configuration updated successfully')
-        return NextResponse.json(responseConfig)
+        return NextResponse.json({
+            ...responseConfig,
+            ...(whitelistAutoAdded && {
+                _warning: `Your current IP (${adminIp}) was automatically added to the whitelist to prevent lockout.`
+            })
+        })
 
     } catch (error) {
         if (error instanceof z.ZodError) {

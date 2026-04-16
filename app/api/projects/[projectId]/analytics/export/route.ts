@@ -58,7 +58,8 @@ export async function GET(
             );
         }
 
-        if (!project.isPublic && user.role !== 'ADMIN') {
+        // Analytics export is internal data — viewers cannot access it
+        if (user.role === 'VIEWER') {
             return NextResponse.json(
                 {error: 'Not authorized'},
                 {status: 403}

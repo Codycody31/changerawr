@@ -17,9 +17,30 @@ interface ConnectionResponse {
     updatedAt: string;
 }
 
+interface SAMLConnectionResponse {
+    id: string;
+    providerId: string;
+    provider: {
+        id: string;
+        name: string;
+        enabled: boolean;
+        isDefault: boolean;
+    };
+    nameId: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
 interface UserConnectionsResponse {
     connections: ConnectionResponse[];
     allProviders: {
+        id: string;
+        name: string;
+        enabled: boolean;
+        isDefault: boolean;
+    }[];
+    samlConnections: SAMLConnectionResponse[];
+    allSAMLProviders: {
         id: string;
         name: string;
         enabled: boolean;
@@ -112,6 +133,23 @@ export async function GET() {
             }
         });
 
+        // Fetch SAML connections
+        const samlConnectionsRaw = await db.sAMLConnection.findMany({
+            where: { userId: user.id },
+            include: {
+                provider: {
+                    select: { id: true, name: true, enabled: true, isDefault: true }
+                }
+            },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        // Fetch all SAML providers
+        const allSAMLProviders = await db.sAMLProvider.findMany({
+            select: { id: true, name: true, enabled: true, isDefault: true },
+            orderBy: { name: 'asc' }
+        });
+
         // Transform connections to match the expected format
         const transformedConnections: ConnectionResponse[] = connections.map(connection => ({
             id: connection.id,
@@ -123,9 +161,20 @@ export async function GET() {
             updatedAt: connection.updatedAt.toISOString()
         }));
 
+        const samlConnections: SAMLConnectionResponse[] = samlConnectionsRaw.map(c => ({
+            id: c.id,
+            providerId: c.providerId,
+            provider: c.provider,
+            nameId: c.nameId,
+            createdAt: c.createdAt.toISOString(),
+            updatedAt: c.updatedAt.toISOString(),
+        }));
+
         const response: UserConnectionsResponse = {
             connections: transformedConnections,
-            allProviders
+            allProviders,
+            samlConnections,
+            allSAMLProviders,
         };
 
         return NextResponse.json(response);

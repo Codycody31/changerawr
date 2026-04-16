@@ -3,7 +3,26 @@
     "allow": [
       "Bash(npm run build:*)",
       "mcp__next-devtools__init",
-      "mcp__next-devtools__browser_eval"
+      "mcp__next-devtools__browser_eval",
+      "WebFetch(domain:api.slack.com)",
+      "Bash(cat:*)",
+      "Bash(find . -type f \\\\\\( -name \"*.test.ts\" -o -name \"*.test.tsx\" -o -name \"*.spec.ts\" -o -name \"*.spec.tsx\" \\\\\\) 2>/dev/null | head -20)",
+      "Bash(for file in app/api/check-setup/route.ts app/api/config/timezone/route.ts app/api/avatar/[hash]/route.ts app/api/integrations/widget/[projectId]/route.ts)",
+      "Bash(do echo \"=== $file ===\")",
+      "Read(//c/Users/Nova/WebstormProjects/changerawr/**)",
+      "Bash(done)",
+      "Bash(grep -n \"smtpPassword\" /c/Users/Nova/WebstormProjects/changerawr/app/api/projects/[projectId]/integrations/email/route.ts | head -10)",
+      "Bash(grep -n \"smtpPassword\\\\|clientSecret\" /c/Users/Nova/WebstormProjects/changerawr/app/api/projects/[projectId]/integrations/email/test/route.ts | head -5)",
+      "Bash(grep -B 5 -A 10 \"return NextResponse.json\\(safeConfig\\)\" /c/Users/Nova/WebstormProjects/changerawr/app/api/projects/[projectId]/integrations/email/route.ts)",
+      "Bash(grep -n \"return NextResponse.json\" /c/Users/Nova/WebstormProjects/changerawr/app/api/projects/[projectId]/integrations/email/route.ts | head -10)",
+      "Bash(wc -l /c/Users/Nova/WebstormProjects/changerawr/app/api/projects/[projectId]/changelog/[entryId]/route.ts)",
+      "Bash(cd \"C:/Users/Nova/WebstormProjects/changerawr\" && npx tsc --noEmit 2>&1 | head -60)",
+      "Bash(cd \"C:/Users/Nova/WebstormProjects/changerawr\" && npx tsc --noEmit 2>&1 | grep -v \"allowedEmailDomains\\\\|blockExistingUsers\\\\|requiredClaims\" | head -40)",
+      "Bash(ls -la \"C:\\\\Users\\\\Nova\\\\WebstormProjects\\\\changerawr\\\\app\\\\api\\\\projects\\\\[projectId]\\\\integrations\\\\email\\\\\" 2>/dev/null | head -20)",
+      "Read(//c/Users/Nova/WebstormProjects/nginx-agent/**)",
+      "Bash(npx tsc --noEmit 2>&1 | grep -v \"allowedEmailDomains\\\\|blockExistingUsers\\\\|requiredClaims\\\\|allowAutoPublish\\\\|requireApproval\" | head -20)",
+      "Bash(cd \"C:/Users/Nova/WebstormProjects/nginx-agent\" && npx tsc --noEmit 2>&1 | head -20)",
+      "Bash(cd \"C:/Users/Nova/WebstormProjects/nginx-agent\" && node_modules/.bin/tsc --noEmit 2>&1 | head -20)"
     ],
     "deny": [],
     "ask": []

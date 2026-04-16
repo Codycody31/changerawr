@@ -3,11 +3,24 @@ import {createCustomDomain} from '@/lib/custom-domains/service'
 import {getAppDomain} from '@/lib/custom-domains/utils'
 import {DOMAIN_CONSTANTS} from '@/lib/custom-domains/constants'
 import type {AddDomainRequest, AddDomainResponse} from '@/lib/types/custom-domains'
+import {validateAuthAndGetUser} from '@/lib/utils/changelog'
 
 export async function POST(request: NextRequest): Promise<NextResponse<AddDomainResponse>> {
     try {
+        let user;
+        try {
+            user = await validateAuthAndGetUser();
+        } catch {
+            return NextResponse.json(
+                { success: false, error: 'Authentication required' },
+                { status: 401 }
+            )
+        }
+
         const body: AddDomainRequest = await request.json()
-        const {domain, projectId, userId} = body
+        const {domain, projectId} = body
+        // Always use the authenticated user's ID, never trust the client-supplied userId
+        const userId = user.id
 
         if (!domain || !projectId) {
             return NextResponse.json(

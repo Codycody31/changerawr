@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { hashPassword } from '@/lib/auth/password'
 import { z } from 'zod'
+import { checkRateLimit } from '@/lib/utils/rate-limit'
 
 const registerSchema = z.object({
     token: z.string(),
@@ -25,8 +26,18 @@ const registerSchema = z.object({
  * @error 409 User already exists
  * @error 500 An unexpected error occurred during registration
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
     try {
+        // Rate limit: 10 registration attempts per hour per IP
+        const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() || request.headers.get('x-real-ip') || 'unknown'
+        const rateLimit = checkRateLimit(`register:${ip}`, 10, 60 * 60 * 1000)
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { error: 'Too many registration attempts. Please try again later.' },
+                { status: 429 }
+            )
+        }
+
         const body = await request.json()
         const { token, name, password } = registerSchema.parse(body)
 

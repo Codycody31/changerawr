@@ -11,12 +11,17 @@ import {useWhatsNew} from '@/hooks/useWhatsNew';
 import WhatsNewModal from '@/components/dashboard/WhatsNewModal';
 import DinoGame from '@/components/DinoGame';
 import {UpdateStatus as UpdateStatusType} from '@/lib/types/easypanel';
+import {useTimezone} from '@/hooks/use-timezone';
 
 export default function AboutPage() {
     const [databaseInfo, setDatabaseInfo] = useState<{ databaseVersion?: string }>({});
     const [updateStatus, setUpdateStatus] = useState<UpdateStatusType | null>(null);
     const [showDinoGame, setShowDinoGame] = useState(false);
     const [rawrClickCount, setRawrClickCount] = useState(0);
+    const [licenseActive, setLicenseActive] = useState(false);
+    const [sslEnabled, setSslEnabled] = useState(false);
+    const [agentVersion, setAgentVersion] = useState<{ version?: string; status?: string } | null>(null);
+    const timezone = useTimezone();
 
     const {
         showWhatsNew,
@@ -40,6 +45,11 @@ export default function AboutPage() {
     useEffect(() => {
         async function fetchSystemInfo() {
             try {
+                // Fetch runtime config
+                const configResponse = await fetch('/api/config/runtime');
+                const configData = await configResponse.json();
+                setSslEnabled(configData.sslEnabled);
+
                 // Fetch database info
                 const versionResponse = await fetch('/api/system/version');
                 const versionData = await versionResponse.json();
@@ -50,6 +60,26 @@ export default function AboutPage() {
                 if (updateResponse.ok) {
                     const updateData = await updateResponse.json();
                     setUpdateStatus(updateData);
+                }
+
+                // Fetch license status
+                try {
+                    const licenseResponse = await fetch('/api/admin/sponsor');
+                    if (licenseResponse.ok) {
+                        const licenseData = await licenseResponse.json();
+                        setLicenseActive(licenseData.active === true);
+                    }
+                } catch {}
+
+                // Fetch nginx-agent version if SSL is enabled
+                if (configData.sslEnabled) {
+                    try {
+                        const agentResponse = await fetch('/api/system/agent-version');
+                        if (agentResponse.ok) {
+                            const agentData = await agentResponse.json();
+                            setAgentVersion(agentData);
+                        }
+                    } catch {}
                 }
             } catch (error) {
                 console.error('Failed to fetch system info:', error);
@@ -170,8 +200,19 @@ export default function AboutPage() {
                         </div>
                         <div className="flex justify-between py-1 border-b border-border/40">
                             <span>Released</span>
-                            <span>{new Date(appInfo.releaseDate).toLocaleDateString()}</span>
+                            <span>{new Date(appInfo.releaseDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: timezone })}</span>
                         </div>
+                        {sslEnabled && agentVersion && (
+                            <div className="flex justify-between py-1 border-b border-border/40">
+                                <span>nginx-agent</span>
+                                <span className="flex items-center gap-1">
+                                    {agentVersion.version || 'Unknown'}
+                                    {agentVersion.status === 'live' && (
+                                        <Activity className="h-3 w-3 text-green-500"/>
+                                    )}
+                                </span>
+                            </div>
+                        )}
                         {updateStatus?.easypanelConfigured && (
                             <>
                                 <div className="flex justify-between py-1 border-b border-border/40">
@@ -190,6 +231,22 @@ export default function AboutPage() {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Sponsor Thank You */}
+            {licenseActive && (
+                <Card className="border-2 border-pink-200 dark:border-pink-800 bg-gradient-to-br from-pink-50/50 to-purple-50/50 dark:from-pink-950/20 dark:to-purple-950/20 overflow-hidden">
+                    <CardContent className="pt-6 text-center">
+                        <div className="flex justify-center mb-3">
+                            <Heart className="h-8 w-8 text-pink-500 fill-pink-500"/>
+                        </div>
+                        <h3 className="text-lg font-semibold mb-1">Thank You for Sponsoring!</h3>
+                        <p className="text-sm text-muted-foreground">
+                            Your support helps keep Changerawr alive and growing.
+                            Extended features are unlocked for this instance.
+                        </p>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Easter egg - Secret Dino Game */}
             <div className="text-center text-xs text-muted-foreground pt-2">

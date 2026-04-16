@@ -5,18 +5,20 @@
 
 export const appInfo = {
     name: 'Changerawr',
-    version: '1.0.5',
+    version: '1.0.6',
     status: 'Stable',
     environment: process.env.NODE_ENV || 'development',
-    license: 'Sponsorware',
+    license: 'CNC OSL',
     releaseDate: '2025-06-15', // this is when Changerawr 1.0.0 first released
 
     framework: 'Next.js App Router',
     database: 'PostgreSQL with Prisma ORM',
-    cumEngine: '1.1.7', // package version of @changerawr/markdown
+    cumEngine: '1.2.0', // package version of @changerawr/markdown
 
     // Repository and documentation links
     repository: 'https://github.com/supernova3339/changerawr',
+    author: 'supernova3339',
+    sponsors_url: 'https://github.com/sponsors/Supernova3339',
     documentation: '/api-docs',
 };
 

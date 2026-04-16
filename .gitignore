@@ -65,3 +65,13 @@ next-env.d.ts
 # sensitive changerawr shenanigans
 .changerawr
 .changerawr/donotdeletethisfolder/donotdeletethisfile.chrcli.json
+nul
+null
+.chtsredevmscli
+.claude
+
+# sponsorer server
+/sponsor-server
+
+# user requests to add
+CLAUDE.md

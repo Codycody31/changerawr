@@ -61,7 +61,10 @@ import {
     Settings,
     ExternalLink,
     Globe,
-    Link2
+    Link2,
+    Info,
+    Shield,
+    User
 } from 'lucide-react';
 import {motion, AnimatePresence} from 'framer-motion';
 import {z} from 'zod';
@@ -91,7 +94,9 @@ const providerFormSchema = z.object({
         message: 'At least one scope is required'
     }),
     enabled: z.boolean().default(true),
-    isDefault: z.boolean().default(false)
+    isDefault: z.boolean().default(false),
+    allowedEmailDomains: z.string().default(''),
+    blockExistingUsers: z.boolean().default(false),
 }).refine((data) => {
     if (data.urlMode === 'preset' && !data.preset) {
         return false;
@@ -172,6 +177,9 @@ interface OAuthProvider {
     scopes: string[];
     enabled: boolean;
     isDefault: boolean;
+    allowedEmailDomains?: string[];
+    blockExistingUsers?: boolean;
+    requiredClaims?: Record<string, string>;
 }
 
 // Type for the API request body
@@ -185,6 +193,9 @@ interface ProviderApiData {
     authorizationUrl: string;
     tokenUrl: string;
     userInfoUrl: string;
+    allowedEmailDomains?: string[];
+    blockExistingUsers?: boolean;
+    requiredClaims?: Record<string, string>;
 }
 
 // Provider logo component that handles placeholders
@@ -300,6 +311,41 @@ const ProviderLogo: React.FC<{ providerName: string }> = ({providerName}) => {
     );
 };
 
+// SAML provider interface
+interface SAMLProvider {
+    id: string;
+    name: string;
+    entityId: string;
+    ssoUrl: string;
+    certificate: string;
+    spEntityId?: string | null;
+    nameIdFormat: string;
+    emailAttribute: string;
+    nameAttribute: string;
+    enabled: boolean;
+    isDefault: boolean;
+    allowedEmailDomains: string[];
+    blockExistingUsers: boolean;
+    requiredClaims?: Record<string, string>;
+}
+
+const samlProviderSchema = z.object({
+    name: z.string().min(1, 'Name is required'),
+    entityId: z.string().min(1, 'IdP Entity ID is required'),
+    ssoUrl: z.string().url('SSO URL must be valid'),
+    certificate: z.string().min(1, 'Certificate is required'),
+    spEntityId: z.string().optional(),
+    nameIdFormat: z.string().default('urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress'),
+    emailAttribute: z.string().default('email'),
+    nameAttribute: z.string().default('name'),
+    enabled: z.boolean().default(true),
+    isDefault: z.boolean().default(false),
+    allowedEmailDomains: z.string().default(''),
+    blockExistingUsers: z.boolean().default(false),
+});
+
+type SAMLProviderFormValues = z.infer<typeof samlProviderSchema>;
+
 export default function OAuthProvidersPage() {
     const {user} = useAuth();
     const queryClient = useQueryClient();
@@ -308,6 +354,19 @@ export default function OAuthProvidersPage() {
     const [selectedProvider, setSelectedProvider] = useState<OAuthProvider | null>(null);
     const [providerToDelete, setProviderToDelete] = useState<OAuthProvider | null>(null);
     const [activeTab, setActiveTab] = useState('active');
+    const [ssoType, setSsoType] = useState<'oauth' | 'saml'>('oauth');
+
+    // SAML provider state
+    const [isSAMLAddDialogOpen, setIsSAMLAddDialogOpen] = useState(false);
+    const [isSAMLEditDialogOpen, setIsSAMLEditDialogOpen] = useState(false);
+    const [selectedSAMLProvider, setSelectedSAMLProvider] = useState<SAMLProvider | null>(null);
+    const [samlProviderToDelete, setSAMLProviderToDelete] = useState<SAMLProvider | null>(null);
+
+    // Required claims state for OAuth and SAML
+    const [oauthCreateClaims, setOauthCreateClaims] = useState<Record<string, string>>({});
+    const [oauthEditClaims, setOauthEditClaims] = useState<Record<string, string>>({});
+    const [samlCreateClaims, setSamlCreateClaims] = useState<Record<string, string>>({});
+    const [samlEditClaims, setSamlEditClaims] = useState<Record<string, string>>({});
 
     // Get all OAuth providers
     const {data: providers, isLoading} = useQuery({
@@ -394,7 +453,10 @@ export default function OAuthProvidersPage() {
                 isDefault: data.isDefault,
                 authorizationUrl: '',
                 tokenUrl: '',
-                userInfoUrl: ''
+                userInfoUrl: '',
+                allowedEmailDomains: data.allowedEmailDomains ? data.allowedEmailDomains.split(',').map(d => d.trim()).filter(Boolean) : [],
+                blockExistingUsers: data.blockExistingUsers,
+                requiredClaims: oauthCreateClaims,
             };
 
             if (data.urlMode === 'preset' && data.preset) {
@@ -429,6 +491,7 @@ export default function OAuthProvidersPage() {
             });
             setIsAddDialogOpen(false);
             createForm.reset();
+            setOauthCreateClaims({});
         },
         onError: (error: Error) => {
             toast({
@@ -451,7 +514,10 @@ export default function OAuthProvidersPage() {
                 isDefault: data.isDefault,
                 authorizationUrl: '',
                 tokenUrl: '',
-                userInfoUrl: ''
+                userInfoUrl: '',
+                allowedEmailDomains: data.allowedEmailDomains ? data.allowedEmailDomains.split(',').map(d => d.trim()).filter(Boolean) : [],
+                blockExistingUsers: data.blockExistingUsers,
+                requiredClaims: oauthEditClaims,
             };
 
             if (data.urlMode === 'preset' && data.preset) {
@@ -569,14 +635,170 @@ export default function OAuthProvidersPage() {
             clientSecret: provider.clientSecret,
             scopes: provider.scopes.join(','),
             enabled: provider.enabled,
-            isDefault: provider.isDefault
+            isDefault: provider.isDefault,
+            allowedEmailDomains: provider.allowedEmailDomains?.join(', ') || '',
+            blockExistingUsers: provider.blockExistingUsers || false
         });
 
+        setOauthEditClaims(provider.requiredClaims || {});
         setIsEditDialogOpen(true);
     };
 
     // Filter providers based on active tab
     const filteredProviders = providers?.providers?.filter((provider: OAuthProvider) => {
+        if (activeTab === 'active') return provider.enabled;
+        if (activeTab === 'disabled') return !provider.enabled;
+        return true; // "all" tab
+    });
+
+    // ── SAML ──────────────────────────────────────────────────────────────────
+
+    const {data: samlData, isLoading: isSAMLLoading} = useQuery({
+        queryKey: ['saml-providers'],
+        queryFn: async () => {
+            const response = await fetch('/api/admin/saml/providers?includeAll=true');
+            if (!response.ok) throw new Error('Failed to fetch SAML providers');
+            return response.json();
+        }
+    });
+
+    const samlCreateForm = useForm<SAMLProviderFormValues>({
+        resolver: zodResolver(samlProviderSchema),
+        defaultValues: {
+            name: '',
+            entityId: '',
+            ssoUrl: '',
+            certificate: '',
+            spEntityId: '',
+            nameIdFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+            emailAttribute: 'email',
+            nameAttribute: 'name',
+            enabled: true,
+            isDefault: false,
+        }
+    });
+
+    const samlEditForm = useForm<SAMLProviderFormValues>({
+        resolver: zodResolver(samlProviderSchema),
+        defaultValues: {
+            name: '',
+            entityId: '',
+            ssoUrl: '',
+            certificate: '',
+            spEntityId: '',
+            nameIdFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+            emailAttribute: 'email',
+            nameAttribute: 'name',
+            enabled: true,
+            isDefault: false,
+        }
+    });
+
+    const addSAMLProvider = useMutation({
+        mutationFn: async (data: SAMLProviderFormValues) => {
+            const apiData = {
+                ...data,
+                allowedEmailDomains: data.allowedEmailDomains ? data.allowedEmailDomains.split(',').map(d => d.trim()).filter(Boolean) : [],
+                requiredClaims: samlCreateClaims,
+            };
+            const response = await fetch('/api/admin/saml/providers', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(apiData)
+            });
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error || 'Failed to add SAML provider');
+            }
+            return response.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({queryKey: ['saml-providers']});
+            toast({title: 'SAML Provider Added', description: 'The SAML provider has been added successfully.'});
+            setIsSAMLAddDialogOpen(false);
+            samlCreateForm.reset();
+            setSamlCreateClaims({});
+        },
+        onError: (error: Error) => {
+            toast({title: 'Failed to Add SAML Provider', description: error.message, variant: 'destructive'});
+        }
+    });
+
+    const updateSAMLProvider = useMutation({
+        mutationFn: async (data: SAMLProviderFormValues & {id: string}) => {
+            const apiData = {
+                ...data,
+                allowedEmailDomains: data.allowedEmailDomains ? data.allowedEmailDomains.split(',').map(d => d.trim()).filter(Boolean) : [],
+                requiredClaims: samlEditClaims,
+            };
+            const response = await fetch(`/api/admin/saml/providers/${data.id}`, {
+                method: 'PATCH',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(apiData)
+            });
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error || 'Failed to update SAML provider');
+            }
+            return response.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({queryKey: ['saml-providers']});
+            toast({title: 'SAML Provider Updated', description: 'The SAML provider has been updated successfully.'});
+            setIsSAMLEditDialogOpen(false);
+            setSelectedSAMLProvider(null);
+        },
+        onError: (error: Error) => {
+            toast({title: 'Failed to Update SAML Provider', description: error.message, variant: 'destructive'});
+        }
+    });
+
+    const deleteSAMLProvider = useMutation({
+        mutationFn: async (id: string) => {
+            const response = await fetch(`/api/admin/saml/providers/${id}`, {method: 'DELETE'});
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error || 'Failed to delete SAML provider');
+            }
+            return response.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({queryKey: ['saml-providers']});
+            toast({title: 'SAML Provider Deleted', description: 'The SAML provider has been deleted successfully.'});
+            setSAMLProviderToDelete(null);
+        },
+        onError: (error: Error) => {
+            toast({title: 'Failed to Delete SAML Provider', description: error.message, variant: 'destructive'});
+        }
+    });
+
+    const handleEditSAMLProvider = (provider: SAMLProvider) => {
+        setSelectedSAMLProvider(provider);
+        samlEditForm.reset({
+            name: provider.name,
+            entityId: provider.entityId,
+            ssoUrl: provider.ssoUrl,
+            certificate: provider.certificate,
+            spEntityId: provider.spEntityId || '',
+            nameIdFormat: provider.nameIdFormat,
+            emailAttribute: provider.emailAttribute,
+            nameAttribute: provider.nameAttribute,
+            enabled: provider.enabled,
+            isDefault: provider.isDefault,
+            allowedEmailDomains: provider.allowedEmailDomains?.join(', ') || '',
+            blockExistingUsers: provider.blockExistingUsers,
+        });
+        setSamlEditClaims(provider.requiredClaims || {});
+        setIsSAMLEditDialogOpen(true);
+    };
+
+    const copySAMLUrl = (url: string, label: string) => {
+        navigator.clipboard.writeText(url);
+        toast({title: 'Copied', description: `${label} copied to clipboard.`});
+    };
+
+    // Filter SAML providers based on active tab
+    const filteredSAMLProviders = samlData?.providers?.filter((provider: SAMLProvider) => {
         if (activeTab === 'active') return provider.enabled;
         if (activeTab === 'disabled') return !provider.enabled;
         return true; // "all" tab
@@ -621,237 +843,293 @@ export default function OAuthProvidersPage() {
                     </DialogHeader>
                     <Form {...createForm}>
                         <form onSubmit={createForm.handleSubmit(onCreateSubmit)} className="space-y-6">
-                            {/* Basic Information */}
-                            <div className="space-y-4">
-                                <h3 className="text-lg font-medium">Basic Information</h3>
+                            <Tabs defaultValue="basic" className="w-full">
+                                <TabsList className="grid w-full grid-cols-2">
+                                    <TabsTrigger value="basic" className="flex items-center gap-1">
+                                        <Settings className="h-4 w-4"/>
+                                        <span className="hidden sm:inline">Configuration</span>
+                                        <span className="sm:hidden">Config</span>
+                                    </TabsTrigger>
+                                    <TabsTrigger value="security" className="flex items-center gap-1">
+                                        <Shield className="h-4 w-4"/>
+                                        <span className="hidden sm:inline">Security & Access</span>
+                                        <span className="sm:hidden">Security</span>
+                                    </TabsTrigger>
+                                </TabsList>
 
-                                <FormField
-                                    control={createForm.control}
-                                    name="name"
-                                    render={({field}) => (
-                                        <FormItem>
-                                            <FormLabel>Provider Name</FormLabel>
-                                            <FormControl>
-                                                <Input placeholder="Custom Provider" {...field} />
-                                            </FormControl>
-                                            <FormDescription>
-                                                A descriptive name for the OAuth provider.
-                                            </FormDescription>
-                                            <FormMessage/>
-                                        </FormItem>
-                                    )}
-                                />
-                                {/* URL Configuration */}
-                                <FormField
-                                    control={createForm.control}
-                                    name="urlMode"
-                                    render={({field}) => (
-                                        <FormItem>
-                                            <FormLabel>URL Configuration</FormLabel>
-                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <TabsContent value="basic" className="space-y-4 mt-4">
+                                    <FormField
+                                        control={createForm.control}
+                                        name="name"
+                                        render={({field}) => (
+                                            <FormItem>
+                                                <FormLabel>Provider Name</FormLabel>
                                                 <FormControl>
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Choose configuration method"/>
-                                                    </SelectTrigger>
+                                                    <Input placeholder="Custom Provider" {...field} />
                                                 </FormControl>
-                                                <SelectContent>
-                                                    <SelectItem value="preset">
-                                                        <div className="flex items-center gap-2">
-                                                            <Globe className="h-4 w-4"/>
-                                                            Use Provider Preset
-                                                        </div>
-                                                    </SelectItem>
-                                                    <SelectItem value="custom">
-                                                        <div className="flex items-center gap-2">
-                                                            <Link2 className="h-4 w-4"/>
-                                                            Custom URLs
-                                                        </div>
-                                                    </SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                            <FormDescription>
-                                                Choose whether to use a predefined provider or configure custom URLs.
-                                            </FormDescription>
-                                            <FormMessage/>
-                                        </FormItem>
-                                    )}
-                                />
+                                                <FormDescription>
+                                                    A descriptive name for the OAuth provider.
+                                                </FormDescription>
+                                                <FormMessage/>
+                                            </FormItem>
+                                        )}
+                                    />
 
-                                {/* Preset Selection */}
-                                {watchCreateUrlMode === 'preset' && (
-                                    <motion.div
-                                        initial={{opacity: 0, height: 0}}
-                                        animate={{opacity: 1, height: 'auto'}}
-                                        exit={{opacity: 0, height: 0}}
-                                        className="space-y-4"
-                                    >
+                                    {/* URL Configuration */}
+                                    <FormField
+                                        control={createForm.control}
+                                        name="urlMode"
+                                        render={({field}) => (
+                                            <FormItem>
+                                                <FormLabel>URL Configuration</FormLabel>
+                                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                    <FormControl>
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Choose configuration method"/>
+                                                        </SelectTrigger>
+                                                    </FormControl>
+                                                    <SelectContent>
+                                                        <SelectItem value="preset">
+                                                            <div className="flex items-center gap-2">
+                                                                <Globe className="h-4 w-4"/>
+                                                                Use Provider Preset
+                                                            </div>
+                                                        </SelectItem>
+                                                        <SelectItem value="custom">
+                                                            <div className="flex items-center gap-2">
+                                                                <Link2 className="h-4 w-4"/>
+                                                                Custom URLs
+                                                            </div>
+                                                        </SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                                <FormDescription>
+                                                    Choose whether to use a predefined provider or configure custom URLs.
+                                                </FormDescription>
+                                                <FormMessage/>
+                                            </FormItem>
+                                        )}
+                                    />
+
+                                    {/* Preset Selection */}
+                                    {watchCreateUrlMode === 'preset' && (
+                                        <motion.div
+                                            initial={{opacity: 0, height: 0}}
+                                            animate={{opacity: 1, height: 'auto'}}
+                                            exit={{opacity: 0, height: 0}}
+                                            className="space-y-4"
+                                        >
+                                            <FormField
+                                                control={createForm.control}
+                                                name="preset"
+                                                render={({field}) => (
+                                                    <FormItem>
+                                                        <FormLabel>Select Provider</FormLabel>
+                                                        <Select onValueChange={field.onChange} value={field.value}>
+                                                            <FormControl>
+                                                                <SelectTrigger>
+                                                                    <SelectValue placeholder="Choose a provider preset"/>
+                                                                </SelectTrigger>
+                                                            </FormControl>
+                                                            <SelectContent>
+                                                                {Object.entries(PROVIDER_PRESETS).map(([key, preset]) => (
+                                                                    <SelectItem key={key} value={key}>
+                                                                        <div className="flex items-center gap-2">
+                                                                            <ProviderLogo providerName={preset.name}/>
+                                                                            <span>{preset.name}</span>
+                                                                        </div>
+                                                                    </SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
+                                                        <FormDescription>
+                                                            Select from common OAuth providers with preconfigured URLs.
+                                                        </FormDescription>
+                                                        <FormMessage/>
+                                                    </FormItem>
+                                                )}
+                                            />
+
+                                            {/* Show preset URLs preview */}
+                                            {watchCreatePreset && PROVIDER_PRESETS[watchCreatePreset as keyof typeof PROVIDER_PRESETS] && (
+                                                <div className="space-y-2 p-4 bg-muted/30 rounded-md border">
+                                                    <h4 className="text-sm font-medium">Provider URLs (Auto-configured)</h4>
+                                                    <div className="space-y-1 text-xs">
+                                                        <div>
+                                                            <strong>Authorization:</strong> {PROVIDER_PRESETS[watchCreatePreset as keyof typeof PROVIDER_PRESETS].authorizationUrl}
+                                                        </div>
+                                                        <div>
+                                                            <strong>Token:</strong> {PROVIDER_PRESETS[watchCreatePreset as keyof typeof PROVIDER_PRESETS].tokenUrl}
+                                                        </div>
+                                                        <div><strong>User
+                                                            Info:</strong> {PROVIDER_PRESETS[watchCreatePreset as keyof typeof PROVIDER_PRESETS].userInfoUrl}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </motion.div>
+                                    )}
+
+                                    {/* Custom URLs */}
+                                    {watchCreateUrlMode === 'custom' && (
+                                        <motion.div
+                                            initial={{opacity: 0, height: 0}}
+                                            animate={{opacity: 1, height: 'auto'}}
+                                            exit={{opacity: 0, height: 0}}
+                                            className="space-y-4"
+                                        >
+                                            <div className="grid grid-cols-1 gap-4">
+                                                <FormField
+                                                    control={createForm.control}
+                                                    name="authorizationUrl"
+                                                    render={({field}) => (
+                                                        <FormItem>
+                                                            <FormLabel>Authorization URL</FormLabel>
+                                                            <FormControl>
+                                                                <Input
+                                                                    placeholder="https://provider.com/oauth/authorize" {...field} />
+                                                            </FormControl>
+                                                            <FormDescription>
+                                                                The OAuth authorization endpoint URL.
+                                                            </FormDescription>
+                                                            <FormMessage/>
+                                                        </FormItem>
+                                                    )}
+                                                />
+
+                                                <FormField
+                                                    control={createForm.control}
+                                                    name="tokenUrl"
+                                                    render={({field}) => (
+                                                        <FormItem>
+                                                            <FormLabel>Token URL</FormLabel>
+                                                            <FormControl>
+                                                                <Input
+                                                                    placeholder="https://provider.com/oauth/token" {...field} />
+                                                            </FormControl>
+                                                            <FormDescription>
+                                                                The OAuth token exchange endpoint URL.
+                                                            </FormDescription>
+                                                            <FormMessage/>
+                                                        </FormItem>
+                                                    )}
+                                                />
+
+                                                <FormField
+                                                    control={createForm.control}
+                                                    name="userInfoUrl"
+                                                    render={({field}) => (
+                                                        <FormItem>
+                                                            <FormLabel>User Info URL</FormLabel>
+                                                            <FormControl>
+                                                                <Input
+                                                                    placeholder="https://provider.com/oauth/userinfo" {...field} />
+                                                            </FormControl>
+                                                            <FormDescription>
+                                                                The endpoint to fetch user information.
+                                                            </FormDescription>
+                                                            <FormMessage/>
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                            </div>
+                                        </motion.div>
+                                    )}
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <FormField
                                             control={createForm.control}
-                                            name="preset"
+                                            name="clientId"
                                             render={({field}) => (
                                                 <FormItem>
-                                                    <FormLabel>Select Provider</FormLabel>
-                                                    <Select onValueChange={field.onChange} value={field.value}>
-                                                        <FormControl>
-                                                            <SelectTrigger>
-                                                                <SelectValue placeholder="Choose a provider preset"/>
-                                                            </SelectTrigger>
-                                                        </FormControl>
-                                                        <SelectContent>
-                                                            {Object.entries(PROVIDER_PRESETS).map(([key, preset]) => (
-                                                                <SelectItem key={key} value={key}>
-                                                                    <div className="flex items-center gap-2">
-                                                                        <ProviderLogo providerName={preset.name}/>
-                                                                        <span>{preset.name}</span>
-                                                                    </div>
-                                                                </SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                    <FormDescription>
-                                                        Select from common OAuth providers with preconfigured URLs.
-                                                    </FormDescription>
+                                                    <FormLabel>Client ID</FormLabel>
+                                                    <FormControl>
+                                                        <Input placeholder="client_id" {...field} />
+                                                    </FormControl>
                                                     <FormMessage/>
                                                 </FormItem>
                                             )}
                                         />
 
-                                        {/* Show preset URLs preview */}
-                                        {watchCreatePreset && PROVIDER_PRESETS[watchCreatePreset as keyof typeof PROVIDER_PRESETS] && (
-                                            <div className="space-y-2 p-4 bg-muted/30 rounded-md border">
-                                                <h4 className="text-sm font-medium">Provider URLs (Auto-configured)</h4>
-                                                <div className="space-y-1 text-xs">
-                                                    <div>
-                                                        <strong>Authorization:</strong> {PROVIDER_PRESETS[watchCreatePreset as keyof typeof PROVIDER_PRESETS].authorizationUrl}
-                                                    </div>
-                                                    <div>
-                                                        <strong>Token:</strong> {PROVIDER_PRESETS[watchCreatePreset as keyof typeof PROVIDER_PRESETS].tokenUrl}
-                                                    </div>
-                                                    <div><strong>User
-                                                        Info:</strong> {PROVIDER_PRESETS[watchCreatePreset as keyof typeof PROVIDER_PRESETS].userInfoUrl}
-                                                    </div>
-                                                </div>
-                                            </div>
+                                        <FormField
+                                            control={createForm.control}
+                                            name="clientSecret"
+                                            render={({field}) => (
+                                                <FormItem>
+                                                    <FormLabel>Client Secret</FormLabel>
+                                                    <FormControl>
+                                                        <Input placeholder="client_secret" type="password" {...field} />
+                                                    </FormControl>
+                                                    <FormMessage/>
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </div>
+
+                                    <FormField
+                                        control={createForm.control}
+                                        name="scopes"
+                                        render={({field}) => (
+                                            <FormItem>
+                                                <FormLabel>Scopes</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="openid,profile,email" {...field} />
+                                                </FormControl>
+                                                <FormDescription>
+                                                    Comma-separated list of OAuth scopes.
+                                                </FormDescription>
+                                                <FormMessage/>
+                                            </FormItem>
                                         )}
-                                    </motion.div>
-                                )}
+                                    />
 
-                                {/* Custom URLs */}
-                                {watchCreateUrlMode === 'custom' && (
-                                    <motion.div
-                                        initial={{opacity: 0, height: 0}}
-                                        animate={{opacity: 1, height: 'auto'}}
-                                        exit={{opacity: 0, height: 0}}
-                                        className="space-y-4"
-                                    >
-                                        <div className="grid grid-cols-1 gap-4">
-                                            <FormField
-                                                control={createForm.control}
-                                                name="authorizationUrl"
-                                                render={({field}) => (
-                                                    <FormItem>
-                                                        <FormLabel>Authorization URL</FormLabel>
-                                                        <FormControl>
-                                                            <Input
-                                                                placeholder="https://provider.com/oauth/authorize" {...field} />
-                                                        </FormControl>
-                                                        <FormDescription>
-                                                            The OAuth authorization endpoint URL.
-                                                        </FormDescription>
-                                                        <FormMessage/>
-                                                    </FormItem>
-                                                )}
-                                            />
-
-                                            <FormField
-                                                control={createForm.control}
-                                                name="tokenUrl"
-                                                render={({field}) => (
-                                                    <FormItem>
-                                                        <FormLabel>Token URL</FormLabel>
-                                                        <FormControl>
-                                                            <Input
-                                                                placeholder="https://provider.com/oauth/token" {...field} />
-                                                        </FormControl>
-                                                        <FormDescription>
-                                                            The OAuth token exchange endpoint URL.
-                                                        </FormDescription>
-                                                        <FormMessage/>
-                                                    </FormItem>
-                                                )}
-                                            />
-
-                                            <FormField
-                                                control={createForm.control}
-                                                name="userInfoUrl"
-                                                render={({field}) => (
-                                                    <FormItem>
-                                                        <FormLabel>User Info URL</FormLabel>
-                                                        <FormControl>
-                                                            <Input
-                                                                placeholder="https://provider.com/oauth/userinfo" {...field} />
-                                                        </FormControl>
-                                                        <FormDescription>
-                                                            The endpoint to fetch user information.
-                                                        </FormDescription>
-                                                        <FormMessage/>
-                                                    </FormItem>
-                                                )}
-                                            />
+                                    {/* Callback URL section */}
+                                    <div className="space-y-2 border rounded-md p-4 bg-muted/30">
+                                        <div className="flex items-center justify-between">
+                                            <FormLabel className="text-sm font-medium">Callback URL</FormLabel>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => {
+                                                    const url = `${window.location.origin}/api/auth/oauth/callback/${createForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`;
+                                                    navigator.clipboard.writeText(url);
+                                                    toast({
+                                                        title: 'Copied to clipboard',
+                                                        description: 'Callback URL has been copied to your clipboard.'
+                                                    });
+                                                }}
+                                            >
+                                                <Copy className="h-4 w-4 mr-1"/>
+                                                Copy
+                                            </Button>
                                         </div>
-                                    </motion.div>
-                                )}
-                            </div>
-
-                            <Separator/>
-
-                            {/* OAuth Configuration */}
-                            <div className="space-y-4">
-                                <h3 className="text-lg font-medium">OAuth Configuration</h3>
-
-                                {/* Callback URL section */}
-                                <div className="space-y-2 border rounded-md p-4 bg-muted/30">
-                                    <div className="flex items-center justify-between">
-                                        <FormLabel className="text-sm font-medium">Callback URL</FormLabel>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => {
-                                                const url = `${window.location.origin}/api/auth/oauth/callback/${createForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`;
-                                                navigator.clipboard.writeText(url);
-                                                toast({
-                                                    title: 'Copied to clipboard',
-                                                    description: 'Callback URL has been copied to your clipboard.'
-                                                });
-                                            }}
-                                        >
-                                            <Copy className="h-4 w-4 mr-1"/>
-                                            Copy
-                                        </Button>
+                                        <div className="flex items-center gap-2">
+                                            <code
+                                                className="flex-1 p-2 text-xs bg-background rounded border overflow-x-auto text-muted-foreground">
+                                                {`${window.location.origin}/api/auth/oauth/callback/${createForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`}
+                                            </code>
+                                        </div>
+                                        <FormDescription>
+                                            Use this URL as the callback URL (redirect URI) in your OAuth provider
+                                            configuration.
+                                        </FormDescription>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <code
-                                            className="flex-1 p-2 text-xs bg-background rounded border overflow-x-auto text-muted-foreground">
-                                            {`${window.location.origin}/api/auth/oauth/callback/${createForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`}
-                                        </code>
-                                    </div>
-                                    <FormDescription>
-                                        Use this URL as the callback URL (redirect URI) in your OAuth provider
-                                        configuration.
-                                    </FormDescription>
-                                </div>
+                                </TabsContent>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <TabsContent value="security" className="space-y-4 mt-4">
                                     <FormField
                                         control={createForm.control}
-                                        name="clientId"
+                                        name="allowedEmailDomains"
                                         render={({field}) => (
                                             <FormItem>
-                                                <FormLabel>Client ID</FormLabel>
+                                                <FormLabel>Allowed Email Domains</FormLabel>
                                                 <FormControl>
-                                                    <Input placeholder="client_id" {...field} />
+                                                    <Input placeholder="example.com, company.org" {...field} />
                                                 </FormControl>
+                                                <FormDescription>
+                                                    Restrict signups to specific email domains. Leave empty to allow all domains. Separate multiple domains with commas.
+                                                </FormDescription>
                                                 <FormMessage/>
                                             </FormItem>
                                         )}
@@ -859,82 +1137,139 @@ export default function OAuthProvidersPage() {
 
                                     <FormField
                                         control={createForm.control}
-                                        name="clientSecret"
+                                        name="blockExistingUsers"
                                         render={({field}) => (
-                                            <FormItem>
-                                                <FormLabel>Client Secret</FormLabel>
+                                            <FormItem className="flex flex-row items-start justify-between rounded-lg border p-4 space-y-0 gap-3">
+                                                <div className="space-y-1">
+                                                    <FormLabel className="text-destructive font-semibold">Block Existing Users (Dangerous)</FormLabel>
+                                                    <FormDescription className="text-destructive/80">
+                                                        ⚠️ WARNING: When enabled, users with existing accounts cannot log in with this provider, even if their domain is allowed. Only new user registration will be permitted.
+                                                    </FormDescription>
+                                                </div>
                                                 <FormControl>
-                                                    <Input placeholder="client_secret" type="password" {...field} />
+                                                    <Switch
+                                                        checked={field.value}
+                                                        onCheckedChange={field.onChange}
+                                                    />
                                                 </FormControl>
-                                                <FormMessage/>
                                             </FormItem>
                                         )}
                                     />
-                                </div>
 
-                                <FormField
-                                    control={createForm.control}
-                                    name="scopes"
-                                    render={({field}) => (
-                                        <FormItem>
-                                            <FormLabel>Scopes</FormLabel>
-                                            <FormControl>
-                                                <Input placeholder="openid,profile,email" {...field} />
-                                            </FormControl>
+                                    <div className="space-y-4 rounded-lg border p-4">
+                                        <div className="space-y-2">
+                                            <FormLabel>Required Claims / Attributes</FormLabel>
                                             <FormDescription>
-                                                Comma-separated list of OAuth scopes.
+                                                Validate specific claims from OAuth userInfo or SAML attributes. Users must have matching values to sign in.
+                                                Example: Require users to be in a specific organization or have a certain role.
                                             </FormDescription>
-                                            <FormMessage/>
-                                        </FormItem>
-                                    )}
-                                />
+                                        </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FormField
-                                        control={createForm.control}
-                                        name="enabled"
-                                        render={({field}) => (
-                                            <FormItem
-                                                className="flex flex-row items-center justify-between rounded-lg border p-3 h-full">
-                                                <div className="space-y-0.5">
-                                                    <FormLabel>Enabled</FormLabel>
-                                                    <FormDescription>
-                                                        Allow users to sign in with this provider.
-                                                    </FormDescription>
-                                                </div>
-                                                <FormControl>
-                                                    <Switch
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
+                                        <div className="space-y-2">
+                                            {Object.entries(oauthCreateClaims).map(([key, value], index) => (
+                                                <div key={index} className="flex gap-2">
+                                                    <Input
+                                                        placeholder="Claim name (e.g., organization)"
+                                                        value={key}
+                                                        onChange={(e) => {
+                                                            const newClaims = {...oauthCreateClaims};
+                                                            delete newClaims[key];
+                                                            newClaims[e.target.value] = value;
+                                                            setOauthCreateClaims(newClaims);
+                                                        }}
+                                                        className="flex-1"
                                                     />
-                                                </FormControl>
-                                            </FormItem>
-                                        )}
-                                    />
+                                                    <Input
+                                                        placeholder="Required value (e.g., my-company)"
+                                                        value={value}
+                                                        onChange={(e) => {
+                                                            setOauthCreateClaims({...oauthCreateClaims, [key]: e.target.value});
+                                                        }}
+                                                        className="flex-1"
+                                                    />
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => {
+                                                            const newClaims = {...oauthCreateClaims};
+                                                            delete newClaims[key];
+                                                            setOauthCreateClaims(newClaims);
+                                                        }}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            ))}
 
-                                    <FormField
-                                        control={createForm.control}
-                                        name="isDefault"
-                                        render={({field}) => (
-                                            <FormItem
-                                                className="flex flex-row items-center justify-between rounded-lg border p-3 h-full">
-                                                <div className="space-y-0.5">
-                                                    <FormLabel>Default Provider</FormLabel>
-                                                    <FormDescription>
-                                                        Make this the default sign-in option.
-                                                    </FormDescription>
-                                                </div>
-                                                <FormControl>
-                                                    <Switch
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                            </FormItem>
-                                        )}
-                                    />
-                                </div>
-                            </div>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => {
+                                                    const newKey = `claim_${Object.keys(oauthCreateClaims).length + 1}`;
+                                                    setOauthCreateClaims({...oauthCreateClaims, [newKey]: ''});
+                                                }}
+                                            >
+                                                <Plus className="h-4 w-4 mr-2" />
+                                                Add Claim Rule
+                                            </Button>
+                                        </div>
+
+                                        <div className="text-xs text-muted-foreground space-y-1">
+                                            <p><strong>For OAuth:</strong> Claim names like <code>organizations</code>, <code>groups</code>, <code>role</code></p>
+                                            <p><strong>For SAML:</strong> Attribute names from your IdP (e.g., <code>memberOf</code>, <code>department</code>)</p>
+                                            <p><strong>Note:</strong> Matching is case-insensitive. Array claims (groups, etc.) are supported.</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <FormField
+                                            control={createForm.control}
+                                            name="enabled"
+                                            render={({field}) => (
+                                                <FormItem
+                                                    className="flex flex-row items-center justify-between rounded-lg border p-3 h-full">
+                                                    <div className="space-y-0.5">
+                                                        <FormLabel>Enabled</FormLabel>
+                                                        <FormDescription>
+                                                            Allow users to sign in with this provider.
+                                                        </FormDescription>
+                                                    </div>
+                                                    <FormControl>
+                                                        <Switch
+                                                            checked={field.value}
+                                                            onCheckedChange={field.onChange}
+                                                        />
+                                                    </FormControl>
+                                                </FormItem>
+                                            )}
+                                        />
+
+                                        <FormField
+                                            control={createForm.control}
+                                            name="isDefault"
+                                            render={({field}) => (
+                                                <FormItem
+                                                    className="flex flex-row items-center justify-between rounded-lg border p-3 h-full">
+                                                    <div className="space-y-0.5">
+                                                        <FormLabel>Default Provider</FormLabel>
+                                                        <FormDescription>
+                                                            Make this the default sign-in option.
+                                                        </FormDescription>
+                                                    </div>
+                                                    <FormControl>
+                                                        <Switch
+                                                            checked={field.value}
+                                                            onCheckedChange={field.onChange}
+                                                        />
+                                                    </FormControl>
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </div>
+                                </TabsContent>
+                            </Tabs>
 
                             <DialogFooter>
                                 <Button
@@ -974,238 +1309,293 @@ export default function OAuthProvidersPage() {
                     </DialogHeader>
                     <Form {...editForm}>
                         <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-6">
-                            {/* Basic Information */}
-                            <div className="space-y-4">
-                                <h3 className="text-lg font-medium">Basic Information</h3>
+                            <Tabs defaultValue="basic" className="w-full">
+                                <TabsList className="grid w-full grid-cols-2">
+                                    <TabsTrigger value="basic" className="flex items-center gap-1">
+                                        <Settings className="h-4 w-4"/>
+                                        <span className="hidden sm:inline">Configuration</span>
+                                        <span className="sm:hidden">Config</span>
+                                    </TabsTrigger>
+                                    <TabsTrigger value="security" className="flex items-center gap-1">
+                                        <Shield className="h-4 w-4"/>
+                                        <span className="hidden sm:inline">Security & Access</span>
+                                        <span className="sm:hidden">Security</span>
+                                    </TabsTrigger>
+                                </TabsList>
 
-                                <FormField
-                                    control={editForm.control}
-                                    name="name"
-                                    render={({field}) => (
-                                        <FormItem>
-                                            <FormLabel>Provider Name</FormLabel>
-                                            <FormControl>
-                                                <Input placeholder="Custom Provider" {...field} />
-                                            </FormControl>
-                                            <FormDescription>
-                                                A descriptive name for the OAuth provider.
-                                            </FormDescription>
-                                            <FormMessage/>
-                                        </FormItem>
-                                    )}
-                                />
-
-                                {/* URL Configuration */}
-                                <FormField
-                                    control={editForm.control}
-                                    name="urlMode"
-                                    render={({field}) => (
-                                        <FormItem>
-                                            <FormLabel>URL Configuration</FormLabel>
-                                            <Select onValueChange={field.onChange} value={field.value}>
+                                <TabsContent value="basic" className="space-y-4 mt-4">
+                                    <FormField
+                                        control={editForm.control}
+                                        name="name"
+                                        render={({field}) => (
+                                            <FormItem>
+                                                <FormLabel>Provider Name</FormLabel>
                                                 <FormControl>
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Choose configuration method"/>
-                                                    </SelectTrigger>
+                                                    <Input placeholder="Custom Provider" {...field} />
                                                 </FormControl>
-                                                <SelectContent>
-                                                    <SelectItem value="preset">
-                                                        <div className="flex items-center gap-2">
-                                                            <Globe className="h-4 w-4"/>
-                                                            Use Provider Preset
-                                                        </div>
-                                                    </SelectItem>
-                                                    <SelectItem value="custom">
-                                                        <div className="flex items-center gap-2">
-                                                            <Link2 className="h-4 w-4"/>
-                                                            Custom URLs
-                                                        </div>
-                                                    </SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                            <FormDescription>
-                                                Choose whether to use a predefined provider or configure custom URLs.
-                                            </FormDescription>
-                                            <FormMessage/>
-                                        </FormItem>
-                                    )}
-                                />
+                                                <FormDescription>
+                                                    A descriptive name for the OAuth provider.
+                                                </FormDescription>
+                                                <FormMessage/>
+                                            </FormItem>
+                                        )}
+                                    />
 
-                                {/* Preset Selection */}
-                                {watchEditUrlMode === 'preset' && (
-                                    <motion.div
-                                        initial={{opacity: 0, height: 0}}
-                                        animate={{opacity: 1, height: 'auto'}}
-                                        exit={{opacity: 0, height: 0}}
-                                        className="space-y-4"
-                                    >
+                                    {/* URL Configuration */}
+                                    <FormField
+                                        control={editForm.control}
+                                        name="urlMode"
+                                        render={({field}) => (
+                                            <FormItem>
+                                                <FormLabel>URL Configuration</FormLabel>
+                                                <Select onValueChange={field.onChange} value={field.value}>
+                                                    <FormControl>
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Choose configuration method"/>
+                                                        </SelectTrigger>
+                                                    </FormControl>
+                                                    <SelectContent>
+                                                        <SelectItem value="preset">
+                                                            <div className="flex items-center gap-2">
+                                                                <Globe className="h-4 w-4"/>
+                                                                Use Provider Preset
+                                                            </div>
+                                                        </SelectItem>
+                                                        <SelectItem value="custom">
+                                                            <div className="flex items-center gap-2">
+                                                                <Link2 className="h-4 w-4"/>
+                                                                Custom URLs
+                                                            </div>
+                                                        </SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                                <FormDescription>
+                                                    Choose whether to use a predefined provider or configure custom URLs.
+                                                </FormDescription>
+                                                <FormMessage/>
+                                            </FormItem>
+                                        )}
+                                    />
+
+                                    {/* Preset Selection */}
+                                    {watchEditUrlMode === 'preset' && (
+                                        <motion.div
+                                            initial={{opacity: 0, height: 0}}
+                                            animate={{opacity: 1, height: 'auto'}}
+                                            exit={{opacity: 0, height: 0}}
+                                            className="space-y-4"
+                                        >
+                                            <FormField
+                                                control={editForm.control}
+                                                name="preset"
+                                                render={({field}) => (
+                                                    <FormItem>
+                                                        <FormLabel>Select Provider</FormLabel>
+                                                        <Select onValueChange={field.onChange} value={field.value}>
+                                                            <FormControl>
+                                                                <SelectTrigger>
+                                                                    <SelectValue placeholder="Choose a provider preset"/>
+                                                                </SelectTrigger>
+                                                            </FormControl>
+                                                            <SelectContent>
+                                                                {Object.entries(PROVIDER_PRESETS).map(([key, preset]) => (
+                                                                    <SelectItem key={key} value={key}>
+                                                                        <div className="flex items-center gap-2">
+                                                                            <ProviderLogo providerName={preset.name}/>
+                                                                            <span>{preset.name}</span>
+                                                                        </div>
+                                                                    </SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
+                                                        <FormDescription>
+                                                            Select from common OAuth providers with preconfigured URLs.
+                                                        </FormDescription>
+                                                        <FormMessage/>
+                                                    </FormItem>
+                                                )}
+                                            />
+
+                                            {/* Show preset URLs preview */}
+                                            {watchEditPreset && PROVIDER_PRESETS[watchEditPreset as keyof typeof PROVIDER_PRESETS] && (
+                                                <div className="space-y-2 p-4 bg-muted/30 rounded-md border">
+                                                    <h4 className="text-sm font-medium">Provider URLs (Auto-configured)</h4>
+                                                    <div className="space-y-1 text-xs">
+                                                        <div>
+                                                            <strong>Authorization:</strong> {PROVIDER_PRESETS[watchEditPreset as keyof typeof PROVIDER_PRESETS].authorizationUrl}
+                                                        </div>
+                                                        <div>
+                                                            <strong>Token:</strong> {PROVIDER_PRESETS[watchEditPreset as keyof typeof PROVIDER_PRESETS].tokenUrl}
+                                                        </div>
+                                                        <div><strong>User
+                                                            Info:</strong> {PROVIDER_PRESETS[watchEditPreset as keyof typeof PROVIDER_PRESETS].userInfoUrl}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </motion.div>
+                                    )}
+
+                                    {/* Custom URLs */}
+                                    {watchEditUrlMode === 'custom' && (
+                                        <motion.div
+                                            initial={{opacity: 0, height: 0}}
+                                            animate={{opacity: 1, height: 'auto'}}
+                                            exit={{opacity: 0, height: 0}}
+                                            className="space-y-4"
+                                        >
+                                            <div className="grid grid-cols-1 gap-4">
+                                                <FormField
+                                                    control={editForm.control}
+                                                    name="authorizationUrl"
+                                                    render={({field}) => (
+                                                        <FormItem>
+                                                            <FormLabel>Authorization URL</FormLabel>
+                                                            <FormControl>
+                                                                <Input
+                                                                    placeholder="https://provider.com/oauth/authorize" {...field} />
+                                                            </FormControl>
+                                                            <FormDescription>
+                                                                The OAuth authorization endpoint URL.
+                                                            </FormDescription>
+                                                            <FormMessage/>
+                                                        </FormItem>
+                                                    )}
+                                                />
+
+                                                <FormField
+                                                    control={editForm.control}
+                                                    name="tokenUrl"
+                                                    render={({field}) => (
+                                                        <FormItem>
+                                                            <FormLabel>Token URL</FormLabel>
+                                                            <FormControl>
+                                                                <Input
+                                                                    placeholder="https://provider.com/oauth/token" {...field} />
+                                                            </FormControl>
+                                                            <FormDescription>
+                                                                The OAuth token exchange endpoint URL.
+                                                            </FormDescription>
+                                                            <FormMessage/>
+                                                        </FormItem>
+                                                    )}
+                                                />
+
+                                                <FormField
+                                                    control={editForm.control}
+                                                    name="userInfoUrl"
+                                                    render={({field}) => (
+                                                        <FormItem>
+                                                            <FormLabel>User Info URL</FormLabel>
+                                                            <FormControl>
+                                                                <Input
+                                                                    placeholder="https://provider.com/oauth/userinfo" {...field} />
+                                                            </FormControl>
+                                                            <FormDescription>
+                                                                The endpoint to fetch user information.
+                                                            </FormDescription>
+                                                            <FormMessage/>
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                            </div>
+                                        </motion.div>
+                                    )}
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <FormField
                                             control={editForm.control}
-                                            name="preset"
+                                            name="clientId"
                                             render={({field}) => (
                                                 <FormItem>
-                                                    <FormLabel>Select Provider</FormLabel>
-                                                    <Select onValueChange={field.onChange} value={field.value}>
-                                                        <FormControl>
-                                                            <SelectTrigger>
-                                                                <SelectValue placeholder="Choose a provider preset"/>
-                                                            </SelectTrigger>
-                                                        </FormControl>
-                                                        <SelectContent>
-                                                            {Object.entries(PROVIDER_PRESETS).map(([key, preset]) => (
-                                                                <SelectItem key={key} value={key}>
-                                                                    <div className="flex items-center gap-2">
-                                                                        <ProviderLogo providerName={preset.name}/>
-                                                                        <span>{preset.name}</span>
-                                                                    </div>
-                                                                </SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                    <FormDescription>
-                                                        Select from common OAuth providers with preconfigured URLs.
-                                                    </FormDescription>
+                                                    <FormLabel>Client ID</FormLabel>
+                                                    <FormControl>
+                                                        <Input placeholder="client_id" {...field} />
+                                                    </FormControl>
                                                     <FormMessage/>
                                                 </FormItem>
                                             )}
                                         />
 
-                                        {/* Show preset URLs preview */}
-                                        {watchEditPreset && PROVIDER_PRESETS[watchEditPreset as keyof typeof PROVIDER_PRESETS] && (
-                                            <div className="space-y-2 p-4 bg-muted/30 rounded-md border">
-                                                <h4 className="text-sm font-medium">Provider URLs (Auto-configured)</h4>
-                                                <div className="space-y-1 text-xs">
-                                                    <div>
-                                                        <strong>Authorization:</strong> {PROVIDER_PRESETS[watchEditPreset as keyof typeof PROVIDER_PRESETS].authorizationUrl}
-                                                    </div>
-                                                    <div>
-                                                        <strong>Token:</strong> {PROVIDER_PRESETS[watchEditPreset as keyof typeof PROVIDER_PRESETS].tokenUrl}
-                                                    </div>
-                                                    <div><strong>User
-                                                        Info:</strong> {PROVIDER_PRESETS[watchEditPreset as keyof typeof PROVIDER_PRESETS].userInfoUrl}
-                                                    </div>
-                                                </div>
-                                            </div>
+                                        <FormField
+                                            control={editForm.control}
+                                            name="clientSecret"
+                                            render={({field}) => (
+                                                <FormItem>
+                                                    <FormLabel>Client Secret</FormLabel>
+                                                    <FormControl>
+                                                        <Input placeholder="client_secret" type="password" {...field} />
+                                                    </FormControl>
+                                                    <FormMessage/>
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </div>
+
+                                    <FormField
+                                        control={editForm.control}
+                                        name="scopes"
+                                        render={({field}) => (
+                                            <FormItem>
+                                                <FormLabel>Scopes</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="openid,profile,email" {...field} />
+                                                </FormControl>
+                                                <FormDescription>
+                                                    Comma-separated list of OAuth scopes.
+                                                </FormDescription>
+                                                <FormMessage/>
+                                            </FormItem>
                                         )}
-                                    </motion.div>
-                                )}
+                                    />
 
-                                {/* Custom URLs */}
-                                {watchEditUrlMode === 'custom' && (
-                                    <motion.div
-                                        initial={{opacity: 0, height: 0}}
-                                        animate={{opacity: 1, height: 'auto'}}
-                                        exit={{opacity: 0, height: 0}}
-                                        className="space-y-4"
-                                    >
-                                        <div className="grid grid-cols-1 gap-4">
-                                            <FormField
-                                                control={editForm.control}
-                                                name="authorizationUrl"
-                                                render={({field}) => (
-                                                    <FormItem>
-                                                        <FormLabel>Authorization URL</FormLabel>
-                                                        <FormControl>
-                                                            <Input
-                                                                placeholder="https://provider.com/oauth/authorize" {...field} />
-                                                        </FormControl>
-                                                        <FormDescription>
-                                                            The OAuth authorization endpoint URL.
-                                                        </FormDescription>
-                                                        <FormMessage/>
-                                                    </FormItem>
-                                                )}
-                                            />
-
-                                            <FormField
-                                                control={editForm.control}
-                                                name="tokenUrl"
-                                                render={({field}) => (
-                                                    <FormItem>
-                                                        <FormLabel>Token URL</FormLabel>
-                                                        <FormControl>
-                                                            <Input
-                                                                placeholder="https://provider.com/oauth/token" {...field} />
-                                                        </FormControl>
-                                                        <FormDescription>
-                                                            The OAuth token exchange endpoint URL.
-                                                        </FormDescription>
-                                                        <FormMessage/>
-                                                    </FormItem>
-                                                )}
-                                            />
-
-                                            <FormField
-                                                control={editForm.control}
-                                                name="userInfoUrl"
-                                                render={({field}) => (
-                                                    <FormItem>
-                                                        <FormLabel>User Info URL</FormLabel>
-                                                        <FormControl>
-                                                            <Input
-                                                                placeholder="https://provider.com/oauth/userinfo" {...field} />
-                                                        </FormControl>
-                                                        <FormDescription>
-                                                            The endpoint to fetch user information.
-                                                        </FormDescription>
-                                                        <FormMessage/>
-                                                    </FormItem>
-                                                )}
-                                            />
+                                    {/* Callback URL section */}
+                                    <div className="space-y-2 border rounded-md p-4 bg-muted/30">
+                                        <div className="flex items-center justify-between">
+                                            <FormLabel className="text-sm font-medium">Callback URL</FormLabel>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => {
+                                                    const url = `${window.location.origin}/api/auth/oauth/callback/${editForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`;
+                                                    navigator.clipboard.writeText(url);
+                                                    toast({
+                                                        title: 'Copied to clipboard',
+                                                        description: 'Callback URL has been copied to your clipboard.'
+                                                    });
+                                                }}
+                                            >
+                                                <Copy className="h-4 w-4 mr-1"/>
+                                                Copy
+                                            </Button>
                                         </div>
-                                    </motion.div>
-                                )}
-                            </div>
-
-                            <Separator/>
-
-                            {/* OAuth Configuration */}
-                            <div className="space-y-4">
-                                <h3 className="text-lg font-medium">OAuth Configuration</h3>
-
-                                {/* Callback URL section */}
-                                <div className="space-y-2 border rounded-md p-4 bg-muted/30">
-                                    <div className="flex items-center justify-between">
-                                        <FormLabel className="text-sm font-medium">Callback URL</FormLabel>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => {
-                                                const url = `${window.location.origin}/api/auth/oauth/callback/${editForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`;
-                                                navigator.clipboard.writeText(url);
-                                                toast({
-                                                    title: 'Copied to clipboard',
-                                                    description: 'Callback URL has been copied to your clipboard.'
-                                                });
-                                            }}
-                                        >
-                                            <Copy className="h-4 w-4 mr-1"/>
-                                            Copy
-                                        </Button>
+                                        <div className="flex items-center gap-2">
+                                            <code
+                                                className="flex-1 p-2 text-xs bg-background rounded border overflow-x-auto text-muted-foreground">
+                                                {`${window.location.origin}/api/auth/oauth/callback/${editForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`}
+                                            </code>
+                                        </div>
+                                        <FormDescription>
+                                            Use this URL as the callback URL (redirect URI) in your OAuth provider
+                                            configuration.
+                                        </FormDescription>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <code
-                                            className="flex-1 p-2 text-xs bg-background rounded border overflow-x-auto text-muted-foreground">
-                                            {`${window.location.origin}/api/auth/oauth/callback/${editForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`}
-                                        </code>
-                                    </div>
-                                    <FormDescription>
-                                        Use this URL as the callback URL (redirect URI) in your OAuth provider
-                                        configuration.
-                                    </FormDescription>
-                                </div>
+                                </TabsContent>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <TabsContent value="security" className="space-y-4 mt-4">
                                     <FormField
                                         control={editForm.control}
-                                        name="clientId"
+                                        name="allowedEmailDomains"
                                         render={({field}) => (
                                             <FormItem>
-                                                <FormLabel>Client ID</FormLabel>
+                                                <FormLabel>Allowed Email Domains</FormLabel>
                                                 <FormControl>
-                                                    <Input placeholder="client_id" {...field} />
+                                                    <Input placeholder="example.com, company.org" {...field} />
                                                 </FormControl>
+                                                <FormDescription>
+                                                    Restrict signups to specific email domains. Leave empty to allow all domains. Separate multiple domains with commas.
+                                                </FormDescription>
                                                 <FormMessage/>
                                             </FormItem>
                                         )}
@@ -1213,82 +1603,139 @@ export default function OAuthProvidersPage() {
 
                                     <FormField
                                         control={editForm.control}
-                                        name="clientSecret"
+                                        name="blockExistingUsers"
                                         render={({field}) => (
-                                            <FormItem>
-                                                <FormLabel>Client Secret</FormLabel>
+                                            <FormItem className="flex flex-row items-start justify-between rounded-lg border p-4 space-y-0 gap-3">
+                                                <div className="space-y-1">
+                                                    <FormLabel className="text-destructive font-semibold">Block Existing Users (Dangerous)</FormLabel>
+                                                    <FormDescription className="text-destructive/80">
+                                                        ⚠️ WARNING: When enabled, users with existing accounts cannot log in with this provider, even if their domain is allowed. Only new user registration will be permitted.
+                                                    </FormDescription>
+                                                </div>
                                                 <FormControl>
-                                                    <Input placeholder="client_secret" type="password" {...field} />
+                                                    <Switch
+                                                        checked={field.value}
+                                                        onCheckedChange={field.onChange}
+                                                    />
                                                 </FormControl>
-                                                <FormMessage/>
                                             </FormItem>
                                         )}
                                     />
-                                </div>
 
-                                <FormField
-                                    control={editForm.control}
-                                    name="scopes"
-                                    render={({field}) => (
-                                        <FormItem>
-                                            <FormLabel>Scopes</FormLabel>
-                                            <FormControl>
-                                                <Input placeholder="openid,profile,email" {...field} />
-                                            </FormControl>
+                                    <div className="space-y-4 rounded-lg border p-4">
+                                        <div className="space-y-2">
+                                            <FormLabel>Required Claims / Attributes</FormLabel>
                                             <FormDescription>
-                                                Comma-separated list of OAuth scopes.
+                                                Validate specific claims from OAuth userInfo or SAML attributes. Users must have matching values to sign in.
+                                                Example: Require users to be in a specific organization or have a certain role.
                                             </FormDescription>
-                                            <FormMessage/>
-                                        </FormItem>
-                                    )}
-                                />
+                                        </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FormField
-                                        control={editForm.control}
-                                        name="enabled"
-                                        render={({field}) => (
-                                            <FormItem
-                                                className="flex flex-row items-center justify-between rounded-lg border p-3 h-full">
-                                                <div className="space-y-0.5">
-                                                    <FormLabel>Enabled</FormLabel>
-                                                    <FormDescription>
-                                                        Allow users to sign in with this provider.
-                                                    </FormDescription>
-                                                </div>
-                                                <FormControl>
-                                                    <Switch
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
+                                        <div className="space-y-2">
+                                            {Object.entries(oauthEditClaims).map(([key, value], index) => (
+                                                <div key={index} className="flex gap-2">
+                                                    <Input
+                                                        placeholder="Claim name (e.g., organization)"
+                                                        value={key}
+                                                        onChange={(e) => {
+                                                            const newClaims = {...oauthEditClaims};
+                                                            delete newClaims[key];
+                                                            newClaims[e.target.value] = value;
+                                                            setOauthEditClaims(newClaims);
+                                                        }}
+                                                        className="flex-1"
                                                     />
-                                                </FormControl>
-                                            </FormItem>
-                                        )}
-                                    />
+                                                    <Input
+                                                        placeholder="Required value (e.g., my-company)"
+                                                        value={value}
+                                                        onChange={(e) => {
+                                                            setOauthEditClaims({...oauthEditClaims, [key]: e.target.value});
+                                                        }}
+                                                        className="flex-1"
+                                                    />
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => {
+                                                            const newClaims = {...oauthEditClaims};
+                                                            delete newClaims[key];
+                                                            setOauthEditClaims(newClaims);
+                                                        }}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            ))}
 
-                                    <FormField
-                                        control={editForm.control}
-                                        name="isDefault"
-                                        render={({field}) => (
-                                            <FormItem
-                                                className="flex flex-row items-center justify-between rounded-lg border p-3 h-full">
-                                                <div className="space-y-0.5">
-                                                    <FormLabel>Default Provider</FormLabel>
-                                                    <FormDescription>
-                                                        Make this the default sign-in option.
-                                                    </FormDescription>
-                                                </div>
-                                                <FormControl>
-                                                    <Switch
-                                                        checked={field.value}
-                                                        onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                            </FormItem>
-                                        )}
-                                    />
-                                </div>
-                            </div>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => {
+                                                    const newKey = `claim_${Object.keys(oauthEditClaims).length + 1}`;
+                                                    setOauthEditClaims({...oauthEditClaims, [newKey]: ''});
+                                                }}
+                                            >
+                                                <Plus className="h-4 w-4 mr-2" />
+                                                Add Claim Rule
+                                            </Button>
+                                        </div>
+
+                                        <div className="text-xs text-muted-foreground space-y-1">
+                                            <p><strong>For OAuth:</strong> Claim names like <code>organizations</code>, <code>groups</code>, <code>role</code></p>
+                                            <p><strong>For SAML:</strong> Attribute names from your IdP (e.g., <code>memberOf</code>, <code>department</code>)</p>
+                                            <p><strong>Note:</strong> Matching is case-insensitive. Array claims (groups, etc.) are supported.</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <FormField
+                                            control={editForm.control}
+                                            name="enabled"
+                                            render={({field}) => (
+                                                <FormItem
+                                                    className="flex flex-row items-center justify-between rounded-lg border p-3 h-full">
+                                                    <div className="space-y-0.5">
+                                                        <FormLabel>Enabled</FormLabel>
+                                                        <FormDescription>
+                                                            Allow users to sign in with this provider.
+                                                        </FormDescription>
+                                                    </div>
+                                                    <FormControl>
+                                                        <Switch
+                                                            checked={field.value}
+                                                            onCheckedChange={field.onChange}
+                                                        />
+                                                    </FormControl>
+                                                </FormItem>
+                                            )}
+                                        />
+
+                                        <FormField
+                                            control={editForm.control}
+                                            name="isDefault"
+                                            render={({field}) => (
+                                                <FormItem
+                                                    className="flex flex-row items-center justify-between rounded-lg border p-3 h-full">
+                                                    <div className="space-y-0.5">
+                                                        <FormLabel>Default Provider</FormLabel>
+                                                        <FormDescription>
+                                                            Make this the default sign-in option.
+                                                        </FormDescription>
+                                                    </div>
+                                                    <FormControl>
+                                                        <Switch
+                                                            checked={field.value}
+                                                            onCheckedChange={field.onChange}
+                                                        />
+                                                    </FormControl>
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </div>
+                                </TabsContent>
+                            </Tabs>
 
                             <DialogFooter>
                                 <Button
@@ -1344,48 +1791,53 @@ export default function OAuthProvidersPage() {
             </AlertDialog>
 
             {/* Page Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">OAuth Providers</h1>
-                    <p className="text-muted-foreground mt-2">
-                        Manage single sign-on providers for Changerawr with custom URLs support
-                    </p>
-                </div>
-                <Button onClick={() => setIsAddDialogOpen(true)} className="sm:self-start">
-                    <Plus className="mr-2 h-4 w-4"/>
-                    Add Provider
-                </Button>
+            <div>
+                <h1 className="text-3xl font-bold tracking-tight">SSO Providers</h1>
+                <p className="text-muted-foreground mt-2">
+                    Manage OAuth/OIDC and SAML single sign-on providers for Changerawr
+                </p>
             </div>
 
-            {/* Filter tabs */}
-            <Tabs defaultValue="active" value={activeTab} onValueChange={setActiveTab} className="w-full">
+            {/* Outer SSO type tabs */}
+            <Tabs value={ssoType} onValueChange={(v) => setSsoType(v as 'oauth' | 'saml')} className="w-full">
+                <TabsList className="grid w-full sm:w-auto grid-cols-2 mb-4">
+                    <TabsTrigger value="oauth" className="flex items-center gap-1">
+                        <KeyRound className="h-4 w-4"/>
+                        <span>OAuth / OIDC</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="saml" className="flex items-center gap-1">
+                        <Fingerprint className="h-4 w-4"/>
+                        <span>SAML</span>
+                    </TabsTrigger>
+                </TabsList>
+
+                {/* OAuth Tab Content */}
+                <TabsContent value="oauth" className="space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div>
+                            <h2 className="text-xl font-semibold">OAuth / OpenID Connect</h2>
+                            <p className="text-sm text-muted-foreground">Manage OAuth 2.0 and OpenID Connect providers</p>
+                        </div>
+                        <Button onClick={() => setIsAddDialogOpen(true)} className="sm:self-start">
+                            <Plus className="mr-2 h-4 w-4"/>
+                            Add OAuth Provider
+                        </Button>
+                    </div>
+
+                {/* Filter tabs */}
+                <Tabs defaultValue="active" value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="grid w-full sm:w-auto grid-cols-3">
                     <TabsTrigger value="active" className="flex items-center gap-1">
                         <Check className="h-4 w-4"/>
                         <span>Active</span>
-                        {providers?.providers && (
-                            <Badge variant="secondary" className="ml-1 text-xs">
-                                {providers.providers.filter((p: OAuthProvider) => p.enabled).length}
-                            </Badge>
-                        )}
                     </TabsTrigger>
                     <TabsTrigger value="disabled" className="flex items-center gap-1">
                         <X className="h-4 w-4"/>
                         <span>Disabled</span>
-                        {providers?.providers && (
-                            <Badge variant="secondary" className="ml-1 text-xs">
-                                {providers.providers.filter((p: OAuthProvider) => !p.enabled).length}
-                            </Badge>
-                        )}
                     </TabsTrigger>
                     <TabsTrigger value="all" className="flex items-center gap-1">
                         <Settings className="h-4 w-4"/>
                         <span>All</span>
-                        {providers?.providers && (
-                            <Badge variant="secondary" className="ml-1 text-xs">
-                                {providers.providers.length}
-                            </Badge>
-                        )}
                     </TabsTrigger>
                 </TabsList>
 
@@ -1417,6 +1869,633 @@ export default function OAuthProvidersPage() {
                         onDelete={setProviderToDelete}
                         setIsAddDialogOpen={setIsAddDialogOpen}
                     />
+                </TabsContent>
+            </Tabs>
+                </TabsContent>
+
+                {/* SAML Tab Content */}
+                <TabsContent value="saml" className="space-y-4">
+                    {/* SAML Add Dialog */}
+                    <Dialog open={isSAMLAddDialogOpen} onOpenChange={setIsSAMLAddDialogOpen}>
+                        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+                            <DialogHeader>
+                                <DialogTitle className="flex items-center gap-2">
+                                    <Plus className="h-5 w-5"/>
+                                    Add SAML Provider
+                                </DialogTitle>
+                                <DialogDescription>
+                                    Configure a new SAML 2.0 identity provider for enterprise SSO.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <Form {...samlCreateForm}>
+                                <form onSubmit={samlCreateForm.handleSubmit((d) => addSAMLProvider.mutate(d))} className="space-y-6">
+                                    <Tabs defaultValue="basic" className="w-full">
+                                        <TabsList className="grid w-full grid-cols-3">
+                                            <TabsTrigger value="basic" className="flex items-center gap-1">
+                                                <Settings className="h-4 w-4"/>
+                                                <span className="hidden sm:inline">Configuration</span>
+                                                <span className="sm:hidden">Config</span>
+                                            </TabsTrigger>
+                                            <TabsTrigger value="security" className="flex items-center gap-1">
+                                                <Shield className="h-4 w-4"/>
+                                                <span className="hidden sm:inline">Security & Access</span>
+                                                <span className="sm:hidden">Security</span>
+                                            </TabsTrigger>
+                                            <TabsTrigger value="advanced" className="flex items-center gap-1">
+                                                <User className="h-4 w-4"/>
+                                                <span className="hidden sm:inline">Attribute Mapping</span>
+                                                <span className="sm:hidden">Attributes</span>
+                                            </TabsTrigger>
+                                        </TabsList>
+
+                                        <TabsContent value="basic" className="space-y-4 mt-4">
+                                            <FormField control={samlCreateForm.control} name="name" render={({field}) => (
+                                                <FormItem>
+                                                    <FormLabel>Provider Name</FormLabel>
+                                                    <FormControl><Input placeholder="Okta SAML" {...field}/></FormControl>
+                                                    <FormDescription>Unique display name for this provider.</FormDescription>
+                                                    <FormMessage/>
+                                                </FormItem>
+                                            )}/>
+                                            <FormField control={samlCreateForm.control} name="entityId" render={({field}) => (
+                                                <FormItem>
+                                                    <FormLabel>IdP Entity ID / Issuer</FormLabel>
+                                                    <FormControl><Input placeholder="https://idp.example.com/entity" {...field}/></FormControl>
+                                                    <FormDescription>The Entity ID or Issuer of the Identity Provider.</FormDescription>
+                                                    <FormMessage/>
+                                                </FormItem>
+                                            )}/>
+                                            <FormField control={samlCreateForm.control} name="ssoUrl" render={({field}) => (
+                                                <FormItem>
+                                                    <FormLabel>IdP SSO URL</FormLabel>
+                                                    <FormControl><Input placeholder="https://idp.example.com/sso/saml" {...field}/></FormControl>
+                                                    <FormDescription>The IdP single sign-on URL (HTTP-Redirect binding).</FormDescription>
+                                                    <FormMessage/>
+                                                </FormItem>
+                                            )}/>
+                                            <FormField control={samlCreateForm.control} name="certificate" render={({field}) => (
+                                                <FormItem>
+                                                    <FormLabel>IdP Signing Certificate (PEM)</FormLabel>
+                                                    <FormControl>
+                                                        <textarea
+                                                            className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 font-mono"
+                                                            placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
+                                                            {...field}
+                                                        />
+                                                    </FormControl>
+                                                    <FormDescription>Paste the full PEM certificate from your IdP.</FormDescription>
+                                                    <FormMessage/>
+                                                </FormItem>
+                                            )}/>
+                                            <FormField control={samlCreateForm.control} name="spEntityId" render={({field}) => (
+                                                <FormItem>
+                                                    <FormLabel>SP Entity ID Override (optional)</FormLabel>
+                                                    <FormControl><Input placeholder="Defaults to metadata URL" {...field}/></FormControl>
+                                                    <FormMessage/>
+                                                </FormItem>
+                                            )}/>
+
+                                            {/* SP URLs section */}
+                                            <div className="space-y-2 border rounded-md p-4 bg-muted/30">
+                                                <p className="text-sm font-medium">SP URLs (register these with your IdP)</p>
+                                                <div className="space-y-3">
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center justify-between">
+                                                            <FormLabel className="text-xs text-muted-foreground">ACS URL</FormLabel>
+                                                            <Button type="button" variant="ghost" size="sm" onClick={() => copySAMLUrl(`${window.location.origin}/api/auth/saml/callback/${samlCreateForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`, 'ACS URL')}>
+                                                                <Copy className="h-3 w-3 mr-1"/>
+                                                                Copy
+                                                            </Button>
+                                                        </div>
+                                                        <code className="block p-2 text-xs bg-background rounded border overflow-x-auto text-muted-foreground">
+                                                            {`${typeof window !== 'undefined' ? window.location.origin : ''}/api/auth/saml/callback/${samlCreateForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`}
+                                                        </code>
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center justify-between">
+                                                            <FormLabel className="text-xs text-muted-foreground">Metadata URL</FormLabel>
+                                                            <Button type="button" variant="ghost" size="sm" onClick={() => copySAMLUrl(`${window.location.origin}/api/auth/saml/metadata/${samlCreateForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`, 'Metadata URL')}>
+                                                                <Copy className="h-3 w-3 mr-1"/>
+                                                                Copy
+                                                            </Button>
+                                                        </div>
+                                                        <code className="block p-2 text-xs bg-background rounded border overflow-x-auto text-muted-foreground">
+                                                            {`${typeof window !== 'undefined' ? window.location.origin : ''}/api/auth/saml/metadata/${samlCreateForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`}
+                                                        </code>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </TabsContent>
+
+                                        <TabsContent value="security" className="space-y-4 mt-4">
+                                            <FormField control={samlCreateForm.control} name="allowedEmailDomains" render={({field}) => (
+                                                <FormItem>
+                                                    <FormLabel>Allowed Email Domains</FormLabel>
+                                                    <FormControl><Input placeholder="example.com, company.org" {...field}/></FormControl>
+                                                    <FormDescription>
+                                                        Restrict signups to specific email domains. Leave empty to allow all domains. Separate multiple domains with commas.
+                                                    </FormDescription>
+                                                    <FormMessage/>
+                                                </FormItem>
+                                            )}/>
+
+                                            <FormField control={samlCreateForm.control} name="blockExistingUsers" render={({field}) => (
+                                                <FormItem className="flex flex-row items-start justify-between rounded-lg border p-4 space-y-0 gap-3">
+                                                    <div className="space-y-1">
+                                                        <FormLabel className="text-destructive font-semibold">Block Existing Users (Dangerous)</FormLabel>
+                                                        <FormDescription className="text-destructive/80">
+                                                            ⚠️ WARNING: When enabled, users with existing accounts cannot log in with this provider, even if their domain is allowed. Only new user registration will be permitted.
+                                                        </FormDescription>
+                                                    </div>
+                                                    <FormControl>
+                                                        <Switch checked={field.value} onCheckedChange={field.onChange}/>
+                                                    </FormControl>
+                                                </FormItem>
+                                            )}/>
+
+                                            <div className="space-y-4 rounded-lg border p-4">
+                                                <div className="space-y-2">
+                                                    <FormLabel>Required Claims / Attributes</FormLabel>
+                                                    <FormDescription>
+                                                        Validate specific claims from OAuth userInfo or SAML attributes. Users must have matching values to sign in.
+                                                        Example: Require users to be in a specific organization or have a certain role.
+                                                    </FormDescription>
+                                                </div>
+
+                                                <div className="space-y-2">
+                                                    {Object.entries(samlCreateClaims).map(([key, value], index) => (
+                                                        <div key={index} className="flex gap-2">
+                                                            <Input
+                                                                placeholder="Claim name (e.g., organization)"
+                                                                value={key}
+                                                                onChange={(e) => {
+                                                                    const newClaims = {...samlCreateClaims};
+                                                                    delete newClaims[key];
+                                                                    newClaims[e.target.value] = value;
+                                                                    setSamlCreateClaims(newClaims);
+                                                                }}
+                                                                className="flex-1"
+                                                            />
+                                                            <Input
+                                                                placeholder="Required value (e.g., my-company)"
+                                                                value={value}
+                                                                onChange={(e) => {
+                                                                    setSamlCreateClaims({...samlCreateClaims, [key]: e.target.value});
+                                                                }}
+                                                                className="flex-1"
+                                                            />
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                onClick={() => {
+                                                                    const newClaims = {...samlCreateClaims};
+                                                                    delete newClaims[key];
+                                                                    setSamlCreateClaims(newClaims);
+                                                                }}
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </div>
+                                                    ))}
+
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => {
+                                                            const newKey = `claim_${Object.keys(samlCreateClaims).length + 1}`;
+                                                            setSamlCreateClaims({...samlCreateClaims, [newKey]: ''});
+                                                        }}
+                                                    >
+                                                        <Plus className="h-4 w-4 mr-2" />
+                                                        Add Claim Rule
+                                                    </Button>
+                                                </div>
+
+                                                <div className="text-xs text-muted-foreground space-y-1">
+                                                    <p><strong>For OAuth:</strong> Claim names like <code>organizations</code>, <code>groups</code>, <code>role</code></p>
+                                                    <p><strong>For SAML:</strong> Attribute names from your IdP (e.g., <code>memberOf</code>, <code>department</code>)</p>
+                                                    <p><strong>Note:</strong> Matching is case-insensitive. Array claims (groups, etc.) are supported.</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <FormField control={samlCreateForm.control} name="enabled" render={({field}) => (
+                                                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 h-full">
+                                                        <div className="space-y-0.5">
+                                                            <FormLabel>Enabled</FormLabel>
+                                                            <FormDescription>Show on login page</FormDescription>
+                                                        </div>
+                                                        <FormControl><Switch checked={field.value} onCheckedChange={field.onChange}/></FormControl>
+                                                    </FormItem>
+                                                )}/>
+                                                <FormField control={samlCreateForm.control} name="isDefault" render={({field}) => (
+                                                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 h-full">
+                                                        <div className="space-y-0.5">
+                                                            <FormLabel>Default Provider</FormLabel>
+                                                            <FormDescription>Primary SAML provider</FormDescription>
+                                                        </div>
+                                                        <FormControl><Switch checked={field.value} onCheckedChange={field.onChange}/></FormControl>
+                                                    </FormItem>
+                                                )}/>
+                                            </div>
+                                        </TabsContent>
+
+                                        <TabsContent value="advanced" className="space-y-4 mt-4">
+                                            <FormField control={samlCreateForm.control} name="nameIdFormat" render={({field}) => (
+                                                <FormItem>
+                                                    <FormLabel>Name ID Format</FormLabel>
+                                                    <FormControl><Input placeholder="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress" {...field}/></FormControl>
+                                                    <FormDescription>The SAML NameID format to request from the IdP.</FormDescription>
+                                                    <FormMessage/>
+                                                </FormItem>
+                                            )}/>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <FormField control={samlCreateForm.control} name="emailAttribute" render={({field}) => (
+                                                    <FormItem>
+                                                        <FormLabel>Email Attribute</FormLabel>
+                                                        <FormControl><Input placeholder="email" {...field}/></FormControl>
+                                                        <FormDescription>SAML attribute containing user email</FormDescription>
+                                                        <FormMessage/>
+                                                    </FormItem>
+                                                )}/>
+                                                <FormField control={samlCreateForm.control} name="nameAttribute" render={({field}) => (
+                                                    <FormItem>
+                                                        <FormLabel>Name Attribute</FormLabel>
+                                                        <FormControl><Input placeholder="name" {...field}/></FormControl>
+                                                        <FormDescription>SAML attribute containing user name</FormDescription>
+                                                        <FormMessage/>
+                                                    </FormItem>
+                                                )}/>
+                                            </div>
+                                        </TabsContent>
+                                    </Tabs>
+
+                                    <DialogFooter>
+                                        <Button type="button" variant="outline" onClick={() => setIsSAMLAddDialogOpen(false)}>Cancel</Button>
+                                        <Button type="submit" disabled={addSAMLProvider.isPending}>
+                                            {addSAMLProvider.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Adding...</> : 'Add Provider'}
+                                        </Button>
+                                    </DialogFooter>
+                                </form>
+                            </Form>
+                        </DialogContent>
+                    </Dialog>
+
+                    {/* SAML Edit Dialog */}
+                    <Dialog open={isSAMLEditDialogOpen} onOpenChange={setIsSAMLEditDialogOpen}>
+                        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+                            <DialogHeader>
+                                <DialogTitle className="flex items-center gap-2">
+                                    <Pencil className="h-5 w-5"/>
+                                    Edit SAML Provider
+                                </DialogTitle>
+                                <DialogDescription>Update the SAML identity provider configuration.</DialogDescription>
+                            </DialogHeader>
+                            <Form {...samlEditForm}>
+                                <form onSubmit={samlEditForm.handleSubmit((d) => selectedSAMLProvider && updateSAMLProvider.mutate({...d, id: selectedSAMLProvider.id}))} className="space-y-6">
+                                    <Tabs defaultValue="basic" className="w-full">
+                                        <TabsList className="grid w-full grid-cols-3">
+                                            <TabsTrigger value="basic" className="flex items-center gap-1">
+                                                <Settings className="h-4 w-4"/>
+                                                <span className="hidden sm:inline">Configuration</span>
+                                                <span className="sm:hidden">Config</span>
+                                            </TabsTrigger>
+                                            <TabsTrigger value="security" className="flex items-center gap-1">
+                                                <Shield className="h-4 w-4"/>
+                                                <span className="hidden sm:inline">Security & Access</span>
+                                                <span className="sm:hidden">Security</span>
+                                            </TabsTrigger>
+                                            <TabsTrigger value="advanced" className="flex items-center gap-1">
+                                                <User className="h-4 w-4"/>
+                                                <span className="hidden sm:inline">Attribute Mapping</span>
+                                                <span className="sm:hidden">Attributes</span>
+                                            </TabsTrigger>
+                                        </TabsList>
+
+                                        <TabsContent value="basic" className="space-y-4 mt-4">
+                                            <FormField control={samlEditForm.control} name="name" render={({field}) => (
+                                                <FormItem>
+                                                    <FormLabel>Provider Name</FormLabel>
+                                                    <FormControl><Input {...field}/></FormControl>
+                                                    <FormDescription>Unique display name for this provider.</FormDescription>
+                                                    <FormMessage/>
+                                                </FormItem>
+                                            )}/>
+                                            <FormField control={samlEditForm.control} name="entityId" render={({field}) => (
+                                                <FormItem>
+                                                    <FormLabel>IdP Entity ID / Issuer</FormLabel>
+                                                    <FormControl><Input {...field}/></FormControl>
+                                                    <FormDescription>The Entity ID or Issuer of the Identity Provider.</FormDescription>
+                                                    <FormMessage/>
+                                                </FormItem>
+                                            )}/>
+                                            <FormField control={samlEditForm.control} name="ssoUrl" render={({field}) => (
+                                                <FormItem>
+                                                    <FormLabel>IdP SSO URL</FormLabel>
+                                                    <FormControl><Input {...field}/></FormControl>
+                                                    <FormDescription>The IdP single sign-on URL (HTTP-Redirect binding).</FormDescription>
+                                                    <FormMessage/>
+                                                </FormItem>
+                                            )}/>
+                                            <FormField control={samlEditForm.control} name="certificate" render={({field}) => (
+                                                <FormItem>
+                                                    <FormLabel>IdP Signing Certificate (PEM)</FormLabel>
+                                                    <FormControl>
+                                                        <textarea
+                                                            className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 font-mono"
+                                                            {...field}
+                                                        />
+                                                    </FormControl>
+                                                    <FormDescription>Paste the full PEM certificate from your IdP.</FormDescription>
+                                                    <FormMessage/>
+                                                </FormItem>
+                                            )}/>
+                                            <FormField control={samlEditForm.control} name="spEntityId" render={({field}) => (
+                                                <FormItem>
+                                                    <FormLabel>SP Entity ID Override (optional)</FormLabel>
+                                                    <FormControl><Input placeholder="Defaults to metadata URL" {...field}/></FormControl>
+                                                    <FormMessage/>
+                                                </FormItem>
+                                            )}/>
+
+                                            {/* SP URLs section */}
+                                            <div className="space-y-2 border rounded-md p-4 bg-muted/30">
+                                                <p className="text-sm font-medium">SP URLs (register these with your IdP)</p>
+                                                <div className="space-y-3">
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center justify-between">
+                                                            <FormLabel className="text-xs text-muted-foreground">ACS URL</FormLabel>
+                                                            <Button type="button" variant="ghost" size="sm" onClick={() => copySAMLUrl(`${window.location.origin}/api/auth/saml/callback/${samlEditForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`, 'ACS URL')}>
+                                                                <Copy className="h-3 w-3 mr-1"/>
+                                                                Copy
+                                                            </Button>
+                                                        </div>
+                                                        <code className="block p-2 text-xs bg-background rounded border overflow-x-auto text-muted-foreground">
+                                                            {`${typeof window !== 'undefined' ? window.location.origin : ''}/api/auth/saml/callback/${samlEditForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`}
+                                                        </code>
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center justify-between">
+                                                            <FormLabel className="text-xs text-muted-foreground">Metadata URL</FormLabel>
+                                                            <Button type="button" variant="ghost" size="sm" onClick={() => copySAMLUrl(`${window.location.origin}/api/auth/saml/metadata/${samlEditForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`, 'Metadata URL')}>
+                                                                <Copy className="h-3 w-3 mr-1"/>
+                                                                Copy
+                                                            </Button>
+                                                        </div>
+                                                        <code className="block p-2 text-xs bg-background rounded border overflow-x-auto text-muted-foreground">
+                                                            {`${typeof window !== 'undefined' ? window.location.origin : ''}/api/auth/saml/metadata/${samlEditForm.watch('name')?.toLowerCase().replace(/\s+/g, '-') || 'provider'}`}
+                                                        </code>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </TabsContent>
+
+                                        <TabsContent value="security" className="space-y-4 mt-4">
+                                            <FormField control={samlEditForm.control} name="allowedEmailDomains" render={({field}) => (
+                                                <FormItem>
+                                                    <FormLabel>Allowed Email Domains</FormLabel>
+                                                    <FormControl><Input placeholder="example.com, company.org" {...field}/></FormControl>
+                                                    <FormDescription>
+                                                        Restrict signups to specific email domains. Leave empty to allow all domains. Separate multiple domains with commas.
+                                                    </FormDescription>
+                                                    <FormMessage/>
+                                                </FormItem>
+                                            )}/>
+
+                                            <FormField control={samlEditForm.control} name="blockExistingUsers" render={({field}) => (
+                                                <FormItem className="flex flex-row items-start justify-between rounded-lg border p-4 space-y-0 gap-3">
+                                                    <div className="space-y-1">
+                                                        <FormLabel className="text-destructive font-semibold">Block Existing Users (Dangerous)</FormLabel>
+                                                        <FormDescription className="text-destructive/80">
+                                                            ⚠️ WARNING: When enabled, users with existing accounts cannot log in with this provider, even if their domain is allowed. Only new user registration will be permitted.
+                                                        </FormDescription>
+                                                    </div>
+                                                    <FormControl>
+                                                        <Switch checked={field.value} onCheckedChange={field.onChange}/>
+                                                    </FormControl>
+                                                </FormItem>
+                                            )}/>
+
+                                            <div className="space-y-4 rounded-lg border p-4">
+                                                <div className="space-y-2">
+                                                    <FormLabel>Required Claims / Attributes</FormLabel>
+                                                    <FormDescription>
+                                                        Validate specific claims from OAuth userInfo or SAML attributes. Users must have matching values to sign in.
+                                                        Example: Require users to be in a specific organization or have a certain role.
+                                                    </FormDescription>
+                                                </div>
+
+                                                <div className="space-y-2">
+                                                    {Object.entries(samlEditClaims).map(([key, value], index) => (
+                                                        <div key={index} className="flex gap-2">
+                                                            <Input
+                                                                placeholder="Claim name (e.g., organization)"
+                                                                value={key}
+                                                                onChange={(e) => {
+                                                                    const newClaims = {...samlEditClaims};
+                                                                    delete newClaims[key];
+                                                                    newClaims[e.target.value] = value;
+                                                                    setSamlEditClaims(newClaims);
+                                                                }}
+                                                                className="flex-1"
+                                                            />
+                                                            <Input
+                                                                placeholder="Required value (e.g., my-company)"
+                                                                value={value}
+                                                                onChange={(e) => {
+                                                                    setSamlEditClaims({...samlEditClaims, [key]: e.target.value});
+                                                                }}
+                                                                className="flex-1"
+                                                            />
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                onClick={() => {
+                                                                    const newClaims = {...samlEditClaims};
+                                                                    delete newClaims[key];
+                                                                    setSamlEditClaims(newClaims);
+                                                                }}
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </div>
+                                                    ))}
+
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => {
+                                                            const newKey = `claim_${Object.keys(samlEditClaims).length + 1}`;
+                                                            setSamlEditClaims({...samlEditClaims, [newKey]: ''});
+                                                        }}
+                                                    >
+                                                        <Plus className="h-4 w-4 mr-2" />
+                                                        Add Claim Rule
+                                                    </Button>
+                                                </div>
+
+                                                <div className="text-xs text-muted-foreground space-y-1">
+                                                    <p><strong>For OAuth:</strong> Claim names like <code>organizations</code>, <code>groups</code>, <code>role</code></p>
+                                                    <p><strong>For SAML:</strong> Attribute names from your IdP (e.g., <code>memberOf</code>, <code>department</code>)</p>
+                                                    <p><strong>Note:</strong> Matching is case-insensitive. Array claims (groups, etc.) are supported.</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <FormField control={samlEditForm.control} name="enabled" render={({field}) => (
+                                                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 h-full">
+                                                        <div className="space-y-0.5">
+                                                            <FormLabel>Enabled</FormLabel>
+                                                            <FormDescription>Show on login page</FormDescription>
+                                                        </div>
+                                                        <FormControl><Switch checked={field.value} onCheckedChange={field.onChange}/></FormControl>
+                                                    </FormItem>
+                                                )}/>
+                                                <FormField control={samlEditForm.control} name="isDefault" render={({field}) => (
+                                                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 h-full">
+                                                        <div className="space-y-0.5">
+                                                            <FormLabel>Default Provider</FormLabel>
+                                                            <FormDescription>Primary SAML provider</FormDescription>
+                                                        </div>
+                                                        <FormControl><Switch checked={field.value} onCheckedChange={field.onChange}/></FormControl>
+                                                    </FormItem>
+                                                )}/>
+                                            </div>
+                                        </TabsContent>
+
+                                        <TabsContent value="advanced" className="space-y-4 mt-4">
+                                            <FormField control={samlEditForm.control} name="nameIdFormat" render={({field}) => (
+                                                <FormItem>
+                                                    <FormLabel>Name ID Format</FormLabel>
+                                                    <FormControl><Input placeholder="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress" {...field}/></FormControl>
+                                                    <FormDescription>The SAML NameID format to request from the IdP.</FormDescription>
+                                                    <FormMessage/>
+                                                </FormItem>
+                                            )}/>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <FormField control={samlEditForm.control} name="emailAttribute" render={({field}) => (
+                                                    <FormItem>
+                                                        <FormLabel>Email Attribute</FormLabel>
+                                                        <FormControl><Input {...field}/></FormControl>
+                                                        <FormDescription>SAML attribute containing user email</FormDescription>
+                                                        <FormMessage/>
+                                                    </FormItem>
+                                                )}/>
+                                                <FormField control={samlEditForm.control} name="nameAttribute" render={({field}) => (
+                                                    <FormItem>
+                                                        <FormLabel>Name Attribute</FormLabel>
+                                                        <FormControl><Input {...field}/></FormControl>
+                                                        <FormDescription>SAML attribute containing user name</FormDescription>
+                                                        <FormMessage/>
+                                                    </FormItem>
+                                                )}/>
+                                            </div>
+                                        </TabsContent>
+                                    </Tabs>
+
+                                    <DialogFooter>
+                                        <Button type="button" variant="outline" onClick={() => setIsSAMLEditDialogOpen(false)}>Cancel</Button>
+                                        <Button type="submit" disabled={updateSAMLProvider.isPending}>
+                                            {updateSAMLProvider.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Updating...</> : 'Update Provider'}
+                                        </Button>
+                                    </DialogFooter>
+                                </form>
+                            </Form>
+                        </DialogContent>
+                    </Dialog>
+
+                    {/* SAML Delete Dialog */}
+                    <AlertDialog open={!!samlProviderToDelete} onOpenChange={(open) => !open && setSAMLProviderToDelete(null)}>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle className="flex items-center gap-2">
+                                    <Trash2 className="h-5 w-5 text-destructive"/>
+                                    Delete {samlProviderToDelete?.name || 'SAML Provider'}
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Are you sure you want to delete this SAML provider? This action cannot be undone.
+                                    Users who previously signed in with this provider may lose access.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                    onClick={() => samlProviderToDelete && deleteSAMLProvider.mutate(samlProviderToDelete.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                    {deleteSAMLProvider.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Trash2 className="mr-2 h-4 w-4"/>}
+                                    Delete
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+
+                    {/* SAML Providers list */}
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div>
+                            <h2 className="text-xl font-semibold">SAML 2.0</h2>
+                            <p className="text-sm text-muted-foreground">Configure SAML identity providers for enterprise SSO</p>
+                        </div>
+                        <Button onClick={() => setIsSAMLAddDialogOpen(true)} className="sm:self-start">
+                            <Plus className="mr-2 h-4 w-4"/>
+                            Add SAML Provider
+                        </Button>
+                    </div>
+
+                    {/* Filter tabs */}
+                    <Tabs defaultValue="active" value={activeTab} onValueChange={setActiveTab} className="w-full">
+                        <TabsList className="grid w-full sm:w-auto grid-cols-3">
+                            <TabsTrigger value="active" className="flex items-center gap-1">
+                                <Check className="h-4 w-4"/>
+                                <span>Active</span>
+                            </TabsTrigger>
+                            <TabsTrigger value="disabled" className="flex items-center gap-1">
+                                <X className="h-4 w-4"/>
+                                <span>Disabled</span>
+                            </TabsTrigger>
+                            <TabsTrigger value="all" className="flex items-center gap-1">
+                                <Settings className="h-4 w-4"/>
+                                <span>All</span>
+                            </TabsTrigger>
+                        </TabsList>
+
+                        <TabsContent value="active" className="mt-4">
+                            <SAMLProvidersList
+                                providers={filteredSAMLProviders}
+                                isLoading={isSAMLLoading}
+                                onEdit={handleEditSAMLProvider}
+                                onDelete={setSAMLProviderToDelete}
+                                setIsAddDialogOpen={setIsSAMLAddDialogOpen}
+                                copySAMLUrl={copySAMLUrl}
+                            />
+                        </TabsContent>
+
+                        <TabsContent value="disabled" className="mt-4">
+                            <SAMLProvidersList
+                                providers={filteredSAMLProviders}
+                                isLoading={isSAMLLoading}
+                                onEdit={handleEditSAMLProvider}
+                                onDelete={setSAMLProviderToDelete}
+                                setIsAddDialogOpen={setIsSAMLAddDialogOpen}
+                                copySAMLUrl={copySAMLUrl}
+                            />
+                        </TabsContent>
+
+                        <TabsContent value="all" className="mt-4">
+                            <SAMLProvidersList
+                                providers={filteredSAMLProviders}
+                                isLoading={isSAMLLoading}
+                                onEdit={handleEditSAMLProvider}
+                                onDelete={setSAMLProviderToDelete}
+                                setIsAddDialogOpen={setIsSAMLAddDialogOpen}
+                                copySAMLUrl={copySAMLUrl}
+                            />
+                        </TabsContent>
+                    </Tabs>
                 </TabsContent>
             </Tabs>
         </motion.div>
@@ -1621,6 +2700,139 @@ const ProvidersList: React.FC<ProvidersListProps> = ({
                                 >
                                     <Trash2 className="h-4 w-4 mr-2"/>
                                     Delete
+                                </Button>
+                            </CardFooter>
+                        </Card>
+                    </motion.div>
+                ))}
+            </AnimatePresence>
+        </div>
+    );
+};
+
+interface SAMLProvidersListProps {
+    providers: SAMLProvider[];
+    isLoading: boolean;
+    onEdit: (provider: SAMLProvider) => void;
+    onDelete: (provider: SAMLProvider) => void;
+    setIsAddDialogOpen: (open: boolean) => void;
+    copySAMLUrl: (url: string, label: string) => void;
+}
+
+const SAMLProvidersList: React.FC<SAMLProvidersListProps> = ({
+                                                                 providers,
+                                                                 isLoading,
+                                                                 onEdit,
+                                                                 onDelete,
+                                                                 setIsAddDialogOpen,
+                                                                 copySAMLUrl
+                                                             }) => {
+    if (isLoading) {
+        return (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {Array.from({length: 2}).map((_, i) => (
+                    <Card key={i} className="animate-pulse">
+                        <CardHeader className="pb-2">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-md bg-muted"></div>
+                                <div>
+                                    <div className="h-6 w-24 bg-muted rounded"></div>
+                                    <div className="h-4 w-32 bg-muted rounded mt-1"></div>
+                                </div>
+                            </div>
+                        </CardHeader>
+                    </Card>
+                ))}
+            </div>
+        );
+    }
+
+    if (!providers?.length) {
+        return (
+            <Card className="border-dashed">
+                <CardContent className="pt-6 pb-6 flex flex-col items-center justify-center text-center">
+                    <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                        <Fingerprint className="h-8 w-8 text-muted-foreground"/>
+                    </div>
+                    <h3 className="text-lg font-medium mb-2">No SAML Providers</h3>
+                    <p className="text-sm text-muted-foreground mb-4 max-w-sm">
+                        Add a SAML identity provider to enable enterprise single sign-on.
+                    </p>
+                    <Button onClick={() => setIsAddDialogOpen(true)}>
+                        <Plus className="mr-2 h-4 w-4"/>
+                        Add SAML Provider
+                    </Button>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    return (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <AnimatePresence>
+                {providers.map((provider: SAMLProvider, index: number) => (
+                    <motion.div
+                        key={provider.id}
+                        initial={{opacity: 0, y: 20}}
+                        animate={{opacity: 1, y: 0}}
+                        exit={{opacity: 0, y: -20}}
+                        transition={{duration: 0.2, delay: index * 0.05}}
+                    >
+                        <Card className={!provider.enabled ? "h-full flex flex-col opacity-80 border-dashed" : "h-full flex flex-col"}>
+                            <CardHeader className="pb-2">
+                                <div className="flex items-center gap-3">
+                                    <ProviderLogo providerName={provider.name}/>
+                                    <div>
+                                        <CardTitle className="flex items-center text-base">
+                                            {provider.name}
+                                            {provider.isDefault && (
+                                                <Badge variant="secondary" className="ml-2 text-xs">
+                                                    Default
+                                                </Badge>
+                                            )}
+                                        </CardTitle>
+                                        <CardDescription>
+                                            {provider.enabled ? (
+                                                <span className="flex items-center text-green-600 text-xs">
+                                                    <Check className="mr-1 h-3 w-3"/>
+                                                    Active
+                                                </span>
+                                            ) : (
+                                                <span className="flex items-center text-muted-foreground text-xs">
+                                                    <X className="mr-1 h-3 w-3"/>
+                                                    Disabled
+                                                </span>
+                                            )}
+                                        </CardDescription>
+                                    </div>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="flex-1 space-y-2">
+                                <div className="text-xs text-muted-foreground space-y-1">
+                                    <div className="truncate"><span className="font-medium">SSO URL: </span>{provider.ssoUrl}</div>
+                                    <div className="truncate"><span className="font-medium">Entity ID: </span>{provider.entityId}</div>
+                                </div>
+                                <div className="flex items-center gap-2 pt-1">
+                                    <Button
+                                        type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs"
+                                        onClick={() => copySAMLUrl(`${window.location.origin}/api/auth/saml/callback/${provider.name.toLowerCase().replace(/\s+/g, '-')}`, 'ACS URL')}
+                                    >
+                                        <Copy className="h-3 w-3 mr-1"/>ACS URL
+                                    </Button>
+                                    <Button
+                                        type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs"
+                                        onClick={() => copySAMLUrl(`${window.location.origin}/api/auth/saml/metadata/${provider.name.toLowerCase().replace(/\s+/g, '-')}`, 'Metadata URL')}
+                                    >
+                                        <Copy className="h-3 w-3 mr-1"/>Metadata
+                                    </Button>
+                                </div>
+                            </CardContent>
+                            <CardFooter className="flex justify-between">
+                                <Button variant="outline" size="sm" onClick={() => onEdit(provider)}>
+                                    <Pencil className="h-4 w-4 mr-2"/>Edit
+                                </Button>
+                                <Button variant="destructive" size="sm" onClick={() => onDelete(provider)}>
+                                    <Trash2 className="h-4 w-4 mr-2"/>Delete
                                 </Button>
                             </CardFooter>
                         </Card>

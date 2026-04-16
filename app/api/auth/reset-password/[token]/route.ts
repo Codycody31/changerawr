@@ -1,9 +1,10 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
     validatePasswordResetToken,
     resetPassword
 } from '@/lib/services/auth/password-reset';
+import { checkRateLimit } from '@/lib/utils/rate-limit';
 
 // Validation schema for password reset
 const resetPasswordSchema = z.object({
@@ -44,9 +45,16 @@ const resetPasswordSchema = z.object({
  * }
  */
 export async function GET(
-    request: Request,
+    request: NextRequest,
     context: { params: Promise<{ token: string }> }
 ) {
+    // Rate limit token validation attempts to prevent enumeration
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown'
+    const rateLimit = checkRateLimit(`reset-token-check:${ip}`, 20, 15 * 60 * 1000)
+    if (!rateLimit.allowed) {
+        return NextResponse.json({ valid: false, error: 'Too many requests' }, { status: 429 })
+    }
+
     const { token } = await context.params;
 
     const validation = await validatePasswordResetToken(token);
@@ -109,10 +117,16 @@ export async function GET(
  * }
  */
 export async function POST(
-    request: Request,
+    request: NextRequest,
     context: { params: Promise<{ token: string }> }
 ) {
     try {
+        // Rate limit: 5 password reset submissions per 15 minutes per IP
+        const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown'
+        const rateLimit = checkRateLimit(`reset-password:${ip}`, 5, 15 * 60 * 1000)
+        if (!rateLimit.allowed) {
+            return NextResponse.json({ error: 'Too many attempts. Please try again later.' }, { status: 429 })
+        }
         const { token } = await context.params;
         const body = await request.json();
 

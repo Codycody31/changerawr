@@ -35,6 +35,7 @@
 - [x] add scopes to API keys for permissioning, also added project-level API keys.
 - [ ] allow for collecting user feedback ( NPS )
 - [ ] publish in multiple languages
+- [ ] allow for emails to support custom domains
 
 # widget ideas
 - [x] classic widget
@@ -59,5 +60,5 @@ Honestly, I need some sort of funding for this at some point. Here's a list of s
 - [ ] the about page has a list of every single sponsorer of the Changerawr project
 - [ ] dedicated page on the Changerawr website for viewing all sponsors.
 - [ ] sponsor tiers are overrated, will separate it by business/personal though. Any level of support is appreciated.
-- [ ] add a license key system to Changerawr that literally just gives a "supporter" badge in the about page. 
+- [x] add a license key system to Changerawr that literally just gives a "supporter" badge in the about page. 
 - [ ] higher feature request priority. I am extremely talented and can most likely add any feature that is requested, perhaps this is a good incentive?

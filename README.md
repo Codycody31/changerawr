@@ -42,7 +42,7 @@ If you don't know what a changelog is, check out [betterauth](https://www.better
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 22+
 - PostgreSQL database
 
 ### Installation

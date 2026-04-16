@@ -2,6 +2,8 @@ import { OAuthUserInfo } from '@/lib/types/oauth';
 import { db } from '@/lib/db';
 import { generateTokens } from '@/lib/auth/tokens';
 import { Role } from '@prisma/client';
+import { validateEmailDomain } from '@/lib/auth/email-domain-validator';
+import { validateClaims, parseRequiredClaims } from '@/lib/auth/claim-validator';
 
 export async function getOAuthProviders(includeDisabled = false) {
     const providers = await db.oAuthProvider.findMany({
@@ -280,6 +282,28 @@ export async function handleOAuthCallback(providerName: string, code: string) {
         const existingUser = await db.user.findUnique({
             where: { email: userDetails.email }
         });
+
+        // Validate email domain restrictions
+        const validation = validateEmailDomain(
+            userDetails.email,
+            {
+                allowedEmailDomains: provider.allowedEmailDomains,
+                blockExistingUsers: provider.blockExistingUsers,
+            },
+            !!existingUser
+        );
+
+        if (!validation.allowed) {
+            throw new Error(validation.reason || 'Email domain not allowed for this SSO provider');
+        }
+
+        // Validate required claims
+        const requiredClaims = parseRequiredClaims(provider.requiredClaims);
+        const claimValidation = validateClaims(userInfo, requiredClaims);
+
+        if (!claimValidation.allowed) {
+            throw new Error(claimValidation.reason || 'Required claims validation failed');
+        }
 
         let user;
 

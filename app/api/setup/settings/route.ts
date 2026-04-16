@@ -8,9 +8,10 @@ import {db} from '@/lib/db'
 const settingsSchema = z.object({
     defaultInvitationExpiry: z.number().min(1).max(30).default(7),
     requireApprovalForChangelogs: z.boolean().default(true),
-    maxChangelogEntriesPerProject: z.number().min(10).max(1000).default(100),
+    maxChangelogEntriesPerProject: z.number().min(10).max(10000).default(100),
     enableAnalytics: z.boolean().default(true),
     enableNotifications: z.boolean().default(true),
+    timezone: z.string().min(1).max(100).default('UTC'),
 })
 
 /**
@@ -135,6 +136,17 @@ const settingsSchema = z.object({
  */
 export async function POST(request: Request) {
     try {
+        // Block access once setup is complete (admin user exists)
+        const userCount = await db.user.count({
+            where: { email: { not: { endsWith: '@changerawr.sys' } } }
+        })
+        if (userCount > 0) {
+            return NextResponse.json(
+                { error: 'Setup already completed. Use the admin panel to manage system settings.' },
+                { status: 403 }
+            )
+        }
+
         // Validate request data first
         const body = await request.json()
         const validatedData = settingsSchema.parse(body)
@@ -153,6 +165,7 @@ export async function POST(request: Request) {
                     maxChangelogEntriesPerProject: validatedData.maxChangelogEntriesPerProject,
                     enableAnalytics: validatedData.enableAnalytics,
                     enableNotifications: validatedData.enableNotifications,
+                    timezone: validatedData.timezone,
                 }
             })
         } else {
@@ -165,6 +178,7 @@ export async function POST(request: Request) {
                     maxChangelogEntriesPerProject: validatedData.maxChangelogEntriesPerProject,
                     enableAnalytics: validatedData.enableAnalytics,
                     enableNotifications: validatedData.enableNotifications,
+                    timezone: validatedData.timezone,
                 }
             })
         }

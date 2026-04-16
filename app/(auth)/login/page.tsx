@@ -162,6 +162,23 @@ export default function LoginPage() {
         staleTime: 60000 // 1 minute
     })
 
+    // Fetch SAML providers
+    const {data: samlProviders, isLoading: isLoadingSAMLProviders} = useQuery({
+        queryKey: ['samlProviders'],
+        queryFn: async () => {
+            try {
+                const response = await fetch('/api/auth/saml/providers')
+                if (!response.ok) return []
+                const data = await response.json()
+                return data.providers
+            } catch (error) {
+                console.error('Failed to fetch SAML providers:', error)
+                return []
+            }
+        },
+        staleTime: 60000
+    })
+
     const emailForm = useForm<EmailForm>({
         resolver: zodResolver(emailSchema),
         defaultValues: {
@@ -397,6 +414,14 @@ export default function LoginPage() {
         window.location.href = `/api/auth/oauth/authorize/${providerNameForUrl}?redirect=${encodeURIComponent(redirectTo)}`
     }
 
+    const handleSAMLLogin = (provider: {id: string; name: string; isDefault: boolean}) => {
+        const providerNameForUrl = provider.name
+            .toLowerCase()
+            .replace(/\s+/g, '-')
+            .replace(/[^a-z0-9-]/g, '')
+        window.location.href = `/api/auth/saml/authorize/${providerNameForUrl}?redirect=${encodeURIComponent(redirectTo)}`
+    }
+
     const handlePasskeyLogin = async () => {
         try {
             setError('')
@@ -569,7 +594,7 @@ export default function LoginPage() {
                                             </form>
 
                                             {/* Auth Options */}
-                                            {(supportsWebAuthn || (!isLoadingProviders && oauthProviders && oauthProviders.length > 0)) && (
+                                            {(supportsWebAuthn || (!isLoadingProviders && oauthProviders && oauthProviders.length > 0) || (!isLoadingSAMLProviders && samlProviders && samlProviders.length > 0)) && (
                                                 <div>
                                                     <div className="relative my-6">
                                                         <div className="absolute inset-0 flex items-center">
@@ -614,6 +639,24 @@ export default function LoginPage() {
                                                                 type="button"
                                                                 className="w-full h-11 relative pl-10"
                                                                 onClick={() => handleOAuthLogin(provider)}
+                                                            >
+                                                                <span
+                                                                    className="absolute left-3 top-1/2 transform -translate-y-1/2">
+                                                                    <ProviderLogo providerName={provider.name}
+                                                                                  size="sm"/>
+                                                                </span>
+                                                                <span>Continue with {provider.name}</span>
+                                                            </Button>
+                                                        ))}
+
+                                                        {/* SAML Provider Buttons */}
+                                                        {!isLoadingSAMLProviders && samlProviders && samlProviders.map((provider: {id: string; name: string; isDefault: boolean}) => (
+                                                            <Button
+                                                                key={provider.id}
+                                                                variant="outline"
+                                                                type="button"
+                                                                className="w-full h-11 relative pl-10"
+                                                                onClick={() => handleSAMLLogin(provider)}
                                                             >
                                                                 <span
                                                                     className="absolute left-3 top-1/2 transform -translate-y-1/2">
@@ -878,7 +921,7 @@ export default function LoginPage() {
 
                             <CardFooter className="pb-6 flex justify-center">
                                 {step === 'email' && (
-                                    <div className="text-center">
+                                    <div className="text-center pt-2">
                                         <p className="text-sm text-muted-foreground">
                                             Don&apos;t have an account?{' '}
                                             <TooltipProvider>
