@@ -36,6 +36,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      actions: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -62,6 +63,17 @@ jobs:
           PLATFORM_SUFFIX=$(echo "${{ inputs.platform }}" | sed 's|linux/||')
           echo "suffix=$PLATFORM_SUFFIX" >> $GITHUB_OUTPUT
 
+      - name: Delete GHA Docker cache (force rebuild)
+        if: inputs.no_cache
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "🗑️ Deleting cached Docker layers for scope: ${{ steps.platform.outputs.suffix }}"
+          gh cache list --repo ${{ github.repository }} --json id,key \
+            | jq -r '.[] | select(.key | contains("${{ steps.platform.outputs.suffix }}")) | .id' \
+            | xargs -I{} gh cache delete {} --repo ${{ github.repository }} \
+            || echo "No cache entries found or deletion skipped"
+
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
@@ -70,8 +82,8 @@ jobs:
           push: true
           no-cache: ${{ inputs.no_cache }}
           tags: ${{ env.REGISTRY }}/${{ inputs.image_name }}:${{ inputs.version }}-${{ steps.platform.outputs.suffix }}
-          cache-from: ${{ inputs.no_cache && '' || format('type=gha,scope={0}', steps.platform.outputs.suffix) }}
-          cache-to: ${{ inputs.no_cache && '' || format('type=gha,mode=max,scope={0}', steps.platform.outputs.suffix) }}
+          cache-from: ${{ inputs.no_cache == false && format('type=gha,scope={0}', steps.platform.outputs.suffix) || '' }}
+          cache-to: ${{ inputs.no_cache == false && format('type=gha,mode=max,scope={0}', steps.platform.outputs.suffix) || '' }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.version=${{ inputs.version }}
