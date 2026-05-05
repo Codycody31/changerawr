@@ -30,6 +30,7 @@ import {useWhatsNew} from '@/hooks/useWhatsNew'
 import {NavSection, Sidebar, SidebarUser} from '@/components/ui/sidebar'
 import {getGravatarUrl} from '@/lib/utils/gravatar'
 import {CommandPaletteProvider} from "@/components/providers/CommandPaletteProvider"
+import {UpdateIndicatorBadge} from '@/components/UpdateIndicatorBadge'
 import {TelemetryPromptModal} from '@/components/telemetry/PromptModal'
 import {useTelemetry} from '@/hooks/useTelemetry'
 
@@ -125,7 +126,8 @@ const NAV_SECTIONS: NavSection[] = [
                 href: "/dashboard/admin/about",
                 label: "About",
                 icon: Info,
-                requiredRole: ['ADMIN']
+                requiredRole: ['ADMIN'],
+                badge: <UpdateIndicatorBadge />
             },
         ]
     },

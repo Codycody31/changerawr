@@ -43,6 +43,7 @@ interface NavItem {
     label: string
     icon: LucideIcon
     requiredRole?: string[]
+    badge?: React.ReactNode
 }
 
 interface NavSection {
@@ -96,14 +97,13 @@ function DesktopSidebar({
 
     // Function to check if a route is active based on namespace
     const isRouteActive = (itemHref: string): boolean => {
-        // Exact match for dashboard home
-        if (itemHref === '/dashboard' && pathname === '/dashboard') {
+        // Exact-match routes
+        if (pathname === itemHref) {
             return true
         }
 
-        // For other routes, check if current path starts with the item href
-        // but make sure we don't match dashboard root for other routes
-        if (itemHref !== '/dashboard' && pathname.startsWith(itemHref)) {
+        // Prefix match only for non-exact routes, but require a / boundary
+        if (itemHref !== '/dashboard' && itemHref !== '/dashboard/admin' && pathname.startsWith(itemHref + '/')) {
             return true
         }
 
@@ -194,7 +194,10 @@ function DesktopSidebar({
                                                             : "text-muted-foreground group-hover:text-foreground"
                                                     )} />
                                                     {isExpanded && (
-                                                        <span className="truncate">{item.label}</span>
+                                                        <>
+                                                            <span className="truncate flex-1">{item.label}</span>
+                                                            {item.badge && <span className="ml-auto shrink-0">{item.badge}</span>}
+                                                        </>
                                                     )}
                                                 </Link>
                                             </TooltipTrigger>
@@ -337,14 +340,11 @@ function MobileNav({
 
     // Function to check if a route is active based on namespace
     const isRouteActive = (itemHref: string): boolean => {
-        // Exact match for dashboard home
-        if (itemHref === '/dashboard' && pathname === '/dashboard') {
+        if (pathname === itemHref) {
             return true
         }
 
-        // For other routes, check if current path starts with the item href
-        // but make sure we don't match dashboard root for other routes
-        if (itemHref !== '/dashboard' && pathname.startsWith(itemHref)) {
+        if (itemHref !== '/dashboard' && itemHref !== '/dashboard/admin' && pathname.startsWith(itemHref + '/')) {
             return true
         }
 
@@ -420,7 +420,8 @@ function MobileNav({
                                                         )}
                                                     >
                                                         <item.icon className="h-5 w-5 text-muted-foreground" />
-                                                        <span>{item.label}</span>
+                                                        <span className="flex-1">{item.label}</span>
+                                                        {item.badge && <span className="ml-auto shrink-0">{item.badge}</span>}
                                                     </Link>
                                                 ))}
                                             </div>

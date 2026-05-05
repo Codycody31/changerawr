@@ -8,7 +8,9 @@ import {
     Link as LinkIcon,
     Database,
     Activity,
-    ChevronRight
+    ChevronRight,
+    ArrowRight,
+    Sparkles,
 } from 'lucide-react'
 
 import {
@@ -19,6 +21,7 @@ import {
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { UpdateStatus } from '@/lib/types/easypanel'
 
 // Types for our dashboard data
 interface AdminDashboardData {
@@ -50,6 +53,16 @@ export default function AdminOverviewPage() {
             if (!response.ok) throw new Error('Failed to fetch dashboard data')
             return response.json()
         }
+    })
+
+    const { data: updateStatus } = useQuery<UpdateStatus>({
+        queryKey: ['update-status'],
+        queryFn: async () => {
+            const res = await fetch('/api/system/update-status', { cache: 'no-store' })
+            if (!res.ok) throw new Error('Not available')
+            return res.json()
+        },
+        retry: false,
     })
 
     // Quick Action items
@@ -93,6 +106,18 @@ export default function AdminOverviewPage() {
         <div className="container mx-auto p-4 space-y-6">
             <div className="space-y-4">
                 <h1 className="text-2xl font-bold">Dashboard</h1>
+
+                {/* Update banner */}
+                {updateStatus?.available && (
+                    <a
+                        href="/dashboard/admin/about"
+                        className="flex items-center gap-3 px-4 py-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+                    >
+                        <Sparkles className="h-4 w-4 shrink-0" />
+                        <span className="text-sm font-medium flex-1">A new version is available</span>
+                        <ArrowRight className="h-4 w-4 shrink-0" />
+                    </a>
+                )}
 
                 {/* Key Metrics Grid */}
                 <div className="grid gap-4 md:grid-cols-2">
