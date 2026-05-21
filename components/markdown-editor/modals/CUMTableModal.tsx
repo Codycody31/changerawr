@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -52,6 +52,41 @@ export const CUMTableModal: React.FC<CUMModalProps> = ({
     });
 
     const [showPreview, setShowPreview] = useState(true);
+    const [previewHtml, setPreviewHtml] = useState<string>('');
+
+    // Generate markdown table
+    const generateMarkdown = useCallback((): string => {
+        let markdown = '';
+
+        // Header row
+        markdown += '| ' + config.data[0].join(' | ') + ' |\n';
+
+        // Separator row
+        const separators = config.alignments.map(align => {
+            if (align === 'center') return ':-----:';
+            if (align === 'right') return '-----:';
+            return ':-----';
+        });
+        markdown += '| ' + separators.join(' | ') + ' |\n';
+
+        // Data rows
+        for (let i = 1; i < config.data.length; i++) {
+            markdown += '| ' + config.data[i].join(' | ') + ' |\n';
+        }
+
+        return markdown;
+    }, [config]);
+
+    // Render preview whenever config changes
+    useEffect(() => {
+        if (showPreview) {
+            const markdown = generateMarkdown();
+            renderMarkdown(markdown).then(setPreviewHtml).catch((err) => {
+                console.error('Failed to render table preview:', err);
+                setPreviewHtml('<p>Error rendering preview</p>');
+            });
+        }
+    }, [generateMarkdown, showPreview]);
 
     // Update table dimensions
     const updateDimensions = (newRows: number, newCols: number) => {
@@ -93,29 +128,6 @@ export const CUMTableModal: React.FC<CUMModalProps> = ({
         const newAlignments = [...config.alignments];
         newAlignments[col] = align;
         setConfig({ ...config, alignments: newAlignments });
-    };
-
-    // Generate markdown table
-    const generateMarkdown = (): string => {
-        let markdown = '';
-
-        // Header row
-        markdown += '| ' + config.data[0].join(' | ') + ' |\n';
-
-        // Separator row
-        const separators = config.alignments.map(align => {
-            if (align === 'center') return ':-----:';
-            if (align === 'right') return '-----:';
-            return ':-----';
-        });
-        markdown += '| ' + separators.join(' | ') + ' |\n';
-
-        // Data rows
-        for (let i = 1; i < config.data.length; i++) {
-            markdown += '| ' + config.data[i].join(' | ') + ' |\n';
-        }
-
-        return markdown;
     };
 
     const handleInsert = () => {
@@ -287,7 +299,7 @@ export const CUMTableModal: React.FC<CUMModalProps> = ({
                                         <div
                                             className="inline-block"
                                             dangerouslySetInnerHTML={{
-                                                __html: renderMarkdown(generateMarkdown()),
+                                                __html: previewHtml,
                                             }}
                                         />
                                     </div>

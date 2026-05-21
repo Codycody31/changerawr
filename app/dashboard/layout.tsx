@@ -17,6 +17,7 @@ import {
     LayoutGrid,
     Loader2,
     PanelRightClose,
+    Puzzle,
     ServerCog,
     Settings,
     Shield,
@@ -33,6 +34,7 @@ import {CommandPaletteProvider} from "@/components/providers/CommandPaletteProvi
 import {UpdateIndicatorBadge} from '@/components/UpdateIndicatorBadge'
 import {TelemetryPromptModal} from '@/components/telemetry/PromptModal'
 import {useTelemetry} from '@/hooks/useTelemetry'
+import {DevToolsConsole} from '@/components/extensions/DevToolsConsole'
 
 // Navigation Configuration
 const NAV_SECTIONS: NavSection[] = [
@@ -96,6 +98,12 @@ const NAV_SECTIONS: NavSection[] = [
                 href: "/dashboard/admin/api-keys",
                 label: "API Keys",
                 icon: Key,
+                requiredRole: ['ADMIN']
+            },
+            {
+                href: "/dashboard/admin/extensions",
+                label: "Extensions",
+                icon: Puzzle,
                 requiredRole: ['ADMIN']
             },
             {
@@ -309,6 +317,9 @@ export default function DashboardLayout({
                         </div>
                     </div>
                 </main>
+
+                {/* Dev Tools Console (only in development) */}
+                <DevToolsConsole />
 
                 {/* Telemetry Prompt Modal */}
                 {user && (

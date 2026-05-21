@@ -1,6 +1,6 @@
 'use client';
 
-import React, {useState} from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
@@ -49,8 +49,9 @@ export const CUMButtonModal: React.FC<CUMModalProps> = ({
     });
 
     const [showPreview, setShowPreview] = useState(true);
+    const [previewHtml, setPreviewHtml] = useState<string>('');
 
-    const handleInsert = () => {
+    const generateMarkdown = useCallback(() => {
         const options = [];
         if (config.style !== 'primary') options.push(config.style);
         if (config.size !== 'md') options.push(config.size);
@@ -58,9 +59,22 @@ export const CUMButtonModal: React.FC<CUMModalProps> = ({
         if (config.target !== '_blank') options.push('self');
 
         const optionsString = options.length > 0 ? `{${options.join(',')}}` : '';
-        const markdown = `[button:${config.text}](${config.url})${optionsString}`;
+        return `[button:${config.text}](${config.url})${optionsString}`;
+    }, [config]);
 
-        onInsert(markdown);
+    // Render preview whenever config changes
+    useEffect(() => {
+        if (showPreview) {
+            const markdown = generateMarkdown();
+            renderMarkdown(markdown).then(setPreviewHtml).catch((err) => {
+                console.error('Failed to render button preview:', err);
+                setPreviewHtml('<p>Error rendering preview</p>');
+            });
+        }
+    }, [generateMarkdown, showPreview]);
+
+    const handleInsert = () => {
+        onInsert(generateMarkdown());
         onClose();
     };
 
@@ -73,17 +87,6 @@ export const CUMButtonModal: React.FC<CUMModalProps> = ({
             target: '_blank',
             disabled: false,
         });
-    };
-
-    const generateMarkdown = () => {
-        const options = [];
-        if (config.style !== 'primary') options.push(config.style);
-        if (config.size !== 'md') options.push(config.size);
-        if (config.disabled) options.push('disabled');
-        if (config.target !== '_blank') options.push('self');
-
-        const optionsString = options.length > 0 ? `{${options.join(',')}}` : '';
-        return `[button:${config.text}](${config.url})${optionsString}`;
     };
 
     const getStyleColor = (style: string) => {
@@ -272,7 +275,7 @@ export const CUMButtonModal: React.FC<CUMModalProps> = ({
                                         <div
                                             className="flex justify-center"
                                             dangerouslySetInnerHTML={{
-                                                __html: renderMarkdown(generateMarkdown())
+                                                __html: previewHtml
                                             }}
                                         />
                                     </div>

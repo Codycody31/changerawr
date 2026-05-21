@@ -126,3 +126,14 @@ html[data-theme="light"] {
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground) / 0.5);
 }
+/* Markdown Image Styles */
+.markdown-image {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 0.5rem;
+}
+
+.markdown-figure {
+  display: inline-block;
+}

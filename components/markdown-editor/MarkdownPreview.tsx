@@ -26,10 +26,12 @@ export const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({
                     setHtml(rendered);
                 } catch (error) {
                     console.error('Streaming render failed:', error);
-                    setHtml(renderMarkdown(content));
+                    const fallbackHtml = await renderMarkdown(content);
+                    setHtml(fallbackHtml);
                 }
             } else {
-                setHtml(renderMarkdown(content));
+                const rendered = await renderMarkdown(content);
+                setHtml(rendered);
             }
         };
 

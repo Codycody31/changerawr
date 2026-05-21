@@ -75,3 +75,18 @@ null
 
 # user requests to add
 CLAUDE.md
+
+# extension system generated files
+/extensions/
+/chr-mrkd-docs/
+*.md.bak
+.restart-pending
+.serena/
+temp_migration.sql
+temp
+
+# documentation files
+CLAIM_VALIDATION_FEATURE.md
+EMAIL_DOMAIN_RESTRICTION_IMPLEMENTATION.md
+MULTI_FILE_SCHEMA_MIGRATION.md
+PRISMA_6.7_UPGRADE_SUMMARY.md

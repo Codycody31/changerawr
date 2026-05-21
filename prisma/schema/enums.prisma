@@ -85,3 +85,9 @@ enum BrowserRuleType {
   BLOCK
   ALLOW
 }
+
+enum ExtensionSourceType {
+  STORE      // From chr-extension-store
+  CUSTOM     // Custom/third-party
+  BUILTIN    // Built-in extensions
+}

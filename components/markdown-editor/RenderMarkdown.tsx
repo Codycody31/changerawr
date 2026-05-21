@@ -1,6 +1,6 @@
 'use client';
 
-import React, {useMemo} from 'react';
+import React, {useState, useEffect} from 'react';
 import {renderMarkdown} from '@/lib/services/core/markdown/useCustomExtensions';
 import {useDebounce} from "use-debounce";
 
@@ -16,10 +16,26 @@ export const RenderMarkdown: React.FC<RenderMarkdownProps> = ({
                                                               }) => {
     // Use our new markdown renderer
     const [debouncedContent] = useDebounce(children || '', 300);
+    const [renderedHtml, setRenderedHtml] = useState<string>('');
 
-    const renderedHtml = useMemo(() => {
+    useEffect(() => {
+        let cancelled = false;
+
         const content = debouncedContent || '';
-        return renderMarkdown(content);
+        renderMarkdown(content).then((html) => {
+            if (!cancelled) {
+                setRenderedHtml(html);
+            }
+        }).catch((error) => {
+            console.error('Failed to render markdown:', error);
+            if (!cancelled) {
+                setRenderedHtml('<p>Error rendering markdown</p>');
+            }
+        });
+
+        return () => {
+            cancelled = true;
+        };
     }, [debouncedContent]);
 
     return (

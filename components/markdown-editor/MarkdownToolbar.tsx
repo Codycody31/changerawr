@@ -35,6 +35,10 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+
 import {Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger,} from '@/components/ui/sheet';
 
 import {Tabs, TabsList, TabsTrigger,} from '@/components/ui/tabs';
@@ -42,6 +46,8 @@ import {Tabs, TabsList, TabsTrigger,} from '@/components/ui/tabs';
 import {Button} from '@/components/ui/button';
 import {Separator} from '@/components/ui/separator';
 import {ScrollArea} from '@/components/ui/scroll-area';
+import * as LucideIcons from 'lucide-react';
+import type { ExtensionWithMetadata } from '@/lib/services/core/markdown/extensions';
 
 export interface ToolbarAction {
     icon: React.ReactNode;
@@ -78,6 +84,11 @@ export interface MarkdownToolbarProps {
     enableAI?: boolean;
     className?: string;
 
+    // Extension integration
+    extensions?: ExtensionWithMetadata[];
+    textAreaRef?: React.RefObject<HTMLTextAreaElement | null>;
+    onToolbarInsert?: (before: string, after: string, placeholder?: string) => void;
+
     // Additional handlers for specific actions
     onBold?: () => void;
     onItalic?: () => void;
@@ -91,6 +102,255 @@ export interface MarkdownToolbarProps {
     onCode?: () => void;
     onImage?: () => void;
 }
+
+/**
+ * Helper to convert Lucide icon name string to React component
+ * Special case: 'ExtensionIcon' uses extension's icon.png from API
+ */
+function getLucideIcon(iconName: string, size: number = 16, extensionId?: string, invertIcon?: boolean): React.ReactNode {
+    // Special handling for ExtensionIcon
+    if (iconName === 'ExtensionIcon' && extensionId) {
+        return (
+            <img
+                src={`/api/extensions/${extensionId}/icon`}
+                alt="Extension icon"
+                className={`w-4 h-4 object-contain ${invertIcon ? 'dark:invert' : ''}`}
+            />
+        );
+    }
+
+    const Icon = (LucideIcons as any)[iconName];
+    if (!Icon) {
+        console.warn(`Lucide icon "${iconName}" not found, using default`);
+        return <LucideIcons.HelpCircle size={size} />;
+    }
+    return <Icon size={size} />;
+}
+
+interface ExtensionButton {
+    id: string;
+    group: string;
+    icon: React.ReactNode;
+    label: string;
+    customUI?: {
+        type: 'popover' | 'modal' | 'inline';
+        component: React.ComponentType<any>;
+    };
+    action?: {
+        before: string;
+        after: string;
+        placeholder?: string;
+    };
+    onClick?: () => void;
+    settings?: Record<string, any>;
+    extensionName?: string;
+    extensionId?: string;
+}
+
+/**
+ * Convert extension toolbar buttons with custom UI support
+ */
+function convertExtensionButtons(
+    extensions: ExtensionWithMetadata[],
+    textAreaRef?: React.RefObject<HTMLTextAreaElement | null>
+): Record<string, ExtensionButton[]> {
+    const groupedActions: Record<string, ExtensionButton[]> = {
+        formatting: [],
+        blocks: [],
+        media: [],
+        advanced: [],
+    };
+
+    for (const ext of extensions) {
+        const toolbar = ext.metadata.toolbar;
+        if (!toolbar) continue;
+
+        // Handle both array format and new object format
+        const buttons = Array.isArray(toolbar) ? toolbar : toolbar.buttons;
+        const customUIs = !Array.isArray(toolbar) && toolbar.customUI ? toolbar.customUI : [];
+
+        if (!buttons) continue;
+
+        for (const button of buttons) {
+            const group = button.group || 'advanced';
+
+            // Handle both React component icons and string icons
+            const iconComponent = typeof button.icon === 'string'
+                ? getLucideIcon(button.icon, 16, (ext.metadata as any).id, ext.metadata.invertIcon)
+                : React.createElement(button.icon, { size: 16 });
+
+            // Check if this button has custom UI
+            const customUI = customUIs.find((ui: any) => ui.buttonId === button.id);
+
+            const extensionButton: ExtensionButton = {
+                id: button.id,
+                group,
+                icon: iconComponent,
+                label: button.tooltip,
+                customUI: customUI ? {
+                    type: customUI.type,
+                    component: customUI.component,
+                } : undefined,
+                action: button.action,
+                onClick: button.onClick,
+                settings: (ext as any).settings || {}, // Pass actual extension settings values
+                extensionName: ext.metadata.name, // Pass extension name for fetching settings
+                extensionId: (ext.metadata as any).id, // Pass extension database ID for direct settings access
+            };
+
+            if (!groupedActions[group]) {
+                groupedActions[group] = [];
+            }
+            groupedActions[group].push(extensionButton);
+        }
+    }
+
+    return groupedActions;
+}
+
+// Extension Button Component with Custom UI support
+const ExtensionButtonComponent = memo(({
+    button,
+    textAreaRef,
+    onInsert,
+}: {
+    button: ExtensionButton;
+    textAreaRef?: React.RefObject<HTMLTextAreaElement | null>;
+    onInsert?: (before: string, after: string, placeholder?: string) => void;
+}) => {
+    const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+
+    const handleClick = () => {
+        // If there's custom UI, handle it
+        if (button.customUI) {
+            if (button.customUI.type === 'popover') {
+                setIsPopoverOpen(!isPopoverOpen);
+            } else if (button.customUI.type === 'modal') {
+                setIsModalOpen(true);
+            }
+            return;
+        }
+
+        // Otherwise handle simple action or onClick
+        if (button.onClick) {
+            button.onClick();
+        } else if (button.action && onInsert) {
+            // Use the callback to properly update React state
+            onInsert(button.action.before, button.action.after, button.action.placeholder);
+        }
+    };
+
+    const handlePopoverClose = () => {
+        setIsPopoverOpen(false);
+    };
+
+    const handleModalClose = () => {
+        setIsModalOpen(false);
+    };
+
+    // If this button has a modal, render it
+    if (button.customUI?.type === 'modal') {
+        const CustomComponent = button.customUI.component;
+
+        return (
+            <>
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={handleClick}
+                                className="h-8 w-8"
+                                type="button"
+                            >
+                                {button.icon}
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>{button.label}</TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+
+                <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+                    <DialogContent className="max-w-6xl h-[85vh]">
+                        <DialogHeader>
+                            <DialogTitle>{button.label}</DialogTitle>
+                        </DialogHeader>
+                        {textAreaRef?.current && (
+                            <CustomComponent
+                                textarea={textAreaRef.current}
+                                onClose={handleModalClose}
+                                settings={button.settings}
+                                extensionName={button.extensionName}
+                                extensionId={button.extensionId}
+                            />
+                        )}
+                    </DialogContent>
+                </Dialog>
+            </>
+        );
+    }
+
+    // If this button has a popover, render it
+    if (button.customUI?.type === 'popover') {
+        const CustomComponent = button.customUI.component;
+
+        return (
+            <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    type="button"
+                                >
+                                    {button.icon}
+                                </Button>
+                            </PopoverTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent>{button.label}</TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+                <PopoverContent className="w-64 p-0" align="start">
+                    {textAreaRef?.current && (
+                        <CustomComponent
+                            textarea={textAreaRef.current}
+                            onClose={handlePopoverClose}
+                            settings={button.settings}
+                            extensionName={button.extensionName}
+                            extensionId={button.extensionId}
+                        />
+                    )}
+                </PopoverContent>
+            </Popover>
+        );
+    }
+
+    // Regular button without custom UI
+    return (
+        <TooltipProvider>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleClick}
+                        className="h-8 w-8"
+                        type="button"
+                    >
+                        {button.icon}
+                    </Button>
+                </TooltipTrigger>
+                <TooltipContent>{button.label}</TooltipContent>
+            </Tooltip>
+        </TooltipProvider>
+    );
+});
+ExtensionButtonComponent.displayName = 'ExtensionButtonComponent';
 
 // Create stable action component to prevent re-renders
 const ToolbarAction = memo(({action, isMobile = false}: { action: ToolbarAction; isMobile?: boolean }) => {
@@ -201,6 +461,85 @@ const ToolbarDropdownComponent = memo(({dropdown, isMobile = false}: {
 });
 ToolbarDropdownComponent.displayName = 'ToolbarDropdownComponent';
 
+// Mobile Extension Button Component - renders extension buttons with custom UI support in mobile
+const MobileExtensionButton = memo(({
+    button,
+    textAreaRef,
+    onActionComplete,
+}: {
+    button: ExtensionButton;
+    textAreaRef?: React.RefObject<HTMLTextAreaElement | null>;
+    onActionComplete: () => void;
+}) => {
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+    const handleClick = () => {
+        // If there's custom UI, open dialog
+        if (button.customUI) {
+            setIsDialogOpen(true);
+            return;
+        }
+
+        // Otherwise handle simple action
+        if (button.onClick) {
+            button.onClick();
+        }
+        onActionComplete();
+    };
+
+    const handleDialogClose = () => {
+        setIsDialogOpen(false);
+        onActionComplete();
+    };
+
+    // If this button has custom UI, render it in a dialog
+    if (button.customUI?.type === 'popover') {
+        const CustomComponent = button.customUI.component;
+
+        return (
+            <>
+                <Button
+                    variant="ghost"
+                    onClick={handleClick}
+                    className="w-full justify-start h-14 text-left font-normal hover:bg-accent/50 transition-colors"
+                    type="button"
+                >
+                    <span className="mr-4 text-muted-foreground">{button.icon}</span>
+                    <span className="flex-1 text-foreground">{button.label}</span>
+                </Button>
+
+                {/* Render custom UI in a dialog for mobile */}
+                {isDialogOpen && textAreaRef?.current && (
+                    <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm">
+                        <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-md">
+                            <div className="bg-background border rounded-lg shadow-lg">
+                                <CustomComponent
+                                    textarea={textAreaRef.current}
+                                    onClose={handleDialogClose}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </>
+        );
+    }
+
+    // Regular button without custom UI
+    return (
+        <Button
+            variant="ghost"
+            onClick={handleClick}
+            className="w-full justify-start h-14 text-left font-normal hover:bg-accent/50 transition-colors"
+            type="button"
+        >
+            <span className="mr-4 text-muted-foreground">{button.icon}</span>
+            <span className="flex-1 text-foreground">{button.label}</span>
+        </Button>
+    );
+});
+MobileExtensionButton.displayName = 'MobileExtensionButton';
+
 // Mobile toolbar sheet component
 const MobileToolbarSheet = memo(({
                                      groups,
@@ -213,6 +552,8 @@ const MobileToolbarSheet = memo(({
                                      onExport,
                                      onAIAssist,
                                      enableAI,
+                                     extensions = [],
+                                     textAreaRef,
                                      onBold,
                                      onItalic,
                                      onLink,
@@ -226,6 +567,12 @@ const MobileToolbarSheet = memo(({
                                      onImage,
                                  }: Omit<MarkdownToolbarProps, 'className' | 'viewMode' | 'onViewModeChange'>) => {
     const [isOpen, setIsOpen] = useState(false);
+
+    // Convert extension toolbar buttons to actions
+    const extensionActions = React.useMemo(
+        () => convertExtensionButtons(extensions, textAreaRef),
+        [extensions, textAreaRef]
+    );
 
     const handleActionClick = (originalOnClick: () => void) => {
         return () => {
@@ -407,6 +754,94 @@ const MobileToolbarSheet = memo(({
                             </div>
                         ))}
 
+                        {/* Extension Formatting Actions */}
+                        {extensionActions.formatting.length > 0 && (
+                            <div className="space-y-3">
+                                <div className="flex items-center space-x-3 px-4">
+                                    <div className="p-2 bg-muted rounded-lg">
+                                        {extensionActions.formatting[0]?.icon}
+                                    </div>
+                                    <h3 className="font-semibold text-base text-foreground">Extensions - Formatting</h3>
+                                </div>
+                                <div className="space-y-1 px-2">
+                                    {extensionActions.formatting.map((button, idx) => (
+                                        <MobileExtensionButton
+                                            key={`ext-formatting-${idx}`}
+                                            button={button}
+                                            textAreaRef={textAreaRef}
+                                            onActionComplete={() => setIsOpen(false)}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Extension Block Actions */}
+                        {extensionActions.blocks.length > 0 && (
+                            <div className="space-y-3">
+                                <div className="flex items-center space-x-3 px-4">
+                                    <div className="p-2 bg-muted rounded-lg">
+                                        {extensionActions.blocks[0]?.icon}
+                                    </div>
+                                    <h3 className="font-semibold text-base text-foreground">Extensions - Blocks</h3>
+                                </div>
+                                <div className="space-y-1 px-2">
+                                    {extensionActions.blocks.map((button, idx) => (
+                                        <MobileExtensionButton
+                                            key={`ext-blocks-${idx}`}
+                                            button={button}
+                                            textAreaRef={textAreaRef}
+                                            onActionComplete={() => setIsOpen(false)}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Extension Media Actions */}
+                        {extensionActions.media.length > 0 && (
+                            <div className="space-y-3">
+                                <div className="flex items-center space-x-3 px-4">
+                                    <div className="p-2 bg-muted rounded-lg">
+                                        {extensionActions.media[0]?.icon}
+                                    </div>
+                                    <h3 className="font-semibold text-base text-foreground">Extensions - Media</h3>
+                                </div>
+                                <div className="space-y-1 px-2">
+                                    {extensionActions.media.map((button, idx) => (
+                                        <MobileExtensionButton
+                                            key={`ext-media-${idx}`}
+                                            button={button}
+                                            textAreaRef={textAreaRef}
+                                            onActionComplete={() => setIsOpen(false)}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Extension Advanced Actions */}
+                        {extensionActions.advanced.length > 0 && (
+                            <div className="space-y-3">
+                                <div className="flex items-center space-x-3 px-4">
+                                    <div className="p-2 bg-muted rounded-lg">
+                                        {extensionActions.advanced[0]?.icon}
+                                    </div>
+                                    <h3 className="font-semibold text-base text-foreground">Extensions - Advanced</h3>
+                                </div>
+                                <div className="space-y-1 px-2">
+                                    {extensionActions.advanced.map((button, idx) => (
+                                        <MobileExtensionButton
+                                            key={`ext-advanced-${idx}`}
+                                            button={button}
+                                            textAreaRef={textAreaRef}
+                                            onActionComplete={() => setIsOpen(false)}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         {/* Dropdowns */}
                         {allDropdowns.map((dropdown, dropdownIndex) => (
                             <ToolbarDropdownComponent
@@ -496,6 +931,9 @@ const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
                                                              onAIAssist,
                                                              enableAI = false,
                                                              className = '',
+                                                             extensions = [],
+                                                             textAreaRef,
+                                                             onToolbarInsert,
                                                              onBold,
                                                              onItalic,
                                                              onLink,
@@ -508,6 +946,11 @@ const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
                                                              onCode,
                                                              onImage,
                                                          }) => {
+    // Convert extension toolbar buttons to actions
+    const extensionActions = React.useMemo(
+        () => convertExtensionButtons(extensions, textAreaRef),
+        [extensions, textAreaRef]
+    );
     return (
         <div className={`flex items-center justify-between p-2 border-b bg-muted/10 ${className}`}>
             {/* Left side - Tools */}
@@ -524,6 +967,8 @@ const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
                     onExport={onExport}
                     onAIAssist={onAIAssist}
                     enableAI={enableAI}
+                    extensions={extensions}
+                    textAreaRef={textAreaRef}
                     onBold={onBold}
                     onItalic={onItalic}
                     onLink={onLink}
@@ -593,6 +1038,11 @@ const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
                             <Link size={16}/>
                         </Button>
 
+                        {/* Extension formatting actions */}
+                        {extensionActions.formatting.map((button, idx) => (
+                            <ExtensionButtonComponent key={`ext-formatting-${idx}`} button={button} textAreaRef={textAreaRef} onInsert={onToolbarInsert} />
+                        ))}
+
                         <Separator orientation="vertical" className="mx-1 h-6"/>
 
                         {/* Headings */}
@@ -655,6 +1105,11 @@ const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
                             <Quote size={16}/>
                         </Button>
 
+                        {/* Extension block actions */}
+                        {extensionActions.blocks.map((button, idx) => (
+                            <ExtensionButtonComponent key={`ext-blocks-${idx}`} button={button} textAreaRef={textAreaRef} onInsert={onToolbarInsert} />
+                        ))}
+
                         <Separator orientation="vertical" className="mx-1 h-6"/>
 
                         {/* Code and images */}
@@ -676,6 +1131,21 @@ const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
                         >
                             <Image size={16}/>
                         </Button>
+
+                        {/* Extension media actions */}
+                        {extensionActions.media.map((button, idx) => (
+                            <ExtensionButtonComponent key={`ext-media-${idx}`} button={button} textAreaRef={textAreaRef} onInsert={onToolbarInsert} />
+                        ))}
+
+                        {/* Extension advanced actions */}
+                        {extensionActions.advanced.length > 0 && (
+                            <>
+                                <Separator orientation="vertical" className="mx-1 h-6"/>
+                                {extensionActions.advanced.map((button, idx) => (
+                                    <ExtensionButtonComponent key={`ext-advanced-${idx}`} button={button} textAreaRef={textAreaRef} onInsert={onToolbarInsert} />
+                                ))}
+                            </>
+                        )}
 
                         {/* Dropdowns (including CUM Extensions) */}
                         {dropdowns.length > 0 && (

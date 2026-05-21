@@ -2,7 +2,7 @@
   "openapi": "3.0.0",
   "info": {
     "title": "Changerawr API Documentation",
-    "version": "1.0.5",
+    "version": "1.0.7",
     "description": "The official documentation for the Changerawr API. rawr",
     "contact": {
       "name": "API Support",
@@ -806,77 +806,6 @@
         "description": "Development-only endpoint to generate mock subscribers for testing"
       }
     },
-    "/api/setup/status": {
-      "get": {
-        "tags": [
-          "Setup"
-        ],
-        "summary": "",
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "isComplete": {
-                      "type": "boolean",
-                      "description": "Indicates whether the setup has been completed"
-                    },
-                    "setupState": {
-                      "type": "object",
-                      "properties": {
-                        "adminCreated": {
-                          "type": "boolean"
-                        },
-                        "systemConfigured": {
-                          "type": "boolean"
-                        },
-                        "oauthConfigured": {
-                          "type": "boolean"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "An unexpected error occurred while checking setup status",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [],
-        "description": "Checks if the initial setup has been completed and provides setup state information"
-      }
-    },
     "/api/setup/settings": {
       "get": {
         "tags": [
@@ -1031,6 +960,77 @@
             }
           }
         }
+      }
+    },
+    "/api/setup/status": {
+      "get": {
+        "tags": [
+          "Setup"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "isComplete": {
+                      "type": "boolean",
+                      "description": "Indicates whether the setup has been completed"
+                    },
+                    "setupState": {
+                      "type": "object",
+                      "properties": {
+                        "adminCreated": {
+                          "type": "boolean"
+                        },
+                        "systemConfigured": {
+                          "type": "boolean"
+                        },
+                        "oauthConfigured": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "An unexpected error occurred while checking setup status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "description": "Checks if the initial setup has been completed and provides setup state information"
       }
     },
     "/api/setup/oauth": {
@@ -2263,102 +2263,6 @@
         "description": "Creates a new pending changelog request"
       }
     },
-    "/api/analytics/track": {
-      "post": {
-        "tags": [
-          "Analytics"
-        ],
-        "summary": "",
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request body",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Failed to track view",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [],
-        "description": "Track a changelog view (cookieless, GDPR compliant)",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "description": ""
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/auth/validate": {
       "get": {
         "tags": [
@@ -2728,121 +2632,6 @@
         "description": "Updates the user's settings"
       }
     },
-    "/api/auth/register": {
-      "post": {
-        "tags": [
-          "Auth"
-        ],
-        "summary": "",
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid or expired invitation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "User already exists",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "An unexpected error occurred during registration",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [],
-        "description": "Registers a new user using an invitation token"
-      }
-    },
     "/api/auth/refresh": {
       "post": {
         "tags": [
@@ -2979,6 +2768,121 @@
         },
         "security": [],
         "description": "Refreshes the access token by providing a valid refresh token"
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or expired invitation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "User already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "An unexpected error occurred during registration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "description": "Registers a new user using an invitation token"
       }
     },
     "/api/auth/preview": {
@@ -3723,10 +3627,10 @@
         }
       }
     },
-    "/api/ai/settings": {
-      "get": {
+    "/api/analytics/track": {
+      "post": {
         "tags": [
-          "Ai"
+          "Analytics"
         ],
         "summary": "",
         "responses": {
@@ -3737,14 +3641,66 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "enableAIAssistant": {
+                    "success": {
                       "type": "boolean"
-                    },
-                    "aiApiKey": {
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
                       "type": "string"
                     },
-                    "aiDefaultModel": {
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to track view",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
                       "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
                     }
                   }
                 }
@@ -3753,7 +3709,18 @@
           }
         },
         "security": [],
-        "description": "Retrieve the system AI settings with encrypted API key for the editor"
+        "description": "Track a changelog view (cookieless, GDPR compliant)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": ""
+              }
+            }
+          }
+        }
       }
     },
     "/api/ai/decrypt": {
@@ -3792,6 +3759,39 @@
             }
           }
         }
+      }
+    },
+    "/api/ai/settings": {
+      "get": {
+        "tags": [
+          "Ai"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "enableAIAssistant": {
+                      "type": "boolean"
+                    },
+                    "aiApiKey": {
+                      "type": "string"
+                    },
+                    "aiDefaultModel": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "description": "Retrieve the system AI settings with encrypted API key for the editor"
       }
     },
     "/api/admin/users": {
@@ -7490,6 +7490,17 @@
         }
       }
     },
+    "/api/auth/saml/providers": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "",
+        "responses": {},
+        "security": [],
+        "description": "Returns enabled SAML providers for the login page"
+      }
+    },
     "/api/auth/reset-password/{token}": {
       "get": {
         "tags": [
@@ -9747,537 +9758,6 @@
         }
       }
     },
-    "/api/projects/{projectId}/integrations/github": {
-      "get": {
-        "tags": [
-          "Projects"
-        ],
-        "summary": "",
-        "responses": {},
-        "security": [],
-        "description": "Get GitHub integration settings for a project"
-      },
-      "post": {
-        "tags": [
-          "Projects"
-        ],
-        "summary": "",
-        "responses": {},
-        "security": [],
-        "description": "Create or update GitHub integration"
-      },
-      "delete": {
-        "tags": [
-          "Projects"
-        ],
-        "summary": "",
-        "responses": {},
-        "security": [],
-        "description": "Remove GitHub integration"
-      }
-    },
-    "/api/projects/{projectId}/integrations/email": {
-      "get": {
-        "tags": [
-          "Projects"
-        ],
-        "summary": "",
-        "responses": {},
-        "security": [],
-        "description": "Retrieves the email configuration for a project"
-      },
-      "post": {
-        "tags": [
-          "Projects"
-        ],
-        "summary": "",
-        "responses": {},
-        "security": [],
-        "description": "Creates or updates email configuration for a project"
-      }
-    },
-    "/api/projects/{projectId}/cli/unlink": {
-      "post": {
-        "tags": [
-          "Projects"
-        ],
-        "summary": "",
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "success": {
-                          "type": "boolean"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "unlinkedAt": {
-                          "type": "string"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request data",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Project not found or not linked",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "description": "Unlink a project from its Git repository",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "description": ""
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/projects/{projectId}/cli/sync": {
-      "post": {
-        "tags": [
-          "Projects"
-        ],
-        "summary": "",
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "success": {
-                          "type": "boolean"
-                        },
-                        "processed": {
-                          "type": "number"
-                        },
-                        "skipped": {
-                          "type": "number"
-                        },
-                        "errors": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        "warnings": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        "newSyncHash": {
-                          "type": "string"
-                        },
-                        "syncedAt": {
-                          "type": "string"
-                        },
-                        "nextSyncRecommendedAt": {
-                          "type": "string"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request data",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Project not found or not linked",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "description": "Sync commits from CLI to Changerawr project",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "description": ""
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/projects/{projectId}/cli/link": {
-      "post": {
-        "tags": [
-          "Projects"
-        ],
-        "summary": "",
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "success": {
-                          "type": "boolean"
-                        },
-                        "message": {
-                          "type": "string"
-                        },
-                        "linkId": {
-                          "type": "string"
-                        },
-                        "linkedAt": {
-                          "type": "string"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request data",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Project not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Project already linked",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "description": "Link a project to a Git repository for CLI integration",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "description": ""
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/projects/{projectId}/changelog/{entryId}": {
       "get": {
         "tags": [
@@ -11708,6 +11188,537 @@
         }
       }
     },
+    "/api/projects/{projectId}/integrations/github": {
+      "get": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "",
+        "responses": {},
+        "security": [],
+        "description": "Get GitHub integration settings for a project"
+      },
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "",
+        "responses": {},
+        "security": [],
+        "description": "Create or update GitHub integration"
+      },
+      "delete": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "",
+        "responses": {},
+        "security": [],
+        "description": "Remove GitHub integration"
+      }
+    },
+    "/api/projects/{projectId}/integrations/email": {
+      "get": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "",
+        "responses": {},
+        "security": [],
+        "description": "Retrieves the email configuration for a project"
+      },
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "",
+        "responses": {},
+        "security": [],
+        "description": "Creates or updates email configuration for a project"
+      }
+    },
+    "/api/projects/{projectId}/cli/unlink": {
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "unlinkedAt": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found or not linked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Unlink a project from its Git repository",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": ""
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/cli/sync": {
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean"
+                        },
+                        "processed": {
+                          "type": "number"
+                        },
+                        "skipped": {
+                          "type": "number"
+                        },
+                        "errors": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "warnings": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "newSyncHash": {
+                          "type": "string"
+                        },
+                        "syncedAt": {
+                          "type": "string"
+                        },
+                        "nextSyncRecommendedAt": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found or not linked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Sync commits from CLI to Changerawr project",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": ""
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/cli/link": {
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "linkId": {
+                          "type": "string"
+                        },
+                        "linkedAt": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Project already linked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Link a project to a Git repository for CLI integration",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": ""
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/projects/{projectId}/catch-up/ai-summary": {
       "post": {
         "tags": [
@@ -12042,6 +12053,39 @@
         "responses": {},
         "security": [],
         "description": "Fetches the changelog entries with FULL CONTENT for a given public project"
+      }
+    },
+    "/api/auth/saml/metadata/{providerName}": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "",
+        "responses": {},
+        "security": [],
+        "description": "Returns SP metadata XML for IdP registration"
+      }
+    },
+    "/api/auth/saml/callback/{providerName}": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "",
+        "responses": {},
+        "security": [],
+        "description": "ACS (Assertion Consumer Service) endpoint — handles SAMLResponse from IdP"
+      }
+    },
+    "/api/auth/saml/authorize/{providerName}": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "",
+        "responses": {},
+        "security": [],
+        "description": "Initiates SP-initiated SAML SSO by redirecting to the IdP"
       }
     },
     "/api/auth/oauth/callback/{providerName}": {
@@ -12761,212 +12805,6 @@
             }
           }
         }
-      }
-    },
-    "/api/projects/{projectId}/integrations/github/test": {
-      "post": {
-        "tags": [
-          "Projects"
-        ],
-        "summary": "",
-        "responses": {},
-        "security": [],
-        "description": "Test GitHub connection with provided credentials"
-      }
-    },
-    "/api/projects/{projectId}/integrations/github/tags": {
-      "get": {
-        "tags": [
-          "Projects"
-        ],
-        "summary": "",
-        "responses": {},
-        "security": [],
-        "description": "Get available tags and releases from GitHub repository"
-      }
-    },
-    "/api/projects/{projectId}/integrations/github/generate": {
-      "post": {
-        "tags": [
-          "Projects"
-        ],
-        "summary": "",
-        "responses": {},
-        "security": [],
-        "description": "Generate changelog content from GitHub commits with optional AI analysis"
-      }
-    },
-    "/api/projects/{projectId}/integrations/email/test": {
-      "post": {
-        "tags": [
-          "Projects"
-        ],
-        "summary": "",
-        "responses": {},
-        "security": [],
-        "description": "Tests SMTP connection and sends a test email"
-      }
-    },
-    "/api/projects/{projectId}/integrations/email/send": {
-      "post": {
-        "tags": [
-          "Projects"
-        ],
-        "summary": "",
-        "responses": {},
-        "security": [],
-        "description": "Sends a changelog email to specified recipients or subscribers"
-      }
-    },
-    "/api/projects/{projectId}/cli/sync/status": {
-      "get": {
-        "tags": [
-          "Projects"
-        ],
-        "summary": "",
-        "responses": {
-          "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "success": {
-                          "type": "boolean"
-                        },
-                        "lastSync": {
-                          "type": "object",
-                          "properties": {
-                            "syncHash": {
-                              "type": "string"
-                            },
-                            "syncedAt": {
-                              "type": "string"
-                            },
-                            "commitCount": {
-                              "type": "number"
-                            },
-                            "branch": {
-                              "type": "string"
-                            }
-                          }
-                        },
-                        "pendingCommits": {
-                          "type": "number"
-                        },
-                        "totalCommits": {
-                          "type": "number"
-                        },
-                        "repositoryInfo": {
-                          "type": "object",
-                          "properties": {
-                            "url": {
-                              "type": "string"
-                            },
-                            "branch": {
-                              "type": "string"
-                            },
-                            "lastCommitHash": {
-                              "type": "string"
-                            },
-                            "linkedAt": {
-                              "type": "string"
-                            }
-                          }
-                        },
-                        "syncSettings": {
-                          "type": "object",
-                          "properties": {
-                            "autoSync": {
-                              "type": "boolean"
-                            },
-                            "lastSyncInterval": {
-                              "type": "number"
-                            },
-                            "maxCommitsPerSync": {
-                              "type": "number"
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Project not found or not linked",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "path": {
-                            "type": "string"
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "description": "Get sync status for a project"
       }
     },
     "/api/projects/{projectId}/changelog/{entryId}/schedule": {
@@ -13762,6 +13600,212 @@
         }
       }
     },
+    "/api/projects/{projectId}/integrations/github/test": {
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "",
+        "responses": {},
+        "security": [],
+        "description": "Test GitHub connection with provided credentials"
+      }
+    },
+    "/api/projects/{projectId}/integrations/github/generate": {
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "",
+        "responses": {},
+        "security": [],
+        "description": "Generate changelog content from GitHub commits with optional AI analysis"
+      }
+    },
+    "/api/projects/{projectId}/integrations/github/tags": {
+      "get": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "",
+        "responses": {},
+        "security": [],
+        "description": "Get available tags and releases from GitHub repository"
+      }
+    },
+    "/api/projects/{projectId}/integrations/email/test": {
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "",
+        "responses": {},
+        "security": [],
+        "description": "Tests SMTP connection and sends a test email"
+      }
+    },
+    "/api/projects/{projectId}/integrations/email/send": {
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "",
+        "responses": {},
+        "security": [],
+        "description": "Sends a changelog email to specified recipients or subscribers"
+      }
+    },
+    "/api/projects/{projectId}/cli/sync/status": {
+      "get": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean"
+                        },
+                        "lastSync": {
+                          "type": "object",
+                          "properties": {
+                            "syncHash": {
+                              "type": "string"
+                            },
+                            "syncedAt": {
+                              "type": "string"
+                            },
+                            "commitCount": {
+                              "type": "number"
+                            },
+                            "branch": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "pendingCommits": {
+                          "type": "number"
+                        },
+                        "totalCommits": {
+                          "type": "number"
+                        },
+                        "repositoryInfo": {
+                          "type": "object",
+                          "properties": {
+                            "url": {
+                              "type": "string"
+                            },
+                            "branch": {
+                              "type": "string"
+                            },
+                            "lastCommitHash": {
+                              "type": "string"
+                            },
+                            "linkedAt": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "syncSettings": {
+                          "type": "object",
+                          "properties": {
+                            "autoSync": {
+                              "type": "boolean"
+                            },
+                            "lastSyncInterval": {
+                              "type": "number"
+                            },
+                            "maxCommitsPerSync": {
+                              "type": "number"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found or not linked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Get sync status for a project"
+      }
+    },
     "/api/projects/{projectId}/changelog/{entryId}/schedule/approval": {
       "post": {
         "tags": [
@@ -14018,12 +14062,12 @@
       "description": "Operations related to Changelog"
     },
     {
-      "name": "Analytics",
-      "description": "Operations related to Analytics"
-    },
-    {
       "name": "Auth",
       "description": "Operations related to Auth"
+    },
+    {
+      "name": "Analytics",
+      "description": "Operations related to Analytics"
     },
     {
       "name": "Ai",
@@ -14088,15 +14132,15 @@
       ]
     },
     {
-      "name": "Analytics",
-      "tags": [
-        "Analytics"
-      ]
-    },
-    {
       "name": "Auth",
       "tags": [
         "Auth"
+      ]
+    },
+    {
+      "name": "Analytics",
+      "tags": [
+        "Analytics"
       ]
     },
     {

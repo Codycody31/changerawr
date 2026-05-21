@@ -1,0 +1,57 @@
+// Editor Extensions Schema
+// Manages markdown editor extensions installation, versioning, and settings
+
+model ExtensionStore {
+  id          String   @id @default(cuid())
+  name        String   @unique // Store identifier (e.g., 'changerawr-official')
+  displayName String   // Human-readable name
+  url         String   // Base URL for the store
+  isBuiltIn   Boolean  @default(false)
+  isEnabled   Boolean  @default(true)
+  priority    Int      @default(0) // Higher priority stores checked first for updates
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Extensions from this store
+  extensions  EditorExtension[]
+
+  @@index([isEnabled])
+  @@map("extension_stores")
+}
+
+model EditorExtension {
+  id            String   @id @default(cuid())
+  name          String   @unique // Extension identifier (e.g., 'spoiler')
+  displayName   String   // Human-readable name
+  version       String   // Installed version
+  author        String?
+  description   String?
+  category      String?  // 'blocks', 'formatting', 'media', etc.
+  isBuiltIn     Boolean  @default(false)
+  isEnabled     Boolean  @default(true)
+  isLinked      Boolean  @default(false) // True if symlinked for local development
+
+  // Installation metadata
+  installedAt   DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Extension source
+  sourceType    ExtensionSourceType @default(STORE)
+  storeId       String?  // Which store it was installed from
+  store         ExtensionStore? @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  sourceUrl     String?  // Direct URL for custom/external extensions (or local path for linked)
+
+  // Version tracking
+  latestVersion String?  // Latest available version (for update checks)
+  updateAvailable Boolean @default(false)
+
+  // Settings
+  settings      Json?    // Extension-specific configuration
+
+  @@index([name])
+  @@index([isEnabled])
+  @@index([storeId])
+  @@index([isLinked])
+  @@map("editor_extensions")
+}

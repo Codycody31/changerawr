@@ -2,9 +2,11 @@ import {JobRunnerService} from '@/lib/services/jobs/job-runner.service';
 import {TelemetryService} from '@/lib/services/telemetry/service';
 import {ensureSystemUser} from '@/lib/services/core/system-user/service';
 import {setupDailySslRenewal} from '@/lib/custom-domains/ssl/setup-renewal-job';
+import {initializeExtensions} from '@/lib/services/extensions/initialization.service';
 import {spawn, exec} from 'child_process';
 import path from 'path';
 import {promisify} from 'util';
+import {promises as fs} from 'fs';
 
 const execAsync = promisify(exec);
 
@@ -44,6 +46,99 @@ function checkRequirements(): void {
 
     if (missing.length > 0) {
         throw createEnvironmentError(missing);
+    }
+}
+
+/**
+ * Validate extension directories and regenerate imports if needed
+ */
+async function validateExtensions(): Promise<void> {
+    try {
+        const extensionsDir = path.join(process.cwd(), 'extensions');
+        const loaderPath = path.join(process.cwd(), 'lib', 'services', 'core', 'markdown', 'extensionLoader.ts');
+
+        // Check if extensions directory exists
+        try {
+            await fs.access(extensionsDir);
+        } catch {
+            console.log('⚠️  Extensions directory not found, skipping validation');
+            return;
+        }
+
+        // Read the extension loader to check for imports
+        let loaderContent = '';
+        try {
+            loaderContent = await fs.readFile(loaderPath, 'utf-8');
+        } catch {
+            console.log('⚠️  Extension loader not found, skipping validation');
+            return;
+        }
+
+        // Extract extension paths from imports
+        const importRegex = /from ['"]@\/extensions\/([^\/]+)\/([^'"]+)['"]/g;
+        const imports = [...loaderContent.matchAll(importRegex)];
+
+        let hasInvalidImports = false;
+
+        // Validate each imported extension
+        const invalidExtensions: string[] = [];
+        for (const match of imports) {
+            const [, author, extensionName] = match;
+            const extPath = path.join(extensionsDir, author, extensionName);
+
+            try {
+                await fs.access(extPath);
+                // Check if index.ts exists
+                await fs.access(path.join(extPath, 'index.ts'));
+            } catch {
+                console.error(`✗ Extension directory missing or invalid: ${author}/${extensionName}`);
+                invalidExtensions.push(`${author}/${extensionName}`);
+                hasInvalidImports = true;
+
+                // Try to delete the broken extension directory
+                try {
+                    await fs.rm(extPath, { recursive: true, force: true });
+                    console.log(`✓ Removed broken extension directory: ${author}/${extensionName}`);
+                } catch (rmErr) {
+                    console.warn(`Could not remove ${author}/${extensionName}:`, rmErr);
+                }
+            }
+        }
+
+        // If we have invalid imports, regenerate
+        if (hasInvalidImports) {
+            console.log('⚠️  Invalid extension imports detected, attempting to regenerate...');
+            await regenerateExtensionImports();
+        } else {
+            console.log('✓ Extension validation passed');
+        }
+    } catch (error) {
+        console.error('Extension validation error:', error);
+        // Don't fail the app, just warn
+    }
+}
+
+/**
+ * Trigger extension import regeneration via the builder service
+ */
+async function regenerateExtensionImports(): Promise<void> {
+    try {
+        console.log('Calling extension builder service to regenerate imports...');
+
+        const response = await fetch('http://localhost:3010/extensions/generate-imports', {
+            method: 'POST',
+            signal: AbortSignal.timeout(15000),
+        });
+
+        if (response.ok) {
+            console.log('✓ Extension imports regenerated successfully');
+            console.log('⚠️  Please restart the application for changes to take effect');
+        } else {
+            console.error('✗ Failed to regenerate extensions:', response.status);
+        }
+    } catch (error: any) {
+        console.error('✗ Error regenerating extensions:', error.message);
+        console.log('💡 You may need to run: npm run extensions:generate');
     }
 }
 
@@ -107,7 +202,13 @@ export async function startBackgroundServices(): Promise<void> {
             console.log('✓ Environment validation passed');
         }
 
+        // Validate extensions before initializing
+        await validateExtensions();
+
         await ensureSystemUser();
+
+        // Initialize markdown extensions
+        await initializeExtensions();
 
         await TelemetryService.initialize();
         console.log('✓ Telemetry service initialized');

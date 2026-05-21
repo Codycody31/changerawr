@@ -74,8 +74,48 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
     const [wordCount, setWordCount] = useState(0);
     const [charCount, setCharCount] = useState(0);
     const [isSaved, setIsSaved] = useState(true);
+    const [lastSavedTime, setLastSavedTime] = useState<Date | null>(null);
+    const [extensions, setExtensions] = useState<any[]>([]);
 
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+    // Load extensions for toolbar with database IDs
+    useEffect(() => {
+        const loadExtensions = async () => {
+            try {
+                const { getAvailableExtensions } = await import('@/lib/services/core/markdown/extensionLoader');
+                const allExtensions = await getAvailableExtensions();
+
+                // Fetch database IDs for installed extensions
+                const response = await fetch('/api/extensions/list');
+                if (response.ok) {
+                    const dbExtensions = await response.json();
+
+                    // Merge database IDs into extension metadata
+                    const extensionsWithIds = allExtensions.map(ext => {
+                        const dbExt = dbExtensions.find((db: any) => db.name === ext.metadata.name);
+                        if (dbExt) {
+                            return {
+                                ...ext,
+                                metadata: {
+                                    ...ext.metadata,
+                                    id: dbExt.id // Add database ID
+                                }
+                            };
+                        }
+                        return ext;
+                    });
+
+                    setExtensions(extensionsWithIds);
+                } else {
+                    setExtensions(allExtensions);
+                }
+            } catch (error) {
+                console.error('[MarkdownEditor] Failed to load extensions:', error);
+            }
+        };
+        loadExtensions();
+    }, []);
 
     // AI integration - ALWAYS call the hook
     const ai = useAIAssistant({apiKey: aiApiKey});
@@ -106,6 +146,58 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
             textareaRef.current.focus();
         }
     }, [autoFocus]);
+
+    // Listen for extensions that modify textarea directly
+    // Extensions modify textarea.value and dispatch input/change events
+    // We need to catch these and update our React state
+    useEffect(() => {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+
+        let isProcessing = false;
+
+        const handleExternalInput = (e: Event) => {
+            // Prevent double-processing
+            if (isProcessing) return;
+
+            const newValue = (e.target as HTMLTextAreaElement).value;
+
+            // Only update if the value actually changed from our state
+            if (newValue !== content) {
+                isProcessing = true;
+
+                // Update React state
+                setContent(newValue);
+                setIsSaved(false);
+                onChange?.(newValue);
+
+                // Reset flag after React has processed
+                setTimeout(() => {
+                    isProcessing = false;
+                }, 0);
+            }
+        };
+
+        // Use capture phase to intercept before React's onChange
+        textarea.addEventListener('input', handleExternalInput, true);
+        textarea.addEventListener('change', handleExternalInput, true);
+
+        return () => {
+            textarea.removeEventListener('input', handleExternalInput, true);
+            textarea.removeEventListener('change', handleExternalInput, true);
+        };
+    }, [content, onChange]);
+
+    // Autosave: Save after user stops typing (1 second debounce)
+    const [debouncedContentForSave] = useDebounce(content, 1000);
+    useEffect(() => {
+        // Only trigger if content has changed and is not already saved
+        if (!isSaved && debouncedContentForSave === content) {
+            onChange?.(content);
+            setIsSaved(true);
+            setLastSavedTime(new Date());
+        }
+    }, [debouncedContentForSave, content, isSaved, onChange]);
 
     // Debounced content for preview rendering (300ms delay)
     const [debouncedContent] = useDebounce(content, 300);
@@ -224,6 +316,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
     const handleSave = useCallback(() => {
         onSave?.(content);
         setIsSaved(true);
+        setLastSavedTime(new Date());
     }, [content, onSave]);
 
     // Export handler
@@ -374,10 +467,26 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
         enableAI, ai
     ]);
 
-    // Render markdown (engine has built-in LRU caching, so no manual memoization needed)
-    // Still using useMemo for React optimization to prevent re-renders
-    const renderedHtml = useMemo(() => {
-        return renderMarkdown(debouncedContent);
+    // Render markdown (async to load all installed extensions)
+    const [renderedHtml, setRenderedHtml] = useState<string>('');
+
+    useEffect(() => {
+        let cancelled = false;
+
+        renderMarkdown(debouncedContent).then((html) => {
+            if (!cancelled) {
+                setRenderedHtml(html);
+            }
+        }).catch((error) => {
+            console.error('Failed to render markdown:', error);
+            if (!cancelled) {
+                setRenderedHtml('<p>Error rendering markdown</p>');
+            }
+        });
+
+        return () => {
+            cancelled = true;
+        };
     }, [debouncedContent]);
 
     // Create clean toolbar structure
@@ -511,6 +620,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
                 onViewModeChange={(mode: 'edit' | 'preview' | 'split') => setView(mode)}
                 onAIAssist={enableAI && ai ? () => ai.openAssistant?.(AICompletionType.COMPLETE) : undefined}
                 enableAI={enableAI}
+                extensions={extensions}
+                textAreaRef={textareaRef}
                 onBold={handleBold}
                 onItalic={handleItalic}
                 onLink={handleLink}
@@ -567,10 +678,15 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
                             {charCount}/{maxLength}
                         </Badge>
                     )}
-                    {!isSaved && <Badge variant="outline">Unsaved</Badge>}
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
+                    {lastSavedTime && (
+                        <span className="text-muted-foreground/70">
+                            Saved {lastSavedTime.toLocaleTimeString()}
+                        </span>
+                    )}
+                    {!isSaved && <Badge variant="outline" className="text-xs">Unsaved</Badge>}
                     {enableCUM && (
                         <Badge variant="outline" className="text-xs">
                             CUM Enabled

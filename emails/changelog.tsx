@@ -12,7 +12,7 @@ import {
     Hr,
     Link
 } from '@react-email/components';
-import { renderMarkdown } from '@/lib/services/core/markdown/useCustomExtensions';
+import { renderMarkdownSync } from '@/lib/services/core/markdown/useCustomExtensions';
 
 /**
  * Sanitizes HTML to fix malformed tags (unclosed li, p, etc.)
@@ -189,7 +189,7 @@ export const ChangelogEmail: React.FC<ChangelogEmailProps> = ({
                                             margin: '10px 0',
                                         }}
                                         dangerouslySetInnerHTML={{
-                                            __html: sanitizeHtml(renderMarkdown(entry.content))
+                                            __html: sanitizeHtml(renderMarkdownSync(entry.content))
                                         }}
                                     />
 

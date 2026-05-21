@@ -11,6 +11,7 @@ import {
     ChevronRight,
     ArrowRight,
     Sparkles,
+    Puzzle,
 } from 'lucide-react'
 
 import {
@@ -72,6 +73,12 @@ export default function AdminOverviewPage() {
             icon: Users,
             href: '/dashboard/admin/users',
             description: 'Add or modify user accounts'
+        },
+        {
+            title: 'Extensions',
+            icon: Puzzle,
+            href: '/dashboard/admin/extensions',
+            description: 'Manage markdown extensions'
         },
         {
             title: 'Audit Logs',

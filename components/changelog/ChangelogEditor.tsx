@@ -1154,47 +1154,6 @@ Generated: ${new Date().toISOString()}
                 {!editorState.content.trim() && status.lastSaveError && (
                     <p className="text-sm text-red-600 -mt-4">Content is required</p>
                 )}
-
-                {/* Save Status Footer */}
-                <AnimatePresence>
-                    {(status.lastSavedTime || status.isSaving) && (
-                        <motion.div
-                            initial={{opacity: 0}}
-                            animate={{opacity: 1}}
-                            exit={{opacity: 0}}
-                            className="flex items-center justify-between p-4 bg-muted/30 rounded-lg border"
-                        >
-                            <div className="flex items-center space-x-3">
-                                {status.isSaving ? (
-                                    <>
-                                        <Loader2 className="h-4 w-4 animate-spin text-blue-600"/>
-                                        <span className="text-sm text-muted-foreground">
-                                            {status.isAutoSaving ? 'Auto-saving...' : 'Saving...'}
-                                        </span>
-                                    </>
-                                ) : status.lastSavedTime ? (
-                                    <>
-                                        <div className="h-2 w-2 bg-green-500 rounded-full"/>
-                                        <span className="text-sm text-muted-foreground">
-                                            Last saved {status.lastSavedTime.toLocaleTimeString()}
-                                        </span>
-                                    </>
-                                ) : null}
-                            </div>
-
-                            {editorState.hasUnsavedChanges && !status.isSaving && (
-                                <Button
-                                    onClick={handleManualSave}
-                                    size="sm"
-                                    disabled={editorState.hasVersionConflict || !editorState.title.trim() || !editorState.content.trim()}
-                                >
-                                    <Save className="h-3 w-3 mr-2"/>
-                                    Save Now
-                                </Button>
-                            )}
-                        </motion.div>
-                    )}
-                </AnimatePresence>
             </div>
         </div>
     );
