@@ -24,7 +24,7 @@ const engineCache = new Map<string, ChangerawrMarkdown>();
  * Get or create the singleton markdown engine with all custom extensions
  * Now loads both built-in AND installed extensions automatically
  */
-async function getMarkdownEngineAsync(): Promise<ChangerawrMarkdown> {
+export async function getMarkdownEngineAsync(): Promise<ChangerawrMarkdown> {
   // Always recreate if not fully initialized to avoid partial registration
   if (!engineInstanceInitialized) {
     // Create minimal engine with no default extensions

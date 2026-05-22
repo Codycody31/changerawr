@@ -17,7 +17,8 @@ import {
     Heading2,
     Heading3,
     Image,
-    Zap
+    Zap,
+    Loader2
 } from 'lucide-react';
 
 // Import existing components
@@ -76,6 +77,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
     const [isSaved, setIsSaved] = useState(true);
     const [lastSavedTime, setLastSavedTime] = useState<Date | null>(null);
     const [extensions, setExtensions] = useState<any[]>([]);
+    const [extensionsLoaded, setExtensionsLoaded] = useState(false);
 
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -83,6 +85,11 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
     useEffect(() => {
         const loadExtensions = async () => {
             try {
+                // First, initialize the markdown engine with extensions
+                const { getMarkdownEngineAsync } = await import('@/lib/services/core/markdown/useCustomExtensions');
+                await getMarkdownEngineAsync(); // Ensure engine is initialized with all extensions
+
+                // Then load extension metadata for toolbar
                 const { getAvailableExtensions } = await import('@/lib/services/core/markdown/extensionLoader');
                 const allExtensions = await getAvailableExtensions();
 
@@ -112,6 +119,9 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
                 }
             } catch (error) {
                 console.error('[MarkdownEditor] Failed to load extensions:', error);
+            } finally {
+                // Mark extensions as loaded (success or failure)
+                setExtensionsLoaded(true);
             }
         };
         loadExtensions();
@@ -602,6 +612,20 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
                 },
             ],
         });
+    }
+
+    // Show loading state while extensions are being initialized
+    if (!extensionsLoaded) {
+        return (
+            <div className={`flex flex-col border rounded-md shadow-sm bg-background ${className}`} style={{height}}>
+                <div className="flex items-center justify-center h-full">
+                    <div className="flex flex-col items-center space-y-4">
+                        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                        <p className="text-muted-foreground">Loading editor...</p>
+                    </div>
+                </div>
+            </div>
+        );
     }
 
     return (

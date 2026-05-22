@@ -2,7 +2,61 @@
 
 Extension metadata defines how your extension appears and behaves in the Changerawr system.
 
-## Metadata Structure
+## Two Ways to Define Metadata
+
+### 1. TypeScript Metadata (index.ts)
+
+Export metadata in your extension's `index.ts` file:
+
+```typescript
+import type { ExtensionMetadata } from '@/lib/services/extensions/sdk';
+
+export const metadata: ExtensionMetadata = {
+  name: 'my-extension',
+  displayName: 'My Extension',
+  version: '1.0.0',
+  author: 'Your Name',
+  description: 'A custom markdown extension',
+  category: 'formatting',
+  icon: 'Highlighter',
+};
+```
+
+### 2. JSON Metadata (extension.json)
+
+Create an `extension.json` file in your extension directory for packaging and distribution:
+
+```json
+{
+  "name": "my-extension",
+  "displayName": "My Extension",
+  "version": "1.0.0",
+  "author": "Your Name",
+  "description": "A custom markdown extension",
+  "category": "formatting",
+  "icon": "Highlighter",
+  "files": {
+    "required": [
+      "index.ts",
+      "extension.json"
+    ],
+    "optional": [
+      "README.md",
+      "CHANGELOG.md",
+      "icon.png"
+    ],
+    "directories": [
+      "components"
+    ]
+  }
+}
+```
+
+**When to use each**:
+- **TypeScript metadata**: Required for all extensions - defines runtime behavior
+- **JSON metadata**: Optional but recommended for distribution - enables validation and packaging
+
+## Metadata Fields
 
 ```typescript
 export const metadata = {
@@ -75,14 +129,16 @@ description: 'Add customizable highlight colors to your markdown text'
 ```
 
 ### category
-**Type**: `string`
+**Type**: `'formatting' | 'blocks' | 'media' | 'integrations' | 'utilities' | 'other'`
 **Description**: Extension category for organization
 
-**Common categories**:
+**Available categories**:
 - `'formatting'` - Text formatting (bold, italic, highlight, etc.)
-- `'blocks'` - Block elements (callouts, cards, tabs, etc.)
-- `'media'` - Media elements (videos, embeds, galleries, etc.)
-- `'advanced'` - Advanced features (diagrams, math, code, etc.)
+- `'blocks'` - Block elements (callouts, spoilers, cards, etc.)
+- `'media'` - Media elements (images, videos, embeds, etc.)
+- `'integrations'` - External service integrations (APIs, embeds, etc.)
+- `'utilities'` - Utility features (tables, diagrams, etc.)
+- `'other'` - Miscellaneous extensions
 
 ```typescript
 category: 'formatting'
@@ -286,6 +342,124 @@ export const metadata = {
 };
 ```
 
+## extension.json File Format
+
+The `extension.json` file is a JSON manifest that describes your extension's metadata and file structure. This file is used for:
+- Extension validation and packaging
+- Distribution through the extension store
+- Dependency checking during installation
+
+### Basic Structure
+
+```json
+{
+  "name": "my-extension",
+  "displayName": "My Extension",
+  "version": "1.0.0",
+  "author": "Your Name",
+  "description": "Extension description",
+  "category": "formatting",
+  "icon": "Highlighter",
+  "files": {
+    "required": [
+      "index.ts",
+      "extension.json"
+    ],
+    "optional": [
+      "README.md",
+      "CHANGELOG.md",
+      "icon.png",
+      "toolbar.tsx"
+    ],
+    "directories": [
+      "components"
+    ]
+  }
+}
+```
+
+### Files Configuration
+
+The `files` object defines which files and directories are part of your extension:
+
+#### required
+**Type**: `string[]`
+**Description**: Files that must be present for the extension to work
+
+Common required files:
+- `index.ts` - Main extension code (always required)
+- `extension.json` - Extension manifest (always required)
+- `toolbar.tsx` - Toolbar configuration (if extension has toolbar buttons)
+
+```json
+"required": [
+  "index.ts",
+  "extension.json"
+]
+```
+
+#### optional
+**Type**: `string[]`
+**Description**: Files that enhance the extension but aren't required for functionality
+
+Common optional files:
+- `README.md` - Extension documentation
+- `CHANGELOG.md` - Version history
+- `icon.png` - Custom icon image
+- `toolbar.tsx` - Toolbar configuration (if not required)
+
+```json
+"optional": [
+  "README.md",
+  "CHANGELOG.md",
+  "icon.png"
+]
+```
+
+#### directories
+**Type**: `string[]`
+**Description**: Directories containing extension code (typically React components)
+
+Common directories:
+- `components` - Custom UI components
+- `utils` - Utility functions
+- `types` - TypeScript type definitions
+
+```json
+"directories": [
+  "components"
+]
+```
+
+### Complete extension.json Example
+
+```json
+{
+  "name": "highlight",
+  "displayName": "Text Highlighter",
+  "version": "1.2.7",
+  "author": "changerawr",
+  "description": "Highlight text with hex colors. Pick from 7 presets or choose any custom color.",
+  "category": "formatting",
+  "icon": "Highlighter",
+  "files": {
+    "required": [
+      "index.ts",
+      "toolbar.tsx",
+      "extension.json"
+    ],
+    "optional": [
+      "README.md",
+      "icon.png",
+      "CHANGELOG.md"
+    ],
+    "directories": [
+      "components"
+    ]
+  }
+}
+```
+
 ## Best Practices
 
 ### Naming
@@ -309,6 +483,12 @@ export const metadata = {
 ✅ Use Lucide icons when possible
 ✅ Choose icons that represent function
 ✅ Keep custom icons simple and clear
+
+### extension.json
+✅ Always include `extension.json` for distributed extensions
+✅ List all required files accurately
+✅ Include optional files for better user experience
+✅ Keep metadata in sync with TypeScript metadata
 
 ## Type Definitions
 

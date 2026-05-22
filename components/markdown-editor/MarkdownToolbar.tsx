@@ -48,6 +48,8 @@ import {Separator} from '@/components/ui/separator';
 import {ScrollArea} from '@/components/ui/scroll-area';
 import * as LucideIcons from 'lucide-react';
 import type { ExtensionWithMetadata } from '@/lib/services/core/markdown/extensions';
+import { ExtensionOverflowMenu } from '@/components/markdown-editor/ExtensionOverflowMenu';
+import { getToolbarManager } from '@/lib/services/toolbar/extensionToolbarManager';
 
 export interface ToolbarAction {
     icon: React.ReactNode;
@@ -946,11 +948,60 @@ const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
                                                              onCode,
                                                              onImage,
                                                          }) => {
-    // Convert extension toolbar buttons to actions
-    const extensionActions = React.useMemo(
-        () => convertExtensionButtons(extensions, textAreaRef),
-        [extensions, textAreaRef]
-    );
+    // State to force re-render when pin status changes
+    const [, setRefreshKey] = useState(0);
+
+    const toolbarManager = React.useMemo(() => getToolbarManager(), []);
+
+    // Convert extension toolbar buttons to actions and organize into inline/overflow
+    const { extensionActions, overflowActions } = React.useMemo(() => {
+        const allActions = convertExtensionButtons(extensions, textAreaRef);
+
+        // Organize each category
+        const organized = {
+            formatting: { inline: [] as ExtensionButton[], overflow: [] as ExtensionButton[] },
+            blocks: { inline: [] as ExtensionButton[], overflow: [] as ExtensionButton[] },
+            media: { inline: [] as ExtensionButton[], overflow: [] as ExtensionButton[] },
+            advanced: { inline: [] as ExtensionButton[], overflow: [] as ExtensionButton[] },
+        };
+
+        // Organize each group
+        Object.entries(allActions).forEach(([group, buttons]) => {
+            const result = toolbarManager.organizeExtensions(buttons);
+            organized[group as keyof typeof organized] = result;
+        });
+
+        return {
+            extensionActions: {
+                formatting: organized.formatting.inline,
+                blocks: organized.blocks.inline,
+                media: organized.media.inline,
+                advanced: organized.advanced.inline,
+            },
+            overflowActions: {
+                formatting: organized.formatting.overflow,
+                blocks: organized.blocks.overflow,
+                media: organized.media.overflow,
+                advanced: organized.advanced.overflow,
+            },
+        };
+    }, [extensions, textAreaRef, toolbarManager]);
+
+    // Flatten overflow actions for the overflow menu
+    const allOverflowButtons = React.useMemo(() => {
+        return [
+            ...overflowActions.formatting,
+            ...overflowActions.blocks,
+            ...overflowActions.media,
+            ...overflowActions.advanced,
+        ];
+    }, [overflowActions]);
+
+    // Handle pin change callback
+    const handlePinChange = React.useCallback(() => {
+        // Force component to re-render
+        setRefreshKey(prev => prev + 1);
+    }, []);
     return (
         <div className={`flex items-center justify-between p-2 border-b bg-muted/10 ${className}`}>
             {/* Left side - Tools */}
@@ -1045,37 +1096,6 @@ const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
 
                         <Separator orientation="vertical" className="mx-1 h-6"/>
 
-                        {/* Headings */}
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={onHeading1}
-                            className="h-8 w-8"
-                            title="Heading 1 (Ctrl+1)"
-                        >
-                            <Heading1 size={16}/>
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={onHeading2}
-                            className="h-8 w-8"
-                            title="Heading 2 (Ctrl+2)"
-                        >
-                            <Heading2 size={16}/>
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={onHeading3}
-                            className="h-8 w-8"
-                            title="Heading 3 (Ctrl+3)"
-                        >
-                            <Heading3 size={16}/>
-                        </Button>
-
-                        <Separator orientation="vertical" className="mx-1 h-6"/>
-
                         {/* Lists and quotes */}
                         <Button
                             variant="ghost"
@@ -1144,6 +1164,19 @@ const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
                                 {extensionActions.advanced.map((button, idx) => (
                                     <ExtensionButtonComponent key={`ext-advanced-${idx}`} button={button} textAreaRef={textAreaRef} onInsert={onToolbarInsert} />
                                 ))}
+                            </>
+                        )}
+
+                        {/* Extension Overflow Menu - Shows when there are more extensions than fit inline */}
+                        {allOverflowButtons.length > 0 && (
+                            <>
+                                <Separator orientation="vertical" className="mx-1 h-6"/>
+                                <ExtensionOverflowMenu
+                                    buttons={allOverflowButtons}
+                                    textAreaRef={textAreaRef}
+                                    onInsert={onToolbarInsert}
+                                    onPinChange={handlePinChange}
+                                />
                             </>
                         )}
 

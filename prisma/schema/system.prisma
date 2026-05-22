@@ -75,6 +75,11 @@ model SystemConfig {
   // IP Whitelisting for panel access
   panelIpWhitelistEnabled       Boolean        @default(false)
   panelIpWhitelist              String[]
+  // LanguageTool Spellchecker Configuration
+  languageToolEnabled           Boolean        @default(false) // Enable/disable LanguageTool spellchecker
+  languageToolApiUrl            String?        @default("https://api.languagetool.org/v2") // LanguageTool API endpoint
+  languageToolApiKey            String? // Optional API key for premium features
+  languageToolLanguage          String?        @default("en-US") // Default language for spellchecking
   createdAt                     DateTime       @default(now())
   updatedAt                     DateTime       @updatedAt
 }

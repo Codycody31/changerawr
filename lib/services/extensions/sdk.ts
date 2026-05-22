@@ -128,6 +128,12 @@ export interface ExtensionToolbar {
 
 /**
  * Parse rule for custom markdown syntax
+ *
+ * Priority guidelines:
+ * - 800+: HTML-like tags that must match before text escaping (e.g., <cr>text</cr>)
+ * - 500-799: Complex block patterns (e.g., spoiler blocks, tables)
+ * - 100-499: Inline formatting (e.g., highlight, inline code)
+ * - <100: Simple replacements
  */
 export interface ParseRule {
   name: string;
@@ -141,7 +147,7 @@ export interface ParseRule {
  * Render rule for custom markdown elements
  */
 export interface RenderRule {
-  name: string;
+  type: string;
   render: (token: MarkdownToken) => MarkdownElement | string;
 }
 
@@ -152,7 +158,7 @@ export interface MarkdownToken {
   type: string;
   content: string;
   raw: string;
-  data?: Record<string, any>;
+  attributes?: Record<string, any>;
 }
 
 /**

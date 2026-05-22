@@ -27,6 +27,8 @@ const nextConfig: NextConfig = {
         optimizePackageImports: ['lucide-react', '@radix-ui/react-icons', '@heroicons/react'],
         // Turbo mode for faster builds
     },
+    // Transpile linked extension packages so they can use dependencies
+    transpilePackages: ['@/extensions'],
     // output: 'standalone', uses next-start, leave commented-out
 };
 
