@@ -76,10 +76,12 @@ model SystemConfig {
   panelIpWhitelistEnabled       Boolean        @default(false)
   panelIpWhitelist              String[]
   // LanguageTool Spellchecker Configuration
-  languageToolEnabled           Boolean        @default(false) // Enable/disable LanguageTool spellchecker
-  languageToolApiUrl            String?        @default("https://api.languagetool.org/v2") // LanguageTool API endpoint
-  languageToolApiKey            String? // Optional API key for premium features
-  languageToolLanguage          String?        @default("en-US") // Default language for spellchecking
+  languageToolEnabled              Boolean        @default(false) // Enable/disable LanguageTool spellchecker
+  languageToolApiUrl               String?        @default("https://api.languagetool.org/v2") // LanguageTool API endpoint
+  languageToolApiKey               String? // Optional API key for premium features
+  languageToolLanguage             String?        @default("en-US") // Default language for spellchecking
+  languageToolUsername             String? // Username for LanguageTool premium
+  languageToolAllowUserOverride    Boolean        @default(true) // Allow users to set custom URL/credentials
   createdAt                     DateTime       @default(now())
   updatedAt                     DateTime       @updatedAt
 }

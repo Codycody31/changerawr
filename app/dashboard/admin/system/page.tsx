@@ -72,6 +72,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog'
 import {SlackLogo} from "@/lib/services/slack/logo";
+import {LanguageToolLogo} from "@/lib/services/languagetool/logo";
 import {TIMEZONES, getTimezonesByRegion} from "@/lib/constants/timezones";
 
 function buildConfigSchema(sponsored: boolean) {
@@ -961,6 +962,29 @@ export default function SystemConfigPage() {
                                                 </div>
                                                 <Button asChild variant="outline" size="sm">
                                                     <Link href="/dashboard/admin/system/slack">
+                                                        Configure
+                                                    </Link>
+                                                </Button>
+                                            </motion.div>
+
+                                            <motion.div
+                                                variants={cardVariants}
+                                                initial="hidden"
+                                                animate="visible"
+                                                transition={{delay: 0.2}}
+                                                className="flex flex-row items-center justify-between rounded-lg border p-4"
+                                            >
+                                                <div className="flex gap-2">
+                                                    <LanguageToolLogo className="h-8 w-8 mt-0.5"/>
+                                                    <div className="space-y-1">
+                                                        <h3 className="text-base font-medium">LanguageTool Spellcheck</h3>
+                                                        <p className="text-sm text-muted-foreground">
+                                                            Configure LanguageTool API for spelling and grammar checking in the markdown editor.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <Button asChild variant="outline" size="sm">
+                                                    <Link href="/dashboard/admin/system/languagetool">
                                                         Configure
                                                     </Link>
                                                 </Button>

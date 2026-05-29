@@ -5,6 +5,7 @@
 import React, {memo, useState} from 'react';
 import {
     Bold,
+    CheckCircle,
     ChevronDown,
     Code,
     FileDown,
@@ -23,6 +24,7 @@ import {
     Save,
     Sparkles,
 } from 'lucide-react';
+import { LanguageToolLogo } from '@/lib/services/languagetool/logo';
 
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,} from '@/components/ui/tooltip';
 
@@ -84,6 +86,7 @@ export interface MarkdownToolbarProps {
     onViewModeChange?: (mode: 'edit' | 'preview' | 'split') => void;
     onAIAssist?: () => void;
     enableAI?: boolean;
+    onSpellcheck?: () => void;
     className?: string;
 
     // Extension integration
@@ -129,7 +132,7 @@ function getLucideIcon(iconName: string, size: number = 16, extensionId?: string
     return <Icon size={size} />;
 }
 
-interface ExtensionButton {
+export interface ExtensionButton {
     id: string;
     group: string;
     icon: React.ReactNode;
@@ -554,6 +557,7 @@ const MobileToolbarSheet = memo(({
                                      onExport,
                                      onAIAssist,
                                      enableAI,
+                                     onSpellcheck,
                                      extensions = [],
                                      textAreaRef,
                                      onBold,
@@ -881,6 +885,29 @@ const MobileToolbarSheet = memo(({
                             </div>
                         )}
 
+                        {/* Spellcheck */}
+                        {onSpellcheck && (
+                            <div className="space-y-3">
+                                <div className="flex items-center space-x-3 px-4">
+                                    <div className="p-2 bg-muted rounded-lg">
+                                        <LanguageToolLogo className="h-4 w-4"/>
+                                    </div>
+                                    <h3 className="font-semibold text-base text-foreground">Spellcheck</h3>
+                                </div>
+                                <div className="px-2">
+                                    <Button
+                                        variant="outline"
+                                        onClick={handleActionClick(onSpellcheck)}
+                                        className="w-full justify-start h-14 text-left font-normal hover:bg-accent/50 transition-colors"
+                                    >
+                                        <LanguageToolLogo className="h-4 w-4 mr-4 text-muted-foreground"/>
+                                        <span className="flex-1 text-foreground">Check Spelling & Grammar</span>
+                                        <span className="text-xs text-muted-foreground ml-2">Alt+S</span>
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Save & Export */}
                         {(onSave || onExport) && (
                             <div className="space-y-3">
@@ -932,6 +959,7 @@ const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
                                                              onViewModeChange,
                                                              onAIAssist,
                                                              enableAI = false,
+                                                             onSpellcheck,
                                                              className = '',
                                                              extensions = [],
                                                              textAreaRef,
@@ -1018,6 +1046,7 @@ const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
                     onExport={onExport}
                     onAIAssist={onAIAssist}
                     enableAI={enableAI}
+                    onSpellcheck={onSpellcheck}
                     extensions={extensions}
                     textAreaRef={textAreaRef}
                     onBold={onBold}
@@ -1237,6 +1266,23 @@ const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
                         >
                             <Sparkles size={15}/>
                             <span>AI</span>
+                        </Button>
+                        <Separator orientation="vertical" className="mx-1 h-6"/>
+                    </>
+                )}
+
+                {/* Spellcheck button */}
+                {onSpellcheck && (
+                    <>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={onSpellcheck}
+                            className="h-8 gap-1"
+                            title="Spellcheck (Alt+S)"
+                        >
+                            <LanguageToolLogo className="h-4 w-4"/>
+                            <span>Spellcheck</span>
                         </Button>
                         <Separator orientation="vertical" className="mx-1 h-6"/>
                     </>

@@ -79,14 +79,21 @@ model OAuthConnection {
 }
 
 model Settings {
-  id                  String   @id @default(cuid())
-  userId              String   @unique
-  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  theme               String   @default("light")
-  enableNotifications Boolean  @default(true)
-  timezone            String? // User-preferred IANA timezone override (null = use system default)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id                       String   @id @default(cuid())
+  userId                   String   @unique
+  user                     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  theme                    String   @default("light")
+  enableNotifications      Boolean  @default(true)
+  timezone                 String? // User-preferred IANA timezone override (null = use system default)
+  // LanguageTool User Preferences
+  languageToolLanguage     String? // User's preferred language (null = use system default)
+  languageToolLevel        String?  @default("default") // Checking level: "default" or "picky"
+  languageToolMotherTongue String? // Mother tongue language code (e.g., "en-US")
+  languageToolApiUrl       String? // Custom API URL (if admin allows override)
+  languageToolUsername     String? // Custom username (if admin allows override)
+  languageToolApiKey       String? // Custom API key (if admin allows override)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
 
   @@index([userId])
 }

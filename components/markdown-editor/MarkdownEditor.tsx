@@ -18,7 +18,8 @@ import {
     Heading3,
     Image,
     Zap,
-    Loader2
+    Loader2,
+    CheckCircle
 } from 'lucide-react';
 
 // Import existing components
@@ -31,6 +32,10 @@ import {renderMarkdown} from '@/lib/services/core/markdown/useCustomExtensions';
 import useAIAssistant from '@/hooks/useAIAssistant';
 import {AICompletionType} from '@/lib/utils/ai/types';
 import AIAssistantPanel from '@/components/markdown-editor/ai/AIAssistantPanel';
+
+// Import Spellcheck integration
+import {useSpellcheck} from '@/hooks/use-spellcheck';
+import {SpellcheckPanel} from '@/components/markdown-editor/SpellcheckPanel';
 
 // Import CUM modals
 import {CUMButtonModal, CUMAlertModal, CUMEmbedModal, CUMTableModal} from '@/components/markdown-editor/modals';
@@ -129,6 +134,29 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 
     // AI integration - ALWAYS call the hook
     const ai = useAIAssistant({apiKey: aiApiKey});
+
+    // Spellcheck integration
+    const spellcheck = useSpellcheck();
+    const [showSpellcheck, setShowSpellcheck] = useState(false);
+    const [isSpellcheckEnabled, setIsSpellcheckEnabled] = useState(false);
+    const [spellcheckLevel, setSpellcheckLevel] = useState<'default' | 'picky'>('default');
+
+    // Check if spellcheck is enabled in system settings
+    useEffect(() => {
+        const checkSpellcheckStatus = async () => {
+            try {
+                const response = await fetch('/api/languagetool/check');
+                if (response.ok) {
+                    const data = await response.json();
+                    setIsSpellcheckEnabled(data.enabled);
+                }
+            } catch (error) {
+                console.error('[MarkdownEditor] Failed to check spellcheck status:', error);
+                setIsSpellcheckEnabled(false);
+            }
+        };
+        checkSpellcheckStatus();
+    }, []);
 
     // CUM modals state
     const {modals, openModal, closeModal} = useCUMModals();
@@ -412,6 +440,44 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
         });
     }, [enableAI, ai, getContextForAI]);
 
+    // Spellcheck helper functions
+    const handleSpellcheck = useCallback(async () => {
+        if (!content.trim()) return;
+
+        // Open modal immediately
+        setShowSpellcheck(true);
+
+        try {
+            // Then check text in background with current level
+            await spellcheck.checkText(content, undefined, spellcheckLevel);
+        } catch (error) {
+            console.error('Error checking text:', error);
+        }
+    }, [content, spellcheck, spellcheckLevel]);
+
+    const handleApplySpellcheckSuggestion = useCallback((error: any, suggestion: string) => {
+        const textarea = textareaRef.current;
+        if (!textarea || !error.context) return;
+
+        // Find the error text in content
+        const errorText = error.context.text.substring(
+            error.context.offset,
+            error.context.offset + error.context.length
+        );
+
+        // Replace the first occurrence of the error with the suggestion
+        const newContent = content.replace(errorText, suggestion);
+        handleContentChange(newContent);
+
+        // Remove this specific error from the list (without re-polling API)
+        spellcheck.removeError(error);
+    }, [content, handleContentChange, spellcheck]);
+
+    const handleCloseSpellcheck = useCallback(() => {
+        setShowSpellcheck(false);
+        spellcheck.clearErrors();
+    }, [spellcheck]);
+
     // Keyboard shortcuts
     const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         // Save shortcut: Ctrl+S
@@ -470,11 +536,17 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
             e.preventDefault();
             ai.openAssistant(AICompletionType.COMPLETE);
         }
+
+        // Spellcheck: Alt+S (only if enabled)
+        if (e.altKey && e.key === 's' && isSpellcheckEnabled) {
+            e.preventDefault();
+            handleSpellcheck();
+        }
     }, [
         handleSave, handleUndo, handleRedo,
         handleBold, handleItalic, handleLink,
         handleHeading1, handleHeading2, handleHeading3,
-        enableAI, ai
+        enableAI, ai, handleSpellcheck, isSpellcheckEnabled
     ]);
 
     // Render markdown (async to load all installed extensions)
@@ -644,6 +716,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
                 onViewModeChange={(mode: 'edit' | 'preview' | 'split') => setView(mode)}
                 onAIAssist={enableAI && ai ? () => ai.openAssistant?.(AICompletionType.COMPLETE) : undefined}
                 enableAI={enableAI}
+                onSpellcheck={isSpellcheckEnabled ? handleSpellcheck : undefined}
                 extensions={extensions}
                 textAreaRef={textareaRef}
                 onBold={handleBold}
@@ -768,6 +841,23 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
                     onSetApiKey={ai.setApiKey}
                 />
             )}
+
+            {/* Spellcheck Panel */}
+            <SpellcheckPanel
+                isVisible={showSpellcheck}
+                errors={spellcheck.errors}
+                isLoading={spellcheck.isChecking}
+                onClose={handleCloseSpellcheck}
+                onApplySuggestion={handleApplySpellcheckSuggestion}
+                level={spellcheckLevel}
+                onLevelChange={(newLevel) => {
+                    setSpellcheckLevel(newLevel);
+                    // Re-check with new level if there's content
+                    if (content.trim()) {
+                        spellcheck.checkText(content, undefined, newLevel);
+                    }
+                }}
+            />
         </div>
     );
 };

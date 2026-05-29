@@ -37,6 +37,7 @@
   ],
   "exclude": [
     "node_modules",
-    "chr-mrkd-docs"
+    "chr-mrkd-docs",
+    "extensions"
   ]
 }
