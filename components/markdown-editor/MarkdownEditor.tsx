@@ -145,7 +145,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
     useEffect(() => {
         const checkSpellcheckStatus = async () => {
             try {
-                const response = await fetch('/api/languagetool/check');
+                const response = await fetch('/api/integrations/spellchecker/check');
                 if (response.ok) {
                     const data = await response.json();
                     setIsSpellcheckEnabled(data.enabled);

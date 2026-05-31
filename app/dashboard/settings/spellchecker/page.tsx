@@ -8,17 +8,18 @@ import Flag from 'react-world-flags';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { Eye, EyeOff, Loader2, Info } from 'lucide-react';
-import { useAuth } from '@/context/auth';
+import { Eye, EyeOff, Loader2, ArrowLeft } from 'lucide-react';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Separator } from '@/components/ui/separator';
 import { useRouter } from 'next/navigation';
 import { LanguageToolLogo } from '@/lib/services/languagetool/logo';
 
-const userLanguageToolSchema = z.object({
+const schema = z.object({
   languageToolLanguage: z.string().nullable(),
   languageToolLevel: z.string().default('default'),
   languageToolMotherTongue: z.string().nullable(),
@@ -27,7 +28,7 @@ const userLanguageToolSchema = z.object({
   languageToolApiKey: z.string().optional(),
 });
 
-type UserLanguageToolFormValues = z.infer<typeof userLanguageToolSchema>;
+type FormValues = z.infer<typeof schema>;
 
 interface Language {
   name: string;
@@ -35,73 +36,48 @@ interface Language {
   longCode: string;
 }
 
-interface SystemConfig {
-  languageToolEnabled: boolean;
-  languageToolAllowUserOverride: boolean;
-  languageToolLanguage: string;
+interface SpellcheckerStatus {
+  enabled: boolean;
+  defaultLanguage: string;
+  allowUserOverride: boolean;
 }
 
-// Map language codes to country codes for flags
 const getCountryCode = (langCode: string): string => {
   const mapping: Record<string, string> = {
-    'en-US': 'US',
-    'en-GB': 'GB',
-    'en-CA': 'CA',
-    'en-AU': 'AU',
-    'en-NZ': 'NZ',
-    'de-DE': 'DE',
-    'de-AT': 'AT',
-    'de-CH': 'CH',
-    'fr': 'FR',
-    'fr-CA': 'CA',
-    'es': 'ES',
-    'pt-BR': 'BR',
-    'pt-PT': 'PT',
-    'it': 'IT',
-    'nl': 'NL',
-    'pl-PL': 'PL',
-    'ru-RU': 'RU',
-    'zh-CN': 'CN',
-    'ja-JP': 'JP',
-    'ca-ES': 'ES',
-    'da-DK': 'DK',
-    'sv': 'SE',
-    'nb': 'NO',
-    'uk-UA': 'UA',
-    'el-GR': 'GR',
-    'ar': 'SA',
-    'fa': 'IR',
-    'he': 'IL',
+    'en-US': 'US', 'en-GB': 'GB', 'en-CA': 'CA', 'en-AU': 'AU', 'en-NZ': 'NZ',
+    'de-DE': 'DE', 'de-AT': 'AT', 'de-CH': 'CH', 'fr': 'FR', 'fr-CA': 'CA',
+    'es': 'ES', 'pt-BR': 'BR', 'pt-PT': 'PT', 'it': 'IT', 'nl': 'NL',
+    'pl-PL': 'PL', 'ru-RU': 'RU', 'zh-CN': 'CN', 'ja-JP': 'JP',
+    'ca-ES': 'ES', 'da-DK': 'DK', 'sv': 'SE', 'nb': 'NO',
+    'uk-UA': 'UA', 'el-GR': 'GR', 'ar': 'SA', 'fa': 'IR', 'he': 'IL',
   };
-
-  // Try exact match first
   if (mapping[langCode]) return mapping[langCode];
-
-  // Try extracting country code from format like 'en-US'
   const parts = langCode.split('-');
-  if (parts.length > 1) {
-    const countryPart = parts[1].toUpperCase();
-    // Validate it's a real 2-letter country code
-    if (countryPart.length === 2) return countryPart;
-  }
-
-  // Default to language code as country (works for many: 'de', 'fr', 'it', etc.)
+  if (parts.length > 1 && parts[1].length === 2) return parts[1].toUpperCase();
   return langCode.toUpperCase().slice(0, 2);
 };
 
-export default function UserLanguageToolSettingsPage() {
+function LanguageOption({ lang }: { lang: Language }) {
+  return (
+    <div className="flex items-center gap-2">
+      <Flag code={getCountryCode(lang.longCode)} height="16" width="24" fallback={<span>🏳️</span>} />
+      <span>{lang.name}</span>
+    </div>
+  );
+}
+
+export default function SpellcheckerSettingsPage() {
   const { toast } = useToast();
-  const { user } = useAuth();
   const router = useRouter();
   const [showApiKey, setShowApiKey] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isFormLoading, setIsFormLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [languages, setLanguages] = useState<Language[]>([]);
   const [languagesLoading, setLanguagesLoading] = useState(true);
-  const [systemConfig, setSystemConfig] = useState<SystemConfig | null>(null);
+  const [status, setStatus] = useState<SpellcheckerStatus | null>(null);
 
-  const form = useForm<UserLanguageToolFormValues>({
-    resolver: zodResolver(userLanguageToolSchema),
+  const form = useForm<FormValues>({
+    resolver: zodResolver(schema),
     defaultValues: {
       languageToolLanguage: null,
       languageToolLevel: 'default',
@@ -112,89 +88,65 @@ export default function UserLanguageToolSettingsPage() {
     },
   });
 
-  // Load languages from API
   useEffect(() => {
-    const loadLanguages = async () => {
+    async function load() {
       try {
-        const response = await fetch('/api/languagetool/languages');
-        if (response.ok) {
-          const data = await response.json();
+        const [statusRes, userRes] = await Promise.all([
+          fetch('/api/integrations/spellchecker/status'),
+          fetch('/api/user/settings/languagetool'),
+        ]);
+
+        if (statusRes.ok) {
+          const s: SpellcheckerStatus = await statusRes.json();
+          setStatus(s);
+          if (!s.enabled) { setIsLoading(false); return; }
+        }
+
+        if (userRes.ok) {
+          const userData = await userRes.json();
+          startTransition(() => {
+            form.reset({
+              languageToolLanguage: userData.languageToolLanguage || null,
+              languageToolLevel: userData.languageToolLevel || 'default',
+              languageToolMotherTongue: userData.languageToolMotherTongue || null,
+              languageToolApiUrl: userData.languageToolApiUrl || '',
+              languageToolUsername: userData.languageToolUsername || '',
+              languageToolApiKey: userData.languageToolApiKey || '',
+            });
+          });
+        }
+      } catch {
+        toast({ title: 'Error', description: 'Failed to load settings', variant: 'destructive' });
+      } finally {
+        setIsLoading(false);
+      }
+
+      try {
+        const langRes = await fetch('/api/integrations/spellchecker/languages');
+        if (langRes.ok) {
+          const data = await langRes.json();
           setLanguages(data.languages || []);
         }
-      } catch (error) {
-        console.error('Failed to load languages:', error);
+      } catch {
+        // non-critical, leave empty
       } finally {
         setLanguagesLoading(false);
       }
-    };
+    }
 
-    loadLanguages();
-  }, []);
-
-  // Check if LanguageTool is enabled and load user settings
-  useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        // Check system config first
-        const systemResponse = await fetch('/api/admin/system/languagetool');
-        if (systemResponse.ok) {
-          const systemData = await systemResponse.json();
-          setSystemConfig(systemData);
-
-          if (!systemData.languageToolEnabled) {
-            setIsFormLoading(false);
-            return;
-          }
-        }
-
-        // Load user settings
-        const userResponse = await fetch('/api/user/settings/languagetool');
-        if (!userResponse.ok) throw new Error('Failed to fetch user settings');
-        const userData = await userResponse.json();
-
-        startTransition(() => {
-          form.reset({
-            languageToolLanguage: userData.languageToolLanguage || null,
-            languageToolLevel: userData.languageToolLevel || 'default',
-            languageToolMotherTongue: userData.languageToolMotherTongue || null,
-            languageToolApiUrl: userData.languageToolApiUrl || '',
-            languageToolUsername: userData.languageToolUsername || '',
-            languageToolApiKey: userData.languageToolApiKey || '',
-          });
-          setIsFormLoading(false);
-        });
-      } catch (error) {
-        toast({
-          title: 'Error',
-          description: 'Failed to load LanguageTool settings',
-          variant: 'destructive',
-        });
-        setIsFormLoading(false);
-      }
-    };
-
-    loadSettings();
+    load();
   }, [form, toast]);
 
-  const onSubmit = async (data: UserLanguageToolFormValues) => {
-    setIsLoading(true);
+  const onSubmit = async (data: FormValues) => {
+    setIsSaving(true);
     try {
-      const response = await fetch('/api/user/settings/languagetool', {
+      const res = await fetch('/api/user/settings/languagetool', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to save settings');
-      }
-
-      toast({
-        title: 'Success',
-        description: 'Your LanguageTool preferences have been saved successfully',
-      });
+      if (!res.ok) throw new Error('Failed to save settings');
+      toast({ title: 'Saved', description: 'Spellchecker preferences updated.' });
     } catch (error) {
       toast({
         title: 'Error',
@@ -202,44 +154,39 @@ export default function UserLanguageToolSettingsPage() {
         variant: 'destructive',
       });
     } finally {
-      setIsLoading(false);
+      setIsSaving(false);
     }
   };
 
-  if (isFormLoading) {
+  if (isLoading) {
     return (
-      <div className="container mx-auto py-8 max-w-4xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">LanguageTool Preferences</h1>
-          <p className="text-muted-foreground mt-2">
-            Customize your spelling and grammar checking preferences.
-          </p>
-        </div>
-        <Card>
-          <CardContent className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="max-w-2xl space-y-6">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-4 w-96" />
+        <Card className="border shadow-sm">
+          <CardContent className="py-8 flex justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </CardContent>
         </Card>
       </div>
     );
   }
 
-  // If LanguageTool is not enabled system-wide
-  if (!systemConfig?.languageToolEnabled) {
+  if (!status?.enabled) {
     return (
-      <div className="container mx-auto py-8 max-w-4xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">LanguageTool Preferences</h1>
-          <p className="text-muted-foreground mt-2">
-            Customize your spelling and grammar checking preferences.
-          </p>
+      <div className="max-w-2xl space-y-6">
+        <div>
+          <Button variant="ghost" size="sm" className="-ml-2 mb-4 text-muted-foreground" onClick={() => router.back()}>
+            <ArrowLeft className="mr-1.5 h-4 w-4" />
+            Back to Settings
+          </Button>
+          <h1 className="text-2xl font-bold tracking-tight">Spellchecker</h1>
         </div>
-        <Card>
+        <Card className="border shadow-sm">
           <CardHeader>
-            <CardTitle>LanguageTool Not Enabled</CardTitle>
+            <CardTitle>Not enabled</CardTitle>
             <CardDescription>
-              LanguageTool spelling and grammar checking is not currently enabled on this system.
-              Please contact your administrator if you would like to use this feature.
+              Spellchecking is not enabled on this instance. Contact your administrator to enable it.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -247,85 +194,79 @@ export default function UserLanguageToolSettingsPage() {
     );
   }
 
-  // Prepare language options for SearchableSelect
   const languageItems = [
     {
       value: '',
-      label: <span className="text-muted-foreground">Use System Default ({systemConfig?.languageToolLanguage || 'en-US'})</span>,
+      label: <span className="text-muted-foreground">System default ({status.defaultLanguage})</span>,
       searchValue: 'system default',
     },
-    ...languages.map((lang) => {
-      const countryCode = getCountryCode(lang.longCode);
-      return {
-        value: lang.longCode,
-        label: (
-          <div className="flex items-center gap-2">
-            <Flag code={countryCode} height="16" width="24" fallback={<span>🏳️</span>} />
-            <span>{lang.name}</span>
-          </div>
-        ),
-        searchValue: `${lang.name} ${lang.longCode}`,
-      };
-    }),
+    ...languages.map((lang) => ({
+      value: lang.longCode,
+      label: <LanguageOption lang={lang} />,
+      searchValue: `${lang.name} ${lang.longCode}`,
+    })),
   ];
 
-  const allowOverride = systemConfig?.languageToolAllowUserOverride ?? false;
+  const motherTongueItems = [
+    { value: '', label: <span className="text-muted-foreground">None</span>, searchValue: 'none' },
+    ...languages.map((lang) => ({
+      value: lang.longCode,
+      label: <LanguageOption lang={lang} />,
+      searchValue: `${lang.name} ${lang.longCode}`,
+    })),
+  ];
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto py-8 max-w-4xl">
-        {/* Header with branding */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="bg-primary/10 p-3 rounded-lg">
-              <LanguageToolLogo className="h-8 w-8 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">Spellchecker Settings</h1>
-              <p className="text-muted-foreground mt-1">
-                Powered by LanguageTool
-              </p>
-            </div>
+    <div className="max-w-2xl space-y-6">
+      {/* Header */}
+      <div>
+        <Button variant="ghost" size="sm" className="-ml-2 mb-4 text-muted-foreground" onClick={() => router.back()}>
+          <ArrowLeft className="mr-1.5 h-4 w-4" />
+          Back to Settings
+        </Button>
+        <div className="flex items-center gap-3">
+          <div className="bg-primary/10 p-2.5 rounded-lg">
+            <LanguageToolLogo className="h-6 w-6 text-primary" />
           </div>
-          <p className="text-muted-foreground mt-2 text-sm">
-            Customize your spelling and grammar checking preferences. Changes are saved automatically when you click Save Preferences.
-          </p>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Spellchecker</h1>
+            <p className="text-sm text-muted-foreground">Powered by LanguageTool</p>
+          </div>
         </div>
+      </div>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <Card className="border-2">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-xl">Language Preferences</CardTitle>
-                <CardDescription>
-                  Configure which language to check and your native language for better suggestions
-                </CardDescription>
-              </CardHeader>
-            <CardContent className="space-y-6">
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          {/* Language preferences */}
+          <Card className="border shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Language</CardTitle>
+              <CardDescription>
+                Which language to check and your native language for better suggestions.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
               <FormField
                 control={form.control}
                 name="languageToolLanguage"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Preferred Language</FormLabel>
+                    <FormLabel>Preferred language</FormLabel>
                     <FormControl>
                       {languagesLoading ? (
-                        <div className="flex items-center gap-2 h-10 px-3 border rounded-md">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          <span className="text-sm text-muted-foreground">Loading languages...</span>
-                        </div>
+                        <Skeleton className="h-10 w-full" />
                       ) : (
                         <SearchableSelect
                           value={field.value || ''}
-                          onValueChange={(value) => field.onChange(value || null)}
+                          onValueChange={(v) => field.onChange(v || null)}
                           placeholder="Select a language"
-                          searchPlaceholder="Search languages..."
+                          searchPlaceholder="Search languages…"
                           items={languageItems}
                         />
                       )}
                     </FormControl>
                     <FormDescription>
-                      Select your preferred language for spell checking. Leave as system default to use the administrator's configured language.
+                      Leave blank to use the system default.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -337,69 +278,25 @@ export default function UserLanguageToolSettingsPage() {
                 name="languageToolMotherTongue"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Mother Tongue (Optional)</FormLabel>
+                    <FormLabel>
+                      Mother tongue{' '}
+                      <span className="text-muted-foreground font-normal">(optional)</span>
+                    </FormLabel>
                     <FormControl>
                       {languagesLoading ? (
-                        <div className="flex items-center gap-2 h-10 px-3 border rounded-md">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          <span className="text-sm text-muted-foreground">Loading languages...</span>
-                        </div>
+                        <Skeleton className="h-10 w-full" />
                       ) : (
                         <SearchableSelect
                           value={field.value || ''}
-                          onValueChange={(value) => field.onChange(value || null)}
+                          onValueChange={(v) => field.onChange(v || null)}
                           placeholder="Select your native language"
-                          searchPlaceholder="Search languages..."
-                          items={[
-                            {
-                              value: '',
-                              label: <span className="text-muted-foreground">None</span>,
-                              searchValue: 'none',
-                            },
-                            ...languages.map((lang) => {
-                              const countryCode = getCountryCode(lang.longCode);
-                              return {
-                                value: lang.longCode,
-                                label: (
-                                  <div className="flex items-center gap-2">
-                                    <Flag code={countryCode} height="16" width="24" fallback={<span>🏳️</span>} />
-                                    <span>{lang.name}</span>
-                                  </div>
-                                ),
-                                searchValue: `${lang.name} ${lang.longCode}`,
-                              };
-                            }),
-                          ]}
+                          searchPlaceholder="Search languages…"
+                          items={motherTongueItems}
                         />
                       )}
                     </FormControl>
                     <FormDescription>
-                      Your native language. This helps LanguageTool provide better suggestions for non-native speakers.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="languageToolLevel"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Checking Level</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select checking level" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="default">Default - Standard checking</SelectItem>
-                        <SelectItem value="picky">Picky - More strict checking</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>
-                      Choose how strict the grammar and style checking should be. Picky mode will flag more potential issues.
+                      Helps LanguageTool give better suggestions for non-native speakers.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -408,20 +305,52 @@ export default function UserLanguageToolSettingsPage() {
             </CardContent>
           </Card>
 
-          {allowOverride && (
-            <Card className="border-2 border-dashed">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-xl">Advanced Settings</CardTitle>
+          {/* Checking level */}
+          <Card className="border shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Checking level</CardTitle>
+              <CardDescription>
+                How strictly grammar and style should be evaluated.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <FormField
+                control={form.control}
+                name="languageToolLevel"
+                render={({ field }) => (
+                  <FormItem>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select checking level" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="default">Default — standard checking</SelectItem>
+                        <SelectItem value="picky">Picky — stricter checking</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Advanced / API credentials override */}
+          {status.allowUserOverride && (
+            <Card className="border shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Advanced</CardTitle>
                 <CardDescription>
-                  Override system settings with your own LanguageTool API credentials (optional)
+                  Override the system API credentials with your own LanguageTool Premium account.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <Alert>
-                  <Info className="h-4 w-4" />
-                  <AlertTitle>Optional Settings</AlertTitle>
+              <CardContent className="space-y-5">
+                <Alert variant="info">
+                  <AlertTitle>Optional</AlertTitle>
                   <AlertDescription>
-                    These settings are optional and will override the system defaults. Only configure these if you have your own LanguageTool API credentials.
+                    Leave these blank to use the system defaults. Only fill them in if you have your own LanguageTool credentials.
                   </AlertDescription>
                 </Alert>
 
@@ -430,33 +359,26 @@ export default function UserLanguageToolSettingsPage() {
                   name="languageToolApiUrl"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Custom API URL</FormLabel>
+                      <FormLabel>API URL</FormLabel>
                       <FormControl>
-                        <Input
-                          placeholder="https://api.languagetool.org/v2"
-                          {...field}
-                        />
+                        <Input placeholder="https://api.languagetool.org/v2" {...field} />
                       </FormControl>
-                      <FormDescription>
-                        Leave empty to use the system default API URL.
-                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+
+                <Separator />
 
                 <FormField
                   control={form.control}
                   name="languageToolUsername"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Username (Premium)</FormLabel>
+                      <FormLabel>Username</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter your premium username" {...field} />
+                        <Input placeholder="Your premium username" {...field} />
                       </FormControl>
-                      <FormDescription>
-                        Your LanguageTool premium username, if you have one.
-                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -467,28 +389,25 @@ export default function UserLanguageToolSettingsPage() {
                   name="languageToolApiKey"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>API Key (Premium)</FormLabel>
+                      <FormLabel>API key</FormLabel>
                       <FormControl>
                         <div className="relative">
                           <Input
                             type={showApiKey ? 'text' : 'password'}
-                            placeholder="Enter your API key"
+                            placeholder="Your API key"
                             {...field}
                           />
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                            onClick={() => setShowApiKey(!showApiKey)}
+                            className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                            onClick={() => setShowApiKey((v) => !v)}
                           >
                             {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                           </Button>
                         </div>
                       </FormControl>
-                      <FormDescription>
-                        Your LanguageTool API key for premium features.
-                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -497,21 +416,14 @@ export default function UserLanguageToolSettingsPage() {
             </Card>
           )}
 
-          <div className="flex items-center justify-between p-6 bg-muted/30 rounded-lg border-2">
-            <div className="flex-1">
-              <p className="font-medium">Ready to save your preferences?</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Your settings will apply to all spell checking throughout the app
-              </p>
-            </div>
-            <Button type="submit" disabled={isLoading} size="lg" className="ml-4">
-              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isLoading ? 'Saving...' : 'Save Preferences'}
+          <div className="flex justify-end">
+            <Button type="submit" disabled={isSaving}>
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isSaving ? 'Saving…' : 'Save preferences'}
             </Button>
           </div>
         </form>
       </Form>
-      </div>
     </div>
   );
 }

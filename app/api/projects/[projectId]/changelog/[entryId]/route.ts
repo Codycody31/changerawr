@@ -4,6 +4,7 @@ import {createAuditLog} from '@/lib/utils/auditLog'
 import {db} from '@/lib/db'
 import {Role} from "@/lib/types/auth"
 import {postToSlack} from '@/lib/services/slack';
+import {createOrReopenRequest} from '@/lib/services/request/changelog-request';
 
 /**
  * Get a changelog entry by ID
@@ -844,31 +845,13 @@ export async function PATCH(
                         );
                     }
 
-                    // Create publish request
-                    const publishRequestData: {
-                        type: string;
-                        staffId: string;
-                        projectId: string;
-                        changelogEntryId: string;
-                        status: string;
-                        metadata?: {customPublishedAt: string};
-                    } = {
+                    // Create (or reopen if CHANGES_REQUESTED) publish request
+                    const publishRequest = await createOrReopenRequest({
                         type: 'ALLOW_PUBLISH',
                         staffId: user.id,
                         projectId,
                         changelogEntryId: entryId,
-                        status: 'PENDING'
-                    };
-
-                    // Store custom publishedAt in metadata if provided
-                    if (publishedAt) {
-                        publishRequestData.metadata = {
-                            customPublishedAt: publishedAt
-                        };
-                    }
-
-                    const publishRequest = await db.changelogRequest.create({
-                        data: publishRequestData
+                        ...(publishedAt ? { metadata: { customPublishedAt: publishedAt } } : {}),
                     });
 
                     // Log successful publish request creation
@@ -1150,15 +1133,12 @@ export async function DELETE(
                 );
             }
 
-            // Create deletion request
-            const deleteRequest = await db.changelogRequest.create({
-                data: {
-                    type: 'DELETE_ENTRY',
-                    staffId: user.id,
-                    projectId,
-                    changelogEntryId: entryId,
-                    status: 'PENDING'
-                }
+            // Create (or reopen if CHANGES_REQUESTED) deletion request
+            const deleteRequest = await createOrReopenRequest({
+                type: 'DELETE_ENTRY',
+                staffId: user.id,
+                projectId,
+                changelogEntryId: entryId,
             });
 
             // Log successful deletion request creation

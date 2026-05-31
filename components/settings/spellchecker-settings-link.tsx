@@ -2,82 +2,77 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { BookCheck, ChevronRight } from 'lucide-react';
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ChevronRight } from 'lucide-react';
+import { LanguageToolLogo } from '@/lib/services/languagetool/logo';
+
+interface SpellcheckerStatus {
+  enabled: boolean;
+  defaultLanguage: string;
+  allowUserOverride: boolean;
+}
+
+interface UserPrefs {
+  languageToolLanguage: string | null;
+  languageToolLevel: string | null;
+}
 
 export function SpellcheckerSettingsLink() {
   const router = useRouter();
-  const [isEnabled, setIsEnabled] = useState<boolean | null>(null);
+  const [status, setStatus] = useState<SpellcheckerStatus | null>(null);
+  const [prefs, setPrefs] = useState<UserPrefs | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    async function checkLanguageToolStatus() {
+    async function load() {
       try {
-        const response = await fetch('/api/admin/system/languagetool');
-        if (response.ok) {
-          const data = await response.json();
-          setIsEnabled(data.languageToolEnabled || false);
-        } else {
-          setIsEnabled(false);
+        const [statusRes, prefsRes] = await Promise.all([
+          fetch('/api/integrations/spellchecker/status'),
+          fetch('/api/user/settings/languagetool'),
+        ]);
+        if (statusRes.ok) setStatus(await statusRes.json());
+        if (prefsRes.ok) {
+          const data = await prefsRes.json();
+          setPrefs({ languageToolLanguage: data.languageToolLanguage, languageToolLevel: data.languageToolLevel });
         }
-      } catch (error) {
-        console.error('Failed to fetch LanguageTool status:', error);
-        setIsEnabled(false);
+      } catch {
+        // non-critical
       } finally {
         setIsLoading(false);
       }
     }
-
-    checkLanguageToolStatus();
+    load();
   }, []);
 
-  // Don't render anything while loading
-  if (isLoading) {
-    return (
-      <Card className="border shadow-sm">
-        <CardHeader className="pb-3">
-          <Skeleton className="h-6 w-48" />
-          <Skeleton className="h-4 w-64 mt-2" />
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-10 w-full" />
-        </CardContent>
-      </Card>
-    );
-  }
+  if (isLoading || !status?.enabled) return null;
 
-  // Don't render if not enabled
-  if (!isEnabled) {
-    return null;
-  }
+  const language = prefs?.languageToolLanguage || status.defaultLanguage;
+  const level = prefs?.languageToolLevel === 'picky' ? 'Picky' : 'Default';
 
   return (
-    <Card className="border shadow-sm hover:border-primary/50 transition-colors">
+    <Card
+      className="border shadow-sm hover:border-primary/50 hover:shadow-md transition-all cursor-pointer"
+      onClick={() => router.push('/dashboard/settings/spellchecker')}
+      role="link"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === 'Enter' && router.push('/dashboard/settings/spellchecker')}
+    >
       <CardHeader className="pb-3">
-        <div className="flex items-center gap-2">
-          <div className="bg-primary/10 p-1.5 rounded-md">
-            <BookCheck className="h-5 w-5 text-primary" />
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="bg-primary/10 p-1.5 rounded-md flex-shrink-0">
+              <LanguageToolLogo className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-lg md:text-xl">Spellchecker</CardTitle>
+              <CardDescription className="text-sm mt-0.5">
+                {language} · {level} checking
+              </CardDescription>
+            </div>
           </div>
-          <div className="flex-1">
-            <CardTitle className="text-lg md:text-xl">Spellchecker</CardTitle>
-            <CardDescription className="text-sm mt-1">
-              Configure spell checking and grammar preferences
-            </CardDescription>
-          </div>
+          <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
         </div>
       </CardHeader>
-      <CardContent>
-        <Button
-          variant="outline"
-          className="w-full justify-between group hover:bg-primary/5"
-          onClick={() => router.push('/dashboard/settings/spellchecker')}
-        >
-          <span className="font-medium">Configure Settings</span>
-          <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-        </Button>
-      </CardContent>
     </Card>
   );
 }

@@ -9,76 +9,40 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { Eye, EyeOff, Loader2, CheckCircle2, XCircle, ExternalLink } from 'lucide-react';
+import { Eye, EyeOff, Loader2, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '@/context/auth';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { SearchableSelect } from '@/components/ui/searchable-select';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 
-const languageToolSchema = z.object({
+const DEFAULT_URL = 'https://api.languagetool.org/v2';
+
+const schema = z.object({
   languageToolEnabled: z.boolean(),
   languageToolApiUrl: z.string().url('Must be a valid URL').min(1, 'API URL is required'),
   languageToolApiKey: z.string().optional().default(''),
   languageToolUsername: z.string().optional().default(''),
-  languageToolLanguage: z.string().min(1, 'Language code is required'),
+  languageToolLanguage: z.string().min(1, 'Language is required'),
   languageToolAllowUserOverride: z.boolean(),
 });
 
-type LanguageToolFormValues = z.infer<typeof languageToolSchema>;
+type FormValues = z.infer<typeof schema>;
 
-interface Language {
-  name: string;
-  code: string;
-  longCode: string;
-}
+interface Language { name: string; code: string; longCode: string; }
 
-// Map language codes to country codes for flags
 const getCountryCode = (langCode: string): string => {
   const mapping: Record<string, string> = {
-    'en-US': 'US',
-    'en-GB': 'GB',
-    'en-CA': 'CA',
-    'en-AU': 'AU',
-    'en-NZ': 'NZ',
-    'de-DE': 'DE',
-    'de-AT': 'AT',
-    'de-CH': 'CH',
-    'fr': 'FR',
-    'fr-CA': 'CA',
-    'es': 'ES',
-    'pt-BR': 'BR',
-    'pt-PT': 'PT',
-    'it': 'IT',
-    'nl': 'NL',
-    'pl-PL': 'PL',
-    'ru-RU': 'RU',
-    'zh-CN': 'CN',
-    'ja-JP': 'JP',
-    'ca-ES': 'ES',
-    'da-DK': 'DK',
-    'sv': 'SE',
-    'nb': 'NO',
-    'uk-UA': 'UA',
-    'el-GR': 'GR',
-    'ar': 'SA',
-    'fa': 'IR',
-    'he': 'IL',
+    'en-US': 'US', 'en-GB': 'GB', 'en-CA': 'CA', 'en-AU': 'AU', 'en-NZ': 'NZ',
+    'de-DE': 'DE', 'de-AT': 'AT', 'de-CH': 'CH', 'fr': 'FR', 'fr-CA': 'CA',
+    'es': 'ES', 'pt-BR': 'BR', 'pt-PT': 'PT', 'it': 'IT', 'nl': 'NL',
+    'pl-PL': 'PL', 'ru-RU': 'RU', 'zh-CN': 'CN', 'ja-JP': 'JP',
+    'ca-ES': 'ES', 'da-DK': 'DK', 'sv': 'SE', 'nb': 'NO',
+    'uk-UA': 'UA', 'el-GR': 'GR', 'ar': 'SA', 'fa': 'IR', 'he': 'IL',
   };
-
-  // Try exact match first
   if (mapping[langCode]) return mapping[langCode];
-
-  // Try extracting country code from format like 'en-US'
   const parts = langCode.split('-');
-  if (parts.length > 1) {
-    const countryPart = parts[1].toUpperCase();
-    // Validate it's a real 2-letter country code
-    if (countryPart.length === 2) return countryPart;
-  }
-
-  // Default to language code as country (works for many: 'de', 'fr', 'it', etc.)
+  if (parts.length > 1 && parts[1].length === 2) return parts[1].toUpperCase();
   return langCode.toUpperCase().slice(0, 2);
 };
 
@@ -86,17 +50,20 @@ export default function LanguageToolSettingsPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [showApiKey, setShowApiKey] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [isFormLoading, setIsFormLoading] = useState(true);
+  const [savedEnabled, setSavedEnabled] = useState(false);
+  const [savedApiUrl, setSavedApiUrl] = useState(DEFAULT_URL);
+  const [testPassed, setTestPassed] = useState(false);
   const [languages, setLanguages] = useState<Language[]>([]);
-  const [languagesLoading, setLanguagesLoading] = useState(true);
+  const [languagesLoading, setLanguagesLoading] = useState(false);
 
-  const form = useForm<LanguageToolFormValues>({
-    resolver: zodResolver(languageToolSchema),
+  const form = useForm<FormValues>({
+    resolver: zodResolver(schema),
     defaultValues: {
       languageToolEnabled: false,
-      languageToolApiUrl: 'https://api.languagetool.org/v2',
+      languageToolApiUrl: DEFAULT_URL,
       languageToolApiKey: '',
       languageToolUsername: '',
       languageToolLanguage: 'en-US',
@@ -104,88 +71,98 @@ export default function LanguageToolSettingsPage() {
     },
   });
 
-  // Load languages from API
+  const isEnabled = form.watch('languageToolEnabled');
+  const currentApiUrl = form.watch('languageToolApiUrl');
+  const isCustomUrl = currentApiUrl !== DEFAULT_URL;
+
+  // Credentials section is only shown when the saved endpoint is known-good:
+  // default URL always works; custom URL requires a successful test this session.
+  const canShowCredentials = savedEnabled && (savedApiUrl === DEFAULT_URL || testPassed);
+
+  // Reset test-passed when the user edits away from the last-saved URL
   useEffect(() => {
-    const loadLanguages = async () => {
-      try {
-        const response = await fetch('/api/languagetool/languages');
-        if (response.ok) {
-          const data = await response.json();
-          setLanguages(data.languages || []);
-        }
-      } catch (error) {
-        console.error('Failed to load languages:', error);
-      } finally {
-        setLanguagesLoading(false);
-      }
-    };
+    if (currentApiUrl !== savedApiUrl) setTestPassed(false);
+  }, [currentApiUrl, savedApiUrl]);
 
-    loadLanguages();
-  }, []);
-
+  // Load saved settings
   useEffect(() => {
-    const loadSettings = async () => {
+    async function loadSettings() {
       try {
-        const response = await fetch('/api/admin/system/languagetool');
-        if (!response.ok) throw new Error('Failed to fetch settings');
-        const data = await response.json();
-
+        const res = await fetch('/api/admin/system/languagetool');
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        const url = data.languageToolApiUrl || DEFAULT_URL;
+        setSavedEnabled(data.languageToolEnabled || false);
+        setSavedApiUrl(url);
         startTransition(() => {
           form.reset({
             languageToolEnabled: data.languageToolEnabled || false,
-            languageToolApiUrl: data.languageToolApiUrl || 'https://api.languagetool.org/v2',
+            languageToolApiUrl: url,
             languageToolApiKey: data.languageToolApiKey || '',
             languageToolUsername: data.languageToolUsername || '',
             languageToolLanguage: data.languageToolLanguage || 'en-US',
             languageToolAllowUserOverride: data.languageToolAllowUserOverride ?? true,
           });
-          setIsFormLoading(false);
         });
-      } catch (error) {
-        toast({
-          title: 'Error',
-          description: 'Failed to load LanguageTool settings',
-          variant: 'destructive',
-        });
+      } catch {
+        toast({ title: 'Error', description: 'Failed to load settings', variant: 'destructive' });
+      } finally {
         setIsFormLoading(false);
       }
-    };
-
+    }
     loadSettings();
   }, [form, toast]);
 
+  // Fetch language list from LT API — only makes sense once saved+enabled
+  useEffect(() => {
+    if (!savedEnabled || languages.length > 0) return;
+    setLanguagesLoading(true);
+    fetch('/api/integrations/spellchecker/languages')
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((data) => setLanguages(data.languages || []))
+      .catch(() => {})
+      .finally(() => setLanguagesLoading(false));
+  }, [savedEnabled, languages.length]);
+
   if (user?.role !== 'ADMIN') {
     return (
-      <div className="container mx-auto py-8">
-        <Card>
-          <CardHeader>
-            <CardTitle>Access Denied</CardTitle>
-            <CardDescription>You do not have permission to access this page.</CardDescription>
-          </CardHeader>
-        </Card>
+      <div className="max-w-2xl">
+        <Card><CardHeader>
+          <CardTitle>Access Denied</CardTitle>
+          <CardDescription>You do not have permission to access this page.</CardDescription>
+        </CardHeader></Card>
       </div>
     );
   }
 
-  const onSubmit = async (data: LanguageToolFormValues) => {
-    setIsLoading(true);
+  if (isFormLoading) {
+    return (
+      <div className="max-w-2xl space-y-6">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-4 w-72" />
+        </div>
+        <Card><CardContent className="py-10 flex justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </CardContent></Card>
+      </div>
+    );
+  }
+
+  const onSubmit = async (data: FormValues) => {
+    setIsSaving(true);
     try {
-      const response = await fetch('/api/admin/system/languagetool', {
+      const res = await fetch('/api/admin/system/languagetool', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to save settings');
-      }
-
-      toast({
-        title: 'Success',
-        description: 'LanguageTool settings saved successfully',
-      });
+      if (!res.ok) throw new Error('Failed to save settings');
+      // If URL changed, the previous test no longer applies
+      if (data.languageToolApiUrl !== savedApiUrl) setTestPassed(false);
+      setSavedEnabled(data.languageToolEnabled);
+      setSavedApiUrl(data.languageToolApiUrl);
+      toast({ title: 'Saved', description: 'LanguageTool settings saved.' });
     } catch (error) {
       toast({
         title: 'Error',
@@ -193,138 +170,70 @@ export default function LanguageToolSettingsPage() {
         variant: 'destructive',
       });
     } finally {
-      setIsLoading(false);
+      setIsSaving(false);
     }
   };
 
   const testConnection = async () => {
     setIsTesting(true);
     try {
-      const response = await fetch('/api/admin/system/languagetool', {
-        method: 'POST',
-      });
-
-      const result = await response.json();
-
+      const res = await fetch('/api/admin/system/languagetool', { method: 'POST' });
+      const result = await res.json();
       if (result.success) {
+        setTestPassed(true);
         toast({
-          title: 'Connection Successful',
-          description: result.languageDetected
-            ? `Connected successfully. Detected language: ${result.languageDetected}`
-            : result.message,
+          title: 'Connection successful',
+          description: result.languageDetected ? `Detected language: ${result.languageDetected}` : result.message,
         });
       } else {
-        toast({
-          title: 'Connection Failed',
-          description: result.message,
-          variant: 'destructive',
-        });
+        setTestPassed(false);
+        toast({ title: 'Connection failed', description: result.message, variant: 'destructive' });
       }
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to test connection',
-        variant: 'destructive',
-      });
+    } catch {
+      setTestPassed(false);
+      toast({ title: 'Error', description: 'Failed to test connection', variant: 'destructive' });
     } finally {
       setIsTesting(false);
     }
   };
 
-  if (isFormLoading) {
-    return (
-      <div className="container mx-auto py-8 max-w-4xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">LanguageTool Settings</h1>
-          <p className="text-muted-foreground mt-2">
-            Configure LanguageTool integration for spelling and grammar checking in the markdown editor.
-          </p>
-        </div>
-        <Card>
-          <CardContent className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </CardContent>
-        </Card>
+  const languageItems = languages.map((lang) => ({
+    value: lang.longCode,
+    label: (
+      <div className="flex items-center gap-2">
+        <Flag code={getCountryCode(lang.longCode)} height="16" width="24" fallback={<span>🏳️</span>} />
+        <span>{lang.name}</span>
       </div>
-    );
-  }
+    ),
+    searchValue: `${lang.name} ${lang.longCode}`,
+  }));
 
-  // Prepare language options for SearchableSelect
-  const languageItems = languages.map((lang) => {
-    const countryCode = getCountryCode(lang.longCode);
-    return {
-      value: lang.longCode,
-      label: (
-        <div className="flex items-center gap-2">
-          <Flag code={countryCode} height="16" width="24" fallback={<span>🏳️</span>} />
-          <span>{lang.name}</span>
-        </div>
-      ),
-      searchValue: `${lang.name} ${lang.longCode}`,
-    };
-  });
+  const disabledClass = 'opacity-50 pointer-events-none select-none';
 
   return (
-    <div className="container mx-auto py-8 max-w-4xl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">LanguageTool Settings</h1>
-        <p className="text-muted-foreground mt-2">
-          Configure LanguageTool integration for spelling and grammar checking in the markdown editor.
+    <div className="max-w-2xl space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">LanguageTool</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Spelling and grammar checking for the markdown editor.
         </p>
       </div>
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>LanguageTool Configuration</CardTitle>
-                  <CardDescription className="mt-1.5">
-                    LanguageTool provides advanced spelling and grammar checking. You can use the free public API
-                    or configure your own instance with an API key.
-                  </CardDescription>
-                </div>
-                {form.watch('languageToolEnabled') ? (
-                  <Badge variant="default" className="flex items-center gap-1">
-                    <CheckCircle2 className="h-3 w-3" />
-                    Enabled
-                  </Badge>
-                ) : (
-                  <Badge variant="secondary" className="flex items-center gap-1">
-                    <XCircle className="h-3 w-3" />
-                    Disabled
-                  </Badge>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {!form.watch('languageToolApiKey') && (
-                <Alert variant="info">
-                  <AlertDescription>
-                    You're using the free tier. Get an API key for premium features at{' '}
-                    <a
-                      href="https://languagetool.org/premium"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline inline-flex items-center gap-1"
-                    >
-                      LanguageTool Premium
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  </AlertDescription>
-                </Alert>
-              )}
 
+          {/* 1. Enable */}
+          <Card className="border shadow-sm">
+            <CardContent className="pt-6">
               <FormField
                 control={form.control}
                 name="languageToolEnabled"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">Enable LanguageTool</FormLabel>
+                  <FormItem className="flex items-center justify-between gap-4">
+                    <div>
+                      <FormLabel className="text-base font-medium">Enable LanguageTool</FormLabel>
                       <FormDescription>
-                        Enable spelling and grammar checking in the markdown editor
+                        Activate spelling and grammar checking in the markdown editor.
                       </FormDescription>
                     </div>
                     <FormControl>
@@ -333,126 +242,175 @@ export default function LanguageToolSettingsPage() {
                   </FormItem>
                 )}
               />
+            </CardContent>
+          </Card>
 
+          {/* 2. Endpoint — gated on isEnabled */}
+          <Card className={`border shadow-sm transition-opacity ${!isEnabled ? disabledClass : ''}`}>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Endpoint</CardTitle>
+              <CardDescription>
+                {isEnabled
+                  ? 'The LanguageTool API to use. Defaults to the public free API.'
+                  : 'Enable LanguageTool above to configure the endpoint.'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <FormField
                 control={form.control}
                 name="languageToolApiUrl"
-                render={({ field }) => {
-                  const isCustomUrl = field.value !== 'https://api.languagetool.org/v2';
-                  return (
-                    <FormItem>
-                      <FormLabel>API URL</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <Input
-                            placeholder="https://api.languagetool.org/v2"
-                            {...field}
-                            className={isCustomUrl ? 'pr-32' : ''}
-                          />
-                          {isCustomUrl && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                field.onChange('https://api.languagetool.org/v2');
-                              }}
-                              className="absolute right-0 top-0 h-full px-3 hover:bg-accent"
-                            >
-                              Reset to Default
-                            </Button>
-                          )}
-                        </div>
-                      </FormControl>
-                      {isCustomUrl && (
-                        <Alert variant="default" className="mt-2">
-                          <AlertDescription className="text-sm">
-                            Using custom API URL. Make sure to test the connection after changing.
-                          </AlertDescription>
-                        </Alert>
-                      )}
-                      <FormDescription>
-                        The LanguageTool API endpoint. Use the default public API or your own instance.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  );
-                }}
-              />
-
-              <FormField
-                control={form.control}
-                name="languageToolUsername"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Username (Premium)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter premium username" {...field} />
-                    </FormControl>
-                    <FormDescription>
-                      Optional username for LanguageTool premium features.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="languageToolApiKey"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>API Key (Optional)</FormLabel>
+                    <FormLabel>API URL</FormLabel>
                     <FormControl>
                       <div className="relative">
                         <Input
-                          type={showApiKey ? 'text' : 'password'}
-                          placeholder="Enter API key for premium features"
+                          placeholder={DEFAULT_URL}
                           {...field}
+                          disabled={!isEnabled}
+                          className={isCustomUrl ? 'pr-20' : ''}
                         />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                          onClick={() => setShowApiKey(!showApiKey)}
-                        >
-                          {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
+                        {isCustomUrl && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => field.onChange(DEFAULT_URL)}
+                            className="absolute right-0 top-0 h-full px-3 hover:bg-accent text-xs"
+                            tabIndex={!isEnabled ? -1 : undefined}
+                          >
+                            Reset
+                          </Button>
+                        )}
                       </div>
                     </FormControl>
-                    <FormDescription>
-                      Optional API key for premium LanguageTool features. Leave empty to use the free tier.
-                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
+              {/* Test connection — lives here, next to the URL */}
+              <div className="flex items-center gap-3">
+                {isEnabled && !savedEnabled && (
+                  <p className="text-xs text-muted-foreground flex-1">Save first to test.</p>
+                )}
+                {savedEnabled && isCustomUrl && currentApiUrl === savedApiUrl && testPassed && (
+                  <span className="flex items-center gap-1 text-xs text-green-600 flex-1">
+                    <CheckCircle2 className="h-3.5 w-3.5" /> Connection verified
+                  </span>
+                )}
+                {savedEnabled && isCustomUrl && currentApiUrl === savedApiUrl && !testPassed && (
+                  <p className="text-xs text-muted-foreground flex-1">
+                    Test the connection to unlock credential settings.
+                  </p>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={testConnection}
+                  disabled={!savedEnabled || isTesting}
+                >
+                  {isTesting && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
+                  Test connection
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 3. Credentials — only shown when connection is known-good */}
+          {canShowCredentials && (
+            <Card className="border shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Credentials</CardTitle>
+                <CardDescription>
+                  Optional username and API key for a paid LanguageTool account.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="languageToolUsername"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Username</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Your account username" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="languageToolApiKey"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>API key</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Input
+                            type={showApiKey ? 'text' : 'password'}
+                            placeholder="Your API key"
+                            {...field}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                            onClick={() => setShowApiKey((v) => !v)}
+                          >
+                            {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 4. Defaults — gated on isEnabled */}
+          <Card className={`border shadow-sm transition-opacity ${!isEnabled ? disabledClass : ''}`}>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Defaults</CardTitle>
+              <CardDescription>
+                System-wide defaults that apply to all users.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
               <FormField
                 control={form.control}
                 name="languageToolLanguage"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Default Language</FormLabel>
+                    <FormLabel>Default language</FormLabel>
                     <FormControl>
                       {languagesLoading ? (
-                        <div className="flex items-center gap-2 h-10 px-3 border rounded-md">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          <span className="text-sm text-muted-foreground">Loading languages...</span>
-                        </div>
-                      ) : (
+                        <Skeleton className="h-10 w-full" />
+                      ) : languages.length > 0 ? (
                         <SearchableSelect
                           value={field.value}
                           onValueChange={field.onChange}
                           placeholder="Select a language"
-                          searchPlaceholder="Search languages..."
+                          searchPlaceholder="Search languages…"
                           items={languageItems}
+                        />
+                      ) : (
+                        <Input
+                          placeholder="e.g. en-US"
+                          value={field.value}
+                          onChange={field.onChange}
+                          disabled={!isEnabled}
                         />
                       )}
                     </FormControl>
                     <FormDescription>
-                      Select the default language for spell checking and grammar suggestions
+                      Users can override this in their own spellchecker settings.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -463,32 +421,29 @@ export default function LanguageToolSettingsPage() {
                 control={form.control}
                 name="languageToolAllowUserOverride"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">Allow User Overrides</FormLabel>
+                  <FormItem className="flex items-center justify-between gap-4 rounded-lg border p-4">
+                    <div>
+                      <FormLabel className="text-sm font-medium">Allow user overrides</FormLabel>
                       <FormDescription>
-                        Allow users to set their own LanguageTool API URL, username, and API key
+                        Let users supply their own API URL, username, and key.
                       </FormDescription>
                     </div>
                     <FormControl>
-                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                      <Switch checked={field.value} onCheckedChange={field.onChange} disabled={!isEnabled} />
                     </FormControl>
                   </FormItem>
                 )}
               />
-
-              <div className="flex gap-4">
-                <Button type="button" variant="outline" onClick={testConnection} disabled={isTesting}>
-                  {isTesting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Test Connection
-                </Button>
-                <Button type="submit" disabled={isLoading}>
-                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Save Settings
-                </Button>
-              </div>
             </CardContent>
           </Card>
+
+          <div className="flex justify-end">
+            <Button type="submit" disabled={isSaving}>
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save settings
+            </Button>
+          </div>
+
         </form>
       </Form>
     </div>

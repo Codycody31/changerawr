@@ -35,6 +35,8 @@ import {
 import {useAuth} from '@/context/auth'
 import {cn} from '@/lib/utils'
 import {truncateText} from '@/lib/utils/text'
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
+import {formatDistanceToNow} from 'date-fns'
 
 type ActionType = 'PUBLISH' | 'UNPUBLISH' | 'DELETE' | 'ALLOW_SCHEDULE';
 type RequestType = 'ALLOW_PUBLISH' | 'DELETE_ENTRY' | 'ALLOW_SCHEDULE';
@@ -142,10 +144,12 @@ export function ChangelogActionRequest({
         enabled: action === 'PUBLISH'
     });
 
-    // Check if there's a pending request for this specific action
     const requestType = getRequestType(action);
     const pendingRequest = requestType
-        ? pendingRequests.find(req => req.type === requestType)
+        ? pendingRequests.find(req =>
+            req.type === requestType &&
+            (req.status === 'PENDING' || req.status === 'CHANGES_REQUESTED_PENDING')
+          )
         : null;
 
     const requiresApproval = isStaff && projectSettings?.requireApproval && !projectSettings?.allowAutoPublish;
@@ -328,10 +332,10 @@ export function ChangelogActionRequest({
 
         const configs = {
             'PUBLISH': {
-                icon: isPending ? Clock : Globe,
-                label: isPending ? 'Publish Pending' : 'Publish',
+                icon: Globe,
+                label: 'Publish',
                 loadingLabel: 'Publishing...',
-                variant: (isPending ? 'secondary' : (variant || 'default')) as ButtonVariant,
+                variant: (isPending ? 'outline' : (variant || 'default')) as ButtonVariant,
                 disabled: isPending
             },
             'UNPUBLISH': {
@@ -342,17 +346,17 @@ export function ChangelogActionRequest({
                 disabled: false
             },
             'DELETE': {
-                icon: isPending ? Clock : Trash2,
-                label: isPending ? 'Delete Pending' : 'Delete',
+                icon: Trash2,
+                label: 'Delete',
                 loadingLabel: 'Processing...',
-                variant: (isPending ? 'secondary' : 'destructive') as ButtonVariant,
+                variant: (isPending ? 'outline' : 'destructive') as ButtonVariant,
                 disabled: isPending
             },
             'ALLOW_SCHEDULE': {
-                icon: isPending ? Clock : Calendar,
-                label: isPending ? 'Schedule Pending' : 'Allow Schedule',
+                icon: Calendar,
+                label: 'Allow Schedule',
                 loadingLabel: 'Processing...',
-                variant: (isPending ? 'secondary' : (variant || 'default')) as ButtonVariant,
+                variant: (isPending ? 'outline' : (variant || 'default')) as ButtonVariant,
                 disabled: isPending
             }
         };
@@ -361,6 +365,7 @@ export function ChangelogActionRequest({
 
     const config = getButtonConfig();
     const IconComponent = config.icon;
+    const isPending = !!pendingRequest;
 
     // Don't render publish button if already published
     if (action === 'PUBLISH' && isPublished) return null;
@@ -371,7 +376,7 @@ export function ChangelogActionRequest({
             disabled={disabled || isSubmitting || config.disabled}
             variant={config.variant}
             size={size}
-            className={cn("gap-2", className, config.disabled && "opacity-75")}
+            className={cn("gap-2", className, config.disabled && "opacity-60")}
         >
             {isSubmitting ? (
                 <>
@@ -382,6 +387,9 @@ export function ChangelogActionRequest({
                 <>
                     <IconComponent className="h-4 w-4"/>
                     {config.label}
+                    {isPending && (
+                        <Clock className="h-3.5 w-3.5 text-amber-500 ml-0.5" />
+                    )}
                 </>
             )}
         </Button>
@@ -419,10 +427,28 @@ export function ChangelogActionRequest({
 
     const dialogContent = getDialogContent();
 
+    // When pending, wrap the trigger with an informative tooltip
+    const trigger = isPending && pendingRequest ? (
+        <TooltipProvider>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    {renderButton()}
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs">
+                    <p className="font-medium">Approval pending</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                        Submitted by {pendingRequest.staff.name || pendingRequest.staff.email}{' '}
+                        {formatDistanceToNow(new Date(pendingRequest.createdAt), {addSuffix: true})}
+                    </p>
+                </TooltipContent>
+            </Tooltip>
+        </TooltipProvider>
+    ) : renderButton();
+
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
-                {renderButton()}
+                {trigger}
             </DialogTrigger>
             <DialogContent className="max-w-lg">
                 <DialogHeader>

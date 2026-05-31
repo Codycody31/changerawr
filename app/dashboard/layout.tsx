@@ -32,6 +32,7 @@ import {NavSection, Sidebar, SidebarUser} from '@/components/ui/sidebar'
 import {getGravatarUrl} from '@/lib/utils/gravatar'
 import {CommandPaletteProvider} from "@/components/providers/CommandPaletteProvider"
 import {UpdateIndicatorBadge} from '@/components/UpdateIndicatorBadge'
+import {PendingRequestsBadge} from '@/components/PendingRequestsBadge'
 import {TelemetryPromptModal} from '@/components/telemetry/PromptModal'
 import {useTelemetry} from '@/hooks/useTelemetry'
 import {DevToolsConsole} from '@/components/extensions/DevToolsConsole'
@@ -122,7 +123,8 @@ const NAV_SECTIONS: NavSection[] = [
                 href: "/dashboard/admin/requests",
                 label: "Requests",
                 icon: ClipboardCheck,
-                requiredRole: ['ADMIN']
+                requiredRole: ['ADMIN'],
+                badge: <PendingRequestsBadge />
             },
             {
                 href: "/dashboard/admin/system",

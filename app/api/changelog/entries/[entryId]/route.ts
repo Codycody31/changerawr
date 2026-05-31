@@ -9,6 +9,7 @@ import {
 } from '@/lib/utils/changelog'
 import {z} from "zod";
 import {NextResponse} from 'next/server';
+import {createOrReopenRequest} from '@/lib/services/request/changelog-request';
 import {useEntryViewTracking} from '@/app/changelog/[projectId]/changelog-view'
 
 // Helper to get project ID from changelog entry
@@ -360,16 +361,13 @@ export async function DELETE(
             return sendError('Changelog entry not found', 404)
         }
 
-        // If user is staff, create a deletion request
+        // If user is staff, create (or reopen if CHANGES_REQUESTED) a deletion request
         if (user.role === 'STAFF') {
-            const request = await db.changelogRequest.create({
-                data: {
-                    type: 'DELETE_ENTRY',
-                    status: 'PENDING',
-                    staffId: user.id,
-                    changelogEntryId: (await params).entryId,
-                    projectId: projectId
-                }
+            const request = await createOrReopenRequest({
+                type: 'DELETE_ENTRY',
+                staffId: user.id,
+                changelogEntryId: (await params).entryId,
+                projectId: projectId,
             })
 
             return sendSuccess({

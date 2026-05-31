@@ -1,14 +1,16 @@
-// app/api/projects/[projectId]/changelog/[entryId]/schedule/approval/route.ts
 import {NextResponse} from "next/server";
 import {z} from "zod";
 import {validateAuthAndGetUser} from "@/lib/utils/changelog";
 import {db} from "@/lib/db";
 import {createAuditLog} from "@/lib/utils/auditLog";
-import {Role, ScheduledJobType} from "@prisma/client";
-import {User} from "@/lib/types/auth";
+import {Role} from "@prisma/client";
+import {ScheduledJobService, ScheduledJobType} from "@/lib/services/jobs/scheduled-job.service";
+import {sendNotificationEmail} from "@/lib/services/email/notification";
+import {createOrReopenRequest} from "@/lib/services/request/changelog-request";
 
+// scheduledAt only required for request_approval; optional for approve/reject
 const scheduleApprovalSchema = z.object({
-    scheduledAt: z.string().datetime(),
+    scheduledAt: z.string().datetime().optional(),
     action: z.enum(["request_approval", "approve", "reject"]),
     reason: z.string().optional(),
 });
@@ -152,25 +154,13 @@ export async function POST(
                 );
             }
 
-            // Create the schedule approval request
-            const scheduleRequest = await db.changelogRequest.create({
-                data: {
-                    type: 'ALLOW_SCHEDULE',
-                    staffId: user.id,
-                    projectId,
-                    changelogEntryId: entryId,
-                    status: 'PENDING',
-                    targetId: scheduledAt, // Store the requested schedule time
-                },
-                include: {
-                    staff: {
-                        select: {
-                            id: true,
-                            email: true,
-                            name: true,
-                        },
-                    },
-                },
+            // Create (or reopen if CHANGES_REQUESTED) schedule approval request
+            const scheduleRequest = await createOrReopenRequest({
+                type: 'ALLOW_SCHEDULE',
+                staffId: user.id,
+                projectId,
+                changelogEntryId: entryId,
+                targetId: scheduledAt, // Store the requested schedule time
             });
 
             await createAuditLog(
@@ -256,9 +246,6 @@ export async function POST(
                 });
 
                 // Create scheduled job
-                const {
-                    ScheduledJobService,
-                } = await import('@/lib/services/jobs/scheduled-job.service');
                 const jobId = await ScheduledJobService.createJob({
                     type: ScheduledJobType.PUBLISH_CHANGELOG_ENTRY,
                     entityId: entryId,
@@ -282,7 +269,6 @@ export async function POST(
 
                 // Send notification to staff member
                 try {
-                    const {sendNotificationEmail} = await import('@/lib/services/email/notification');
                     await sendNotificationEmail({
                         userId: pendingRequest.staffId!,
                         status: 'APPROVED',
@@ -335,7 +321,6 @@ export async function POST(
 
                 // Send notification to staff member
                 try {
-                    const {sendNotificationEmail} = await import('@/lib/services/email/notification');
                     await sendNotificationEmail({
                         userId: pendingRequest.staffId!,
                         status: 'REJECTED',

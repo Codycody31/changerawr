@@ -30,7 +30,7 @@ export function useSpellcheck(): UseSpellcheckReturn {
 
     setIsChecking(true);
     try {
-      const response = await fetch('/api/languagetool/check', {
+      const response = await fetch('/api/integrations/spellchecker/check', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

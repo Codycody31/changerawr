@@ -52,6 +52,7 @@ interface AISystemSettings {
     enableAIAssistant: boolean;
     aiApiKey: string | null;
     aiDefaultModel: string | null;
+    changelogTaggerConfigured: boolean;
 }
 
 interface SaveErrorDetails {
@@ -325,12 +326,13 @@ export function ChangelogEditor({
 
                 const encryptedData = await response.json();
 
-                // If no API key or AI disabled, return as-is
+                // If no API key or AI disabled, return as-is (tagger may still be configured)
                 if (!encryptedData.enableAIAssistant || !encryptedData.aiApiKey) {
                     return {
                         enableAIAssistant: encryptedData.enableAIAssistant || false,
                         aiApiKey: null,
-                        aiDefaultModel: encryptedData.aiDefaultModel || null
+                        aiDefaultModel: encryptedData.aiDefaultModel || null,
+                        changelogTaggerConfigured: encryptedData.changelogTaggerConfigured || false,
                     };
                 }
 
@@ -355,12 +357,13 @@ export function ChangelogEditor({
                 return {
                     enableAIAssistant: encryptedData.enableAIAssistant || false,
                     aiApiKey: decryptedApiKey,
-                    aiDefaultModel: encryptedData.aiDefaultModel || null
+                    aiDefaultModel: encryptedData.aiDefaultModel || null,
+                    changelogTaggerConfigured: encryptedData.changelogTaggerConfigured || false,
                 };
 
             } catch (error) {
                 console.error('Error in AI settings query:', error);
-                return { enableAIAssistant: false, aiApiKey: null, aiDefaultModel: null };
+                return { enableAIAssistant: false, aiApiKey: null, aiDefaultModel: null, changelogTaggerConfigured: false };
             }
         },
         staleTime: CACHE_TIME,
@@ -425,6 +428,7 @@ export function ChangelogEditor({
     // ===== Computed Values =====
     const aiEnabled = aiSystemSettings?.enableAIAssistant || false;
     const sectonApiKey = aiSystemSettings?.aiApiKey || '';
+    const changelogTaggerConfigured = aiSystemSettings?.changelogTaggerConfigured || false;
 
     const {availableTags, mappedDefaultTags} = useMemo(() => {
         if (!initialData || !tagsData?.pages) {
@@ -446,22 +450,11 @@ export function ChangelogEditor({
             }
         });
 
-        // Process default tags
+        // Process default tags — only pre-select ones that actually exist in the DB
         defaultTags.forEach(name => {
-            const lowercaseName = name.toLowerCase();
-            if (!tagMap.has(lowercaseName)) {
-                const tag = {
-                    id: `default-${lowercaseName}`,
-                    name: name
-                };
-                tagMap.set(lowercaseName, tag);
-                defaultTagObjects.push(tag);
-            } else {
-                const existingTag = tagMap.get(lowercaseName);
-                if (existingTag) {
-                    defaultTagObjects.push(existingTag);
-                }
-            }
+            const existingTag = tagMap.get(name.toLowerCase());
+            if (existingTag) defaultTagObjects.push(existingTag);
+            // Tag not in DB → silently skip; never fabricate fake tag objects
         });
 
         return {
@@ -981,6 +974,7 @@ Generated: ${new Date().toISOString()}
                 onTitleChange={handleTitleChange}
                 content={editorState.content}
                 aiApiKey={sectonApiKey}
+                changelogTaggerConfigured={changelogTaggerConfigured}
                 onLoadMoreTags={hasNextPage ? async () => {
                     await fetchNextPage();
                 } : undefined}

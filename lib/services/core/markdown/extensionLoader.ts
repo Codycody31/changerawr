@@ -18,7 +18,7 @@ import { builtInExtensions, ExtensionMetadata, ExtensionWithMetadata } from './e
  * Each loader wraps the import in try-catch to handle missing extensions
  */
 
-async function load_changerawr_geode(): Promise<ExtensionWithMetadata | null> {
+async function load_changerawr_geode() {
   try {
     const module = await import('@/extensions/changerawr/geode');
     return {
@@ -27,9 +27,9 @@ async function load_changerawr_geode(): Promise<ExtensionWithMetadata | null> {
         ...module.metadata,
         readme: "# GeodeMD\n\nComprehensive Geometry Dash enhancements for markdown. Add color tags, clickable links to GD content, and Geode API status badges with an intuitive toolkit.\n\n## Features\n\n- 🎨 **Color Tags** - 14 official GD colors with live preview\n- 🔗 **GD Links** - Clickable links to users, levels, and mods\n- 🏷️ **Geode Badges** - API-powered status badges for mods\n- ⚡ **Quick Insert** - Professional 3-tab toolkit for all features\n- 🎯 **Live Preview** - See your formatting before inserting\n\n## Quick Start\n\nClick the **GeodeMD** toolbar button to open the toolkit with three tabs:\n1. **Color Tags** - Apply GD color formatting\n2. **GD Links** - Create links to GD content\n3. **Geode Badges** - Insert mod status badges\n\n## Color Tags\n\n### Usage\n\nUse matching tags to color your text with official GD colors:\n\n```markdown\n<cb>blue text</cb>\n<cg>green text</cg>\n<cr>red text</cr>\n```\n\n### Available Colors\n\n| Tag | Color | Hex Code |\n|-----|-------|----------|\n| `<cb>` | Blue | #4A52E1 |\n| `<cg>` | Green | #40E348 |\n| `<cl>` | Light Blue | #60ABEF |\n| `<cj>` | Cyan | #32C8FF |\n| `<cy>` | Yellow | #FFFF00 |\n| `<co>` | Orange | #FF5A4B |\n| `<cr>` | Red | #FF5A5A |\n| `<cp>` | Pink | #FF00FF |\n| `<ca>` | Purple | #9632FF |\n| `<cd>` | Light Pink | #FF96FF |\n| `<cc>` | Light Yellow | #FFFF96 |\n| `<cf>` | Light Cyan | #96FFFF |\n| `<cs>` | Gold | #FFDC41 |\n| `<c_>` | Bright Red | #FF0000 |\n\n### Example\n\n```markdown\nWelcome to <cb>Geometry Dash</cb>! This level has <cy>100 stars</cy> and is <cr>extremely hard</cr>!\n```\n\n## GD Links\n\nCreate clickable links that automatically redirect to GDBrowser or Geode SDK.\n\n### Syntax\n\n```markdown\n[text](protocol:value)\n```\n\n### Supported Protocols\n\n| Protocol | Redirects To | Example |\n|----------|--------------|---------|\n| `user:` | GDBrowser user profile | `[RobTop](user:RobTop)` |\n| `level:` | GDBrowser level page | `[Bloodbath](level:10565740)` |\n| `mod:` | Geode SDK mod page | `[Geode Loader](mod:geode.loader)` |\n\n### Examples\n\n```markdown\nCheck out [RobTop's profile](user:RobTop)!\nPlay [Bloodbath](level:10565740) - it's insane!\nDownload [Geode](mod:geode.loader) to use mods.\n```\n\n## Geode Badges\n\nInsert dynamic status badges from the Geode API that show real-time mod information.\n\n### Available Badges\n\n- **Version** - Current mod version (e.g., v1.2.3)\n- **Downloads** - Total download count (e.g., 1.2k downloads)\n- **GD Version** - Compatible GD version (e.g., GD 2.206)\n- **Geode Version** - Required Geode version (e.g., Geode v3.0.0)\n\n### Syntax\n\n```markdown\n![badge-type](https://api.geode-sdk.org/v1/mods/MOD_ID/badges/BADGE_TYPE)\n```\n\n### Example\n\n```markdown\n![version](https://api.geode-sdk.org/v1/mods/geode.loader/badges/version)\n![downloads](https://api.geode-sdk.org/v1/mods/geode.loader/badges/downloads)\n```\n\n## Complete Example\n\n```markdown\n# My Awesome GD Level\n\nWelcome to <cy>Golden Valley</cy>! This is a <cb>medium demon</cb> level created by <cg>me</cg>!\n\n## Details\n\n- **ID**: [12345678](level:12345678)\n- **Creator**: [MyUsername](user:MyUsername)\n- **Difficulty**: <cr>Medium Demon</cr>\n\n## Mods Used\n\nI recommend using [Geode](mod:geode.loader) to play this level with these mods:\n\n![version](https://api.geode-sdk.org/v1/mods/geode.loader/badges/version)\n![downloads](https://api.geode-sdk.org/v1/mods/geode.loader/badges/downloads)\n\nHave fun and <cy>good luck</cy>! <cb>GG</cb>!\n```\n\n## Tips\n\n- **Color Tags**: Press Enter in the text field to quickly insert\n- **Links**: Leave \"Link Text\" empty to use the ID/username as display text\n- **Badges**: Select multiple badges to insert them all at once\n- **Combining**: Mix color tags with other markdown formatting (bold, italic, etc.)\n\n## Technical Details\n\n- Color tags use inline CSS with `font-weight: 600` for emphasis\n- Links use `target=\"_blank\"` to open in new tabs\n- Badges are live images from the Geode API\n- All features work in both light and dark themes\n- Zero external CSS dependencies\n",
         icon: "Sparkles",
-
+        
       },
-    } as unknown as ExtensionWithMetadata;
+    };
   } catch (err) {
     console.error('[Extension Loader] Failed to load changerawr/geode:', err instanceof Error ? err.message : err);
     console.error('[Extension Loader] Triggering extension regeneration...');
@@ -46,7 +46,7 @@ async function load_changerawr_geode(): Promise<ExtensionWithMetadata | null> {
   }
 }
 
-async function load_changerawr_highlight(): Promise<ExtensionWithMetadata | null> {
+async function load_changerawr_highlight() {
   try {
     const module = await import('@/extensions/changerawr/highlight');
     return {
@@ -55,9 +55,9 @@ async function load_changerawr_highlight(): Promise<ExtensionWithMetadata | null
         ...module.metadata,
         readme: "# Highlight\n\nMark important text with color. Now with a color picker.\n\n## Basic usage\n\n```markdown\n==yellow highlight==\n=={green}green highlight==\n=={#ff6b6b}custom color==\n```\n\n## Color picker\n\nClick the highlighter button to open a popover where you can:\n- Pick from 7 preset colors\n- Enter any hex color code\n- See a live preview\n\n## Preset colors\n\nyellow, green, blue, red, purple, pink, orange\n\n## Custom colors\n\nType any hex code like `#ff6b6b` or `#4a90e2` in the color picker.\n\n## Examples\n\n```markdown\nStudy notes with ==key terms== highlighted.\n\nMark =={green}correct answers== and =={red}common mistakes==.\n\nBrand colors: =={#FF5733}primary== and =={#33C3FF}secondary==.\n```\n",
         icon: "Highlighter",
-
+        
       },
-    } as unknown as ExtensionWithMetadata;
+    };
   } catch (err) {
     console.error('[Extension Loader] Failed to load changerawr/highlight:', err instanceof Error ? err.message : err);
     console.error('[Extension Loader] Triggering extension regeneration...');
@@ -74,7 +74,7 @@ async function load_changerawr_highlight(): Promise<ExtensionWithMetadata | null
   }
 }
 
-async function load_changerawr_spoiler(): Promise<ExtensionWithMetadata | null> {
+async function load_changerawr_spoiler() {
   try {
     const module = await import('@/extensions/changerawr/spoiler');
     return {
@@ -85,7 +85,7 @@ async function load_changerawr_spoiler(): Promise<ExtensionWithMetadata | null> 
         icon: "Eye",
         
       },
-    } as unknown as ExtensionWithMetadata;
+    };
   } catch (err) {
     console.error('[Extension Loader] Failed to load changerawr/spoiler:', err instanceof Error ? err.message : err);
     console.error('[Extension Loader] Triggering extension regeneration...');
@@ -102,7 +102,7 @@ async function load_changerawr_spoiler(): Promise<ExtensionWithMetadata | null> 
   }
 }
 
-async function load_changerawr_unsplash(): Promise<ExtensionWithMetadata | null> {
+async function load_changerawr_unsplash() {
   try {
     const module = await import('@/extensions/changerawr/unsplash');
     return {
@@ -113,7 +113,7 @@ async function load_changerawr_unsplash(): Promise<ExtensionWithMetadata | null>
         icon: "Image",
         settings: [{"key":"apiKey","label":"**Unsplash API Key**","description":"Your Unsplash API Access Key. Get one free at [unsplash.com/developers](https://unsplash.com/developers) - **will be encrypted** when stored","type":"string","defaultValue":"","required":true,"placeholder":"Enter your Unsplash Access Key"},{"key":"imageSize","label":"**Image Quality & Size**","description":"Controls both the downloaded image quality from Unsplash and the display size in your markdown","type":"select","defaultValue":"800","options":[{"label":"Small (400px)","value":"400"},{"label":"Medium (800px)","value":"800"},{"label":"Large (1200px)","value":"1200"},{"label":"Extra Large (1600px)","value":"1600"}]},{"key":"includeAttribution","label":"**Include Photo Attribution**","description":"Add photographer credit as caption (*required* by [Unsplash guidelines](https://unsplash.com/license)) - if you have **Unsplash+** you can turn this off","type":"boolean","defaultValue":true}],
       },
-    } as unknown as ExtensionWithMetadata;
+    };
   } catch (err) {
     console.error('[Extension Loader] Failed to load changerawr/unsplash:', err instanceof Error ? err.message : err);
     console.error('[Extension Loader] Triggering extension regeneration...');

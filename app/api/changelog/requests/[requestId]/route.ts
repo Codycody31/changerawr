@@ -5,8 +5,9 @@ import { changelogRequestService } from '@/lib/services/request/changelog-reques
 
 // Schema validation
 const updateRequestSchema = z.object({
-    status: z.enum(['APPROVED', 'REJECTED']),
-    timestamp: z.string().optional()
+    status: z.enum(['APPROVED', 'REJECTED', 'CHANGES_REQUESTED']),
+    feedback: z.string().max(2000).optional(),
+    timestamp: z.string().optional(),
 });
 
 /**
@@ -103,7 +104,8 @@ export async function PATCH(
             const result = await changelogRequestService.processRequest({
                 requestId,
                 status: validatedData.status,
-                adminId: user.id
+                adminId: user.id,
+                feedback: validatedData.feedback,
             });
 
             console.log('Request processed successfully:', result);

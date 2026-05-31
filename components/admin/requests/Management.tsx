@@ -51,7 +51,13 @@ import {
     FileText,
     Tag,
     Trash2,
+    MessageSquare,
+    ExternalLink,
+    RefreshCw,
 } from 'lucide-react'
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
 import {motion, AnimatePresence} from 'framer-motion'
 
 // Updated type definitions
@@ -282,8 +288,10 @@ export interface ChangelogRequest {
     id: string;
     type: RequestType;
     targetId?: string | null;
+    projectId: string;
     metadata?: {customPublishedAt?: string} | null;
     project: {
+        id: string;
         name: string;
     };
     staff: {
@@ -291,15 +299,17 @@ export interface ChangelogRequest {
         email: string;
     };
     ChangelogTag?: {
+        id: string;
         name: string;
     };
     ChangelogEntry?: {
+        id: string;
         title: string;
     };
     createdAt: string;
 }
 
-export type RequestStatus = 'APPROVED' | 'REJECTED';
+export type RequestStatus = 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'CHANGES_REQUESTED_PENDING';
 
 type ProcessingRequest = {
     id: string;
@@ -314,6 +324,23 @@ export function RequestManagement() {
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
     const [selectedRequest, setSelectedRequest] = useState<ChangelogRequest | null>(null)
     const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
+    const [isFeedbackDialogOpen, setIsFeedbackDialogOpen] = useState(false)
+    const [feedbackRequestId, setFeedbackRequestId] = useState<string | null>(null)
+    const [feedbackText, setFeedbackText] = useState('')
+    const [confirmFeedback, setConfirmFeedback] = useState('')
+    const [sortBy, setSortBy] = useState<'date' | 'type' | 'severity'>('date')
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+
+    const {data: emailConfig} = useQuery<{smtpHost?: string | null}>({
+        queryKey: ['system-email-config'],
+        queryFn: async () => {
+            const res = await fetch('/api/admin/config/system-email')
+            if (!res.ok) return {}
+            return res.json()
+        },
+        staleTime: 5 * 60 * 1000,
+    })
+    const emailConfigured = !!emailConfig?.smtpHost
 
     const {data: requests, isLoading, error} = useQuery<ChangelogRequest[]>({
         queryKey: ['changelog-requests'],
@@ -330,15 +357,17 @@ export function RequestManagement() {
     const processRequest = useMutation({
         mutationFn: async ({
                                requestId,
-                               status
+                               status,
+                               feedback,
                            }: {
             requestId: string
             status: RequestStatus
+            feedback?: string
         }) => {
             const response = await fetch(`/api/changelog/requests/${requestId}`, {
                 method: 'PATCH',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({status})
+                body: JSON.stringify({ status, ...(feedback ? { feedback } : {}) })
             })
 
             if (!response.ok) {
@@ -350,12 +379,13 @@ export function RequestManagement() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({queryKey: ['changelog-requests']})
+            // Refresh the sidebar badge counter
+            queryClient.invalidateQueries({queryKey: ['pending-requests-count']})
             toast({
                 title: 'Success',
                 description: `Request ${processingRequest?.status?.toLowerCase() || ''} successfully`
             })
             setIsDialogOpen(false)
-            setProcessingRequest(null)
         },
         onError: (error: Error) => {
             toast({
@@ -373,13 +403,32 @@ export function RequestManagement() {
         setIsDialogOpen(true)
     }
 
+    const handleRequestChanges = (requestId: string) => {
+        setFeedbackRequestId(requestId)
+        setFeedbackText('')
+        setIsFeedbackDialogOpen(true)
+    }
+
+    const confirmRequestChanges = () => {
+        if (!feedbackRequestId || !feedbackText.trim()) return
+        processRequest.mutate({
+            requestId: feedbackRequestId,
+            status: 'CHANGES_REQUESTED',
+            feedback: feedbackText.trim(),
+        })
+        setIsFeedbackDialogOpen(false)
+        setFeedbackRequestId(null)
+        setFeedbackText('')
+    }
+
     const confirmProcessRequest = () => {
         if (!processingRequest) return
-
         processRequest.mutate({
             requestId: processingRequest.id,
-            status: processingRequest.status
+            status: processingRequest.status,
+            feedback: confirmFeedback.trim() || undefined,
         })
+        setConfirmFeedback('')
     }
 
     const toggleRowExpansion = (requestId: string) => {
@@ -445,10 +494,42 @@ export function RequestManagement() {
         <>
             <Card>
                 <CardHeader>
-                    <CardTitle>Pending Requests</CardTitle>
-                    <CardDescription>
-                        Review and manage action requests from staff members. Click on any row for detailed information.
-                    </CardDescription>
+                    <div className="flex items-center justify-between gap-4">
+                        <div>
+                            <CardTitle>Pending Requests</CardTitle>
+                            <CardDescription>
+                                Review and manage action requests from staff members.
+                            </CardDescription>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            <Select
+                                value={`${sortBy}-${sortDir}`}
+                                onValueChange={(v) => {
+                                    const [by, dir] = v.split('-') as [typeof sortBy, typeof sortDir];
+                                    setSortBy(by); setSortDir(dir);
+                                }}
+                            >
+                                <SelectTrigger className="h-8 w-36 text-xs">
+                                    <SelectValue/>
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="date-desc">Newest first</SelectItem>
+                                    <SelectItem value="date-asc">Oldest first</SelectItem>
+                                    <SelectItem value="type-asc">Type A–Z</SelectItem>
+                                    <SelectItem value="severity-desc">Severity ↓</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => queryClient.invalidateQueries({queryKey: ['changelog-requests']})}
+                                title="Reload"
+                            >
+                                <RefreshCw className="h-3.5 w-3.5"/>
+                            </Button>
+                        </div>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     {!requests?.length ? (
@@ -465,9 +546,26 @@ export function RequestManagement() {
                         </div>
                     ) : (
                         <div className="space-y-4">
-                            {requests.map((request) => {
+                            {[...(requests ?? [])].sort((a, b) => {
+                                const severityOrder = {critical: 4, high: 3, medium: 2, low: 1};
+                                if (sortBy === 'date') {
+                                    const diff = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+                                    return sortDir === 'asc' ? diff : -diff;
+                                }
+                                if (sortBy === 'type') {
+                                    const diff = a.type.localeCompare(b.type);
+                                    return sortDir === 'asc' ? diff : -diff;
+                                }
+                                if (sortBy === 'severity') {
+                                    const aS = severityOrder[getRequestTypeInfo(a.type).severity] ?? 0;
+                                    const bS = severityOrder[getRequestTypeInfo(b.type).severity] ?? 0;
+                                    return sortDir === 'desc' ? bS - aS : aS - bS;
+                                }
+                                return 0;
+                            }).map((request) => {
                                 const typeInfo = getRequestTypeInfo(request.type);
                                 const isExpanded = expandedRows.has(request.id);
+                                const isResubmitted = (request as unknown as {status: string}).status === 'CHANGES_REQUESTED_PENDING';
 
                                 return (
                                     <motion.div
@@ -499,6 +597,12 @@ export function RequestManagement() {
                                                                     {typeInfo.icon}
                                                                     {typeInfo.label}
                                                                 </Badge>
+                                                                {isResubmitted && (
+                                                                    <Badge variant="outline" className="gap-1 text-xs border-blue-300 text-blue-600 bg-blue-50">
+                                                                        <MessageSquare className="h-2.5 w-2.5"/>
+                                                                        Resubmitted
+                                                                    </Badge>
+                                                                )}
                                                             </div>
 
                                                             <div className="flex-1 min-w-0">
@@ -551,8 +655,22 @@ export function RequestManagement() {
                                                                     handleProcessRequest(request.id, 'APPROVED');
                                                                 }}
                                                                 disabled={processRequest.isPending}
+                                                                className="h-8 w-8 p-0"
                                                             >
                                                                 <Check className="h-4 w-4"/>
+                                                            </Button>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleRequestChanges(request.id);
+                                                                }}
+                                                                disabled={processRequest.isPending}
+                                                                className="h-8 w-8 p-0 border-amber-300 text-amber-600 hover:bg-amber-50 hover:text-amber-700"
+                                                                title="Request changes"
+                                                            >
+                                                                <MessageSquare className="h-4 w-4"/>
                                                             </Button>
                                                             <Button
                                                                 size="sm"
@@ -642,7 +760,34 @@ export function RequestManagement() {
                                     </div>
                                 </div>
 
-                                <div className="flex gap-2 pt-4">
+                                <div className="flex gap-2 pt-4 flex-wrap">
+                                    {/* Open the relevant resource in a new tab for review */}
+                                    {selectedRequest.ChangelogEntry?.id && (
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => window.open(
+                                                `/dashboard/projects/${selectedRequest.project.id}/changelog/${selectedRequest.ChangelogEntry!.id}`,
+                                                '_blank'
+                                            )}
+                                            className="mr-auto"
+                                        >
+                                            <ExternalLink className="h-4 w-4 mr-2"/>
+                                            Open entry
+                                        </Button>
+                                    )}
+                                    {selectedRequest.type === 'DELETE_PROJECT' && (
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => window.open(
+                                                `/dashboard/projects/${selectedRequest.project.id}`,
+                                                '_blank'
+                                            )}
+                                            className="mr-auto"
+                                        >
+                                            <ExternalLink className="h-4 w-4 mr-2"/>
+                                            Open project
+                                        </Button>
+                                    )}
                                     <Button
                                         onClick={() => {
                                             setIsDetailDialogOpen(false);
@@ -651,7 +796,18 @@ export function RequestManagement() {
                                         variant="success"
                                     >
                                         <Check className="h-4 w-4 mr-2"/>
-                                        Approve Request
+                                        Approve
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => {
+                                            setIsDetailDialogOpen(false);
+                                            handleRequestChanges(selectedRequest.id);
+                                        }}
+                                        className="border-amber-300 text-amber-600 hover:bg-amber-50"
+                                    >
+                                        <MessageSquare className="h-4 w-4 mr-2"/>
+                                        Request Changes
                                     </Button>
                                     <Button
                                         variant="destructive"
@@ -659,10 +815,9 @@ export function RequestManagement() {
                                             setIsDetailDialogOpen(false);
                                             handleProcessRequest(selectedRequest.id, 'REJECTED');
                                         }}
-                                        className="flex-1"
                                     >
                                         <X className="h-4 w-4 mr-2"/>
-                                        Reject Request
+                                        Reject
                                     </Button>
                                 </div>
                             </div>
@@ -671,40 +826,107 @@ export function RequestManagement() {
                 </DialogContent>
             </Dialog>
 
-            {/* Confirmation Dialog */}
-            <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>
-                            {processingRequest?.status === 'APPROVED' ? 'Approve Request?' : 'Reject Request?'}
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
+            {/* Approve / Reject Confirmation Dialog */}
+            <Dialog open={isDialogOpen} onOpenChange={(open) => {
+                setIsDialogOpen(open)
+                if (!open) { setProcessingRequest(null); setConfirmFeedback('') }
+            }}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
                             {processingRequest?.status === 'APPROVED'
-                                ? 'This will approve the request and execute the requested action immediately.'
-                                : 'This will reject the request. The requested action will not be performed and the staff member will be notified.'}
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => {
-                            setProcessingRequest(null)
-                            setIsDialogOpen(false)
-                        }}>
+                                ? <><Check className="h-5 w-5 text-green-500"/> Approve request?</>
+                                : <><X className="h-5 w-5 text-destructive"/> Reject request?</>}
+                        </DialogTitle>
+                        <DialogDescription>
+                            {processingRequest?.status === 'APPROVED'
+                                ? 'This will approve the request and execute the action immediately.'
+                                : `The requested action will not be performed.${emailConfigured ? ' The staff member will be notified by email.' : ''}`}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-2">
+                        <Label htmlFor="confirm-feedback">
+                            Note for staff{' '}
+                            <span className="text-muted-foreground font-normal">(optional)</span>
+                        </Label>
+                        <Textarea
+                            id="confirm-feedback"
+                            placeholder={processingRequest?.status === 'APPROVED'
+                                ? 'e.g. Great work — goes live tonight.'
+                                : 'e.g. This conflicts with the upcoming v2 release.'}
+                            value={confirmFeedback}
+                            onChange={(e) => setConfirmFeedback(e.target.value)}
+                            rows={3}
+                            className="resize-none"
+                        />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => { setIsDialogOpen(false); setProcessingRequest(null); setConfirmFeedback('') }}>
                             Cancel
-                        </AlertDialogCancel>
-                        <AlertDialogAction
+                        </Button>
+                        <Button
                             onClick={confirmProcessRequest}
+                            disabled={processRequest.isPending}
+                            variant={processingRequest?.status === 'APPROVED' ? 'success' : 'destructive'}
                         >
-                            {processRequest.isPending ? (
-                                <Loader2 className="h-4 w-4 animate-spin"/>
-                            ) : processingRequest?.status === 'APPROVED' ? (
-                                'Approve'
-                            ) : (
-                                'Reject'
-                            )}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                            {processRequest.isPending
+                                ? <Loader2 className="h-4 w-4 animate-spin mr-2"/>
+                                : processingRequest?.status === 'APPROVED'
+                                    ? <Check className="h-4 w-4 mr-2"/>
+                                    : <X className="h-4 w-4 mr-2"/>}
+                            {processingRequest?.status === 'APPROVED' ? 'Approve' : 'Reject'}
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Feedback / Request Changes Dialog */}
+            <Dialog open={isFeedbackDialogOpen} onOpenChange={(open) => {
+                setIsFeedbackDialogOpen(open);
+                if (!open) { setFeedbackText(''); setFeedbackRequestId(null); }
+            }}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <MessageSquare className="h-5 w-5 text-amber-500"/>
+                            Request Changes
+                        </DialogTitle>
+                        <DialogDescription>
+                            Describe what needs to be changed. The staff member will be{' '}
+                            {emailConfigured ? 'notified by email with your feedback.' : 'able to see your feedback in their requests page.'}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3">
+                        <Label htmlFor="feedback">Feedback for the staff member</Label>
+                        <Textarea
+                            id="feedback"
+                            placeholder="e.g. Please clarify the breaking change section and add migration steps..."
+                            value={feedbackText}
+                            onChange={(e) => setFeedbackText(e.target.value)}
+                            rows={5}
+                            className="resize-none"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            {feedbackText.length}/2000 characters
+                        </p>
+                    </div>
+                    <div className="flex justify-end gap-2 pt-2">
+                        <Button variant="outline" onClick={() => setIsFeedbackDialogOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={confirmRequestChanges}
+                            disabled={!feedbackText.trim() || processRequest.isPending}
+                            className="bg-amber-500 hover:bg-amber-600 text-white"
+                        >
+                            {processRequest.isPending
+                                ? <Loader2 className="h-4 w-4 animate-spin mr-2"/>
+                                : <MessageSquare className="h-4 w-4 mr-2"/>}
+                            Send Feedback
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </>
     )
 }
