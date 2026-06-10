@@ -6,6 +6,8 @@ const { execSync } = require('child_process');
 const { cpSync, existsSync } = require('fs');
 const path = require('path');
 
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+
 if (process.env.NODE_ENV !== 'development') process.exit(0);
 
 const src = path.resolve(__dirname, '../../changerawr-markdown');

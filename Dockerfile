@@ -6,6 +6,8 @@ WORKDIR /app
 
 # Copy package files
 COPY package.json package-lock.json* ./
+# postinstall runs scripts/sync-markdown.js, so it must exist before npm install
+COPY scripts/sync-markdown.js ./scripts/sync-markdown.js
 # CACHEBUST forces npm install to re-run even when package files are unchanged
 ARG CACHEBUST=1
 RUN echo "Cache bust: $CACHEBUST" && npm install --legacy-peer-deps
@@ -40,6 +42,8 @@ ENV NEXT_TELEMETRY_DISABLED 1
 
 # Install all dependencies to satisfy entrypoint requirements
 COPY package.json package-lock.json* ./
+# postinstall runs scripts/sync-markdown.js, so it must exist before npm install
+COPY scripts/sync-markdown.js ./scripts/sync-markdown.js
 RUN npm install --legacy-peer-deps
 # Install Prisma client with exact version match
 RUN npm uninstall prisma @prisma/client --legacy-peer-deps
