@@ -142,9 +142,10 @@ async function ensureExtensionBuilderRunning(): Promise<void> {
 
     console.log('⚠️  Extension Builder Service not detected, starting it...');
 
-    const serverPath = path.join(process.cwd(), 'scripts', 'extension-builder', 'server.js');
-
-    const builder = spawn('node', [serverPath], {
+    // Pass a relative path and resolve it via `cwd` instead of
+    // path.join(process.cwd(), ...) - Turbopack's build-time tracer treats
+    // that pattern as a server-relative import it can't resolve.
+    const builder = spawn('node', ['scripts/extension-builder/server.js'], {
         stdio: 'inherit',
         cwd: process.cwd(),
         detached: true,
@@ -195,13 +196,14 @@ async function cleanup(): Promise<void> {
 }
 
 function launchGuide(missing: string[]): void {
-    const serverPath = path.join(process.cwd(), 'scripts', 'ftb', 'server.js');
-
     console.log('\n🚨 LAUNCHING FAILURE TO BOOT ERROR SERVER 🚨');
     console.log('Terminating Next.js server to free port 3000...\n');
 
     setTimeout(() => {
-        const guide = spawn('node', [serverPath, ...missing], {
+        // Pass a relative path and resolve it via `cwd` instead of
+        // path.join(process.cwd(), ...) - Turbopack's build-time tracer treats
+        // that pattern as a server-relative import it can't resolve.
+        const guide = spawn('node', ['scripts/ftb/server.js', ...missing], {
             stdio: 'inherit',
             cwd: process.cwd(),
             detached: true
