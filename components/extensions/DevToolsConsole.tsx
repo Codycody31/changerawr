@@ -57,10 +57,10 @@ export function DevToolsConsole() {
 
   // Debug logging
   useEffect(() => {
-    console.log('[DevToolsConsole] Extensions:', extensions);
-    console.log('[DevToolsConsole] Has linked:', hasLinkedExtensions);
-    console.log('[DevToolsConsole] Is loading:', isLoading);
-    console.log('[DevToolsConsole] NODE_ENV:', process.env.NODE_ENV);
+    // console.log('[DevToolsConsole] Extensions:', extensions);
+    // console.log('[DevToolsConsole] Has linked:', hasLinkedExtensions);
+    // console.log('[DevToolsConsole] Is loading:', isLoading);
+    // console.log('[DevToolsConsole] NODE_ENV:', process.env.NODE_ENV);
   }, [extensions, hasLinkedExtensions, isLoading]);
 
   // Check connection status periodically

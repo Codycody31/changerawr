@@ -14,7 +14,7 @@ export class CatchUpService {
         userId: string,
         since: string = 'auto'
     ): Promise<CatchUpResponse> {
-        console.log('getCatchUpData called with:', {projectId, userId, since});
+        // console.log('getCatchUpData called with:', {projectId, userId, since});
 
         // Verify project exists
         const project = await db.project.findUnique({
@@ -27,7 +27,7 @@ export class CatchUpService {
         }
 
         if (!project.changelog) {
-            console.log('No changelog found for project');
+            // console.log('No changelog found for project');
             return {
                 fromDate: new Date().toISOString(),
                 fromVersion: null,
@@ -40,7 +40,7 @@ export class CatchUpService {
 
         // Determine the "since" date
         const fromDate = await this.determineSinceDate(userId, since, project.changelog.id);
-        console.log('Determined fromDate:', fromDate);
+        // console.log('Determined fromDate:', fromDate);
 
         // Get entries since that date - Updated query logic
         const entries = await db.changelogEntry.findMany({
@@ -77,22 +77,22 @@ export class CatchUpService {
             ],
         });
 
-        console.log('Found entries:', entries.length);
-        console.log('Entry details:', entries.map(e => ({
-            id: e.id,
-            title: e.title,
-            version: e.version,
-            publishedAt: e.publishedAt,
-            createdAt: e.createdAt,
-        })));
+        // console.log('Found entries:', entries.length);
+        // console.log('Entry details:', entries.map(e => ({
+        //     id: e.id,
+        //     title: e.title,
+        //     version: e.version,
+        //     publishedAt: e.publishedAt,
+        //     createdAt: e.createdAt,
+        // })));
 
         // Find version range
         const {fromVersion, toVersion} = await this.getVersionRange(entries, fromDate, project.changelog.id);
-        console.log('Version range:', {fromVersion, toVersion});
+        // console.log('Version range:', {fromVersion, toVersion});
 
         // Categorize entries
         const summary = this.categorizeEntries(entries);
-        console.log('Summary:', summary);
+        // console.log('Summary:', summary);
 
         return {
             fromDate: fromDate.toISOString(),
@@ -119,7 +119,7 @@ export class CatchUpService {
         since: string,
         changelogId: string
     ): Promise<Date> {
-        console.log('determineSinceDate called with:', {userId, since, changelogId});
+        // console.log('determineSinceDate called with:', {userId, since, changelogId});
 
         if (since === 'auto') {
             // Try to use user's last login
@@ -129,13 +129,13 @@ export class CatchUpService {
             });
 
             if (user?.lastLoginAt) {
-                console.log('Using user lastLoginAt:', user.lastLoginAt);
+                // console.log('Using user lastLoginAt:', user.lastLoginAt);
                 return user.lastLoginAt;
             }
 
             // Fallback: 7 days ago
             const fallbackDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-            console.log('Using 7-day fallback:', fallbackDate);
+            // console.log('Using 7-day fallback:', fallbackDate);
             return fallbackDate;
         }
 
@@ -147,7 +147,7 @@ export class CatchUpService {
                 since.startsWith('v') ? since.substring(1) : `v${since}`,
             ];
 
-            console.log('Looking for version variants:', versionVariants);
+            // console.log('Looking for version variants:', versionVariants);
 
             for (const versionVariant of versionVariants) {
                 const entry = await db.changelogEntry.findFirst({
@@ -159,12 +159,12 @@ export class CatchUpService {
                     orderBy: {publishedAt: 'asc'},
                 });
 
-                console.log('Version search result for', versionVariant, ':', entry);
+                // console.log('Version search result for', versionVariant, ':', entry);
 
                 if (entry) {
                     // Use publishedAt if available, otherwise createdAt
                     const dateToUse = entry.publishedAt || entry.createdAt;
-                    console.log('Using date from version entry:', dateToUse);
+                    // console.log('Using date from version entry:', dateToUse);
                     return dateToUse;
                 }
             }
@@ -174,11 +174,11 @@ export class CatchUpService {
                 where: {changelogId},
                 select: {version: true, publishedAt: true, createdAt: true},
             });
-            console.log('All available versions in changelog:', allVersions);
+            // console.log('All available versions in changelog:', allVersions);
 
             // If version not found, fallback to 7 days ago
             const fallbackDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-            console.log('Version not found, using 7-day fallback:', fallbackDate);
+            // console.log('Version not found, using 7-day fallback:', fallbackDate);
             return fallbackDate;
         }
 
@@ -189,7 +189,7 @@ export class CatchUpService {
             const multipliers = {d: 1, w: 7, m: 30};
             const days = parseInt(amount) * multipliers[unit as keyof typeof multipliers];
             const relativeDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-            console.log('Using relative date:', relativeDate);
+            // console.log('Using relative date:', relativeDate);
             return relativeDate;
         }
 
@@ -197,7 +197,7 @@ export class CatchUpService {
         try {
             const parsedDate = new Date(since);
             if (!isNaN(parsedDate.getTime())) {
-                console.log('Using parsed ISO date:', parsedDate);
+                // console.log('Using parsed ISO date:', parsedDate);
                 return parsedDate;
             }
         } catch {
@@ -206,7 +206,7 @@ export class CatchUpService {
 
         // Fallback: 7 days ago
         const fallbackDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-        console.log('Using final fallback:', fallbackDate);
+        // console.log('Using final fallback:', fallbackDate);
         return fallbackDate;
     }
 

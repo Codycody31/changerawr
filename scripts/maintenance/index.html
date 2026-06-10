@@ -391,7 +391,9 @@
 </div>
 
 <script>
-    const EXTENSION_BUILDER_URL = 'http://localhost:3010';
+    // Same-origin: the maintenance server (and later Next.js) proxy these
+    // requests to the internal Extension Builder Service on port 3010.
+    const EXTENSION_BUILDER_URL = '';
 
     let fallbackMode = false;
     let elapsedSeconds = 0;

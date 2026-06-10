@@ -762,48 +762,48 @@ export const MarkdownEditor: React.FC<EditorProps> = ({
     useEffect(() => {
         const loadExtensions = async () => {
             try {
-                console.log('[MarkdownEditor] Loading extensions...');
+                // console.log('[MarkdownEditor] Loading extensions...');
                 const response = await fetch('/api/extensions/list');
                 if (!response.ok) {
-                    console.log('[MarkdownEditor] Failed to fetch extensions list');
+                    // console.log('[MarkdownEditor] Failed to fetch extensions list');
                     return;
                 }
 
                 const extensions = await response.json();
-                console.log('[MarkdownEditor] All extensions:', extensions.map((e: any) => `${e.name} (enabled: ${e.isEnabled}, broken: ${e.isBroken})`));
+                // console.log('[MarkdownEditor] All extensions:', extensions.map((e: any) => `${e.name} (enabled: ${e.isEnabled}, broken: ${e.isBroken})`));
                 const enabledExtensions = extensions.filter((ext: any) => ext.isEnabled && !ext.isBroken);
-                console.log('[MarkdownEditor] Enabled extensions:', enabledExtensions.map((e: any) => e.name));
+                // console.log('[MarkdownEditor] Enabled extensions:', enabledExtensions.map((e: any) => e.name));
 
                 // Import extension loader dynamically
                 const { getAvailableExtensions } = await import('@/lib/services/core/markdown/extensionLoader');
                 const allExtensions = await getAvailableExtensions();
-                console.log('[MarkdownEditor] Available extension metadata:', allExtensions.map(e => e.metadata.name));
+                // console.log('[MarkdownEditor] Available extension metadata:', allExtensions.map(e => e.metadata.name));
 
                 // Convert toolbar buttons to markdown actions
                 const actions: MarkdownAction[] = [];
 
                 for (const extMeta of allExtensions) {
                     const isEnabled = enabledExtensions.some((e: any) => e.name === extMeta.metadata.name);
-                    console.log(`[MarkdownEditor] ${extMeta.metadata.name}: enabled=${isEnabled}, has toolbar=${!!extMeta.metadata.toolbar}`);
+                    // console.log(`[MarkdownEditor] ${extMeta.metadata.name}: enabled=${isEnabled}, has toolbar=${!!extMeta.metadata.toolbar}`);
                     if (!isEnabled) continue;
 
                     const toolbar = extMeta.metadata.toolbar;
                     if (!toolbar) {
-                        console.log(`[MarkdownEditor] ${extMeta.metadata.name} has no toolbar`);
+                        // console.log(`[MarkdownEditor] ${extMeta.metadata.name} has no toolbar`);
                         continue;
                     }
 
                     const buttons = Array.isArray(toolbar) ? toolbar : toolbar.buttons;
-                    console.log(`[MarkdownEditor] ${extMeta.metadata.name} toolbar buttons:`, buttons?.length || 0);
+                    // console.log(`[MarkdownEditor] ${extMeta.metadata.name} toolbar buttons:`, buttons?.length || 0);
                     if (!buttons) continue;
 
                     for (const button of buttons) {
                         if (!button.action) {
-                            console.log(`[MarkdownEditor] ${extMeta.metadata.name} button ${button.id} has no action`);
+                            // console.log(`[MarkdownEditor] ${extMeta.metadata.name} button ${button.id} has no action`);
                             continue;
                         }
 
-                        console.log(`[MarkdownEditor] Adding button: ${button.tooltip} to group ${button.group}`);
+                        // console.log(`[MarkdownEditor] Adding button: ${button.tooltip} to group ${button.group}`);
                         actions.push({
                             label: button.tooltip || button.id,
                             icon: typeof button.icon === 'string' ? <Text className="w-4 h-4" /> : React.createElement(button.icon, { className: 'w-4 h-4' }),
@@ -814,8 +814,8 @@ export const MarkdownEditor: React.FC<EditorProps> = ({
                     }
                 }
 
-                console.log('[MarkdownEditor] Total extension actions:', actions.length);
-                console.log('[MarkdownEditor] Actions:', actions.map(a => `${a.label} (${a.group})`));
+                // console.log('[MarkdownEditor] Total extension actions:', actions.length);
+                // console.log('[MarkdownEditor] Actions:', actions.map(a => `${a.label} (${a.group})`));
                 setExtensionActions(actions);
             } catch (error) {
                 console.error('[MarkdownEditor] Failed to load extension toolbar buttons:', error);

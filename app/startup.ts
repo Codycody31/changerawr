@@ -119,6 +119,45 @@ async function validateExtensions(): Promise<void> {
 }
 
 /**
+ * Ensure the Extension Builder Service (port 3010) is running.
+ *
+ * `next start` only boots the Next.js server - the builder service is
+ * normally started separately (docker-entrypoint.sh, `npm run start:all`,
+ * `npm run dev:all`). If nothing else has started it yet, spawn it here so
+ * extension install/update features work with a plain `npm start`.
+ */
+async function ensureExtensionBuilderRunning(): Promise<void> {
+    try {
+        const response = await fetch('http://localhost:3010/health', {
+            signal: AbortSignal.timeout(2000),
+        });
+
+        if (response.ok) {
+            console.log('✓ Extension Builder Service already running');
+            return;
+        }
+    } catch {
+        // Not reachable - fall through and start it ourselves
+    }
+
+    console.log('⚠️  Extension Builder Service not detected, starting it...');
+
+    const serverPath = path.join(process.cwd(), 'scripts', 'extension-builder', 'server.js');
+
+    const builder = spawn('node', [serverPath], {
+        stdio: 'inherit',
+        cwd: process.cwd(),
+        detached: true,
+    });
+
+    builder.on('error', (err) => {
+        console.error('Failed to start Extension Builder Service:', err);
+    });
+
+    builder.unref();
+}
+
+/**
  * Trigger extension import regeneration via the builder service
  */
 async function regenerateExtensionImports(): Promise<void> {
@@ -201,6 +240,9 @@ export async function startBackgroundServices(): Promise<void> {
             checkRequirements();
             console.log('✓ Environment validation passed');
         }
+
+        // Make sure the extension builder service is up before validating
+        await ensureExtensionBuilderRunning();
 
         // Validate extensions before initializing
         await validateExtensions();
