@@ -21,6 +21,16 @@ function shouldProxyToBuilder(url) {
     return BUILDER_PROXY_PREFIXES.some((prefix) => url.startsWith(prefix));
 }
 
+// Matches Next.js build assets and any other file-extensioned request
+// (fonts, css, js, images, source maps, etc.) so they get a 503 instead of
+// the maintenance HTML page.
+const STATIC_ASSET_PATTERN = /^\/_next\/|\.[a-zA-Z0-9]+$/;
+
+function isStaticAssetRequest(url) {
+    const pathname = url.split('?')[0];
+    return STATIC_ASSET_PATTERN.test(pathname);
+}
+
 function proxyToBuilder(req, res) {
     const proxyReq = http.request(
         {
@@ -76,7 +86,19 @@ const server = http.createServer((req, res) => {
         return;
     }
 
-    // Serve maintenance page for all other requests
+    // Static assets (_next/static chunks, fonts, css, etc.) aren't ready yet
+    // either. Returning the maintenance HTML with a 200 for these is what
+    // causes "Unexpected token '<'" / font decode errors in the browser once
+    // Next.js comes up and the page tries to load its real chunks - and CDNs
+    // may cache that bad 200 for the asset URL. Fail loudly instead so the
+    // browser/CDN treats it as unavailable rather than valid content.
+    if (isStaticAssetRequest(req.url)) {
+        res.writeHead(503, { 'Content-Type': 'text/plain' });
+        res.end('Service starting up');
+        return;
+    }
+
+    // Serve maintenance page for all other (page navigation) requests
     res.writeHead(200, { 'Content-Type': 'text/html' });
     res.end(maintenanceHTML);
 });
@@ -89,6 +111,12 @@ server.listen(PORT, '0.0.0.0', () => {
 // Graceful shutdown
 process.on('SIGTERM', () => {
     console.log('🦖 Maintenance server shutting down...');
+    // Force-close keep-alive connections too. Otherwise a browser tab that's
+    // been polling /startup/progress on a persistent connection keeps that
+    // socket alive to this (now zombie) process, and reuses it for
+    // subsequent requests (e.g. _next/static/* chunks) that should go to the
+    // Next.js server taking over this port.
+    server.closeAllConnections();
     server.close(() => {
         console.log('🦖 Maintenance server stopped');
         process.exit(0);
@@ -97,6 +125,12 @@ process.on('SIGTERM', () => {
 
 process.on('SIGINT', () => {
     console.log('🦖 Maintenance server shutting down...');
+    // Force-close keep-alive connections too. Otherwise a browser tab that's
+    // been polling /startup/progress on a persistent connection keeps that
+    // socket alive to this (now zombie) process, and reuses it for
+    // subsequent requests (e.g. _next/static/* chunks) that should go to the
+    // Next.js server taking over this port.
+    server.closeAllConnections();
     server.close(() => {
         console.log('🦖 Maintenance server stopped');
         process.exit(0);
