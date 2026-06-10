@@ -8,6 +8,7 @@ import {ThemeProvider} from "@/components/theme-provider";
 import {Toaster} from "@/components/ui/toaster";
 import {Providers} from "@/app/dashboard/providers"
 import {AmbientDinoLoader} from "@/components/AmbientDinoLoader";
+import {CodeCopyButtonHandler} from "@/components/CodeCopyButtonHandler";
 
 const inter = Inter({subsets: ['latin']})
 
@@ -30,6 +31,7 @@ export default function RootLayout({
                     {children}
                     <Toaster/>
                     <AmbientDinoLoader/>
+                    <CodeCopyButtonHandler/>
                 </Providers>
             </ThemeProvider>
         </AuthProvider>
