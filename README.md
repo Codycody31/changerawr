@@ -45,7 +45,7 @@ If you don't know what a changelog is, check out [betterauth](https://www.better
 
 ### Prerequisites
 
-- Node.js 22+
+- Node.js 24+
 - PostgreSQL database
 
 ### Installation
