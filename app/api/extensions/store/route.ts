@@ -107,21 +107,21 @@ export async function GET(request: NextRequest) {
               // Always check if icon.png exists - prefer PNG over Lucide icon
               try {
                 const iconUrl = rawBaseUrl + 'icon.png';
-                console.log(`[Extension Store] Checking icon.png for ${ext.name}: ${iconUrl}`);
+                // console.log(`[Extension Store] Checking icon.png for ${ext.name}: ${iconUrl}`);
                 const iconResponse = await fetch(iconUrl, {
                   method: 'HEAD', // Just check if it exists
                   cache: 'no-store',
                 });
-                console.log(`[Extension Store] Icon response for ${ext.name}: ${iconResponse.status} ${iconResponse.ok ? 'OK' : 'NOT FOUND'}`);
+                // console.log(`[Extension Store] Icon response for ${ext.name}: ${iconResponse.status} ${iconResponse.ok ? 'OK' : 'NOT FOUND'}`);
                 if (iconResponse.ok) {
                   icon = iconUrl; // Prefer the PNG icon over Lucide icon name
-                  console.log(`[Extension Store] Using icon URL for ${ext.name}: ${iconUrl}`);
+                  // console.log(`[Extension Store] Using icon URL for ${ext.name}: ${iconUrl}`);
                 } else {
-                  console.log(`[Extension Store] Keeping Lucide icon for ${ext.name}: ${icon}`);
+                  // console.log(`[Extension Store] Keeping Lucide icon for ${ext.name}: ${icon}`);
                 }
               } catch (e) {
                 // icon.png not found, keep the Lucide icon from ext.icon
-                console.log(`[Extension Store] Error fetching icon for ${ext.name}:`, e);
+                // console.log(`[Extension Store] Error fetching icon for ${ext.name}:`, e);
               }
             } catch (error) {
               // Silently fail for individual extension docs
