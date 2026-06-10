@@ -142,10 +142,10 @@ async function ensureExtensionBuilderRunning(): Promise<void> {
 
     console.log('⚠️  Extension Builder Service not detected, starting it...');
 
-    // Pass a relative path and resolve it via `cwd` instead of
-    // path.join(process.cwd(), ...) - Turbopack's build-time tracer treats
-    // that pattern as a server-relative import it can't resolve.
-    const builder = spawn('node', ['scripts/extension-builder/server.js'], {
+    // Spawn via the npm script rather than referencing the .js file path
+    // directly - Turbopack's instrumentation tracer statically tries (and
+    // fails) to resolve any path-like string passed to spawn/fork.
+    const builder = spawn('npm', ['run', 'start:builder'], {
         stdio: 'inherit',
         cwd: process.cwd(),
         detached: true,
@@ -244,7 +244,9 @@ export async function startBackgroundServices(): Promise<void> {
         }
 
         // Make sure the extension builder service is up before validating
-        await ensureExtensionBuilderRunning();
+        if (!skipCheck) {
+            await ensureExtensionBuilderRunning();
+        }
 
         // Validate extensions before initializing
         await validateExtensions();
