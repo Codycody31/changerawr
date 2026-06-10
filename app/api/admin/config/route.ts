@@ -12,7 +12,13 @@ function buildConfigSchema(sponsored: boolean) {
     return z.object({
         defaultInvitationExpiry: z.number().min(1).max(30),
         requireApprovalForChangelogs: z.boolean(),
-        maxChangelogEntriesPerProject: z.number().min(10).max(sponsored ? 999999 : 10000),
+        // -1 ("unlimited") is always accepted so a previously-licensed value
+        // doesn't fail validation after the license lapses; enforcement falls
+        // back to the unlicensed cap in that case (see SponsorService.checkEntryAllowed).
+        maxChangelogEntriesPerProject: z.union([
+            z.literal(-1),
+            z.number().min(10).max(sponsored ? 999999 : 10000),
+        ]),
         enableAnalytics: z.boolean(),
         enableNotifications: z.boolean(),
         allowTelemetry: z.enum(['prompt', 'enabled', 'disabled']),

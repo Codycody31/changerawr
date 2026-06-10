@@ -11,6 +11,7 @@ import { subtextExtension } from './subtext/subtext';
 import { syntaxHighlightExtension } from './syntax-highlight/syntax-highlight';
 import { imageExtension } from './image/image';
 import { linkExtension } from './link/link';
+import { embedExtension } from './embed/embed';
 
 /**
  * Toolbar button configuration for extensions
@@ -184,6 +185,18 @@ export const builtInExtensions: ExtensionWithMetadata[] = [
       category: 'formatting',
       isBuiltIn: true,
     }
+  },
+  {
+    extension: embedExtension,
+    metadata: {
+      name: 'embed',
+      displayName: 'BetterEmbeds',
+      version: '1.0.0',
+      author: 'Changerawr',
+      description: 'Embeds with loading skeletons, lazy iframes, and preconnect hints',
+      category: 'media',
+      isBuiltIn: true,
+    }
   }
 ];
 
@@ -200,3 +213,4 @@ export { subtextExtension } from './subtext/subtext';
 export { syntaxHighlightExtension } from './syntax-highlight/syntax-highlight';
 export { imageExtension } from './image/image';
 export { linkExtension } from './link/link';
+export { embedExtension } from './embed/embed';

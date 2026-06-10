@@ -19,10 +19,10 @@ import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs';
 import {Switch} from '@/components/ui/switch';
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select';
 import {Eye, Settings, Sparkles} from 'lucide-react';
+import {CodePenLogo} from '@/components/icons/CodePenLogo';
 
 import {
     SiYoutube,
-    SiCodepen,
     SiFigma,
     SiX,
     SiGithub,
@@ -92,7 +92,7 @@ const embedProviders = [
     {
         value: 'codepen',
         label: 'CodePen',
-        icon: SiCodepen,
+        icon: CodePenLogo,
         color: '#000000',
         placeholder: 'https://codepen.io/jcoulterdesign/pen/abYNyLq',
         description: 'Embed CodePen demos',
@@ -491,7 +491,7 @@ export const CUMEmbedModal: React.FC<CUMModalProps> = ({
                                     }}
                                     className="justify-start h-auto py-2"
                                 >
-                                    <SiCodepen color="#000000" size={16} className="mr-2"/>
+                                    <CodePenLogo size={16} className="mr-2"/>
                                     CSS Animation Example
                                 </Button>
                                 <Button

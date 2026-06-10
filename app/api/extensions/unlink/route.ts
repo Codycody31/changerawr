@@ -34,13 +34,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Remove symlink
-    const symlinkPath = path.join(process.cwd(), 'extensions', 'changerawr', name);
+    // Derive author directory — same logic as link route
+    const authorDir = extension.author?.toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'community';
+    const symlinkPath = path.join(process.cwd(), 'extensions', authorDir, name);
+
+    // Also attempt the legacy 'changerawr' path in case this was linked before the fix
+    const legacyPath = path.join(process.cwd(), 'extensions', 'changerawr', name);
     try {
       await fs.rm(symlinkPath, { recursive: true, force: true });
+      // Clean up legacy path too in case it was linked before author namespacing was fixed
+      await fs.rm(legacyPath, { recursive: true, force: true }).catch(() => {});
     } catch (error: any) {
-      console.warn('Failed to remove symlink:', error.message);
+      console.warn('Failed to remove proxy directory:', error.message);
     }
+
 
     // Remove from database
     try {

@@ -18,7 +18,7 @@ const SALT_LENGTH = 32;
  * If not set, generates a new one (should be set in production)
  */
 function getEncryptionKey(): Buffer {
-  const keyEnv = process.env.EXTENSION_SETTINGS_KEY;
+  const keyEnv = process.env.GITHUB_ENCRYPTION_KEY; // note that this is a master encryption key for everything, except nginx-sidecar!
 
   if (keyEnv) {
     return Buffer.from(keyEnv, 'hex');

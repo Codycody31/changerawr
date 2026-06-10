@@ -16,12 +16,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Resolve absolute path
     const absoluteSource = path.isAbsolute(linkPath)
       ? linkPath
       : path.resolve(/*turbopackIgnore: true*/ process.cwd(), linkPath);
 
-    // Check if source exists
     try {
       await fs.access(absoluteSource);
     } catch {
@@ -31,62 +29,57 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Read metadata from source
+    // ── Read metadata (extension.json first, fall back to index.ts regex) ──
     const indexPath = path.join(absoluteSource, 'index.ts');
-    let extensionName;
+    let extensionName: string | undefined;
     let metadata: any = {};
 
     try {
-      const indexContent = await fs.readFile(indexPath, 'utf-8');
-
-      // Extract metadata fields from the metadata object
-      const nameMatch = indexContent.match(/name:\s*['"]([^'"]+)['"]/);
-      const displayNameMatch = indexContent.match(/displayName:\s*['"]([^'"]+)['"]/);
-      const versionMatch = indexContent.match(/version:\s*['"]([^'"]+)['"]/);
-      const authorMatch = indexContent.match(/author:\s*['"]([^'"]+)['"]/);
-      const descriptionMatch = indexContent.match(/description:\s*['"]([^'"]+)['"]/);
-      const categoryMatch = indexContent.match(/category:\s*['"]([^'"]+)['"]/);
-      const iconMatch = indexContent.match(/icon:\s*['"]([^'"]+)['"]/);
-
-      if (nameMatch) {
+      const json = JSON.parse(await fs.readFile(path.join(absoluteSource, 'extension.json'), 'utf-8'));
+      extensionName = json.name;
+      metadata = { ...json };
+    } catch {
+      try {
+        const indexContent = await fs.readFile(indexPath, 'utf-8');
+        const nameMatch = indexContent.match(/name:\s*['"]([^'"]+)['"]/);
+        if (!nameMatch) throw new Error('Could not find name field');
         extensionName = nameMatch[1];
-        metadata.name = nameMatch[1];
-      } else {
-        throw new Error('Could not find name in metadata');
+        metadata.name = extensionName;
+        const pick = (re: RegExp) => indexContent.match(re)?.[1];
+        metadata.displayName = pick(/displayName:\s*['"]([^'"]+)['"]/);
+        metadata.version     = pick(/version:\s*['"]([^'"]+)['"]/);
+        metadata.author      = pick(/author:\s*['"]([^'"]+)['"]/);
+        metadata.description = pick(/description:\s*['"]([^'"]+)['"]/);
+        metadata.category    = pick(/category:\s*['"]([^'"]+)['"]/);
+        metadata.icon        = pick(/icon:\s*['"]([^'"]+)['"]/);
+      } catch (error: any) {
+        return NextResponse.json(
+          { error: `Could not read extension metadata: ${error.message}` },
+          { status: 400 }
+        );
       }
-
-      if (displayNameMatch) metadata.displayName = displayNameMatch[1];
-      if (versionMatch) metadata.version = versionMatch[1];
-      if (authorMatch) metadata.author = authorMatch[1];
-      if (descriptionMatch) metadata.description = descriptionMatch[1];
-      if (categoryMatch) metadata.category = categoryMatch[1];
-      if (iconMatch) metadata.icon = iconMatch[1];
-
-    } catch (error: any) {
-      return NextResponse.json(
-        { error: `Could not read metadata: ${error.message}` },
-        { status: 400 }
-      );
     }
 
     if (!extensionName) {
-      return NextResponse.json(
-        { error: 'Extension name not found in metadata' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Extension name not found in metadata' }, { status: 400 });
     }
 
-    // Create symlink in extensions directory
-    const targetPath = path.join(/*turbopackIgnore: true*/ process.cwd(), 'extensions', 'changerawr', extensionName);
+    const authorDir = (metadata.author as string | undefined)
+      ?.toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'community';
 
-    // Remove existing symlink/directory if it exists
+    const targetPath = path.join(/*turbopackIgnore: true*/ process.cwd(), 'extensions', authorDir, extensionName);
+
+    // Ensure the author directory exists
+    await fs.mkdir(path.dirname(targetPath), { recursive: true });
+
+    // Remove any existing junction/directory at the target path
     try {
       await fs.rm(targetPath, { recursive: true, force: true });
     } catch {
-      // Ignore errors
+      // Ignore — may not exist
     }
 
-    // Create symlink
+    // Create junction (Windows directory symlink that requires no admin privileges)
     try {
       await fs.symlink(absoluteSource, targetPath, 'junction');
     } catch (error: any) {
@@ -96,24 +89,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create extension.json in the source directory if it doesn't exist
-    const extensionJsonPath = path.join(absoluteSource, 'extension.json');
+    // Write extension.json into source if it was missing (index.ts fallback path)
+    const srcExtJson = path.join(absoluteSource, 'extension.json');
     try {
-      await fs.access(extensionJsonPath);
+      await fs.access(srcExtJson);
     } catch {
-      // extension.json doesn't exist, create it
-      try {
-        await fs.writeFile(
-          extensionJsonPath,
-          JSON.stringify(metadata, null, 2),
-          'utf-8'
-        );
-      } catch (error: any) {
-        console.warn('Failed to create extension.json:', error.message);
-      }
+      await fs.writeFile(srcExtJson, JSON.stringify(metadata, null, 2), 'utf-8').catch(() => {});
     }
 
-    // Register extension in database
+    // ── Database registration ─────────────────────────────────────────────
     try {
       await db.editorExtension.upsert({
         where: { name: extensionName },
@@ -144,15 +128,13 @@ export async function POST(request: NextRequest) {
       console.warn('Failed to register extension in database:', error.message);
     }
 
-    // Trigger extension regeneration script
+    // ── Regenerate extension imports ──────────────────────────────────────
     const { exec } = await import('child_process');
     const { promisify } = await import('util');
     const execAsync = promisify(exec);
 
     try {
-      await execAsync('npm run extensions:generate', {
-        cwd: /*turbopackIgnore: true*/ process.cwd(),
-      });
+      await execAsync('npm run extensions:generate', { cwd: /*turbopackIgnore: true*/ process.cwd() });
     } catch (error: any) {
       console.warn('Failed to regenerate extensions:', error.message);
     }
@@ -161,7 +143,7 @@ export async function POST(request: NextRequest) {
       success: true,
       message: `Extension '${extensionName}' linked successfully. Restart dev server to see changes.`,
       path: targetPath,
-      needsRestart: true
+      needsRestart: true,
     });
 
   } catch (error: any) {

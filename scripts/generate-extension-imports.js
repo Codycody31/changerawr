@@ -7,7 +7,7 @@
  * Workaround for Next.js/Turbopack static import requirement
  */
 
-import { readdir, readFile, writeFile } from 'fs/promises';
+import { readdir, readFile, writeFile, lstat } from 'fs/promises';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -49,6 +49,20 @@ async function scanExtensions() {
 
         for (const extName of stat) {
           const extPath = join(authorPath, extName);
+
+          // Skip Windows junctions / symlinks — Turbopack resolves them to their
+          // canonical (physical) path, which is outside the project root, causing
+          // "needs to be on project filesystem" panics or "module not found" errors.
+          try {
+            const extLstat = await lstat(extPath);
+            if (extLstat.isSymbolicLink()) {
+              console.log(`⏭  Skipping linked extension (junction): ${author}/${extName}`);
+              continue;
+            }
+          } catch {
+            // If lstat fails, just try to proceed normally
+          }
+
           const indexPath = join(extPath, 'index.ts');
           const metadataPath = join(extPath, 'extension.json');
           const readmePath = join(extPath, 'README.md');
@@ -282,26 +296,41 @@ async function cleanupBrokenLinks() {
     const brokenLinks = [];
 
     for (const ext of linkedExtensions) {
-      const symlinkPath = join(PROJECT_ROOT, 'extensions', 'changerawr', ext.name);
+      // Use the stored author to find the symlink; also check the legacy 'changerawr' path
+      const authorDir = ext.author?.toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'community';
+      const symlinkPath = join(PROJECT_ROOT, 'extensions', authorDir, ext.name);
+      const legacyPath = join(PROJECT_ROOT, 'extensions', 'changerawr', ext.name);
 
+      // Check that the proxy directory (or legacy junction) exists
+      let proxyExists = false;
       try {
         await access(symlinkPath);
-        // Check if it's a valid symlink pointing to the sourceUrl
-        if (ext.sourceUrl) {
-          try {
-            const stats = await stat(ext.sourceUrl);
-            if (!stats.isDirectory()) {
-              brokenLinks.push(ext);
-              console.log(`   ⚠️  Broken link: ${ext.name} (source directory doesn't exist)`);
-            }
-          } catch {
-            brokenLinks.push(ext);
-            console.log(`   ⚠️  Broken link: ${ext.name} (source path not accessible: ${ext.sourceUrl})`);
-          }
-        }
+        proxyExists = true;
       } catch {
+        try {
+          await access(legacyPath);
+          proxyExists = true;
+        } catch { /* neither path exists */ }
+      }
+
+      if (!proxyExists) {
         brokenLinks.push(ext);
-        console.log(`   ⚠️  Broken link: ${ext.name} (symlink doesn't exist)`);
+        console.log(`   ⚠️  Broken link: ${ext.name} (proxy directory doesn't exist)`);
+        continue;
+      }
+
+      // Check that the source directory is still accessible
+      if (ext.sourceUrl) {
+        try {
+          const stats = await stat(ext.sourceUrl);
+          if (!stats.isDirectory()) {
+            brokenLinks.push(ext);
+            console.log(`   ⚠️  Broken link: ${ext.name} (source is not a directory)`);
+          }
+        } catch {
+          brokenLinks.push(ext);
+          console.log(`   ⚠️  Broken link: ${ext.name} (source not accessible: ${ext.sourceUrl})`);
+        }
       }
     }
 

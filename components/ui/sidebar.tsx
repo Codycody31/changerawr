@@ -15,11 +15,13 @@ import {
     Dialog,
     DialogClose,
     DialogContent,
+    DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog'
 import {
     Sheet,
     SheetContent,
+    SheetTitle,
     SheetTrigger,
 } from '@/components/ui/sheet'
 import {
@@ -240,6 +242,7 @@ function DesktopSidebar({
                                     </Button>
                                 </DialogTrigger>
                                 <DialogContent className="sm:max-w-md">
+                                    <DialogTitle className="sr-only">User profile</DialogTitle>
                                     <div className="flex flex-col items-center space-y-4">
                                         <Avatar className="h-16 w-16">
                                             <AvatarImage
@@ -330,7 +333,6 @@ function MobileNav({
     const pathname = usePathname()
     const [isOpen, setIsOpen] = useState(false)
 
-    // Filter navigation items based on user role
     const filteredNavSections = sections.map(section => ({
         ...section,
         items: section.items.filter(item =>
@@ -338,22 +340,13 @@ function MobileNav({
         )
     })).filter(section => section.items.length > 0)
 
-    // Function to check if a route is active based on namespace
     const isRouteActive = (itemHref: string): boolean => {
-        if (pathname === itemHref) {
-            return true
-        }
-
-        if (itemHref !== '/dashboard' && itemHref !== '/dashboard/admin' && pathname.startsWith(itemHref + '/')) {
-            return true
-        }
-
+        if (pathname === itemHref) return true
+        if (itemHref !== '/dashboard' && itemHref !== '/dashboard/admin' && pathname.startsWith(itemHref + '/')) return true
         return false
     }
 
-    const getUserInitial = () => {
-        return user.name?.[0] || user.email?.[0] || '?'
-    }
+    const getUserInitial = () => user.name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || '?'
 
     const logout = async () => {
         setIsOpen(false)
@@ -361,99 +354,117 @@ function MobileNav({
     }
 
     return (
-        <header className="md:hidden fixed top-0 left-0 right-0 h-16 bg-background/80 backdrop-blur-md z-50 border-b">
-            <div className="flex items-center justify-between px-4 h-full">
-                <Link href={brandHref} className="text-xl font-semibold">
+        <header className="md:hidden fixed top-0 left-0 right-0 h-14 bg-background border-b z-50">
+            <div className="flex items-center justify-between h-full px-4">
+                <Link href={brandHref} className="font-semibold text-base">
                     {brandName}
                 </Link>
 
-                <div className="flex items-center gap-2">
-                    <Sheet open={isOpen} onOpenChange={setIsOpen}>
-                        <SheetTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                                <Menu className="h-5 w-5"/>
-                                <span className="sr-only">Open menu</span>
-                            </Button>
-                        </SheetTrigger>
-                        <SheetContent side="right" className="w-80 p-0">
-                            <div className="flex flex-col h-full">
-                                {/* Header */}
-                                <div className="flex items-center gap-3 p-6 border-b">
-                                    <Avatar className="h-10 w-10">
-                                        <AvatarImage
-                                            src={user.avatar}
-                                            alt={user.name || 'User avatar'}
-                                        />
-                                        <AvatarFallback>{getUserInitial()}</AvatarFallback>
-                                    </Avatar>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="font-semibold truncate">
-                                            {user.name || 'Unnamed User'}
-                                        </p>
-                                        <p className="text-sm text-muted-foreground truncate">
-                                            {user.email || 'No email'}
-                                        </p>
-                                        <p className="text-xs uppercase text-muted-foreground">
-                                            {user.role}
-                                        </p>
-                                    </div>
-                                </div>
+                <Sheet open={isOpen} onOpenChange={setIsOpen}>
+                    <SheetTrigger asChild>
+                        <button className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            <Avatar className="h-8 w-8">
+                                <AvatarImage src={user.avatar} alt={user.name || 'Avatar'}/>
+                                <AvatarFallback className="text-xs font-semibold">{getUserInitial()}</AvatarFallback>
+                            </Avatar>
+                            <span className="sr-only">Open navigation</span>
+                        </button>
+                    </SheetTrigger>
 
-                                {/* Navigation */}
-                                <nav className="flex-1 overflow-y-auto p-6">
-                                    {filteredNavSections.map((section, sectionIndex) => (
-                                        <div key={sectionIndex} className="mb-6">
-                                            <p className="text-xs font-medium text-muted-foreground mb-2">
-                                                {section.title}
-                                            </p>
-                                            <div className="space-y-1">
-                                                {section.items.map((item) => (
-                                                    <Link
-                                                        key={item.href}
-                                                        href={item.href}
-                                                        onClick={() => setIsOpen(false)}
-                                                        className={cn(
-                                                            "flex items-center gap-3 p-2 rounded-md transition-colors",
-                                                            isRouteActive(item.href)
-                                                                ? "bg-secondary text-secondary-foreground"
-                                                                : "hover:bg-secondary/50"
-                                                        )}
-                                                    >
-                                                        <item.icon className="h-5 w-5 text-muted-foreground" />
-                                                        <span className="flex-1">{item.label}</span>
-                                                        {item.badge && <span className="ml-auto shrink-0">{item.badge}</span>}
-                                                    </Link>
-                                                ))}
-                                            </div>
+                    {/* Sheet mirrors the desktop sidebar — same width, same structure */}
+                    <SheetContent side="right" className="w-64 p-0 flex flex-col">
+                        <SheetTitle className="sr-only">Navigation</SheetTitle>
+
+                        {/* Header — matches desktop sidebar header height */}
+                        <div className="h-16 flex items-center border-b px-4 flex-shrink-0">
+                            <Link href={brandHref} className="text-xl font-bold truncate" onClick={() => setIsOpen(false)}>
+                                {brandName}
+                            </Link>
+                        </div>
+
+                        {/* Nav sections — same structure and styles as desktop */}
+                        <nav className="flex-1 overflow-y-auto py-4">
+                            {filteredNavSections.map((section, sectionIndex) => (
+                                <div key={sectionIndex} className="mb-4">
+                                    <p className="text-xs font-medium text-muted-foreground px-4 mb-2">
+                                        {section.title}
+                                    </p>
+                                    {section.items.map((item) => {
+                                        const active = isRouteActive(item.href)
+                                        return (
+                                            <Link
+                                                key={item.href}
+                                                href={item.href}
+                                                onClick={() => setIsOpen(false)}
+                                                className={cn(
+                                                    "flex items-center p-2 px-3 gap-3 transition-colors rounded-md mx-2 min-h-[44px]",
+                                                    active
+                                                        ? "bg-secondary text-secondary-foreground"
+                                                        : "hover:bg-secondary/50"
+                                                )}
+                                            >
+                                                <item.icon className={cn(
+                                                    "h-5 w-5 flex-shrink-0",
+                                                    active ? "text-secondary-foreground" : "text-muted-foreground"
+                                                )}/>
+                                                <span className="truncate flex-1 text-sm">{item.label}</span>
+                                                {item.badge && (
+                                                    <span className="ml-auto shrink-0">{item.badge}</span>
+                                                )}
+                                            </Link>
+                                        )
+                                    })}
+                                </div>
+                            ))}
+                        </nav>
+
+                        {/* User profile — matches desktop sidebar footer */}
+                        <div className="border-t p-4 flex-shrink-0">
+                            <Dialog>
+                                <DialogTrigger asChild>
+                                    <Button variant="ghost" className="w-full flex items-center gap-3 p-2 hover:bg-secondary/50">
+                                        <Avatar className="h-8 w-8 flex-shrink-0">
+                                            <AvatarImage src={user.avatar} alt={user.name || 'User avatar'}/>
+                                            <AvatarFallback>{getUserInitial()}</AvatarFallback>
+                                        </Avatar>
+                                        <div className="text-left flex-1 min-w-0">
+                                            <p className="text-sm font-medium truncate">{user.name || 'Unnamed User'}</p>
+                                            <p className="text-xs text-muted-foreground truncate">{user.role}</p>
                                         </div>
-                                    ))}
-                                </nav>
-
-                                {/* Footer Actions */}
-                                <div className="border-t p-6 space-y-2">
-                                    <Button
-                                        variant="outline"
-                                        className="w-full justify-start"
-                                        asChild
-                                    >
-                                        <Link href="/dashboard/settings" onClick={() => setIsOpen(false)}>
-                                            <Settings className="h-4 w-4 mr-2"/>
-                                            Settings
-                                        </Link>
                                     </Button>
-                                    <Button
-                                        variant="destructive"
-                                        className="w-full justify-start"
-                                        onClick={logout}
-                                    >
-                                        <LogOut className="h-4 w-4 mr-2"/>
-                                        Logout
-                                    </Button>
-                                </div>
-                            </div>
-                        </SheetContent>
-                    </Sheet>
-                </div>
+                                </DialogTrigger>
+                                <DialogContent className="sm:max-w-md">
+                                    <DialogTitle className="sr-only">User profile</DialogTitle>
+                                    <div className="flex flex-col items-center space-y-4">
+                                        <Avatar className="h-16 w-16">
+                                            <AvatarImage src={user.avatar} alt={user.name || 'User avatar'}/>
+                                            <AvatarFallback>{getUserInitial()}</AvatarFallback>
+                                        </Avatar>
+                                        <div className="text-center">
+                                            <p className="font-semibold">{user.name || 'Unnamed User'}</p>
+                                            <p className="text-sm text-muted-foreground">{user.email || 'No email'}</p>
+                                            <p className="text-xs uppercase text-muted-foreground mt-1">{user.role}</p>
+                                        </div>
+                                        <div className="flex w-full space-x-2">
+                                            <Button variant="outline" className="w-full" asChild>
+                                                <DialogClose asChild>
+                                                    <Link href="/dashboard/settings" onClick={() => setIsOpen(false)}>
+                                                        <Settings className="h-4 w-4 mr-2"/>
+                                                        Settings
+                                                    </Link>
+                                                </DialogClose>
+                                            </Button>
+                                            <Button variant="destructive" className="w-full" onClick={logout}>
+                                                <LogOut className="h-4 w-4 mr-2"/>
+                                                Logout
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </DialogContent>
+                            </Dialog>
+                        </div>
+                    </SheetContent>
+                </Sheet>
             </div>
         </header>
     )

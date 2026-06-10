@@ -545,17 +545,22 @@ export class Trex {
         if (isDucking && this.status !== Status.DUCKING) {
             this.update(0, Status.DUCKING);
             this.ducking = true;
-        } else if (this.status === Status.DUCKING) {
+        } else if (!isDucking && this.status === Status.DUCKING) {
             this.update(0, Status.RUNNING);
             this.ducking = false;
         }
+        // identical calls are no-ops: setDuck(true) when already ducking,
+        // or setDuck(false) when already running, both do nothing.
     }
 
     /**
      * Reset the t-rex to running at start of game.
      */
     reset() {
-        this.xPos = this.xInitialPos;
+        // xInitialPos is only set during the intro animation.  When the intro
+        // is skipped (ambient mode) it stays 0, so fall back to startXPos so
+        // the dino never snaps back to the left edge after a jump.
+        this.xPos = this.xInitialPos > 0 ? this.xInitialPos : this.config.startXPos;
         this.yPos = this.groundYPos;
         this.jumpVelocity = 0;
         this.jumping = false;

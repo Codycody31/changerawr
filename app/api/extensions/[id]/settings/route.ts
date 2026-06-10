@@ -14,9 +14,9 @@ export async function GET(
 
     console.log('[Settings API] GET request for extension ID:', id);
 
-    // Get extension settings from database
-    const extension = await db.editorExtension.findUnique({
-      where: { id },
+    // Accept either a DB cuid or an extension name (for component usage)
+    const extension = await db.editorExtension.findFirst({
+      where: { OR: [{ id }, { name: id }] },
       select: {
         id: true,
         name: true,
@@ -66,9 +66,18 @@ export async function PATCH(
       );
     }
 
-    // Update extension settings
+    // Accept either a DB cuid or an extension name
+    const target = await db.editorExtension.findFirst({
+      where: { OR: [{ id }, { name: id }] },
+      select: { id: true, name: true },
+    });
+
+    if (!target) {
+      return NextResponse.json({ error: 'Extension not found' }, { status: 404 });
+    }
+
     const extension = await db.editorExtension.update({
-      where: { id },
+      where: { id: target.id },
       data: { settings },
     });
 

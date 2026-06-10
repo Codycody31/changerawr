@@ -16,7 +16,7 @@ import {
 import {Button} from '@/components/ui/button';
 import {Badge} from '@/components/ui/badge';
 
-import {ChangelogImportModal} from './ChangelogImportModal';
+import {ImportModal} from '@/components/changelog/import';
 import {ImportResult} from '@/lib/types/projects/importing';
 
 interface ImportDataPromptProps {
@@ -96,18 +96,12 @@ export function ImportDataPrompt({
                         <div className="space-y-3">
                             <h4 className="font-medium text-sm text-center">Supported Formats</h4>
                             <div className="flex flex-wrap justify-center gap-2">
-                                <Badge variant="secondary" className="text-xs">
-                                    Keep a Changelog
-                                </Badge>
-                                <Badge variant="secondary" className="text-xs">
-                                    GitHub Releases
-                                </Badge>
-                                <Badge variant="secondary" className="text-xs">
-                                    Markdown Lists
-                                </Badge>
-                                <Badge variant="secondary" className="text-xs">
-                                    Custom Formats
-                                </Badge>
+                                <Badge variant="secondary" className="text-xs">Markdown</Badge>
+                                <Badge variant="secondary" className="text-xs">JSON</Badge>
+                                <Badge variant="secondary" className="text-xs">CSV</Badge>
+                                <Badge variant="secondary" className="text-xs">RSS / Atom</Badge>
+                                <Badge variant="secondary" className="text-xs">GitHub API</Badge>
+                                <Badge variant="secondary" className="text-xs">Canny</Badge>
                             </div>
                         </div>
 
@@ -115,22 +109,18 @@ export function ImportDataPrompt({
                         <div className="bg-muted/30 rounded-lg p-4 space-y-3">
                             <h4 className="font-medium text-sm">What gets imported:</h4>
                             <div className="space-y-2 text-xs">
-                                <div className="flex items-center gap-2">
-                                    <CheckCircle className="h-3 w-3 text-green-600"/>
-                                    <span>Version numbers and dates</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <CheckCircle className="h-3 w-3 text-green-600"/>
-                                    <span>Entry titles and descriptions</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <CheckCircle className="h-3 w-3 text-green-600"/>
-                                    <span>Categories and tags</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <CheckCircle className="h-3 w-3 text-green-600"/>
-                                    <span>Markdown formatting</span>
-                                </div>
+                                {[
+                                    'Version numbers and dates',
+                                    'Entry titles and content',
+                                    'Categories and tags',
+                                    'Markdown / rich formatting',
+                                    'Published status (optional)',
+                                ].map(item => (
+                                    <div key={item} className="flex items-center gap-2">
+                                        <CheckCircle className="h-3 w-3 text-green-600 shrink-0"/>
+                                        <span>{item}</span>
+                                    </div>
+                                ))}
                             </div>
                         </div>
 
@@ -168,7 +158,7 @@ export function ImportDataPrompt({
             </motion.div>
 
             {/* Import Modal */}
-            <ChangelogImportModal
+            <ImportModal
                 open={showImportModal}
                 onOpenChange={setShowImportModal}
                 projectId={projectId}
@@ -272,7 +262,7 @@ export function EmptyStateWithImport({
             </motion.div>
 
             {/* Import Modal */}
-            <ChangelogImportModal
+            <ImportModal
                 open={showImportModal}
                 onOpenChange={setShowImportModal}
                 projectId={projectId}

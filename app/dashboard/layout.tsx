@@ -3,6 +3,7 @@
 import React, {useEffect, useState} from 'react'
 import {useRouter} from 'next/navigation'
 import {useAuth} from '@/context/auth'
+import {SidebarOverrideContext} from '@/context/sidebar-override'
 import {
     BookmarkIcon,
     ChartNoAxesCombined,
@@ -182,6 +183,7 @@ export default function DashboardLayout({
     const {user, isLoading, logout} = useAuth()
     const [sidebarExpanded, setSidebarExpanded] = useState(true)
     const [sidebarVisible, setSidebarVisible] = useState(true)
+    const [isProjectSidebarActive, setProjectSidebarActive] = useState(false)
     const isMobile = useMediaQuery('(max-width: 768px)')
     const isTablet = useMediaQuery('(max-width: 1024px)')
 
@@ -264,36 +266,41 @@ export default function DashboardLayout({
     }
 
     return (
+        <SidebarOverrideContext.Provider value={{ isProjectSidebarActive, setProjectSidebarActive }}>
         <CommandPaletteProvider>
             <div className="min-h-screen bg-background">
-                <Sidebar
-                    user={sidebarUser}
-                    sections={NAV_SECTIONS}
-                    onLogout={logout}
-                    brandName="Changerawr"
-                    brandHref="/dashboard"
-                    isExpanded={sidebarExpanded}
-                    setIsExpanded={setSidebarExpanded}
-                    isVisible={sidebarVisible}
-                    // setIsVisible={setSidebarVisible}
-                />
+                {!isProjectSidebarActive && (
+                    <Sidebar
+                        user={sidebarUser}
+                        sections={NAV_SECTIONS}
+                        onLogout={logout}
+                        brandName="Changerawr"
+                        brandHref="/dashboard"
+                        isExpanded={sidebarExpanded}
+                        setIsExpanded={setSidebarExpanded}
+                        isVisible={sidebarVisible}
+                        // setIsVisible={setSidebarVisible}
+                    />
+                )}
 
                 {/* Main content area with proper responsive behavior */}
                 <main
                     className={cn(
                         "min-h-screen transition-all duration-300 ease-in-out",
                         // Mobile: always full width with top padding for mobile header
-                        "pt-16 md:pt-0",
+                        "pt-14 md:pt-0",
                         // Desktop: adjust margin based on sidebar state
-                        !isMobile && (
-                            sidebarVisible
-                                ? (sidebarExpanded ? "md:ml-64" : "md:ml-16")
-                                : "md:ml-0"
-                        )
+                        isProjectSidebarActive
+                            ? "md:ml-64"
+                            : (!isMobile && (
+                                sidebarVisible
+                                    ? (sidebarExpanded ? "md:ml-64" : "md:ml-16")
+                                    : "md:ml-0"
+                            ))
                     )}
                 >
                     {/* Show sidebar toggle when hidden */}
-                    {!sidebarVisible && !isMobile && (
+                    {!isProjectSidebarActive && !sidebarVisible && !isMobile && (
                         <div className="fixed top-4 left-4 z-50 group">
                             {/* Larger invisible hover trigger area */}
                             <div className="absolute -inset-4 w-16 h-16"/>
@@ -341,5 +348,6 @@ export default function DashboardLayout({
                 )}
             </div>
         </CommandPaletteProvider>
+        </SidebarOverrideContext.Provider>
     )
 }

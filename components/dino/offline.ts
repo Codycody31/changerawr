@@ -684,93 +684,106 @@ export class Runner implements ImageSpriteProvider, GameStateProvider,
 
             const firstObstacle = this.horizon.obstacles[0];
 
-            // ── Ambient auto-play ─────────────────────────────────────────────
+            // ── Ambient AI ────────────────────────────────────────────────────
             if (this.isAmbient && !this.crashed) {
-                // Dino's rightmost inner collision box is at xPos + 32
-                // (outer offset 1 + inner box1 x 1 + width 30).
-                const dinoHitRight = this.tRex.xPos + 32;
-                const dinoRight    = this.tRex.xPos + this.tRex.config.width;
+                this.ambientFixTrexPos();
 
-                // Skip obstacles whose right edge has fully passed the dino's left
-                // edge — they're cleared and we focus on the next one.
+                const dino  = this.tRex;
+                const speed = this.currentSpeed;
+
+                const dinoHitRight = dino.xPos + 40; // head box right edge (xPos+1+22+17)
+                const dinoRight    = dino.xPos + dino.config.width; // visual right
+
+                // Use fixed ground-position thresholds — NOT dino.yPos, which
+                // changes mid-jump and would misclassify obstacles while airborne.
+                // groundY = canvas height − dino height − bottomPad = 150−47−10 = 93.
+                const groundY  = DEFAULT_DIMENSIONS.height - dino.config.height - this.config.bottomPad;
+                const runTopY  = groundY + 1;   // 94  — running head top hit edge
+                const duckTopY = groundY + 19;  // 112 — ducking hitbox top edge
+
+                // Leftmost hit-x of an obstacle from its actual collision boxes.
+                const hitLeft = (o: Obstacle) => {
+                    let left = o.xPos + o.typeConfig.width * o.size;
+                    for (const b of o.collisionBoxes) {
+                        left = Math.min(left, o.xPos + 1 + b.x);
+                    }
+                    return left;
+                };
+
+                // First obstacle whose right edge is still ahead of the dino.
                 let oi = 0;
                 while (oi < this.horizon.obstacles.length) {
                     const o = this.horizon.obstacles[oi]!;
-                    if (o.xPos + o.typeConfig.width * o.size > this.tRex.xPos) break;
+                    if (o.xPos + o.typeConfig.width * o.size > dino.xPos) break;
                     oi++;
                 }
-                const obs  = this.horizon.obstacles[oi];
-                const obs2 = this.horizon.obstacles[oi + 1];
+                const obs = this.horizon.obstacles[oi];
 
                 if (obs) {
+                    const obsLeft  = hitLeft(obs);
                     const obsRight = obs.xPos + obs.typeConfig.width * obs.size;
+                    const gap      = obsLeft - dinoHitRight; // +ve = not yet touching
 
-                    // Use the actual hitbox leading edge of the obstacle.
-                    // Inner collision box offsets from sprite defs:
-                    //   cactusSmall box2 x=4  → left = obs.xPos + 5
-                    //   cactusLarge box2 x=8  → left = obs.xPos + 9
-                    //   pterodactyl box3 x=2  → left = obs.xPos + 3
-                    // Conservative minimum: obs.xPos + 3 (covers all types).
-                    const obsHitLeft = obs.xPos + 3;
+                    // ── Classify by obstacle type / height ────────────────────
+                    // Pterodactyls fly at three known heights — check yPos directly.
+                    //   yPos ≤ 50  high-flying : run straight under, no action
+                    //   yPos ≤ 75  mid-height  : duck under
+                    //   yPos > 75  low-flying  : jump over
+                    // Everything else (cacti) sits on the ground → must jump.
+                    const isPtero = obs.typeConfig.type === 'pterodactyl';
+                    const canRunUnder  = isPtero && obs.yPos <= 50;
+                    const canDuckUnder = isPtero && obs.yPos > 50 && obs.yPos <= 75;
+                    const mustJump     = !canRunUnder && !canDuckUnder;
 
-                    // Positive = hitboxes still apart; 0 = first contact.
-                    const hitboxGap = obsHitLeft - dinoHitRight;
-                    // Two-frame safety margin: jump when at least 2 speed-frames
-                    // remain before the hitboxes actually touch.
-                    const minHitboxGap = this.currentSpeed * 2;
-                    const lookahead    = this.currentSpeed * 32;
+                    // Separate trigger distances: jump needs less lead time (physics
+                    // carries the dino up); duck should start a bit earlier so the
+                    // hitbox has changed well before the ptero arrives.
+                    const jumpDist = speed * 8;   // obstacle arrives ~8 frames after takeoff
+                    const duckDist = speed * 12;  // start ducking with a comfortable buffer
 
-                    const isPtero     = obs.typeConfig.type === 'pterodactyl';
-                    const needsDuck   = isPtero && obs.yPos >= 90;   // low-flying
-                    const canRunUnder = isPtero && obs.yPos <= 55;   // high-flying
-
-                    if (!canRunUnder && hitboxGap >= minHitboxGap && hitboxGap < lookahead) {
-                        if (needsDuck) {
-                            if (!this.tRex.jumping) this.tRex.setDuck(true);
-                        } else if (!this.tRex.jumping) {
-                            if (this.tRex.ducking) {
-                                this.tRex.speedDrop = false;
-                                this.tRex.setDuck(false);
+                    // ── Act ───────────────────────────────────────────────────
+                    if (mustJump) {
+                        // Standing up from a duck is immediate; do it regardless
+                        // of gap so we're always ready to jump.
+                        if (dino.ducking) { dino.speedDrop = false; dino.setDuck(false); }
+                        if (!dino.jumping && gap >= 0 && gap <= jumpDist) {
+                            dino.startJump(speed);
+                            // Pre-advance 2 frames so same-tick collision check
+                            // sees the dino already rising off the ground.
+                            dino.updateJump(deltaTime);
+                            dino.updateJump(deltaTime);
+                        }
+                    } else if (canDuckUnder) {
+                        if (!dino.jumping) {
+                            if (gap >= 0 && gap <= duckDist) {
+                                // Ptero entering the reaction window — duck.
+                                dino.setDuck(true);
+                            } else if (gap > duckDist && dino.ducking) {
+                                // Ptero still far away (we were ducked from a
+                                // previous obstacle) — stand up and wait.
+                                dino.speedDrop = false;
+                                dino.setDuck(false);
                             }
-                            this.tRex.startJump(this.currentSpeed);
-                            // Advance dino physics 2 frames immediately so the
-                            // collision check in this same tick sees the dino off
-                            // the ground — prevents same-frame collision false positives.
-                            this.tRex.updateJump(deltaTime);
-                            this.tRex.updateJump(deltaTime);
+                            // gap < 0: ptero is directly overhead or just past —
+                            // keep duck until the loop's skip threshold (xPos ≤ 4)
+                            // naturally transitions obs to the next obstacle.
                         }
-                    }
-
-                    // Obstacle cleared — cancel duck and optionally speed-drop.
-                    if (obsRight <= dinoRight) {
-                        if (this.tRex.ducking) {
-                            this.tRex.speedDrop = false;
-                            this.tRex.setDuck(false);
-                        }
-                        if (this.tRex.jumping) {
-                            const nextHitGap   = obs2 ? (obs2.xPos + 3) - dinoHitRight : Infinity;
-                            const nextNeedsDuck = obs2?.typeConfig.type === 'pterodactyl'
-                                && (obs2.yPos ?? 0) >= 90;
-                            // Speed-drop to land fast, but not if we need to duck
-                            // for the next obstacle (need time on the ground to duck).
-                            if (nextHitGap > this.currentSpeed * 30 && !nextNeedsDuck) {
-                                this.tRex.setSpeedDrop();
-                            }
-                        }
+                    } else {
+                        // canRunUnder, or obs just became a different type —
+                        // release any lingering duck immediately.
+                        if (dino.ducking) { dino.speedDrop = false; dino.setDuck(false); }
                     }
                 } else {
-                    // No obstacles — cancel any stale duck.
-                    if (this.tRex.ducking) {
-                        this.tRex.speedDrop = false;
-                        this.tRex.setDuck(false);
-                    }
+                    // No obstacles ahead.
+                    if (dino.ducking) { dino.speedDrop = false; dino.setDuck(false); }
                 }
             }
 
             let collision = hasObstacles && firstObstacle &&
                 this.checkForCollision(
                     firstObstacle, this.tRex,
-                    this.debugCollision ? this.canvasCtx ?? undefined : undefined);
+                    this.debugCollision ? this.canvasCtx ?? undefined : undefined,
+                    this.isAmbient ? 3 : 0);
 
             if (this.hasAudioCuesInternal && hasObstacles) {
                 assert(firstObstacle);
@@ -1317,10 +1330,12 @@ export class Runner implements ImageSpriteProvider, GameStateProvider,
 
     private checkForCollision(
         obstacle: Obstacle, tRex: Trex,
-        canvasCtx?: CanvasRenderingContext2D): CollisionBox[]|null {
+        canvasCtx?: CanvasRenderingContext2D,
+        shrink: number = 0): CollisionBox[]|null {
         const tRexBox = new CollisionBox(
-            tRex.xPos + 1, tRex.yPos + 1, tRex.config.width - 2,
-            tRex.config.height - 2);
+            tRex.xPos + 1 + shrink, tRex.yPos + 1 + shrink,
+            tRex.config.width - 2 - shrink * 2,
+            tRex.config.height - 2 - shrink * 2);
 
         const obstacleBox = new CollisionBox(
             obstacle.xPos + 1, obstacle.yPos + 1,

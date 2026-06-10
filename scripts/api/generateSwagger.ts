@@ -55,10 +55,52 @@ const randomDelay = async (min: number = 200, max: number = 800) => {
     await delay(delayTime);
 };
 
-function pathToSectionTitle(path: string): string {
-    const segment = path.split('/')[0];
-    if (!segment) return 'General';
+// Ordered most-specific first
+const PATH_SECTION_PATTERNS: [RegExp, string][] = [
+    // Project sub-sections
+    [/^projects\/[^/]+\/changelog/, 'Project Changelog'],
+    [/^projects\/[^/]+\/integrations/, 'Project Integrations'],
+    [/^projects\/[^/]+\/cli/, 'Project CLI'],
+    [/^projects\/[^/]+\/analytics/, 'Project Analytics'],
+    [/^projects\/[^/]+\/catch-up/, 'Project Catch-up'],
+    [/^projects\/[^/]+\/api-keys/, 'Project API Keys'],
+    [/^projects/, 'Projects'],
+    // Auth sub-sections
+    [/^auth\/oauth/, 'Auth - OAuth'],
+    [/^auth\/saml/, 'Auth - SAML'],
+    [/^auth\/cli/, 'Auth - CLI'],
+    [/^auth\/passkeys/, 'Auth - Passkeys'],
+    [/^auth/, 'Auth'],
+    // Admin sub-sections
+    [/^admin\/users/, 'Admin - Users'],
+    [/^admin\/config/, 'Admin - Config'],
+    [/^admin\/api-keys/, 'Admin - API Keys'],
+    [/^admin\/oauth/, 'Admin - OAuth'],
+    [/^admin\/saml/, 'Admin - SAML'],
+    [/^admin\/audit-logs/, 'Admin - Audit Logs'],
+    [/^admin\/analytics/, 'Admin - Analytics'],
+    [/^admin/, 'Admin'],
+    // AI
+    [/^ai/, 'AI'],
+];
 
+const TAG_GROUP_DEFINITIONS: { name: string; tags: string[] }[] = [
+    {name: 'Authentication', tags: ['Auth', 'Auth - OAuth', 'Auth - SAML', 'Auth - CLI', 'Auth - Passkeys']},
+    {name: 'Projects', tags: ['Projects', 'Project Changelog', 'Project Integrations', 'Project CLI', 'Project Analytics', 'Project Catch-up', 'Project API Keys']},
+    {name: 'Admin', tags: ['Admin', 'Admin - Users', 'Admin - Config', 'Admin - API Keys', 'Admin - OAuth', 'Admin - SAML', 'Admin - Audit Logs', 'Admin - Analytics']},
+    {name: 'Public', tags: ['Changelog', 'Subscribers']},
+    {name: 'System', tags: ['System', 'Health', 'Dashboard', 'Analytics']},
+    {name: 'Integrations', tags: ['Integrations']},
+    {name: 'Other', tags: ['Setup', 'Requests', 'AI']},
+];
+
+function pathToSectionTitle(routePath: string): string {
+    for (const [pattern, section] of PATH_SECTION_PATTERNS) {
+        if (pattern.test(routePath)) return section;
+    }
+
+    const segment = routePath.split('/')[0];
+    if (!segment) return 'General';
     return segment
         .split('-')
         .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
@@ -147,6 +189,99 @@ function extractFullDescription(tag: CommentTag): string {
     return parts.join(' ');
 }
 
+function httpStatusDescription(code: string): string {
+    const n = parseInt(code, 10);
+    if (n >= 500) return 'Server error';
+    if (n >= 400) return 'Client error';
+    if (n === 201) return 'Created';
+    if (n === 204) return 'No content';
+    return 'Successful response';
+}
+
+// Verb-like segments — treated as actions, not resource nouns
+const ACTION_SEGMENTS = new Set([
+    'login', 'logout', 'register', 'track', 'subscribe', 'unsubscribe',
+    'verify', 'sync', 'link', 'unlink', 'generate', 'refresh', 'reset',
+    'check', 'test', 'send', 'approve', 'schedule', 'cancel', 'revoke',
+    'renew', 'issue', 'validate', 'authorize', 'callback', 'authenticate',
+    'decrypt', 'encrypt', 'invite', 'export', 'import', 'restart',
+]);
+
+// Top-level namespace segments that add no useful context to a summary
+const NAMESPACE_SEGMENTS = new Set([
+    'auth', 'admin', 'api', 'public', 'internal', 'v1', 'v2',
+]);
+
+// Segments that map to a fixed readable label
+const SEGMENT_LABELS: Record<string, string> = {
+    'me': 'Current User',
+    'cli': 'CLI',
+    'ai': 'AI',
+    'api-keys': 'API Keys',
+    'api-key': 'API Key',
+    'oauth': 'OAuth',
+    'saml': 'SAML',
+    'acme': 'ACME',
+    'easypanel': 'EasyPanel',
+};
+
+function toTitle(segment: string): string {
+    if (SEGMENT_LABELS[segment.toLowerCase()]) return SEGMENT_LABELS[segment.toLowerCase()];
+    return segment.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+function toSingular(word: string): string {
+    const keep = new Set(['status', 'analytics', 'access', 'progress', 'address', 'process', 'canvas', 'alias', 'cli']);
+    if (keep.has(word.toLowerCase())) return word;
+    if (word.endsWith('ies')) return word.slice(0, -3) + 'y'; // entries → entry
+    if (word.endsWith('ses') || word.endsWith('xes') || word.endsWith('zes')) return word.slice(0, -2);
+    if (word.endsWith('s') && word.length > 3) return word.slice(0, -1);
+    return word;
+}
+
+function routeToSummary(routePath: string, method: HttpMethod): string {
+    const parts = routePath.split('/').filter(Boolean);
+    const endsWithParam = parts[parts.length - 1]?.startsWith('{') ?? false;
+
+    const segs = parts.filter(s => !s.startsWith('{'));
+    const lastSeg = segs[segs.length - 1] ?? '';
+    const prevSeg = segs[segs.length - 2] ?? '';
+
+    // If the last segment is an action word, use it as the verb
+    if (ACTION_SEGMENTS.has(lastSeg.toLowerCase())) {
+        const action = toTitle(lastSeg);
+        // Only add context from prevSeg if it's a meaningful resource (not a namespace)
+        if (prevSeg && !ACTION_SEGMENTS.has(prevSeg) && !NAMESPACE_SEGMENTS.has(prevSeg)) {
+            const ctx = toTitle(toSingular(prevSeg));
+            return `${action} ${ctx}`;
+        }
+        return action;
+    }
+
+    const noun = endsWithParam ? toTitle(toSingular(lastSeg)) : toTitle(lastSeg);
+    const singularNoun = toTitle(toSingular(lastSeg));
+
+    switch (method) {
+        case 'get':    return endsWithParam ? `Get ${noun}` : `List ${noun}`;
+        case 'post':   return `Create ${singularNoun}`;
+        case 'put':    return `Replace ${singularNoun}`;
+        case 'patch':  return `Update ${singularNoun}`;
+        case 'delete': return `Delete ${singularNoun}`;
+    }
+}
+
+function extractBodySchema(tag: CommentTag): Record<string, unknown> | undefined {
+    // comment-parser puts {…} content into tag.type; tag.description will be empty
+    if (tag.description) {
+        return tryParseJSON(tag.description) as Record<string, unknown> | undefined;
+    }
+    if (tag.type) {
+        // Reconstruct the JSON object: content between the outer braces was stripped
+        return tryParseJSON(`{${tag.type}}`) as Record<string, unknown> | undefined;
+    }
+    return undefined;
+}
+
 function processRouteOperation(route: SwaggerRoute, routeDocs: CommentBlock): OpenAPIV3.OperationObject {
     const operation: OpenAPIV3.OperationObject = {
         tags: [route.section],
@@ -205,8 +340,8 @@ function processRouteOperation(route: SwaggerRoute, routeDocs: CommentBlock): Op
                     });
                 }
                 break;
-            case 'body':
-                const bodySchema = tryParseJSON(tag.description) as Record<string, unknown> | undefined;
+            case 'body': {
+                const bodySchema = extractBodySchema(tag);
                 operation.requestBody = {
                     required: true,
                     content: {
@@ -219,6 +354,7 @@ function processRouteOperation(route: SwaggerRoute, routeDocs: CommentBlock): Op
                     }
                 };
                 break;
+            }
             case 'returns':
             case 'response': {
                 const statusCode = tag.name || '200';
@@ -231,7 +367,7 @@ function processRouteOperation(route: SwaggerRoute, routeDocs: CommentBlock): Op
                 );
 
                 operation.responses[statusCode] = {
-                    description: (responseSchema?.description as string) || 'Successful response',
+                    description: (responseSchema?.description as string) || httpStatusDescription(statusCode),
                     content: {
                         'application/json': {
                             schema: schemaObj
@@ -279,6 +415,11 @@ function processRouteOperation(route: SwaggerRoute, routeDocs: CommentBlock): Op
         }
     }
 
+    // Auto-generate summary from route path+method when @summary is absent
+    if (!operation.summary) {
+        operation.summary = routeToSummary(route.path, route.method);
+    }
+
     return operation;
 }
 
@@ -312,16 +453,51 @@ async function processRouteFiles(
         const methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
         let hasDocumentation = false;
 
+        // Build a map of method → line number so we can proximity-match comments
+        const contentLines = content.split('\n');
+        const methodLineMap = new Map<string, number>();
+        contentLines.forEach((line, idx) => {
+            for (const m of methods) {
+                if (new RegExp(`export\\s+(?:async\\s+)?function\\s+${m}\\b`).test(line)) {
+                    methodLineMap.set(m, idx + 1); // 1-indexed
+                }
+            }
+        });
+
+        // Track which comments are already claimed by a tag-matched method
+        const claimedComments = new Set<CommentBlock>();
+
         for (const method of methods) {
-            const methodPattern = new RegExp(`export\\s+async\\s+function\\s+${method}`);
+            const methodPattern = new RegExp(`export\\s+(?:async\\s+)?function\\s+${method}\\b`);
             if (methodPattern.test(content)) {
-                const routeDocs = comments.find(comment =>
+                // Primary: tag-based match
+                let routeDocs = comments.find(comment =>
                     comment.description.includes(`@${method.toLowerCase()}`) ||
                     comment.tags.some(tag =>
                         (tag.tag === 'method' && tag.name.toLowerCase() === method.toLowerCase()) ||
                         tag.tag.toLowerCase() === method.toLowerCase()
                     )
                 );
+
+                if (routeDocs) {
+                    claimedComments.add(routeDocs);
+                } else {
+                    // Fallback: find the comment block that ends immediately before this function
+                    const fnLine = methodLineMap.get(method);
+                    if (fnLine !== undefined) {
+                        routeDocs = comments.find(comment => {
+                            if (claimedComments.has(comment)) return false;
+                            const lastLine = comment.source[comment.source.length - 1]?.number ?? -1;
+                            // Comment must end within 3 lines before the function, and contain
+                            // either useful tags or a plain-text description block
+                            return lastLine < fnLine &&
+                                fnLine - lastLine <= 3 &&
+                                (comment.description.trim().length > 0 ||
+                                    comment.tags.some(t => ['description', 'body', 'response', 'returns', 'error', 'throws', 'param', 'secure', 'summary'].includes(t.tag)));
+                        });
+                        if (routeDocs) claimedComments.add(routeDocs);
+                    }
+                }
 
                 if (routeDocs) {
                     hasDocumentation = true;
@@ -417,21 +593,37 @@ async function generateSwaggerDocs() {
 
         await randomDelay();
         spinner.text = 'Organizing API sections...';
-        const tagGroups: { name: string; tags: string[] }[] = [];
 
-        sections.forEach((routes, section) => {
+        const presentSections = new Set(sections.keys());
+
+        // Add tags in a logical order (group order, then alphabetical within ungrouped)
+        const groupedTags = new Set(TAG_GROUP_DEFINITIONS.flatMap(g => g.tags));
+        const orderedSections: string[] = [];
+
+        for (const group of TAG_GROUP_DEFINITIONS) {
+            for (const tag of group.tags) {
+                if (presentSections.has(tag)) orderedSections.push(tag);
+            }
+        }
+        // Any sections not covered by groups (fallback)
+        for (const section of [...presentSections].sort()) {
+            if (!groupedTags.has(section)) orderedSections.push(section);
+        }
+
+        for (const section of orderedSections) {
             swagger.tags!.push({
                 name: section,
                 description: `Operations related to ${section}`
             });
+        }
 
-            tagGroups.push({
-                name: section,
-                tags: [section]
-            });
-        });
-
-        swagger['x-tagGroups'] = tagGroups;
+        // Build x-tagGroups, only including groups that have at least one present tag
+        swagger['x-tagGroups'] = TAG_GROUP_DEFINITIONS
+            .map(group => ({
+                name: group.name,
+                tags: group.tags.filter(t => presentSections.has(t))
+            }))
+            .filter(group => group.tags.length > 0);
 
         await randomDelay(800, 1500);
         spinner.text = 'Converting routes to OpenAPI format...';

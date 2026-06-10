@@ -1143,26 +1143,28 @@ export default function ExtensionsPage() {
               <AlertCircle className="h-5 w-5" />
               Broken Extensions Detected
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              {extensions && (
-                <>
-                  <p className="mb-3">
-                    {extensions.filter(ext => ext.isBroken).length} extension{extensions.filter(ext => ext.isBroken).length !== 1 ? 's' : ''} {extensions.filter(ext => ext.isBroken).length !== 1 ? 'have' : 'has'} missing or corrupted files:
-                  </p>
-                  <ul className="list-disc list-inside space-y-1 mb-4">
-                    {extensions
-                      .filter(ext => ext.isBroken)
-                      .map(ext => (
-                        <li key={ext.id} className="text-sm">
-                          <strong>{ext.displayName}</strong> ({ext.name})
-                        </li>
-                      ))}
-                  </ul>
-                  <p className="text-sm">
-                    Use the <strong className="text-orange-600">Repair</strong> button on each extension to fix the issues, or uninstall them if no longer needed.
-                  </p>
-                </>
-              )}
+            <AlertDialogDescription asChild>
+              <div>
+                {extensions && (
+                  <>
+                    <p className="mb-3">
+                      {extensions.filter(ext => ext.isBroken).length} extension{extensions.filter(ext => ext.isBroken).length !== 1 ? 's' : ''} {extensions.filter(ext => ext.isBroken).length !== 1 ? 'have' : 'has'} missing or corrupted files:
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 mb-4">
+                      {extensions
+                        .filter(ext => ext.isBroken)
+                        .map(ext => (
+                          <li key={ext.id} className="text-sm">
+                            <strong>{ext.displayName}</strong> ({ext.name})
+                          </li>
+                        ))}
+                    </ul>
+                    <p className="text-sm">
+                      Use the <strong className="text-orange-600">Repair</strong> button on each extension to fix the issues, or uninstall them if no longer needed.
+                    </p>
+                  </>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

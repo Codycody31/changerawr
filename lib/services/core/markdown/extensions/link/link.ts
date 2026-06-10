@@ -24,9 +24,11 @@ const linkExtension: Extension = {
   parseRules: [
     {
       name: 'link',
+      scope: 'inline',
       // Match [text](url) or [text](url "title")
       // Updated regex to handle URLs with query params and special chars
-      pattern: /\[([^\]]+)\]\(([^\s)]+)(?:\s+"([^"]*)")?\)/g,
+      // Negative lookahead avoids hijacking [button:...] and [embed:...] syntax
+      pattern: /\[(?!(?:button|embed):)([^\]]+)\]\(([^\s)]+)(?:\s+"([^"]*)")?\)/,
       render: (match): MarkdownToken => {
         const text = match[1] || '';
         const url = match[2] || '';

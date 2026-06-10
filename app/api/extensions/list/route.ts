@@ -94,13 +94,12 @@ export async function GET(request: NextRequest) {
             : null;
           const extDirLegacy = path.join(EXTENSIONS_DIR, ext.name);
 
-          let indexPath = extDirWithAuthor
+          const indexPath = extDirWithAuthor
             ? path.join(extDirWithAuthor, 'index.ts')
             : path.join(extDirLegacy, 'index.ts');
 
           try {
             await fs.access(indexPath);
-            // File exists
             isBroken = false;
           } catch {
             // Try legacy path if author path failed
@@ -112,6 +111,17 @@ export async function GET(request: NextRequest) {
                 isBroken = true;
               }
             } else {
+              isBroken = true;
+            }
+          }
+
+          // For linked extensions the proxy index.ts always exists, so the check
+          // above always passes. Additionally verify the source directory is still
+          // accessible — if it's gone the extension won't load.
+          if (!isBroken && ext.isLinked && ext.sourceUrl) {
+            try {
+              await fs.access(ext.sourceUrl);
+            } catch {
               isBroken = true;
             }
           }

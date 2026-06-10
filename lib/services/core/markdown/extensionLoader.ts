@@ -17,118 +17,7 @@ import { builtInExtensions, ExtensionMetadata, ExtensionWithMetadata } from './e
  * Extension loaders with error handling
  * Each loader wraps the import in try-catch to handle missing extensions
  */
-
-async function load_changerawr_geode() {
-  try {
-    const module = await import('@/extensions/changerawr/geode');
-    return {
-      extension: module.geodeExtension,
-      metadata: {
-        ...module.metadata,
-        readme: "# GeodeMD\n\nComprehensive Geometry Dash enhancements for markdown. Add color tags, clickable links to GD content, and Geode API status badges with an intuitive toolkit.\n\n## Features\n\n- 🎨 **Color Tags** - 14 official GD colors with live preview\n- 🔗 **GD Links** - Clickable links to users, levels, and mods\n- 🏷️ **Geode Badges** - API-powered status badges for mods\n- ⚡ **Quick Insert** - Professional 3-tab toolkit for all features\n- 🎯 **Live Preview** - See your formatting before inserting\n\n## Quick Start\n\nClick the **GeodeMD** toolbar button to open the toolkit with three tabs:\n1. **Color Tags** - Apply GD color formatting\n2. **GD Links** - Create links to GD content\n3. **Geode Badges** - Insert mod status badges\n\n## Color Tags\n\n### Usage\n\nUse matching tags to color your text with official GD colors:\n\n```markdown\n<cb>blue text</cb>\n<cg>green text</cg>\n<cr>red text</cr>\n```\n\n### Available Colors\n\n| Tag | Color | Hex Code |\n|-----|-------|----------|\n| `<cb>` | Blue | #4A52E1 |\n| `<cg>` | Green | #40E348 |\n| `<cl>` | Light Blue | #60ABEF |\n| `<cj>` | Cyan | #32C8FF |\n| `<cy>` | Yellow | #FFFF00 |\n| `<co>` | Orange | #FF5A4B |\n| `<cr>` | Red | #FF5A5A |\n| `<cp>` | Pink | #FF00FF |\n| `<ca>` | Purple | #9632FF |\n| `<cd>` | Light Pink | #FF96FF |\n| `<cc>` | Light Yellow | #FFFF96 |\n| `<cf>` | Light Cyan | #96FFFF |\n| `<cs>` | Gold | #FFDC41 |\n| `<c_>` | Bright Red | #FF0000 |\n\n### Example\n\n```markdown\nWelcome to <cb>Geometry Dash</cb>! This level has <cy>100 stars</cy> and is <cr>extremely hard</cr>!\n```\n\n## GD Links\n\nCreate clickable links that automatically redirect to GDBrowser or Geode SDK.\n\n### Syntax\n\n```markdown\n[text](protocol:value)\n```\n\n### Supported Protocols\n\n| Protocol | Redirects To | Example |\n|----------|--------------|---------|\n| `user:` | GDBrowser user profile | `[RobTop](user:RobTop)` |\n| `level:` | GDBrowser level page | `[Bloodbath](level:10565740)` |\n| `mod:` | Geode SDK mod page | `[Geode Loader](mod:geode.loader)` |\n\n### Examples\n\n```markdown\nCheck out [RobTop's profile](user:RobTop)!\nPlay [Bloodbath](level:10565740) - it's insane!\nDownload [Geode](mod:geode.loader) to use mods.\n```\n\n## Geode Badges\n\nInsert dynamic status badges from the Geode API that show real-time mod information.\n\n### Available Badges\n\n- **Version** - Current mod version (e.g., v1.2.3)\n- **Downloads** - Total download count (e.g., 1.2k downloads)\n- **GD Version** - Compatible GD version (e.g., GD 2.206)\n- **Geode Version** - Required Geode version (e.g., Geode v3.0.0)\n\n### Syntax\n\n```markdown\n![badge-type](https://api.geode-sdk.org/v1/mods/MOD_ID/badges/BADGE_TYPE)\n```\n\n### Example\n\n```markdown\n![version](https://api.geode-sdk.org/v1/mods/geode.loader/badges/version)\n![downloads](https://api.geode-sdk.org/v1/mods/geode.loader/badges/downloads)\n```\n\n## Complete Example\n\n```markdown\n# My Awesome GD Level\n\nWelcome to <cy>Golden Valley</cy>! This is a <cb>medium demon</cb> level created by <cg>me</cg>!\n\n## Details\n\n- **ID**: [12345678](level:12345678)\n- **Creator**: [MyUsername](user:MyUsername)\n- **Difficulty**: <cr>Medium Demon</cr>\n\n## Mods Used\n\nI recommend using [Geode](mod:geode.loader) to play this level with these mods:\n\n![version](https://api.geode-sdk.org/v1/mods/geode.loader/badges/version)\n![downloads](https://api.geode-sdk.org/v1/mods/geode.loader/badges/downloads)\n\nHave fun and <cy>good luck</cy>! <cb>GG</cb>!\n```\n\n## Tips\n\n- **Color Tags**: Press Enter in the text field to quickly insert\n- **Links**: Leave \"Link Text\" empty to use the ID/username as display text\n- **Badges**: Select multiple badges to insert them all at once\n- **Combining**: Mix color tags with other markdown formatting (bold, italic, etc.)\n\n## Technical Details\n\n- Color tags use inline CSS with `font-weight: 600` for emphasis\n- Links use `target=\"_blank\"` to open in new tabs\n- Badges are live images from the Geode API\n- All features work in both light and dark themes\n- Zero external CSS dependencies\n",
-        icon: "Sparkles",
-        
-      },
-    };
-  } catch (err) {
-    console.error('[Extension Loader] Failed to load changerawr/geode:', err instanceof Error ? err.message : err);
-    console.error('[Extension Loader] Triggering extension regeneration...');
-
-    // Trigger regeneration
-    if (typeof window === 'undefined') {
-      // Server-side: call extension builder
-      fetch('http://localhost:3010/extensions/generate-imports', { method: 'POST' })
-        .then(() => console.log('[Extension Loader] Regeneration triggered, please restart'))
-        .catch(() => console.error('[Extension Loader] Failed to trigger regeneration'));
-    }
-
-    return null;
-  }
-}
-
-async function load_changerawr_highlight() {
-  try {
-    const module = await import('@/extensions/changerawr/highlight');
-    return {
-      extension: module.highlightExtension,
-      metadata: {
-        ...module.metadata,
-        readme: "# Highlight\n\nMark important text with color. Now with a color picker.\n\n## Basic usage\n\n```markdown\n==yellow highlight==\n=={green}green highlight==\n=={#ff6b6b}custom color==\n```\n\n## Color picker\n\nClick the highlighter button to open a popover where you can:\n- Pick from 7 preset colors\n- Enter any hex color code\n- See a live preview\n\n## Preset colors\n\nyellow, green, blue, red, purple, pink, orange\n\n## Custom colors\n\nType any hex code like `#ff6b6b` or `#4a90e2` in the color picker.\n\n## Examples\n\n```markdown\nStudy notes with ==key terms== highlighted.\n\nMark =={green}correct answers== and =={red}common mistakes==.\n\nBrand colors: =={#FF5733}primary== and =={#33C3FF}secondary==.\n```\n",
-        icon: "Highlighter",
-        
-      },
-    };
-  } catch (err) {
-    console.error('[Extension Loader] Failed to load changerawr/highlight:', err instanceof Error ? err.message : err);
-    console.error('[Extension Loader] Triggering extension regeneration...');
-
-    // Trigger regeneration
-    if (typeof window === 'undefined') {
-      // Server-side: call extension builder
-      fetch('http://localhost:3010/extensions/generate-imports', { method: 'POST' })
-        .then(() => console.log('[Extension Loader] Regeneration triggered, please restart'))
-        .catch(() => console.error('[Extension Loader] Failed to trigger regeneration'));
-    }
-
-    return null;
-  }
-}
-
-async function load_changerawr_spoiler() {
-  try {
-    const module = await import('@/extensions/changerawr/spoiler');
-    return {
-      extension: module.spoilerExtension,
-      metadata: {
-        ...module.metadata,
-        readme: "# Spoiler Block Extension\n\nAdd collapsible spoiler blocks with customizable titles and color schemes. Perfect for hiding plot details, quiz answers, or sensitive information.\n\n## Syntax\n\n### Basic Spoiler\n```markdown\n:::spoiler\nHidden content goes here\n:::\n```\n\n### Custom Title\n```markdown\n:::spoiler Plot Twist Alert!\nThe butler did it!\n:::\n```\n\n### Colored Spoiler with Title\n```markdown\n:::spoiler{red} Warning: Spoilers Ahead\nMajor plot details revealed here!\n:::\n```\n\n### Hex Color Support\n```markdown\n:::spoiler{#ff6b6b} Custom Color\nUse any hex color for fully custom themes!\n:::\n```\n\n### Custom Icon (New!)\n```markdown\n:::spoiler{red}[🚨] Critical Alert\nYou can set any emoji as the icon!\n:::\n\n:::spoiler[🎉] Party Time\nEven without a color, you can customize the icon!\n:::\n\n:::spoiler{#9b59b6}[🌟] Custom Everything\nCombine hex colors with custom icons!\n:::\n```\n\n## Color Schemes\n\nAvailable colors with their icons:\n- `default` 🔒 - Gray/blue (default)\n- `red` ⚠️ - Red theme (warnings, major spoilers)\n- `yellow` 💡 - Yellow theme (tips, hints)\n- `green` ✅ - Green theme (solutions, answers)\n- `blue` ℹ️ - Blue theme (information)\n- `purple` 🔮 - Purple theme (mystery, secrets)\n- **Any hex code** 🎨 - Custom colors (e.g., `#ff6b6b`, `#4a90e2`, `#9b59b6`)\n\n## Features\n\n- **Nested Markdown Support**: Use any markdown inside spoilers (bold, italic, lists, code, links, etc.)\n- **Customizable Titles**: Set your own summary text\n- **Color Schemes**: 6 built-in color themes with distinct icons\n- **Hex Color Support**: Use any custom hex color (e.g., `#ff6b6b`)\n- **Custom Icons**: Override the default icon with any emoji (e.g., `[🚨]`, `[🎉]`, `[🌟]`)\n- **Smooth Animations**: Arrow rotates 90° when opening/closing\n- **Dark Mode**: All colors have dark mode variants\n- **Accessibility**: Proper semantic HTML with `<details>` and `<summary>`\n\n## Examples\n\n```markdown\n:::spoiler\nThis is a basic spoiler with **bold text** and *italic*.\n:::\n\n:::spoiler Quiz Answer\nThe answer is: 42\n:::\n\n:::spoiler{red} Major Plot Spoiler\nIn the final episode, the main character reveals they were a ghost all along.\n:::\n\n:::spoiler{green} Solution\nTo solve this problem:\n1. First, identify the variables\n2. Apply the formula\n3. Simplify the result\n:::\n\n:::spoiler{yellow} Pro Tip\nYou can nest **any markdown** including:\n- Lists like this one\n- [Links](https://example.com)\n- `code snippets`\n- And more!\n:::\n\n:::spoiler{red}[🚨] Critical Warning\nCustom icon examples with colors!\n:::\n\n:::spoiler[🎉] Celebration\nCustom icon without a color theme.\n:::\n\n:::spoiler{#9b59b6}[🌟] Premium Feature\nCombine custom hex colors with custom icons for ultimate customization!\n:::\n```\n\n## Toolbar Button\n\nThe extension adds an Eye icon button to the blocks toolbar section that wraps selected text in spoiler syntax.\n",
-        icon: "Eye",
-        
-      },
-    };
-  } catch (err) {
-    console.error('[Extension Loader] Failed to load changerawr/spoiler:', err instanceof Error ? err.message : err);
-    console.error('[Extension Loader] Triggering extension regeneration...');
-
-    // Trigger regeneration
-    if (typeof window === 'undefined') {
-      // Server-side: call extension builder
-      fetch('http://localhost:3010/extensions/generate-imports', { method: 'POST' })
-        .then(() => console.log('[Extension Loader] Regeneration triggered, please restart'))
-        .catch(() => console.error('[Extension Loader] Failed to trigger regeneration'));
-    }
-
-    return null;
-  }
-}
-
-async function load_changerawr_unsplash() {
-  try {
-    const module = await import('@/extensions/changerawr/unsplash');
-    return {
-      extension: module.unsplashExtension,
-      metadata: {
-        ...module.metadata,
-        readme: "# Unsplash Images Extension\n\nBrowse and insert high-quality, royalty-free images from Unsplash directly into your markdown documents.\n\n## Features\n\n- 🖼️ **Browse Unsplash Library** - Access millions of high-quality photos\n- 🔐 **Secure API Key Storage** - Your API key is encrypted and stored securely\n- 📐 **Flexible Image Sizes** - Choose from thumbnail to full resolution\n- 👤 **Automatic Attribution** - Photographer credits added automatically (required by Unsplash)\n- ⚡ **Quick Insert** - Add images with a single click from the toolbar\n\n## Setup\n\n### 1. Get an Unsplash API Key\n\n1. Visit [Unsplash Developers](https://unsplash.com/developers)\n2. Sign in or create a free account\n3. Create a new application\n4. Copy your **Access Key** (not the Secret Key)\n\n### 2. Configure the Extension\n\n1. Go to **Extensions** in your dashboard\n2. Find **Unsplash Images** in your installed extensions\n3. Click **Settings**\n4. Paste your API key\n5. Choose your preferred default image size\n6. Enable/disable automatic attribution\n7. Click **Save Settings**\n\n## Usage\n\n### Insert an Image\n\n1. Click the **Image** icon in the markdown toolbar\n2. Browse or search for images\n3. Click on an image to insert it\n\n### Settings\n\n- **API Key** (Required): Your Unsplash Access Key - stored encrypted\n- **Default Image Size**: Choose between thumb, small, regular, or full resolution\n- **Include Attribution**: Add photographer credits (recommended and required by Unsplash guidelines)\n\n## Image Sizes\n\n- **Thumb**: 200px width - ideal for previews\n- **Small**: 400px width - good for inline images\n- **Regular**: 1080px width - standard for most uses\n- **Full**: Original resolution - best quality\n\n## Attribution\n\nWhen you insert an image with attribution enabled, it will include:\n- Image from Unsplash\n- Photographer name and link\n- Unsplash link\n\nExample:\n```markdown\n![Mountain landscape](https://images.unsplash.com/photo-xyz?w=1080)\n*Photo by [John Doe](https://unsplash.com/@johndoe) on Unsplash*\n```\n\n## Privacy & Security\n\n- Your API key is **encrypted** before being stored in the database using AES-256-GCM encryption\n- The key is only decrypted when needed to make API requests\n- No unencrypted API keys are ever stored or logged\n\n## Troubleshooting\n\n### \"Please configure your Unsplash API key\"\n\nMake sure you've:\n1. Added your API key in extension settings\n2. Saved the settings\n3. The key is a valid Unsplash Access Key\n\n### Images not loading\n\n- Check that your API key is valid\n- Verify you haven't exceeded your rate limit (50 requests/hour for free tier)\n- Ensure you have an active internet connection\n\n## API Rate Limits\n\nUnsplash free tier allows:\n- **50 requests per hour**\n- Upgrade to paid for higher limits\n\n## License\n\nImages from Unsplash are free to use under the [Unsplash License](https://unsplash.com/license).\n\n## Support\n\n- [Unsplash API Documentation](https://unsplash.com/documentation)\n- [Unsplash Guidelines](https://unsplash.com/api-terms)\n",
-        icon: "Image",
-        settings: [{"key":"apiKey","label":"**Unsplash API Key**","description":"Your Unsplash API Access Key. Get one free at [unsplash.com/developers](https://unsplash.com/developers) - **will be encrypted** when stored","type":"string","defaultValue":"","required":true,"placeholder":"Enter your Unsplash Access Key"},{"key":"imageSize","label":"**Image Quality & Size**","description":"Controls both the downloaded image quality from Unsplash and the display size in your markdown","type":"select","defaultValue":"800","options":[{"label":"Small (400px)","value":"400"},{"label":"Medium (800px)","value":"800"},{"label":"Large (1200px)","value":"1200"},{"label":"Extra Large (1600px)","value":"1600"}]},{"key":"includeAttribution","label":"**Include Photo Attribution**","description":"Add photographer credit as caption (*required* by [Unsplash guidelines](https://unsplash.com/license)) - if you have **Unsplash+** you can turn this off","type":"boolean","defaultValue":true}],
-      },
-    };
-  } catch (err) {
-    console.error('[Extension Loader] Failed to load changerawr/unsplash:', err instanceof Error ? err.message : err);
-    console.error('[Extension Loader] Triggering extension regeneration...');
-
-    // Trigger regeneration
-    if (typeof window === 'undefined') {
-      // Server-side: call extension builder
-      fetch('http://localhost:3010/extensions/generate-imports', { method: 'POST' })
-        .then(() => console.log('[Extension Loader] Regeneration triggered, please restart'))
-        .catch(() => console.error('[Extension Loader] Failed to trigger regeneration'));
-    }
-
-    return null;
-  }
-}
+// No installed extensions yet
 
 /**
  * Cache for all extensions
@@ -154,10 +43,7 @@ export async function discoverExtensions(): Promise<ExtensionWithMetadata[]> {
   try {
     // Load all optional extensions with error handling
     const loadPromises = [
-      load_changerawr_geode(),
-      load_changerawr_highlight(),
-      load_changerawr_spoiler(),
-      load_changerawr_unsplash()
+      
     ];
 
     const loadedExtensions = await Promise.all(loadPromises);

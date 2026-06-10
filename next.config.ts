@@ -3,15 +3,18 @@ import path from "node:path";
 
 const nextConfig: NextConfig = {
     reactStrictMode: false,
-    reactCompiler: true,
+    // Exclude extensions/ — they are symlinked and Turbopack's filesystem classification
+    // for that subtree breaks PlainSource::from_source when any diagnostic is emitted.
+    transpilePackages: ['@changerawr/markdown'],
+    reactCompiler: {
+        sources: (filename: string) => !/[/\\]extensions[/\\]/.test(filename),
+    },
     images: {
         formats: ["image/avif", "image/webp"],
         // No remote patterns needed - avatars are proxied through /api/avatar/[hash]
         remotePatterns: [],
     },
-    turbopack: {
-        root: path.join(__dirname, '..'),
-    },
+    turbopack: {},
     webpack: (config, { isServer }) => {
         // Exclude extensions folder from type checking and compilation
         config.module = config.module || {};
@@ -35,8 +38,6 @@ const nextConfig: NextConfig = {
         // Turbo mode for faster builds
     },
     typedRoutes: false,
-    // Transpile linked extension packages so they can use dependencies
-    transpilePackages: ['@/extensions'],
     // output: 'standalone', uses next-start, leave commented-out
 };
 

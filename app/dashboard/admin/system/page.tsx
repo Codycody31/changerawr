@@ -79,7 +79,13 @@ function buildConfigSchema(sponsored: boolean) {
     return z.object({
         defaultInvitationExpiry: z.number().min(1).max(30),
         requireApprovalForChangelogs: z.boolean(),
-        maxChangelogEntriesPerProject: z.number().min(10).max(sponsored ? 999999 : 10000),
+        // -1 ("unlimited") is always accepted so a previously-licensed value
+        // doesn't fail validation after the license lapses; enforcement falls
+        // back to the unlicensed cap in that case (see SponsorService.checkEntryAllowed).
+        maxChangelogEntriesPerProject: z.union([
+            z.literal(-1),
+            z.number().min(10).max(sponsored ? 999999 : 10000),
+        ]),
         enableAnalytics: z.boolean(),
         enableNotifications: z.boolean(),
         allowTelemetry: z.enum(['prompt', 'enabled', 'disabled']),
@@ -437,30 +443,44 @@ export default function SystemConfigPage() {
                                                 <FormField
                                                     control={form.control}
                                                     name="maxChangelogEntriesPerProject"
-                                                    render={({field}) => (
-                                                        <FormItem>
-                                                            <FormLabel className="flex items-center gap-2">
-                                                                Max Changelog Entries per Project
-                                                                {isLicensed && (
-                                                                    <Badge variant="default"
-                                                                           className="text-xs">Unlimited</Badge>
-                                                                )}
-                                                            </FormLabel>
-                                                            <FormControl>
-                                                                <Input
-                                                                    type="number"
-                                                                    {...field}
-                                                                    onChange={(e) => field.onChange(Number(e.target.value))}
-                                                                />
-                                                            </FormControl>
-                                                            <FormDescription>
-                                                                {isLicensed
-                                                                    ? 'Unlimited entries enabled. This value is used as a soft guideline.'
-                                                                    : 'Maximum number of changelog entries allowed per project (10 - 10,000)'}
-                                                            </FormDescription>
-                                                            <FormMessage/>
-                                                        </FormItem>
-                                                    )}
+                                                    render={({field}) => {
+                                                        const isUnlimited = field.value === -1
+                                                        return (
+                                                            <FormItem>
+                                                                <FormLabel className="flex items-center gap-2">
+                                                                    Max Changelog Entries per Project
+                                                                    {isUnlimited && (
+                                                                        <Badge variant="default"
+                                                                               className="text-xs">Unlimited</Badge>
+                                                                    )}
+                                                                </FormLabel>
+                                                                <FormControl>
+                                                                    <Input
+                                                                        type="number"
+                                                                        {...field}
+                                                                        min={isLicensed ? -1 : 10}
+                                                                        max={isLicensed ? 999999 : 10000}
+                                                                        onChange={(e) => {
+                                                                            const raw = e.target.value
+                                                                            if (raw === '' || raw === '-') {
+                                                                                field.onChange(raw)
+                                                                                return
+                                                                            }
+                                                                            field.onChange(Number(raw))
+                                                                        }}
+                                                                    />
+                                                                </FormControl>
+                                                                <FormDescription>
+                                                                    {isUnlimited && !isLicensed
+                                                                        ? 'Set to unlimited, but no active license was found - capped at 10,000 until a license is active.'
+                                                                        : isLicensed
+                                                                            ? 'Maximum number of changelog entries allowed per project (10 - 999,999). Set to -1 for unlimited.'
+                                                                            : 'Maximum number of changelog entries allowed per project (10 - 10,000)'}
+                                                                </FormDescription>
+                                                                <FormMessage/>
+                                                            </FormItem>
+                                                        )
+                                                    }}
                                                 />
                                                 <Separator/>
 

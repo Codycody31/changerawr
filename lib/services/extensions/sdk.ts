@@ -139,6 +139,8 @@ export interface ParseRule {
   name: string;
   pattern: RegExp;
   render: (match: RegExpMatchArray) => MarkdownToken | null | undefined;
+  /** Whether this rule applies to block-level parsing, inline parsing, or both (default: both) */
+  scope?: 'block' | 'inline' | 'both';
   priority?: number;
   recursiveContent?: boolean;
 }
@@ -189,6 +191,8 @@ export interface Extension {
   parseRules?: ParseRule[];
   renderRules?: RenderRule[];
   transformLink?: (href: string, title?: string) => LinkTransform;
+  /** Post-process the final rendered HTML (runs after sanitization) */
+  postProcessHtml?: (html: string) => string;
   onLoad?: () => void;
   onUnload?: () => void;
 }

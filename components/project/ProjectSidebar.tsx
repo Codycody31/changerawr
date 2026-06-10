@@ -2,7 +2,7 @@
 
 'use client'
 
-import React from 'react'
+import React, {useState} from 'react'
 import Link from 'next/link'
 import {usePathname} from 'next/navigation'
 import {useQuery} from '@tanstack/react-query'
@@ -23,6 +23,7 @@ import {
     PenTool,
     MailIcon,
     Rss,
+    Menu,
     type LucideIcon,
     ChartNoAxesCombined,
     Globe,
@@ -36,6 +37,7 @@ import {Skeleton} from '@/components/ui/skeleton'
 import {Badge} from '@/components/ui/badge'
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip'
 import {Alert, AlertDescription} from '@/components/ui/alert'
+import {Sheet, SheetContent, SheetTitle, SheetTrigger} from '@/components/ui/sheet'
 import {cn} from '@/lib/utils'
 import {formatDistanceToNow} from 'date-fns'
 import {useBookmarks} from '@/hooks/useBookmarks'
@@ -270,6 +272,216 @@ function BookmarkedChangelog({id, projectId, title}: BookmarkedChangelogProps) {
     )
 }
 
+interface MobileProjectNavProps {
+    projectId: string
+    projectName: string | undefined
+    isPublic: boolean
+    changelogCount: number
+    pathname: string
+    bookmarks: Array<{id: string; title: string}>
+}
+
+function MobileProjectNav({projectId, projectName, isPublic, changelogCount, pathname, bookmarks}: MobileProjectNavProps) {
+    const [isOpen, setIsOpen] = useState(false)
+    const rssUrl = `/changelog/${projectId}/rss.xml`
+
+    const isActive = (href: string) =>
+        pathname === href ||
+        (href !== `/dashboard/projects/${projectId}` && pathname.startsWith(href))
+
+    const navItem = (href: string, icon: LucideIcon, label: string, opts?: {badge?: string; external?: boolean; disabled?: boolean}) => {
+        if (opts?.disabled) return null
+        const active = isActive(href)
+        const Icon = icon
+        return (
+            <Link
+                key={href}
+                href={href}
+                onClick={() => { if (!opts?.external) setIsOpen(false) }}
+                {...(opts?.external ? {target: "_blank", rel: "noopener noreferrer"} : {})}
+                className={cn(
+                    "flex items-center justify-between py-2 px-3 text-sm rounded-md transition-colors group min-h-[44px]",
+                    active
+                        ? "bg-accent text-accent-foreground font-medium"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                )}
+            >
+                <div className="flex items-center min-w-0">
+                    <Icon className="mr-2 h-4 w-4 flex-shrink-0"/>
+                    <span className="truncate">{label}</span>
+                </div>
+                {opts?.badge && (
+                    <Badge variant="outline" className="ml-2 text-xs bg-primary/5 flex-shrink-0">
+                        {opts.badge}
+                    </Badge>
+                )}
+                {opts?.external && <ExternalLink className="ml-2 h-3 w-3 opacity-70 flex-shrink-0"/>}
+            </Link>
+        )
+    }
+
+    return (
+        <>
+            {/* Top bar */}
+            <header className="md:hidden fixed top-0 left-0 right-0 h-14 bg-background border-b z-50">
+                <div className="flex items-center h-full px-2 gap-1">
+                    <Link
+                        href="/dashboard/projects"
+                        className="flex items-center gap-0.5 h-9 px-2 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors flex-shrink-0"
+                    >
+                        <ChevronLeft className="h-4 w-4"/>
+                        <span>Projects</span>
+                    </Link>
+
+                    <span className="text-muted-foreground/40 text-xs flex-shrink-0">/</span>
+
+                    <span className="text-sm font-medium truncate flex-1 min-w-0">
+                        {projectName || '…'}
+                    </span>
+
+                    <Button variant="ghost" size="icon" className="h-9 w-9 flex-shrink-0" asChild>
+                        <Link href={`/dashboard/projects/${projectId}/changelog/new`}>
+                            <Plus className="h-4 w-4"/>
+                            <span className="sr-only">New entry</span>
+                        </Link>
+                    </Button>
+
+                    <Sheet open={isOpen} onOpenChange={setIsOpen}>
+                        <SheetTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-9 w-9 flex-shrink-0">
+                                <Menu className="h-4 w-4"/>
+                                <span className="sr-only">Project navigation</span>
+                            </Button>
+                        </SheetTrigger>
+
+                        {/* Sheet — mirrors the desktop sidebar content exactly */}
+                        <SheetContent side="right" className="w-72 p-0 flex flex-col">
+                            <SheetTitle className="sr-only">Project navigation</SheetTitle>
+
+                            {/* Header: project name + new entry + rss */}
+                            <div className="h-16 flex items-center justify-between border-b px-4 flex-shrink-0">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <h2 className="font-semibold truncate text-sm">{projectName || 'Project'}</h2>
+                                </div>
+                                <div className="flex items-center gap-1 flex-shrink-0">
+                                    {isPublic && (
+                                        <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                                            <Link href={rssUrl} target="_blank" rel="noopener noreferrer">
+                                                <Rss className="h-4 w-4 text-orange-500"/>
+                                                <span className="sr-only">RSS Feed</span>
+                                            </Link>
+                                        </Button>
+                                    )}
+                                    <Button size="sm" className="h-8 gap-1" asChild>
+                                        <Link href={`/dashboard/projects/${projectId}/changelog/new`} onClick={() => setIsOpen(false)}>
+                                            <Plus className="h-3.5 w-3.5"/>
+                                            <span className="text-xs">New</span>
+                                        </Link>
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {/* Scrollable nav — same structure as desktop sidebar */}
+                            <ScrollArea className="flex-1">
+                                <div className="py-4 px-3">
+                                    {/* Main nav */}
+                                    <nav className="space-y-1">
+                                        {navItem(`/dashboard/projects/${projectId}`, LayoutDashboard, 'Overview')}
+                                        {navItem(`/dashboard/projects/${projectId}/changelog`, FileText, 'All Changelogs', {
+                                            badge: changelogCount > 0 ? changelogCount.toString() : undefined
+                                        })}
+                                        {navItem(`/changelog/${projectId}`, Eye, 'View Public Page', {
+                                            external: true,
+                                            disabled: !isPublic
+                                        })}
+                                    </nav>
+
+                                    <Separator className="my-3"/>
+
+                                    <div className="px-3 mb-2">
+                                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                            Integrations
+                                        </h3>
+                                    </div>
+
+                                    <nav className="space-y-1">
+                                        {navItem(`/dashboard/projects/${projectId}/integrations/widget`, Code, 'Widget', {disabled: !isPublic})}
+                                        {navItem(`/dashboard/projects/${projectId}/integrations/email`, MailIcon, 'Email')}
+                                        {navItem(`/dashboard/projects/${projectId}/integrations/github`, SiGithub as unknown as LucideIcon, 'GitHub')}
+                                        {navItem(`/dashboard/projects/${projectId}/analytics`, ChartNoAxesCombined, 'Analytics')}
+                                        {navItem(`/dashboard/projects/${projectId}/domains`, Globe, 'Domains', {disabled: !isPublic})}
+                                        {navItem(`/dashboard/projects/${projectId}/api-keys`, Key, 'API Keys')}
+                                    </nav>
+
+                                    <Separator className="my-3"/>
+
+                                    <nav className="space-y-1">
+                                        {navItem(`/dashboard/projects/${projectId}/settings`, Settings, 'Settings')}
+                                    </nav>
+
+                                    {/* Private project warning */}
+                                    {!isPublic && (
+                                        <div className="px-3 py-2 mt-2">
+                                            <Alert variant="warning" className="py-2 px-3">
+                                                <AlertDescription className="text-xs">
+                                                    Make this project public in settings to enable all features.
+                                                </AlertDescription>
+                                            </Alert>
+                                        </div>
+                                    )}
+
+                                    {/* Bookmarks */}
+                                    {bookmarks.length > 0 && (
+                                        <>
+                                            <Separator className="my-3"/>
+                                            <div className="flex items-center mb-2 px-3">
+                                                <Star className="h-4 w-4 text-amber-500 mr-1.5"/>
+                                                <h3 className="text-xs font-semibold">Bookmarked</h3>
+                                            </div>
+                                            <nav className="space-y-1">
+                                                {bookmarks.map((bookmark) => {
+                                                    const bHref = `/dashboard/projects/${projectId}/changelog/${bookmark.id}`
+                                                    const active = isActive(bHref)
+                                                    return (
+                                                        <Link
+                                                            key={bookmark.id}
+                                                            href={bHref}
+                                                            onClick={() => setIsOpen(false)}
+                                                            className="flex items-center gap-2 p-2 pr-3 hover:bg-accent/50 rounded-md text-sm transition-colors min-h-[44px]"
+                                                        >
+                                                            <Bookmark className={cn(
+                                                                "h-4 w-4 flex-shrink-0",
+                                                                active ? "text-primary" : "text-amber-500"
+                                                            )}/>
+                                                            <span className="line-clamp-1 break-words text-muted-foreground hover:text-foreground">
+                                                                {bookmark.title}
+                                                            </span>
+                                                        </Link>
+                                                    )
+                                                })}
+                                            </nav>
+                                        </>
+                                    )}
+                                </div>
+                            </ScrollArea>
+
+                            {/* Footer */}
+                            <div className="p-3 border-t flex items-center justify-between flex-shrink-0">
+                                <Button variant="outline" className="justify-start text-xs h-8" asChild>
+                                    <Link href="/dashboard/projects" onClick={() => setIsOpen(false)}>
+                                        <ChevronLeft className="h-3.5 w-3.5 mr-1"/>
+                                        All Projects
+                                    </Link>
+                                </Button>
+                            </div>
+                        </SheetContent>
+                    </Sheet>
+                </div>
+            </header>
+        </>
+    )
+}
+
 export function ProjectSidebar({projectId}: { projectId: string }) {
     const pathname = usePathname()
     const {bookmarks, isLoading: isLoadingBookmarks} = useBookmarks({projectId});
@@ -307,21 +519,40 @@ export function ProjectSidebar({projectId}: { projectId: string }) {
 
     if (isLoadingProject) {
         return (
-            <div
-                className="hidden md:flex fixed inset-y-0 left-0 z-40 flex-col border-r bg-background w-64 transition-all duration-300">
-                <div className="p-4 border-b">
-                    <Skeleton className="h-8 w-36"/>
+            <>
+                <MobileProjectNav
+                    projectId={projectId}
+                    projectName={undefined}
+                    isPublic={false}
+                    changelogCount={0}
+                    pathname={pathname}
+                    bookmarks={[]}
+                />
+                <div
+                    className="hidden md:flex fixed inset-y-0 left-0 z-40 flex-col border-r bg-background w-64 transition-all duration-300">
+                    <div className="p-4 border-b">
+                        <Skeleton className="h-8 w-36"/>
+                    </div>
+                    <div className="p-4 space-y-3">
+                        {Array.from({length: 4}).map((_, i) => (
+                            <Skeleton key={i} className="h-8 w-full"/>
+                        ))}
+                    </div>
                 </div>
-                <div className="p-4 space-y-3">
-                    {Array.from({length: 4}).map((_, i) => (
-                        <Skeleton key={i} className="h-8 w-full"/>
-                    ))}
-                </div>
-            </div>
+            </>
         )
     }
 
     return (
+        <>
+        <MobileProjectNav
+            projectId={projectId}
+            projectName={project?.name}
+            isPublic={isPublic}
+            changelogCount={changelogCount}
+            pathname={pathname}
+            bookmarks={bookmarks}
+        />
         <div
             className="hidden md:flex fixed inset-y-0 left-0 z-40 flex-col border-r bg-background w-64 transition-all duration-300">
             {/* Header */}
@@ -622,5 +853,6 @@ export function ProjectSidebar({projectId}: { projectId: string }) {
                 )}
             </div>
         </div>
+        </>
     )
 }

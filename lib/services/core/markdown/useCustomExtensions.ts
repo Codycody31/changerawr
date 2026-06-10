@@ -8,7 +8,7 @@
  * const tokens = parseMarkdown(markdownContent);
  */
 
-import { ChangerawrMarkdown, EngineConfig, Extension, createMinimalEngine, CoreExtensions } from '@changerawr/markdown';
+import { ChangerawrMarkdown, EngineConfig, Extension, createMinimalEngine, CoreExtensions, AlertExtension, ButtonExtension } from '@changerawr/markdown';
 import { customExtensions, ExtensionWithMetadata } from './extensions';
 import { getAvailableExtensions } from './extensionLoader';
 import { getDevTools } from './dev-tools-connector';
@@ -19,6 +19,25 @@ let engineInstanceInitialized = false;
 
 // Engine instances with specific extension sets
 const engineCache = new Map<string, ChangerawrMarkdown>();
+
+/**
+ * Feature extensions (alert, button) that ship with @changerawr/markdown
+ * but aren't part of CoreExtensions or our customExtensions list.
+ * `createMinimalEngine([])` clears all defaults, so these must be registered explicitly
+ * or [button:...]/::: alert ::: syntax falls through to the link extension.
+ * Note: embed is NOT registered here - our own `embedExtension` (BetterEmbeds) in
+ * customExtensions replaces it with loading skeletons and lazy iframes.
+ */
+const featureExtensions: Extension[] = [AlertExtension, ButtonExtension];
+
+function registerFeatureExtensions(engine: ChangerawrMarkdown): void {
+  featureExtensions.forEach(extension => {
+    const result = engine.registerExtension(extension);
+    if (!result.success) {
+      console.warn(`Failed to register feature extension '${extension.name}':`, result.error);
+    }
+  });
+}
 
 /**
  * Get or create the singleton markdown engine with all custom extensions
@@ -41,6 +60,8 @@ export async function getMarkdownEngineAsync(): Promise<ChangerawrMarkdown> {
         console.warn(`Failed to register core extension '${extension.name}':`, result.error);
       }
     });
+
+    registerFeatureExtensions(engineInstance);
 
     // Load all available extensions (built-in + installed)
     const allExtensions = await getAvailableExtensions();
@@ -137,6 +158,8 @@ function getMarkdownEngine(): ChangerawrMarkdown {
         console.warn(`Failed to register core extension '${extension.name}':`, result.error);
       }
     });
+
+    registerFeatureExtensions(engineInstance);
 
     // Register only built-in extensions (synchronous fallback)
     customExtensions.forEach(extension => {
@@ -305,6 +328,8 @@ export function createEngineWithExtensions(config?: EngineConfig): ChangerawrMar
       console.warn(`Failed to register core extension '${extension.name}':`, result.error);
     }
   });
+
+  registerFeatureExtensions(engine);
 
   // Register all custom extensions
   customExtensions.forEach(extension => {
