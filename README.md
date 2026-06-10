@@ -4,7 +4,7 @@
 </p>
 
 
-[![Version](https://img.shields.io/badge/version-1.0.5-blue.svg)](https://github.com/supernova3339/changerawr)
+[![Version](https://img.shields.io/badge/version-1.0.7-blue.svg)](https://github.com/supernova3339/changerawr)
 [![Status](https://img.shields.io/badge/status-Production%20Ready-green.svg)](https://github.com/supernova3339/changerawr)
 [![License](https://img.shields.io/badge/license-CNC%20OSL-purple.svg)](LICENSE)
 
@@ -25,6 +25,7 @@ If you don't know what a changelog is, check out [betterauth](https://www.better
 
 ## 🚀 Features
 
+- **🛠️ Fully Extendable Software** - Powerful extension system to improve your changelogging experience
 - **📝 Beautiful Content Editor** - Write changelogs that look professional
 - **🤖 AI-Powered** - Let AI help you write better changelog entries
 - **📡 Headless API** - Beautifully documented REST API for full control
@@ -36,7 +37,9 @@ If you don't know what a changelog is, check out [betterauth](https://www.better
 - **🔐 Modern Authentication** - Custom-built auth with passkey support
 - **🖥️ Desktop-First Design** - Built for desktop use (mobile works, but it's quirky)
 - **🔍 Full-Text Search** - Search everything, instantly
-- -**🌐 Custom Domains** - Link a custom domain to your changelog
+- -**🌐 Custom Domains** - Link a custom domain to your changelog ( you can give it an SSL certificate, too!* )
+
+<sup><sub>* SSL Certificates require having the [nginx-sidecar](https://github.com/Changerawr/nginx-agent) setup and configured correctly.</sub></sup>
 
 ## 🚀 Quick Start
 
@@ -80,7 +83,7 @@ docker-compose up --build
 
 ## ⚙️ Configuration
 
-### Environment Variables
+### Environment Variables*
 
 ```bash
 # Database
@@ -96,6 +99,7 @@ GITHUB_ENCRYPTION_KEY="your-github-encryption-key"
 # Analytics
 ANALYTICS_SALT="your-secure-random-salt-here"
 ```
+<sup><sub>This is not a full list, refer to the .env.example for a full list.</sub></sup>
 
 ## 📦 Widget Integration
 
@@ -139,6 +143,7 @@ The easiest way to add changelogs to your site - perfect for non-technical users
 - **PostgreSQL** - Robust, scalable database
 - **Shadcn/UI** - Beautiful, accessible UI components
 - **TypeScript** - Full type safety throughout
+- **Changerawr Universal Markdown** - Our in-house content engine
 
 ## 🏗️ Development
 
