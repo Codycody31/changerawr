@@ -144,11 +144,13 @@ export async function GET(request: NextRequest) {
 
         // Check if icon.png file exists in extension directory
         let iconUrl = metadata?.icon;
+        let invertIcon = metadata?.invertIcon;
         if (!ext.isBuiltIn) {
           const extDirWithAuthor = ext.author
             ? path.join(EXTENSIONS_DIR, ext.author, ext.name)
             : null;
           const extDirLegacy = path.join(EXTENSIONS_DIR, ext.name);
+          const extDir = extDirWithAuthor ?? extDirLegacy;
 
           let hasIconFile = false;
           if (extDirWithAuthor) {
@@ -176,6 +178,19 @@ export async function GET(request: NextRequest) {
           if (hasIconFile) {
             iconUrl = `/api/extensions/${ext.id}/icon`;
           }
+
+          // Linked (symlinked) extensions are skipped by the codegen scan, so
+          // they never end up in extensionMetadataMap. Fall back to reading
+          // extension.json directly off disk for invertIcon in that case.
+          if (invertIcon === undefined) {
+            try {
+              const manifestRaw = await fs.readFile(path.join(extDir, 'extension.json'), 'utf-8');
+              const manifest = JSON.parse(manifestRaw);
+              invertIcon = manifest.invertIcon;
+            } catch {
+              // No extension.json or unreadable, leave invertIcon undefined
+            }
+          }
         }
 
         return {
@@ -184,7 +199,7 @@ export async function GET(request: NextRequest) {
           updateAvailable,
           latestVersion,
           icon: iconUrl,
-          invertIcon: metadata?.invertIcon,
+          invertIcon,
           readme: metadata?.readme,
         };
       })

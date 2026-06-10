@@ -317,6 +317,9 @@ export async function GET(request: Request): Promise<NextResponse<AuditLogsRespo
             if (to) {
                 const toDate = new Date(to);
                 if (!isNaN(toDate.getTime())) {
+                    // Extend to the end of the selected day so the "to" date
+                    // is inclusive instead of cutting off at midnight UTC.
+                    toDate.setUTCHours(23, 59, 59, 999);
                     where.createdAt.lte = toDate;
                     // console.log('🦖 Date filter TO:', toDate.toISOString());
                 }
@@ -492,7 +495,7 @@ export async function GET(request: Request): Promise<NextResponse<AuditLogsRespo
                 }) as DatabaseAuditLog[]
             }
 
-            console.log(`🦖 Fetched ${logs.length} logs`);
+            // console.log(`🦖 Fetched ${logs.length} logs`);
 
             // Process logs to include preserved user info
             const processedLogs = processLogs(logs);
@@ -501,7 +504,7 @@ export async function GET(request: Request): Promise<NextResponse<AuditLogsRespo
             const nextCursor = logs.length === chunkSize && logs.length > 0 ? logs[logs.length - 1].id : null;
             const hasMore = logs.length === chunkSize;
 
-            console.log(`🦖 NextCursor: ${nextCursor ? nextCursor.substring(0, 10) + '...' : 'none'}, HasMore: ${hasMore}`);
+            // console.log(`🦖 NextCursor: ${nextCursor ? nextCursor.substring(0, 10) + '...' : 'none'}, HasMore: ${hasMore}`);
 
             return NextResponse.json({
                 logs: processedLogs,

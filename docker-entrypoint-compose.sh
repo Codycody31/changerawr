@@ -40,6 +40,20 @@ npm run build:widget
 echo "🦖 Generating Swagger documentation..."
 npm run generate-swagger
 
+# Generate extension imports
+echo "🦖 Generating extension imports..."
+npm run extensions:generate
+
+# If any extensions are installed, the regenerated extensionLoader.ts (and the
+# extensions' own source files) must be compiled into .next before `next start`
+# can serve them - the image's prebuilt .next only has the default/empty loader.
+if [ -n "$(find extensions -mindepth 2 -maxdepth 2 -type d 2>/dev/null)" ]; then
+    echo "🦖 Installed extensions detected, rebuilding application..."
+    CI_BUILD_MODE=1 DOCKER_BUILD=1 npm run build
+else
+    echo "🦖 No installed extensions, skipping rebuild"
+fi
+
 # Stop maintenance server
 echo "🦖 Setup complete! Stopping maintenance server..."
 cleanup_maintenance
