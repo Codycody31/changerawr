@@ -107,6 +107,7 @@ async function scanExtensions() {
               variableName: `${author}_${extName}`.replace(/[^a-zA-Z0-9_]/g, '_'),
               readme,
               icon,
+              invertIcon: metadata.invertIcon,
               settings: metadata.settings || null,
             });
 
@@ -138,6 +139,7 @@ async function load_${ext.variableName}() {
         ...module.metadata,
         ${ext.readme ? `readme: ${JSON.stringify(ext.readme)},` : ''}
         ${ext.icon ? `icon: ${JSON.stringify(ext.icon)},` : ''}
+        ${ext.invertIcon !== undefined ? `invertIcon: ${JSON.stringify(ext.invertIcon)},` : ''}
         ${ext.settings ? `settings: ${JSON.stringify(ext.settings)},` : ''}
       },
     };

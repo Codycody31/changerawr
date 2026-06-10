@@ -1,13 +1,17 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { formatDistanceToNow } from 'date-fns'
 import { useTimezone } from '@/hooks/use-timezone'
+import { formatDateTimeMedium } from '@/lib/utils/format-date'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import {
     Dialog,
     DialogContent,
@@ -41,13 +45,12 @@ import {
     Clock,
     MoreVertical,
     Copy,
-    Eye,
+    Hash,
     Shield,
+    ShieldAlert,
     Search,
     Filter,
-    TrendingUp,
     Server,
-    Zap
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { CustomDomain, DNSInstructions } from '@/lib/types/custom-domains'
@@ -60,12 +63,18 @@ interface DomainStats {
     expiringSoon: number
 }
 
+interface ProjectOption {
+    id: string
+    name: string
+}
+
 export default function AdminDomainsPage() {
     const timezone = useTimezone()
     const [domains, setDomains] = useState<CustomDomain[]>([])
     const [filteredDomains, setFilteredDomains] = useState<CustomDomain[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [isAddingDomain, setIsAddingDomain] = useState(false)
+    const [addDialogOpen, setAddDialogOpen] = useState(false)
     const [newDomain, setNewDomain] = useState('')
     const [newProjectId, setNewProjectId] = useState('')
     const [dnsInstructions, setDnsInstructions] = useState<DNSInstructions | null>(null)
@@ -75,6 +84,16 @@ export default function AdminDomainsPage() {
     const [searchQuery, setSearchQuery] = useState('')
     const [statusFilter, setStatusFilter] = useState<'all' | 'verified' | 'pending'>('all')
     const [sslEnabled, setSslEnabled] = useState(false)
+
+    const { data: projects = [] } = useQuery<ProjectOption[]>({
+        queryKey: ['admin-domains-projects'],
+        queryFn: async () => {
+            const response = await fetch('/api/projects')
+            if (!response.ok) return []
+            return response.json()
+        },
+        staleTime: 60_000,
+    })
 
     const stats: DomainStats = {
         total: domains.length,
@@ -167,6 +186,7 @@ export default function AdminDomainsPage() {
                 setNewProjectId('')
                 setDnsInstructions(result.domain.dnsInstructions)
                 setSuccess(`Domain ${newDomain} added successfully!`)
+                setAddDialogOpen(false)
                 await loadDomains()
             } else {
                 setError(result.error || 'Failed to add domain')
@@ -243,16 +263,11 @@ export default function AdminDomainsPage() {
         }
     }
 
-    const formatDate = (date: Date | string): string => {
-        return new Date(date).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            timeZone: timezone,
-        })
-    }
+    const formatRelative = (date: Date | string): string =>
+        formatDistanceToNow(new Date(date), { addSuffix: true })
+
+    const formatAbsolute = (date: Date | string): string =>
+        formatDateTimeMedium(date, timezone)
 
     const getStatusBadge = (domain: CustomDomain) => {
         if (domain.verified) {
@@ -297,7 +312,7 @@ export default function AdminDomainsPage() {
 
     const getCertificateStatusBadge = (domain: CustomDomain) => {
         if (domain.sslMode === 'NONE') {
-            return <span className="text-xs text-muted-foreground">—</span>
+            return null
         }
 
         const activeCert = domain.certificates?.find(c => c.status === 'ISSUED')
@@ -312,7 +327,7 @@ export default function AdminDomainsPage() {
             if (daysUntilExpiry <= 30 && daysUntilExpiry > 0) {
                 return (
                     <Badge variant="default" className="text-orange-700 bg-orange-50 border-orange-200 hover:bg-orange-100">
-                        Expiring Soon
+                        Expires {formatRelative(activeCert.expiresAt!)}
                     </Badge>
                 )
             }
@@ -327,7 +342,7 @@ export default function AdminDomainsPage() {
         if (pendingCert) {
             return (
                 <Badge variant="secondary" className="text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100">
-                    Pending
+                    Cert Pending
                 </Badge>
             )
         }
@@ -336,12 +351,14 @@ export default function AdminDomainsPage() {
         if (failedCert) {
             return (
                 <Badge variant="destructive" className="text-xs">
-                    Failed
+                    Cert Failed
                 </Badge>
             )
         }
 
-        return <span className="text-xs text-muted-foreground">No Certificate</span>
+        return (
+            <span className="text-xs text-muted-foreground">No certificate</span>
+        )
     }
 
     useEffect(() => {
@@ -365,21 +382,29 @@ export default function AdminDomainsPage() {
         )
     }
 
+    const statItems = [
+        { label: 'Total Domains', value: stats.total, icon: Globe, color: 'text-blue-600' },
+        { label: 'Verified', value: stats.verified, icon: CheckCircle, color: 'text-green-600' },
+        { label: 'Pending', value: stats.pending, icon: Clock, color: 'text-yellow-600' },
+        ...(sslEnabled ? [
+            { label: 'SSL Enabled', value: stats.sslEnabled, icon: Shield, color: 'text-purple-600' },
+            { label: 'Expiring Soon', value: stats.expiringSoon, icon: ShieldAlert, color: stats.expiringSoon > 0 ? 'text-orange-600' : 'text-muted-foreground' },
+        ] : []),
+    ]
+
     return (
         <div className="space-y-6">
-            {/* Enhanced Header with Better Visual Hierarchy */}
-            <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                    <div className="flex items-center gap-3">
-                        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600">
-                            <Globe className="w-4 h-4 text-white" />
-                        </div>
-                        <div>
-                            <h1 className="text-2xl font-bold tracking-tight">Domain Administration</h1>
-                            <p className="text-sm text-muted-foreground">
-                                Manage custom domains across all projects
-                            </p>
-                        </div>
+            {/* Header */}
+            <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 shrink-0">
+                        <Globe className="w-4 h-4 text-white" />
+                    </div>
+                    <div>
+                        <h1 className="text-2xl font-bold tracking-tight">Domain Administration</h1>
+                        <p className="text-sm text-muted-foreground">
+                            Manage custom domains across all projects
+                        </p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -387,9 +412,9 @@ export default function AdminDomainsPage() {
                         <RefreshCw className="w-4 h-4" />
                         Refresh
                     </Button>
-                    <Dialog>
+                    <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
                         <DialogTrigger asChild>
-                            <Button className="gap-2">
+                            <Button size="sm" className="gap-2">
                                 <Plus className="w-4 h-4" />
                                 Add Domain
                             </Button>
@@ -402,7 +427,7 @@ export default function AdminDomainsPage() {
                                 </DialogDescription>
                             </DialogHeader>
                             <form onSubmit={handleAddDomain} className="space-y-4">
-                                <div>
+                                <div className="space-y-2">
                                     <Label htmlFor="domain">Custom Domain</Label>
                                     <Input
                                         id="domain"
@@ -413,18 +438,32 @@ export default function AdminDomainsPage() {
                                         required
                                     />
                                 </div>
-                                <div>
-                                    <Label htmlFor="projectId">Project ID</Label>
-                                    <Input
-                                        id="projectId"
-                                        type="text"
-                                        value={newProjectId}
-                                        onChange={(e) => setNewProjectId(e.target.value)}
-                                        placeholder="cm7zegrfx000ipp6g5ogohwuj"
-                                        required
-                                    />
+                                <div className="space-y-2">
+                                    <Label htmlFor="projectId">Project</Label>
+                                    {projects.length > 0 ? (
+                                        <SearchableSelect
+                                            value={newProjectId}
+                                            onValueChange={setNewProjectId}
+                                            placeholder="Select a project..."
+                                            searchPlaceholder="Search projects..."
+                                            items={projects.map(project => ({
+                                                value: project.id,
+                                                label: project.name,
+                                                searchValue: project.id,
+                                            }))}
+                                        />
+                                    ) : (
+                                        <Input
+                                            id="projectId"
+                                            type="text"
+                                            value={newProjectId}
+                                            onChange={(e) => setNewProjectId(e.target.value)}
+                                            placeholder="cm7zegrfx000ipp6g5ogohwuj"
+                                            required
+                                        />
+                                    )}
                                 </div>
-                                <Button type="submit" disabled={isAddingDomain} className="w-full">
+                                <Button type="submit" disabled={isAddingDomain || !newDomain || !newProjectId} className="w-full">
                                     {isAddingDomain ? 'Adding...' : 'Add Domain'}
                                 </Button>
                             </form>
@@ -433,68 +472,20 @@ export default function AdminDomainsPage() {
                 </div>
             </div>
 
-            {/* Improved Stats Cards - More compact and informative */}
-            <div className={`grid grid-cols-2 ${sslEnabled ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-4`}>
-                <Card>
-                    <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-xs font-medium text-blue-700 uppercase tracking-wide">Total Domains</p>
-                                <p className="text-2xl font-bold text-blue-900">{stats.total}</p>
-                            </div>
-                            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                                <Globe className="w-5 h-5 text-blue-600" />
-                            </div>
+            {/* Compact stats strip */}
+            <div className={`grid grid-cols-2 sm:grid-cols-3 ${sslEnabled ? 'lg:grid-cols-5' : 'lg:grid-cols-3'} divide-y divide-border sm:divide-y-0 sm:divide-x rounded-lg border bg-card overflow-hidden`}>
+                {statItems.map((stat) => (
+                    <div key={stat.label} className="flex items-center gap-3 px-4 py-3">
+                        <stat.icon className={`w-5 h-5 shrink-0 ${stat.color}`} />
+                        <div className="min-w-0">
+                            <p className="text-xl font-bold leading-tight">{stat.value}</p>
+                            <p className="text-xs text-muted-foreground truncate">{stat.label}</p>
                         </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-xs font-medium text-green-700 uppercase tracking-wide">Verified</p>
-                                <p className="text-2xl font-bold text-green-900">{stats.verified}</p>
-                            </div>
-                            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                                <CheckCircle className="w-5 h-5 text-green-600" />
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-xs font-medium text-yellow-700 uppercase tracking-wide">Pending</p>
-                                <p className="text-2xl font-bold text-yellow-900">{stats.pending}</p>
-                            </div>
-                            <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
-                                <Clock className="w-5 h-5 text-yellow-600" />
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {sslEnabled && (
-                    <Card>
-                        <CardContent className="p-4">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs font-medium text-purple-700 uppercase tracking-wide">SSL Enabled</p>
-                                    <p className="text-2xl font-bold text-purple-900">{stats.sslEnabled}</p>
-                                </div>
-                                <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                                    <Shield className="w-5 h-5 text-purple-600" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
+                    </div>
+                ))}
             </div>
 
-            {/* Alerts with better positioning */}
+            {/* Alerts */}
             <AnimatePresence>
                 {error && (
                     <motion.div
@@ -522,7 +513,7 @@ export default function AdminDomainsPage() {
                 )}
             </AnimatePresence>
 
-            {/* DNS Instructions - More compact design */}
+            {/* DNS Instructions */}
             {dnsInstructions && (
                 <motion.div
                     initial={{ opacity: 0, scale: 0.98 }}
@@ -541,7 +532,7 @@ export default function AdminDomainsPage() {
                                 Add these DNS records to your domain provider to complete the setup:
                             </p>
 
-                            <div className="grid gap-3">
+                            <div className="grid gap-3 lg:grid-cols-2">
                                 <div className="bg-white/80 p-3 rounded-lg border border-blue-100">
                                     <div className="flex items-center justify-between mb-2">
                                         <h4 className="font-semibold text-blue-900 text-sm flex items-center gap-2">
@@ -557,9 +548,9 @@ export default function AdminDomainsPage() {
                                             <Copy className="w-3 h-3" />
                                         </Button>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-2 text-xs font-mono text-gray-700">
-                                        <div><strong>Name:</strong> {dnsInstructions.cname.name}</div>
-                                        <div><strong>Value:</strong> {dnsInstructions.cname.value}</div>
+                                    <div className="space-y-1 text-xs font-mono text-gray-700">
+                                        <div className="break-all"><strong>Name:</strong> {dnsInstructions.cname.name}</div>
+                                        <div className="break-all"><strong>Value:</strong> {dnsInstructions.cname.value}</div>
                                     </div>
                                 </div>
 
@@ -579,14 +570,14 @@ export default function AdminDomainsPage() {
                                         </Button>
                                     </div>
                                     <div className="space-y-1 text-xs font-mono text-gray-700">
-                                        <div><strong>Name:</strong> {dnsInstructions.txt.name}</div>
-                                        <div><strong>Value:</strong> <span className="break-all">{dnsInstructions.txt.value}</span></div>
+                                        <div className="break-all"><strong>Name:</strong> {dnsInstructions.txt.name}</div>
+                                        <div className="break-all"><strong>Value:</strong> {dnsInstructions.txt.value}</div>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="flex items-center justify-between pt-2">
-                                <Alert>
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+                                <Alert className="flex-1">
                                     <AlertDescription className="text-xs text-blue-700">
                                         DNS changes can take up to 48 hours to propagate.
                                     </AlertDescription>
@@ -600,32 +591,30 @@ export default function AdminDomainsPage() {
                 </motion.div>
             )}
 
-            {/* Enhanced Domains Table */}
+            {/* Domains Table */}
             <Card className="border-0 shadow-sm">
                 <CardHeader className="pb-4">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                        <div>
-                            <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                                <Server className="w-5 h-5 text-muted-foreground" />
-                                Domain Management
-                                <Badge variant="secondary" className="ml-2">
-                                    {filteredDomains.length} of {domains.length}
-                                </Badge>
-                            </CardTitle>
-                        </div>
+                        <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                            <Server className="w-5 h-5 text-muted-foreground" />
+                            Domain Management
+                            <Badge variant="secondary" className="ml-2">
+                                {filteredDomains.length} of {domains.length}
+                            </Badge>
+                        </CardTitle>
                         <div className="flex items-center gap-2">
-                            <div className="relative">
+                            <div className="relative flex-1 sm:flex-initial">
                                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                                 <Input
                                     placeholder="Search domains or projects..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="pl-10 w-64 h-9"
+                                    className="pl-10 w-full sm:w-64 h-9"
                                 />
                             </div>
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" size="sm" className="gap-2">
+                                    <Button variant="outline" size="sm" className="gap-2 shrink-0">
                                         <Filter className="w-4 h-4" />
                                         {statusFilter === 'all' ? 'All' : statusFilter === 'verified' ? 'Verified' : 'Pending'}
                                     </Button>
@@ -662,21 +651,16 @@ export default function AdminDomainsPage() {
                             </p>
                         </div>
                     ) : (
-                        <div className="overflow-hidden">
+                        <div className="overflow-x-auto">
                             <Table>
                                 <TableHeader>
                                     <TableRow className="hover:bg-transparent border-b">
                                         <TableHead className="font-semibold text-xs uppercase tracking-wider">Domain</TableHead>
                                         <TableHead className="font-semibold text-xs uppercase tracking-wider">Status</TableHead>
                                         {sslEnabled && (
-                                            <>
-                                                <TableHead className="font-semibold text-xs uppercase tracking-wider">SSL Mode</TableHead>
-                                                <TableHead className="font-semibold text-xs uppercase tracking-wider">Certificate</TableHead>
-                                            </>
+                                            <TableHead className="font-semibold text-xs uppercase tracking-wider">SSL & Certificate</TableHead>
                                         )}
-                                        <TableHead className="font-semibold text-xs uppercase tracking-wider">Project ID</TableHead>
-                                        <TableHead className="font-semibold text-xs uppercase tracking-wider">Created</TableHead>
-                                        <TableHead className="font-semibold text-xs uppercase tracking-wider">Verified</TableHead>
+                                        <TableHead className="font-semibold text-xs uppercase tracking-wider">Activity</TableHead>
                                         <TableHead className="font-semibold text-xs uppercase tracking-wider text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -687,49 +671,60 @@ export default function AdminDomainsPage() {
                                             layout
                                             className="group hover:bg-muted/30 transition-all duration-200 border-b border-border/50"
                                         >
-                                            <TableCell className="font-medium py-4">
-                                                <div className="flex items-center space-x-3">
-                                                    <div className="flex items-center gap-2">
-                                                        <Zap className="w-4 h-4 text-muted-foreground" />
-                                                        <span className="text-foreground font-medium">{domain.domain}</span>
-                                                    </div>
+                                            <TableCell className="py-3 max-w-xs">
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <span className="text-foreground font-medium truncate">{domain.domain}</span>
                                                     {domain.verified && (
                                                         <a
                                                             href={`https://${domain.domain}`}
                                                             target="_blank"
                                                             rel="noopener noreferrer"
-                                                            className="text-muted-foreground hover:text-primary transition-colors"
+                                                            className="text-muted-foreground hover:text-primary transition-colors shrink-0"
                                                         >
-                                                            <ExternalLink className="w-4 h-4" />
+                                                            <ExternalLink className="w-3.5 h-3.5" />
                                                         </a>
                                                     )}
                                                 </div>
+                                                <button
+                                                    onClick={() => copyToClipboard(domain.projectId)}
+                                                    className="mt-1 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors group/proj"
+                                                    title="Copy project ID"
+                                                >
+                                                    <Hash className="w-3 h-3 shrink-0" />
+                                                    <code className="font-mono truncate">{domain.projectId}</code>
+                                                    <Copy className="w-3 h-3 shrink-0 opacity-0 group-hover/proj:opacity-100 transition-opacity" />
+                                                </button>
                                             </TableCell>
-                                            <TableCell className="py-4">
+                                            <TableCell className="py-3">
                                                 {getStatusBadge(domain)}
                                             </TableCell>
                                             {sslEnabled && (
-                                                <>
-                                                    <TableCell className="py-4">
+                                                <TableCell className="py-3">
+                                                    <div className="flex flex-wrap items-center gap-1.5">
                                                         {getSSLModeBadge(domain.sslMode)}
-                                                    </TableCell>
-                                                    <TableCell className="py-4">
                                                         {getCertificateStatusBadge(domain)}
-                                                    </TableCell>
-                                                </>
+                                                    </div>
+                                                </TableCell>
                                             )}
-                                            <TableCell className="py-4">
-                                                <code className="bg-muted/60 px-2 py-1 rounded text-xs text-foreground font-mono">
-                                                    {domain.projectId}
-                                                </code>
+                                            <TableCell className="py-3 text-sm">
+                                                <div className="flex flex-col gap-0.5">
+                                                    <span
+                                                        className="text-foreground"
+                                                        title={formatAbsolute(domain.createdAt)}
+                                                    >
+                                                        Added {formatRelative(domain.createdAt)}
+                                                    </span>
+                                                    {domain.verifiedAt && (
+                                                        <span
+                                                            className="text-xs text-muted-foreground"
+                                                            title={formatAbsolute(domain.verifiedAt)}
+                                                        >
+                                                            Verified {formatRelative(domain.verifiedAt)}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </TableCell>
-                                            <TableCell className="text-muted-foreground text-sm py-4">
-                                                {formatDate(domain.createdAt)}
-                                            </TableCell>
-                                            <TableCell className="text-muted-foreground text-sm py-4">
-                                                {domain.verifiedAt ? formatDate(domain.verifiedAt) : '—'}
-                                            </TableCell>
-                                            <TableCell className="text-right py-4">
+                                            <TableCell className="text-right py-3">
                                                 <div className="flex items-center justify-end space-x-1">
                                                     {!domain.verified && (
                                                         <Button
@@ -764,7 +759,7 @@ export default function AdminDomainsPage() {
                                                                 onClick={() => copyToClipboard(domain.projectId)}
                                                                 className="gap-2"
                                                             >
-                                                                <Eye className="w-4 h-4" />
+                                                                <Hash className="w-4 h-4" />
                                                                 Copy Project ID
                                                             </DropdownMenuItem>
                                                             <DropdownMenuSeparator />

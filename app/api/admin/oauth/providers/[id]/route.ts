@@ -11,7 +11,8 @@ const updateProviderSchema = z.object({
     tokenUrl: z.string().url('Token URL must be valid').optional(),
     userInfoUrl: z.string().url('User Info URL must be valid').optional(),
     clientId: z.string().min(1, 'Client ID is required').optional(),
-    clientSecret: z.string().min(1, 'Client Secret is required').optional(),
+    // Empty/omitted clientSecret means "keep the existing one" - see below.
+    clientSecret: z.string().optional(),
     scopes: z.array(z.string()).min(1, 'At least one scope is required').optional(),
     enabled: z.boolean().optional(),
     isDefault: z.boolean().optional(),
@@ -95,7 +96,7 @@ export async function PATCH(
             updateData.clientId = validatedData.clientId;
         }
 
-        if (validatedData.clientSecret !== undefined) {
+        if (validatedData.clientSecret) {
             updateData.clientSecret = validatedData.clientSecret;
         }
 
