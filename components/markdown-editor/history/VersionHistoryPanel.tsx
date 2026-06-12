@@ -579,7 +579,7 @@ export function VersionHistoryPanel({
                         </div>
                         <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
                             <div
-                                className="flex min-h-0 max-h-[40vh] shrink-0 flex-col border-b sm:h-full sm:max-h-none sm:w-[300px] sm:border-b-0 sm:border-r">
+                                className="flex min-h-0 min-w-0 max-h-[40vh] shrink-0 flex-col border-b sm:h-full sm:max-h-none sm:w-[300px] sm:border-b-0 sm:border-r">
                                 {versionHistory && (
                                     <Tabs
                                         value={activeTab}
