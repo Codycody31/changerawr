@@ -199,11 +199,6 @@ echo "🦖 Next.js running (PID: $APP_PID)"
 report_progress "ready" 100 "Application ready"
 curl -s -X POST http://localhost:3010/startup/complete >/dev/null 2>&1 || true
 
-# Startup is complete - the captured log has served its purpose (debugging a
-# stuck/slow deploy via the maintenance page) and would otherwise just grow
-# for the lifetime of the container. Remove it now, before the shutdown trap.
-rm -f "$STARTUP_LOG"
-
 # Function to handle shutdown gracefully
 shutdown() {
     echo "🦖 Shutting down..."
@@ -232,6 +227,12 @@ shutdown() {
     # Stop nginx
     echo "🦖 Stopping nginx..."
     nginx -s quit 2>/dev/null || true
+
+    # The captured startup log has served its purpose (debugging a stuck/slow
+    # deploy via the maintenance page). Keep it around for the whole container
+    # lifetime so it stays available while Next.js boots and runs, only
+    # removing it now as part of shutdown.
+    rm -f "$STARTUP_LOG"
 
     echo "🦖 Shutdown complete"
     exit 0

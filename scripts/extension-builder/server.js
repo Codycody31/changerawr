@@ -80,6 +80,7 @@ const updateChains = new Map();
 let startupProgress = {
   phase: 'waiting',
   progress: 0,
+  eta: null,
   startTime: Date.now(),
   logs: [
     {
@@ -97,10 +98,20 @@ let startupProgress = {
  * @param {number} progress
  * @param {string} message
  * @param {LogType} type
+ * @param {number | null} [eta] - estimated seconds remaining, if known
  */
-function updateStartupProgress(phase, progress, message, type = 'info') {
+function updateStartupProgress(phase, progress, message, type = 'info', eta = null) {
+  // Ignore backward progress - e.g. a throttled webpack ProgressPlugin POST
+  // from next.config.ts arriving slightly out of order with
+  // docker-entrypoint.sh's own phase updates would otherwise make the bar
+  // visibly jump backwards.
+  if (progress < startupProgress.progress) {
+    return;
+  }
+
   startupProgress.phase = phase;
   startupProgress.progress = progress;
+  startupProgress.eta = eta;
   startupProgress.logs.push({
     message,
     timestamp: Date.now(),
@@ -112,7 +123,7 @@ function updateStartupProgress(phase, progress, message, type = 'info') {
     startupProgress.logs = startupProgress.logs.slice(-20);
   }
 
-  console.log(`[Startup] ${phase} (${progress}%) - ${message}`);
+  console.log(`[Startup] ${phase} (${progress}%)${eta !== null ? ` ~${eta}s remaining` : ''} - ${message}`);
 }
 
 // Startup progress endpoint (for maintenance page)
@@ -130,6 +141,7 @@ app.get('/startup/progress', (req, res) => {
   const response = {
     phase: startupProgress.phase,
     progress: startupProgress.progress,
+    eta: startupProgress.eta,
     elapsed: Math.floor(elapsed / 1000), // seconds
     logs: startupProgress.logs.slice(-10), // Last 10 logs
     complete: startupProgress.complete,
@@ -185,18 +197,19 @@ app.get('/startup/logs', async (req, res) => {
   }
 });
 
-// Update startup progress (called by docker-entrypoint.sh or install scripts)
+// Update startup progress (called by docker-entrypoint.sh, install scripts, or
+// the webpack ProgressPlugin in next.config.ts during the production rebuild)
 app.post('/startup/update', (req, res) => {
-  const { phase, progress, message, type } = req.body;
+  const { phase, progress, message, type, eta } = req.body;
 
-  console.log(`[Progress POST] Received update: phase=${phase}, progress=${progress}, message=${message}`);
+  console.log(`[Progress POST] Received update: phase=${phase}, progress=${progress}, message=${message}${eta !== undefined && eta !== null ? `, eta=${eta}s` : ''}`);
 
   if (!phase || progress === undefined) {
     console.log('[Progress POST] ERROR: Missing phase or progress');
     return res.status(400).json({ error: 'phase and progress are required' });
   }
 
-  updateStartupProgress(phase, progress, message || phase, type || 'info');
+  updateStartupProgress(phase, progress, message || phase, type || 'info', eta ?? null);
 
   res.json({ success: true });
 });
@@ -206,6 +219,7 @@ app.post('/startup/reset', (req, res) => {
   startupProgress = {
     phase: 'starting',
     progress: 0,
+    eta: null,
     startTime: Date.now(),
     logs: [],
     complete: false,
