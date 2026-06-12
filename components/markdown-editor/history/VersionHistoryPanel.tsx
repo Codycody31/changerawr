@@ -130,69 +130,82 @@ function SessionList({entries, selectedIndex, currentIndex, onSelect}: {
     }, [entries]);
 
     return (
-        <ScrollArea className="min-h-0 flex-1">
-            {entries.length === 0 ? (
-                <div className="px-3 py-6 text-center text-xs text-muted-foreground">
-                    No snapshots yet — they appear here as you edit.
-                </div>
-            ) : (
-                <ol className="flex flex-col gap-0.5 p-2">
-                    {rows.map(({entry, index, wordDelta, changeSummary}) => {
-                        const isSelected = index === selectedIndex;
-                        const isCurrent = index === currentIndex;
+        <TooltipProvider delayDuration={200}>
+            <ScrollArea className="min-h-0 flex-1">
+                {entries.length === 0 ? (
+                    <div className="px-3 py-6 text-center text-xs text-muted-foreground">
+                        No snapshots yet — they appear here as you edit.
+                    </div>
+                ) : (
+                    <ol className="flex flex-col gap-0.5 p-2">
+                        {rows.map(({entry, index, wordDelta, changeSummary}) => {
+                            const isSelected = index === selectedIndex;
+                            const isCurrent = index === currentIndex;
 
-                        return (
-                            <li key={`${entry.timestamp}-${index}`}>
-                                <button
-                                    type="button"
-                                    onClick={() => onSelect(index)}
-                                    className={cn(
-                                        'flex w-full flex-col gap-0.5 rounded-md px-3 py-2 text-left transition-colors hover:bg-accent',
-                                        isSelected && 'bg-accent'
-                                    )}
-                                >
-                                    <div className="flex items-center justify-between gap-2">
-                                        <span
-                                            className={cn('text-xs font-semibold', isSelected ? 'text-foreground' : 'text-foreground/90')}>
-                                            {formatDistanceToNow(entry.timestamp, {addSuffix: true})}
-                                        </span>
-                                        <div className="flex shrink-0 items-center gap-1.5">
-                                            {wordDelta !== 0 && (
+                            const SummaryIcon = index === 0
+                                ? LucideIcons.FilePlus2
+                                : changeSummary.type === 'added'
+                                    ? LucideIcons.Plus
+                                    : changeSummary.type === 'removed'
+                                        ? LucideIcons.Minus
+                                        : LucideIcons.Pencil;
+
+                            return (
+                                <li key={`${entry.timestamp}-${index}`}>
+                                    <button
+                                        type="button"
+                                        onClick={() => onSelect(index)}
+                                        className={cn(
+                                            'flex w-full items-center gap-2 overflow-hidden rounded-md px-2 py-1.5 text-left transition-colors hover:bg-accent',
+                                            isSelected && 'bg-accent'
+                                        )}
+                                    >
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
                                                 <span className={cn(
-                                                    'text-[10px] tabular-nums',
-                                                    wordDelta > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'
+                                                    'flex h-6 w-6 shrink-0 items-center justify-center rounded-md',
+                                                    index !== 0 && changeSummary.type === 'added' && 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+                                                    index !== 0 && changeSummary.type === 'removed' && 'bg-red-500/10 text-red-500 dark:text-red-400',
+                                                    (index === 0 || changeSummary.type === 'none') && 'bg-muted text-muted-foreground'
                                                 )}>
-                                                    {wordDelta > 0 ? `+${wordDelta}` : wordDelta}
+                                                    <SummaryIcon className="h-3.5 w-3.5"/>
                                                 </span>
-                                            )}
-                                            {isCurrent && (
-                                                <Badge variant="secondary"
-                                                       className="px-1.5 py-0 text-[10px] font-normal">
-                                                    Current
-                                                </Badge>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <span className="text-xs text-muted-foreground">
-                                        {index === 0 ? 'Initial version' : `Edit #${index}`}
-                                    </span>
-                                    <p className={cn(
-                                        'min-w-0 truncate text-xs',
-                                        changeSummary.type === 'added' && 'text-emerald-600 dark:text-emerald-400',
-                                        changeSummary.type === 'removed' && 'text-red-500 dark:text-red-400',
-                                        changeSummary.type === 'none' && 'text-muted-foreground/80'
-                                    )}>
-                                        {changeSummary.type === 'added' && '+ '}
-                                        {changeSummary.type === 'removed' && '− '}
-                                        {changeSummary.text}
-                                    </p>
-                                </button>
-                            </li>
-                        );
-                    })}
-                </ol>
-            )}
-        </ScrollArea>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="right" className="max-w-[260px] break-words">
+                                                {changeSummary.type === 'added' && '+ '}
+                                                {changeSummary.type === 'removed' && '− '}
+                                                {changeSummary.text}
+                                            </TooltipContent>
+                                        </Tooltip>
+                                        <span
+                                            className={cn('min-w-0 flex-1 truncate text-xs font-semibold', isSelected ? 'text-foreground' : 'text-foreground/90')}>
+                                            {index === 0 ? 'Initial version' : `Edit #${index}`}
+                                        </span>
+                                        {isCurrent && (
+                                            <Badge variant="secondary"
+                                                   className="shrink-0 px-1.5 py-0 text-[10px] font-normal">
+                                                Current
+                                            </Badge>
+                                        )}
+                                        {wordDelta !== 0 && (
+                                            <span className={cn(
+                                                'shrink-0 text-[10px] tabular-nums',
+                                                wordDelta > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'
+                                            )}>
+                                                {wordDelta > 0 ? `+${wordDelta}` : wordDelta}
+                                            </span>
+                                        )}
+                                        <span className="shrink-0 text-[10px] text-muted-foreground">
+                                            {formatShortRelativeTime(new Date(entry.timestamp))}
+                                        </span>
+                                    </button>
+                                </li>
+                            );
+                        })}
+                    </ol>
+                )}
+            </ScrollArea>
+        </TooltipProvider>
     );
 }
 
