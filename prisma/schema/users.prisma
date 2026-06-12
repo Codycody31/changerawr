@@ -25,6 +25,7 @@ model User {
   twoFactorMode     TwoFactorMode?     @default(NONE)
   twoFactorSessions TwoFactorSession[]
   CliAuthCode       CliAuthCode[]
+  changelogEntryRevisions ChangelogEntryRevision[]
 }
 
 model RefreshToken {

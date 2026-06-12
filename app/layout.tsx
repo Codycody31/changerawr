@@ -3,12 +3,12 @@ import type {Metadata} from 'next'
 import {Inter} from 'next/font/google'
 import {AuthProvider} from '@/context/auth'
 import './globals.css'
+import '@/lib/services/core/markdown/extensions/syntax-highlight/syntax-highlight.css'
 import React from "react";
 import {ThemeProvider} from "@/components/theme-provider";
 import {Toaster} from "@/components/ui/toaster";
 import {Providers} from "@/app/dashboard/providers"
 import {AmbientDinoLoader} from "@/components/AmbientDinoLoader";
-import {CodeCopyButtonHandler} from "@/components/CodeCopyButtonHandler";
 
 const inter = Inter({subsets: ['latin']})
 
@@ -31,7 +31,6 @@ export default function RootLayout({
                     {children}
                     <Toaster/>
                     <AmbientDinoLoader/>
-                    <CodeCopyButtonHandler/>
                 </Providers>
             </ThemeProvider>
         </AuthProvider>

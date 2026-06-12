@@ -25,8 +25,8 @@ import {
 // Import existing components
 import MarkdownToolbar, {ToolbarGroup, ToolbarDropdown} from '@/components/markdown-editor/MarkdownToolbar';
 
-// Import our markdown renderer with custom extensions
-import {renderMarkdown} from '@/lib/services/core/markdown/useCustomExtensions';
+// Import our markdown preview (handles rendering, embeds, and copy buttons)
+import {MarkdownPreview} from '@/components/markdown-editor/MarkdownPreview';
 
 // Import AI integration
 import useAIAssistant from '@/hooks/useAIAssistant';
@@ -40,6 +40,11 @@ import {SpellcheckPanel} from '@/components/markdown-editor/SpellcheckPanel';
 // Import CUM modals
 import {CUMButtonModal, CUMAlertModal, CUMEmbedModal, CUMTableModal} from '@/components/markdown-editor/modals';
 import {useCUMModals} from '@/components/markdown-editor/hooks/useCUMModals';
+
+export interface HistoryEntry {
+    content: string;
+    timestamp: number;
+}
 
 export interface MarkdownEditorProps {
     initialValue?: string;
@@ -55,6 +60,11 @@ export interface MarkdownEditorProps {
     enableCUM?: boolean;
     aiApiKey?: string;
     maxLength?: number;
+    versionHistory?: {
+        projectId: string;
+        entryId: string;
+        onRestore?: (revision: { title: string; content: string; version: string | null }) => void;
+    };
 }
 
 export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
@@ -70,12 +80,13 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
                                                                   enableAI = false,
                                                                   enableCUM = process.env.NEXT_PUBLIC_ENABLE_CUM !== 'false',
                                                                   aiApiKey,
-                                                                  maxLength
+                                                                  maxLength,
+                                                                  versionHistory
                                                               }) => {
     // Core editor state
     const [content, setContent] = useState(initialValue);
     const [view, setView] = useState<'edit' | 'preview' | 'split'>('edit');
-    const [history, setHistory] = useState<string[]>([initialValue]);
+    const [history, setHistory] = useState<HistoryEntry[]>([{content: initialValue, timestamp: Date.now()}]);
     const [historyIndex, setHistoryIndex] = useState(0);
     const [wordCount, setWordCount] = useState(0);
     const [charCount, setCharCount] = useState(0);
@@ -165,7 +176,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
     useEffect(() => {
         if (initialValue !== content) {
             setContent(initialValue);
-            setHistory([initialValue]);
+            setHistory([{content: initialValue, timestamp: Date.now()}]);
             setHistoryIndex(0);
         }
     }, [initialValue, content]);
@@ -244,7 +255,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
     const addToHistory = useCallback((newContent: string) => {
         setHistory(prev => {
             const newHistory = prev.slice(0, historyIndex + 1);
-            newHistory.push(newContent);
+            newHistory.push({content: newContent, timestamp: Date.now()});
             if (newHistory.length > 50) newHistory.shift();
             return newHistory;
         });
@@ -254,7 +265,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
     // Debounced history additions (2 seconds - only add to history when user pauses)
     const [debouncedContentForHistory] = useDebounce(content, 2000);
     useEffect(() => {
-        if (debouncedContentForHistory && debouncedContentForHistory !== history[historyIndex]) {
+        if (debouncedContentForHistory && debouncedContentForHistory !== history[historyIndex].content) {
             addToHistory(debouncedContentForHistory);
         }
     }, [debouncedContentForHistory, historyIndex, history, addToHistory]);
@@ -273,7 +284,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
     const handleUndo = useCallback(() => {
         if (canUndo) {
             const newIndex = historyIndex - 1;
-            const newContent = history[newIndex];
+            const newContent = history[newIndex].content;
             setContent(newContent);
             setHistoryIndex(newIndex);
             onChange?.(newContent);
@@ -283,12 +294,21 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
     const handleRedo = useCallback(() => {
         if (canRedo) {
             const newIndex = historyIndex + 1;
-            const newContent = history[newIndex];
+            const newContent = history[newIndex].content;
             setContent(newContent);
             setHistoryIndex(newIndex);
             onChange?.(newContent);
         }
     }, [canRedo, historyIndex, history, onChange]);
+
+    // Jump directly to an arbitrary point in the session's edit history
+    const jumpToHistory = useCallback((index: number) => {
+        if (index < 0 || index >= history.length || index === historyIndex) return;
+        const newContent = history[index].content;
+        setContent(newContent);
+        setHistoryIndex(index);
+        onChange?.(newContent);
+    }, [history, historyIndex, onChange]);
 
     // Text manipulation helpers
     const insertAtCursor = useCallback((text: string) => {
@@ -330,6 +350,9 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
     const handleBold = useCallback(() => wrapSelection('**', '**'), [wrapSelection]);
     const handleItalic = useCallback(() => wrapSelection('*', '*'), [wrapSelection]);
     const handleCode = useCallback(() => wrapSelection('`', '`'), [wrapSelection]);
+    const handleCodeBlock = useCallback((language: string) => {
+        wrapSelection('```' + language + '\n', '\n```');
+    }, [wrapSelection]);
     const handleLink = useCallback(() => wrapSelection('[', '](url)'), [wrapSelection]);
     const handleImage = useCallback(() => wrapSelection('![', '](url)'), [wrapSelection]);
     const handleQuote = useCallback(() => insertAtCursor('\n> '), [insertAtCursor]);
@@ -549,28 +572,6 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
         enableAI, ai, handleSpellcheck, isSpellcheckEnabled
     ]);
 
-    // Render markdown (async to load all installed extensions)
-    const [renderedHtml, setRenderedHtml] = useState<string>('');
-
-    useEffect(() => {
-        let cancelled = false;
-
-        renderMarkdown(debouncedContent).then((html) => {
-            if (!cancelled) {
-                setRenderedHtml(html);
-            }
-        }).catch((error) => {
-            console.error('Failed to render markdown:', error);
-            if (!cancelled) {
-                setRenderedHtml('<p>Error rendering markdown</p>');
-            }
-        });
-
-        return () => {
-            cancelled = true;
-        };
-    }, [debouncedContent]);
-
     // Create clean toolbar structure
     const toolbarGroups: ToolbarGroup[] = [
         {
@@ -710,6 +711,10 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
                 canRedo={canRedo}
                 onUndo={handleUndo}
                 onRedo={handleRedo}
+                history={history}
+                historyIndex={historyIndex}
+                onJumpToHistory={jumpToHistory}
+                versionHistory={versionHistory}
                 onSave={onSave ? handleSave : undefined}
                 onExport={onExport ? handleExport : undefined}
                 viewMode={view}
@@ -729,6 +734,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
                 onNumberedList={handleNumberedList}
                 onQuote={handleQuote}
                 onCode={handleCode}
+                onCodeBlock={handleCodeBlock}
                 onImage={handleImage}
             />
 
@@ -754,11 +760,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
                 {(view === 'preview' || view === 'split') && (
                     <div className={`flex flex-col overflow-auto ${view === 'split' ? 'w-1/2' : 'w-full'}`}>
                         <div className="flex-1 p-4">
-                            <div
-                                className="prose max-w-none prose-img:my-4 prose-headings:mt-6 prose-headings:mb-4 prose-p:mb-4 prose-pre:my-4 prose-blockquote:my-4"
-                                dangerouslySetInnerHTML={{__html: renderedHtml}}
-                                suppressHydrationWarning
-                            />
+                            <MarkdownPreview content={debouncedContent}/>
                         </div>
                     </div>
                 )}

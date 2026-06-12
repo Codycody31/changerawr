@@ -2,16 +2,20 @@
 
 'use client';
 
-import React, {memo, useState} from 'react';
+import React, {memo, useMemo, useState} from 'react';
 import {
     Bold,
+    Check,
     CheckCircle,
     ChevronDown,
+    ChevronsUpDown,
     Code,
+    FileCode2,
     FileDown,
     Heading1,
     Heading2,
     Heading3,
+    History,
     Image,
     Italic,
     Link,
@@ -25,6 +29,7 @@ import {
     Sparkles,
 } from 'lucide-react';
 import { LanguageToolLogo } from '@/lib/services/languagetool/logo';
+import { cn } from '@/lib/utils';
 
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,} from '@/components/ui/tooltip';
 
@@ -39,11 +44,20 @@ import {
 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from '@/components/ui/command';
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 import {Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger,} from '@/components/ui/sheet';
 
-import {Tabs, TabsList, TabsTrigger,} from '@/components/ui/tabs';
+import {Tabs, TabsList, TabsTrigger, TabsContent,} from '@/components/ui/tabs';
 
 import {Button} from '@/components/ui/button';
 import {Separator} from '@/components/ui/separator';
@@ -52,6 +66,7 @@ import * as LucideIcons from 'lucide-react';
 import type { ExtensionWithMetadata } from '@/lib/services/core/markdown/extensions';
 import { ExtensionOverflowMenu } from '@/components/markdown-editor/ExtensionOverflowMenu';
 import { getToolbarManager } from '@/lib/services/toolbar/extensionToolbarManager';
+import { VersionHistoryPanel } from '@/components/markdown-editor/history/VersionHistoryPanel';
 
 export interface ToolbarAction {
     icon: React.ReactNode;
@@ -73,6 +88,11 @@ export interface ToolbarDropdown {
     actions: ToolbarAction[];
 }
 
+export interface ToolbarHistoryEntry {
+    content: string;
+    timestamp: number;
+}
+
 export interface MarkdownToolbarProps {
     groups?: ToolbarGroup[];
     dropdowns?: ToolbarDropdown[];
@@ -80,6 +100,14 @@ export interface MarkdownToolbarProps {
     canRedo?: boolean;
     onUndo?: () => void;
     onRedo?: () => void;
+    history?: ToolbarHistoryEntry[];
+    historyIndex?: number;
+    onJumpToHistory?: (index: number) => void;
+    versionHistory?: {
+        projectId: string;
+        entryId: string;
+        onRestore?: (revision: { title: string; content: string; version: string | null }) => void;
+    };
     onSave?: () => void;
     onExport?: () => void;
     viewMode?: 'edit' | 'preview' | 'split';
@@ -105,7 +133,219 @@ export interface MarkdownToolbarProps {
     onNumberedList?: () => void;
     onQuote?: () => void;
     onCode?: () => void;
+    onCodeBlock?: (language: string) => void;
     onImage?: () => void;
+}
+
+/**
+ * Languages offered in the "Code" toolbar control's code-block language picker.
+ * Values map to the syntax-highlight extension's Shiki grammar identifiers.
+ */
+const CODE_BLOCK_LANGUAGES: { value: string; label: string }[] = [
+    {value: 'text', label: 'Plain text'},
+    {value: 'javascript', label: 'JavaScript'},
+    {value: 'typescript', label: 'TypeScript'},
+    {value: 'jsx', label: 'JSX'},
+    {value: 'tsx', label: 'TSX'},
+    {value: 'json', label: 'JSON'},
+    {value: 'json5', label: 'JSON5'},
+    {value: 'jsonc', label: 'JSON with Comments'},
+    {value: 'html', label: 'HTML'},
+    {value: 'xml', label: 'XML'},
+    {value: 'css', label: 'CSS'},
+    {value: 'scss', label: 'SCSS'},
+    {value: 'less', label: 'LESS'},
+    {value: 'bash', label: 'Bash'},
+    {value: 'powershell', label: 'PowerShell'},
+    {value: 'python', label: 'Python'},
+    {value: 'sql', label: 'SQL'},
+    {value: 'yaml', label: 'YAML'},
+    {value: 'toml', label: 'TOML'},
+    {value: 'ini', label: 'INI'},
+    {value: 'properties', label: 'Properties'},
+    {value: 'markdown', label: 'Markdown'},
+    {value: 'java', label: 'Java'},
+    {value: 'kotlin', label: 'Kotlin'},
+    {value: 'csharp', label: 'C#'},
+    {value: 'fsharp', label: 'F#'},
+    {value: 'vb', label: 'Visual Basic'},
+    {value: 'go', label: 'Go'},
+    {value: 'rust', label: 'Rust'},
+    {value: 'swift', label: 'Swift'},
+    {value: 'dart', label: 'Dart'},
+    {value: 'php', label: 'PHP'},
+    {value: 'ruby', label: 'Ruby'},
+    {value: 'crystal', label: 'Crystal'},
+    {value: 'c', label: 'C'},
+    {value: 'cpp', label: 'C++'},
+    {value: 'objective-c', label: 'Objective-C'},
+    {value: 'objective-cpp', label: 'Objective-C++'},
+    {value: 'scala', label: 'Scala'},
+    {value: 'groovy', label: 'Groovy'},
+    {value: 'haskell', label: 'Haskell'},
+    {value: 'elixir', label: 'Elixir'},
+    {value: 'erlang', label: 'Erlang'},
+    {value: 'clojure', label: 'Clojure'},
+    {value: 'lua', label: 'Lua'},
+    {value: 'perl', label: 'Perl'},
+    {value: 'r', label: 'R'},
+    {value: 'zig', label: 'Zig'},
+    {value: 'solidity', label: 'Solidity'},
+    {value: 'vue', label: 'Vue'},
+    {value: 'svelte', label: 'Svelte'},
+    {value: 'handlebars', label: 'Handlebars'},
+    {value: 'graphql', label: 'GraphQL'},
+    {value: 'proto', label: 'Protocol Buffers'},
+    {value: 'dockerfile', label: 'Dockerfile'},
+    {value: 'makefile', label: 'Makefile'},
+    {value: 'nginx', label: 'Nginx'},
+    {value: 'nix', label: 'Nix'},
+    {value: 'diff', label: 'Diff'},
+    {value: 'latex', label: 'LaTeX'},
+    {value: 'coffee', label: 'CoffeeScript'},
+];
+
+/**
+ * Toolbar control for inserting code: either inline `code` or a fenced code
+ * block with a chosen syntax-highlighting language.
+ */
+function CodeInsertControl({onInlineCode, onCodeBlock}: {
+    onInlineCode?: () => void;
+    onCodeBlock?: (language: string) => void;
+}) {
+    const [open, setOpen] = useState(false);
+    const [langOpen, setLangOpen] = useState(false);
+    const [language, setLanguage] = useState('javascript');
+
+    const selectedLanguage = CODE_BLOCK_LANGUAGES.find((lang) => lang.value === language);
+
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8" title="Code">
+                    <Code size={16}/>
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-2" align="start">
+                <div className="space-y-1">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full justify-start font-normal"
+                        onClick={() => {
+                            onInlineCode?.();
+                            setOpen(false);
+                        }}
+                    >
+                        <Code size={14} className="mr-2"/>
+                        Inline code
+                    </Button>
+
+                    <Separator className="my-1"/>
+
+                    <div className="px-2 pb-1 pt-0.5 space-y-2">
+                        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                            <FileCode2 size={14}/>
+                            Code block
+                        </div>
+
+                        <Popover open={langOpen} onOpenChange={setLangOpen}>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    aria-expanded={langOpen}
+                                    className="h-8 w-full justify-between text-xs font-normal"
+                                >
+                                    {selectedLanguage?.label ?? 'Select language'}
+                                    <ChevronsUpDown size={14} className="ml-2 shrink-0 opacity-50"/>
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                                <Command>
+                                    <CommandInput placeholder="Search language..." className="h-9 text-xs"/>
+                                    <CommandList>
+                                        <CommandEmpty>No language found.</CommandEmpty>
+                                        <CommandGroup>
+                                            {CODE_BLOCK_LANGUAGES.map((lang) => (
+                                                <CommandItem
+                                                    key={lang.value}
+                                                    value={lang.label}
+                                                    className="text-xs"
+                                                    onSelect={() => {
+                                                        setLanguage(lang.value);
+                                                        setLangOpen(false);
+                                                    }}
+                                                >
+                                                    <Check
+                                                        size={14}
+                                                        className={cn(
+                                                            language === lang.value ? 'opacity-100' : 'opacity-0'
+                                                        )}
+                                                    />
+                                                    {lang.label}
+                                                </CommandItem>
+                                            ))}
+                                        </CommandGroup>
+                                    </CommandList>
+                                </Command>
+                            </PopoverContent>
+                        </Popover>
+
+                        <Button
+                            size="sm"
+                            className="w-full"
+                            onClick={() => {
+                                onCodeBlock?.(language);
+                                setOpen(false);
+                            }}
+                        >
+                            Insert code block
+                        </Button>
+                    </div>
+                </div>
+            </PopoverContent>
+        </Popover>
+    );
+}
+
+/**
+ * Toolbar control showing edit history. Opens a slide-out panel matching the
+ * AI assistant / spellcheck panel pop-out style. With session-only history
+ * (default), it's a paint-program-style timeline of the current editing
+ * session's snapshots; clicking one jumps the editor straight to that
+ * snapshot. When `versionHistory` is provided, a second "Saved versions" tab
+ * shows a DB-persisted, git-log-style list of saved checkpoints with
+ * diff/restore.
+ */
+function HistoryControl({history, historyIndex, onJumpToHistory, versionHistory, trigger}: {
+    history?: ToolbarHistoryEntry[];
+    historyIndex?: number;
+    onJumpToHistory?: (index: number) => void;
+    versionHistory?: MarkdownToolbarProps['versionHistory'];
+    trigger?: React.ReactElement<{ onClick?: () => void }>;
+}) {
+    const [open, setOpen] = useState(false);
+
+    return (
+        <>
+            {trigger ? (
+                React.cloneElement(trigger, {onClick: () => setOpen(true)})
+            ) : (
+                <Button variant="ghost" size="icon" className="h-8 w-8" title="History" onClick={() => setOpen(true)}>
+                    <History size={16}/>
+                </Button>
+            )}
+            <VersionHistoryPanel
+                isOpen={open}
+                onClose={() => setOpen(false)}
+                history={history}
+                historyIndex={historyIndex}
+                onJumpToHistory={onJumpToHistory}
+                versionHistory={versionHistory}
+            />
+        </>
+    );
 }
 
 /**
@@ -553,6 +793,10 @@ const MobileToolbarSheet = memo(({
                                      canRedo,
                                      onUndo,
                                      onRedo,
+                                     history,
+                                     historyIndex,
+                                     onJumpToHistory,
+                                     versionHistory,
                                      onSave,
                                      onExport,
                                      onAIAssist,
@@ -570,6 +814,7 @@ const MobileToolbarSheet = memo(({
                                      onNumberedList,
                                      onQuote,
                                      onCode,
+                                     onCodeBlock,
                                      onImage,
                                  }: Omit<MarkdownToolbarProps, 'className' | 'viewMode' | 'onViewModeChange'>) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -673,6 +918,11 @@ const MobileToolbarSheet = memo(({
                 })),
             },
             {
+                icon: <FileCode2 size={16}/>,
+                label: 'Code Block',
+                onClick: handleActionClick(() => onCodeBlock?.('text')),
+            },
+            {
                 icon: <Image size={16}/>,
                 label: 'Image',
                 onClick: handleActionClick(onImage || (() => {
@@ -734,6 +984,21 @@ const MobileToolbarSheet = memo(({
                                     Redo
                                 </Button>
                             </div>
+                            <HistoryControl
+                                history={history}
+                                historyIndex={historyIndex}
+                                onJumpToHistory={(index) => {
+                                    onJumpToHistory?.(index);
+                                    setIsOpen(false);
+                                }}
+                                versionHistory={versionHistory}
+                                trigger={
+                                    <Button variant="outline" className="w-full">
+                                        <History size={16} className="mr-2"/>
+                                        View timeline
+                                    </Button>
+                                }
+                            />
                         </div>
 
                         {/* Groups */}
@@ -953,6 +1218,10 @@ const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
                                                              canRedo = false,
                                                              onUndo,
                                                              onRedo,
+                                                             history,
+                                                             historyIndex,
+                                                             onJumpToHistory,
+                                                             versionHistory,
                                                              onSave,
                                                              onExport,
                                                              viewMode = 'edit',
@@ -974,6 +1243,7 @@ const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
                                                              onNumberedList,
                                                              onQuote,
                                                              onCode,
+                                                             onCodeBlock,
                                                              onImage,
                                                          }) => {
     // State to force re-render when pin status changes
@@ -1042,6 +1312,10 @@ const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
                     canRedo={canRedo}
                     onUndo={onUndo}
                     onRedo={onRedo}
+                    history={history}
+                    historyIndex={historyIndex}
+                    onJumpToHistory={onJumpToHistory}
+                    versionHistory={versionHistory}
                     onSave={onSave}
                     onExport={onExport}
                     onAIAssist={onAIAssist}
@@ -1059,6 +1333,7 @@ const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
                     onNumberedList={onNumberedList}
                     onQuote={onQuote}
                     onCode={onCode}
+                    onCodeBlock={onCodeBlock}
                     onImage={onImage}
                 />
 
@@ -1086,6 +1361,12 @@ const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
                         >
                             <RotateCw size={16}/>
                         </Button>
+                        <HistoryControl
+                            history={history}
+                            historyIndex={historyIndex}
+                            onJumpToHistory={onJumpToHistory}
+                            versionHistory={versionHistory}
+                        />
 
                         <Separator orientation="vertical" className="mx-1 h-6"/>
 
@@ -1162,15 +1443,7 @@ const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
                         <Separator orientation="vertical" className="mx-1 h-6"/>
 
                         {/* Code and images */}
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={onCode}
-                            className="h-8 w-8"
-                            title="Inline Code"
-                        >
-                            <Code size={16}/>
-                        </Button>
+                        <CodeInsertControl onInlineCode={onCode} onCodeBlock={onCodeBlock}/>
                         <Button
                             variant="ghost"
                             size="icon"

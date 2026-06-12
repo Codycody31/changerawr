@@ -7,7 +7,7 @@ import {Button} from '@/components/ui/button';
 import {useDebounce} from 'use-debounce';
 import {toast} from "@/hooks/use-toast";
 import EditorHeader from '@/components/changelog/editor/EditorHeader';
-import {Loader2, RefreshCw, Save, ExternalLink} from 'lucide-react';
+import {Loader2, RefreshCw, Save, ExternalLink, History} from 'lucide-react';
 import {Alert, AlertDescription, AlertActions, AlertTitle} from '@/components/ui/alert';
 import {motion, AnimatePresence} from 'framer-motion';
 import {cn} from '@/lib/utils';
@@ -224,6 +224,13 @@ export function ChangelogEditor({
         serverUrl: null,
         appliedAt: null
     });
+
+    // Bumped after restoring a saved version to force the editor to remount
+    // with the restored content (git checkout-style fresh working tree).
+    const [restoreNonce, setRestoreNonce] = useState(0);
+
+    // Shows a brief "restored" overlay over the editor while it remounts with the restored content.
+    const [restoreOverlay, setRestoreOverlay] = useState<{ title: string; version: string | null } | null>(null);
 
     // ===== State Management =====
     const [editorState, setEditorState] = useState<EditorState>(() => ({
@@ -505,7 +512,10 @@ export function ChangelogEditor({
 
     // ===== Save Mutation =====
     const saveEntry = useMutation({
-        mutationFn: async (data: Omit<EditorState, 'isPublished' | 'hasUnsavedChanges' | 'hasVersionConflict'>) => {
+        mutationFn: async ({data, isManual}: {
+            data: Omit<EditorState, 'isPublished' | 'hasUnsavedChanges' | 'hasVersionConflict'>;
+            isManual: boolean;
+        }) => {
             const url = entryId
                 ? `/api/projects/${projectId}/changelog/${entryId}`
                 : `/api/projects/${projectId}/changelog`;
@@ -526,7 +536,8 @@ export function ChangelogEditor({
                     title: data.title,
                     content: data.content,
                     version: data.version,
-                    tags: tagData
+                    tags: tagData,
+                    isManual
                 })
             });
 
@@ -698,7 +709,7 @@ export function ChangelogEditor({
         }));
 
         try {
-            const result = await saveEntry.mutateAsync(currentState);
+            const result = await saveEntry.mutateAsync({data: currentState, isManual});
 
             // Handle navigation for new entries
             if (!entryId && result.id) {
@@ -724,6 +735,9 @@ export function ChangelogEditor({
 
             // Invalidate relevant queries
             queryClient.invalidateQueries({queryKey: ['project-versions', projectId]});
+            if (entryId) {
+                queryClient.invalidateQueries({queryKey: ['changelog-revisions', projectId, entryId]});
+            }
 
             if (isManual) {
                 toast({
@@ -770,6 +784,33 @@ export function ChangelogEditor({
     const handleManualSave = useCallback(async () => {
         await performSave(true);
     }, [performSave]);
+
+    const handleRestoreRevision = useCallback((revision: { title: string; content: string; version: string | null }) => {
+        setEditorState(prev => {
+            const next = {
+                ...prev,
+                title: revision.title,
+                content: revision.content,
+                version: revision.version ?? prev.version,
+                hasUnsavedChanges: false,
+            };
+            lastSavedStateRef.current = {
+                title: next.title,
+                content: next.content,
+                version: next.version,
+                tags: prev.tags,
+            };
+            return next;
+        });
+        setRestoreOverlay({title: revision.title, version: revision.version});
+        setRestoreNonce(n => n + 1);
+    }, []);
+
+    useEffect(() => {
+        if (!restoreOverlay) return;
+        const timer = setTimeout(() => setRestoreOverlay(null), 1100);
+        return () => clearTimeout(timer);
+    }, [restoreOverlay]);
 
     const handleRetryAutosave = useCallback(async () => {
         if (status.canRetry) {
@@ -1122,28 +1163,71 @@ Generated: ${new Date().toISOString()}
                 </Card>
 
                 {/* Markdown Editor */}
-                {!isAISettingsLoading ? (
-                    <MarkdownEditor
-                        key={entryId || 'new'}
-                        initialValue={editorState.content}
-                        onChange={handleContentChange}
-                        onSave={handleManualSave}
-                        onExport={handleExport}
-                        placeholder="What's been changed today?"
-                        className={cn(
-                            "min-h-[500px]",
-                            !editorState.content.trim() && status.lastSaveError && "border-red-500"
+                <div className="relative">
+                    {!isAISettingsLoading ? (
+                        <MarkdownEditor
+                            key={`${entryId || 'new'}-${restoreNonce}`}
+                            initialValue={editorState.content}
+                            onChange={handleContentChange}
+                            onSave={handleManualSave}
+                            onExport={handleExport}
+                            placeholder="What's been changed today?"
+                            className={cn(
+                                "min-h-[500px]",
+                                !editorState.content.trim() && status.lastSaveError && "border-red-500"
+                            )}
+                            enableAI={aiEnabled && !!sectonApiKey}
+                            aiApiKey={sectonApiKey}
+                            autoFocus={isNewChangelog && !initialContent}
+                            versionHistory={entryId ? {projectId, entryId, onRestore: handleRestoreRevision} : undefined}
+                        />
+                    ) : (
+                        <div className="flex items-center justify-center p-12 border rounded-md bg-muted/10">
+                            <Loader2 className="w-6 h-6 mr-2 animate-spin"/>
+                            <span>Loading editor...</span>
+                        </div>
+                    )}
+
+                    <AnimatePresence>
+                        {restoreOverlay && (
+                            <motion.div
+                                className="absolute inset-0 z-20 flex items-center justify-center rounded-md bg-background/80 backdrop-blur-sm"
+                                initial={{opacity: 0}}
+                                animate={{opacity: 1}}
+                                exit={{opacity: 0}}
+                            >
+                                <motion.div
+                                    className="flex flex-col items-center gap-3 rounded-lg border bg-card px-6 py-5 shadow-lg"
+                                    initial={{opacity: 0, scale: 0.9, y: 8}}
+                                    animate={{opacity: 1, scale: 1, y: 0}}
+                                    exit={{opacity: 0, scale: 0.95}}
+                                    transition={{type: 'spring', damping: 20, stiffness: 300}}
+                                >
+                                    <motion.div
+                                        className="rounded-full bg-primary/10 p-3"
+                                        initial={{rotate: -90, scale: 0.6}}
+                                        animate={{rotate: 0, scale: 1}}
+                                        transition={{type: 'spring', damping: 12, stiffness: 200}}
+                                    >
+                                        <History className="h-6 w-6 text-primary"/>
+                                    </motion.div>
+                                    <div className="text-center">
+                                        <p className="text-sm font-semibold">
+                                            Restored &ldquo;{restoreOverlay.title}&rdquo;
+                                        </p>
+                                        {restoreOverlay.version && (
+                                            <p className="text-xs text-muted-foreground">
+                                                {restoreOverlay.version.toLowerCase().startsWith('v')
+                                                    ? restoreOverlay.version
+                                                    : `v${restoreOverlay.version}`}
+                                            </p>
+                                        )}
+                                    </div>
+                                </motion.div>
+                            </motion.div>
                         )}
-                        enableAI={aiEnabled && !!sectonApiKey}
-                        aiApiKey={sectonApiKey}
-                        autoFocus={isNewChangelog && !initialContent}
-                    />
-                ) : (
-                    <div className="flex items-center justify-center p-12 border rounded-md bg-muted/10">
-                        <Loader2 className="w-6 h-6 mr-2 animate-spin"/>
-                        <span>Loading editor...</span>
-                    </div>
-                )}
+                    </AnimatePresence>
+                </div>
 
                 {!editorState.content.trim() && status.lastSaveError && (
                     <p className="text-sm text-red-600 -mt-4">Content is required</p>

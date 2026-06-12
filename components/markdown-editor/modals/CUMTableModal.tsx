@@ -19,6 +19,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Card, CardContent } from '@/components/ui/card';
+import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import {
     Eye,
     EyeOff,
@@ -217,24 +218,24 @@ export const CUMTableModal: React.FC<CUMModalProps> = ({
                     <div className="space-y-3">
                         <Label className="text-sm font-medium">Table Content</Label>
                         <div className="border rounded-lg overflow-x-auto max-h-[300px] overflow-y-auto bg-muted/20">
-                            <table className="w-full border-collapse text-sm">
-                                <tbody>
+                            <Table>
+                                <TableBody>
                                     {config.data.map((row, rowIdx) => (
-                                        <tr key={rowIdx} className={rowIdx === 0 ? 'bg-muted' : ''}>
+                                        <TableRow key={rowIdx} className={rowIdx === 0 ? 'bg-muted' : ''}>
                                             {row.map((cell, colIdx) => (
-                                                <td key={`${rowIdx}-${colIdx}`} className="border p-1">
+                                                <TableCell key={`${rowIdx}-${colIdx}`} className="p-1">
                                                     <Input
                                                         value={cell}
                                                         onChange={(e) => updateCell(rowIdx, colIdx, e.target.value)}
                                                         placeholder={`Row ${rowIdx + 1}, Col ${colIdx + 1}`}
                                                         className="h-8 text-xs"
                                                     />
-                                                </td>
+                                                </TableCell>
                                             ))}
-                                        </tr>
+                                        </TableRow>
                                     ))}
-                                </tbody>
-                            </table>
+                                </TableBody>
+                            </Table>
                         </div>
                     </div>
 

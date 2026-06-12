@@ -5,6 +5,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { renderMarkdown, renderMarkdownStreamed } from '@/lib/services/core/markdown/useCustomExtensions';
 import { useEmbedEnhancements } from '@/hooks/use-embed-enhancements';
+import { useCodeCopyButtons } from '@/lib/services/core/markdown/extensions/syntax-highlight/useCodeCopyButtons';
 
 interface MarkdownPreviewProps {
     content: string;
@@ -19,6 +20,7 @@ export const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({
     const containerRef = useRef<HTMLDivElement>(null);
 
     useEmbedEnhancements(containerRef, [html]);
+    const copyButtonPortals = useCodeCopyButtons(containerRef, [html]);
 
     useEffect(() => {
         const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
@@ -43,11 +45,14 @@ export const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({
     }, [content]);
 
     return (
-        <div
-            ref={containerRef}
-            className={`prose max-w-none prose-img:my-4 prose-headings:mt-6 prose-headings:mb-4 prose-p:mb-4 prose-pre:my-4 prose-blockquote:my-4 ${className}`}
-            dangerouslySetInnerHTML={{ __html: html }}
-            suppressHydrationWarning
-        />
+        <>
+            <div
+                ref={containerRef}
+                className={`prose max-w-none prose-img:my-4 prose-headings:mt-6 prose-headings:mb-4 prose-p:mb-4 prose-pre:my-4 prose-blockquote:my-4 ${className}`}
+                dangerouslySetInnerHTML={{ __html: html }}
+                suppressHydrationWarning
+            />
+            {copyButtonPortals}
+        </>
     );
 };
