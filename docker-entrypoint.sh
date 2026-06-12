@@ -23,14 +23,20 @@ report_progress() {
     local phase=$1
     local progress=$2
     local message=$3
+    # --max-time bounds the WHOLE request (connect + response). Without it, a
+    # slow/unresponsive builder service (e.g. its event loop busy during the
+    # CPU-heavy build step) can make curl hang forever - and since this runs
+    # synchronously in the deploy pipeline, that freezes the entire deploy at
+    # whatever percentage was last reported, with `|| true` masking the hang.
     curl -s -X POST http://localhost:3010/startup/update \
+        --connect-timeout 2 --max-time 5 \
         -H "Content-Type: application/json" \
         -d "{\"phase\":\"$phase\",\"progress\":$progress,\"message\":\"$message\"}" \
         >/dev/null 2>&1 || true
 }
 
 # Reset progress tracking
-curl -s -X POST http://localhost:3010/startup/reset >/dev/null 2>&1 || true
+curl -s -X POST http://localhost:3010/startup/reset --connect-timeout 2 --max-time 5 >/dev/null 2>&1 || true
 
 # Start maintenance server in the background
 echo "🦖 Starting maintenance server..."
@@ -197,7 +203,7 @@ export HOSTNAME="0.0.0.0"
 APP_PID=$!
 echo "🦖 Next.js running (PID: $APP_PID)"
 report_progress "ready" 100 "Application ready"
-curl -s -X POST http://localhost:3010/startup/complete >/dev/null 2>&1 || true
+curl -s -X POST http://localhost:3010/startup/complete --connect-timeout 2 --max-time 5 >/dev/null 2>&1 || true
 
 # Function to handle shutdown gracefully
 shutdown() {

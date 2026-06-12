@@ -489,19 +489,15 @@
                     loadingElement.textContent = latestLog.message;
                 }
 
-                // Update status text with elapsed time, ETA, and warnings
-                const etaSuffix = (!data.complete && typeof data.eta === 'number')
-                    ? ` • ~${data.eta}s remaining`
-                    : '';
-
+                // Update status text with elapsed time and warnings
                 if (data.complete) {
                     statusElement.textContent = `Application ready! Redirecting... (${data.elapsed}s total)`;
                 } else if (data.elapsed < 30) {
-                    statusElement.textContent = `${data.progress}% complete • ${data.elapsed}s elapsed${etaSuffix}`;
+                    statusElement.textContent = `${data.progress}% complete • ${data.elapsed}s elapsed`;
                 } else if (data.elapsed < 60) {
-                    statusElement.textContent = `${data.progress}% complete • ${data.elapsed}s elapsed${etaSuffix} • Taking longer than usual`;
+                    statusElement.textContent = `${data.progress}% complete • ${data.elapsed}s elapsed • Taking longer than usual`;
                 } else {
-                    statusElement.textContent = `${data.progress}% complete • ${data.elapsed}s elapsed${etaSuffix} • ⚠️ Unusually slow startup`;
+                    statusElement.textContent = `${data.progress}% complete • ${data.elapsed}s elapsed • ⚠️ Unusually slow startup`;
                 }
 
                 // Show/hide progress bars based on progress state

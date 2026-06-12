@@ -114,6 +114,45 @@ function extractTailwindClasses(content) {
     return Array.from(classes);
 }
 
+// Directories that should never be descended into while scanning an
+// extension's source for Tailwind classes - "linked"/installed extensions
+// can carry their own node_modules or .git, and walking those can take
+// effectively forever, hanging the "extensions" deploy step at 77%.
+const SKIPPED_DIR_NAMES = new Set(['node_modules', '.git', '.next', 'dist', 'build']);
+
+/**
+ * Recursively collect .ts/.tsx/.js/.jsx files under `dir`, skipping
+ * symlinks/junctions and SKIPPED_DIR_NAMES at every level (unlike
+ * `readdir(dir, { recursive: true })`, which can't be bounded this way).
+ */
+async function walkSourceFiles(dir, files = []) {
+    let entries;
+    try {
+        entries = await readdir(dir, { withFileTypes: true });
+    } catch {
+        return files;
+    }
+
+    for (const entry of entries) {
+        const entryPath = join(dir, entry.name);
+
+        if (entry.isSymbolicLink()) {
+            continue;
+        }
+
+        if (entry.isDirectory()) {
+            if (SKIPPED_DIR_NAMES.has(entry.name)) {
+                continue;
+            }
+            await walkSourceFiles(entryPath, files);
+        } else if (/\.(ts|tsx|js|jsx)$/.test(entry.name)) {
+            files.push(entryPath);
+        }
+    }
+
+    return files;
+}
+
 /**
  * Scan all extension files for Tailwind classes
  */
@@ -134,8 +173,8 @@ async function scanExtensions() {
 
                     // Skip Windows junctions / symlinks - "linked" extensions point
                     // outside the project root (often a whole dev checkout with
-                    // node_modules etc.), so a recursive readdir on them can take
-                    // forever and hang the "extensions" deploy step.
+                    // node_modules etc.), so walking them can take forever and
+                    // hang the "extensions" deploy step.
                     try {
                         const extLstat = await lstat(extPath);
                         if (extLstat.isSymbolicLink()) {
@@ -146,29 +185,21 @@ async function scanExtensions() {
                         // If lstat fails, just try to proceed normally
                     }
 
-                    try {
-                        // Read all .ts, .tsx, .js, .jsx files in the extension
-                        const files = await readdir(extPath, { recursive: true });
+                    const files = await walkSourceFiles(extPath);
 
-                        for (const file of files) {
-                            if (/\.(ts|tsx|js|jsx)$/.test(file)) {
-                                const filePath = join(extPath, file);
-                                try {
-                                    const content = await readFile(filePath, 'utf-8');
-                                    const classes = extractTailwindClasses(content);
+                    for (const filePath of files) {
+                        try {
+                            const content = await readFile(filePath, 'utf-8');
+                            const classes = extractTailwindClasses(content);
 
-                                    classes.forEach(cls => extensionClasses.add(cls));
+                            classes.forEach(cls => extensionClasses.add(cls));
 
-                                    if (classes.length > 0) {
-                                        console.log(`  Found ${classes.length} classes in ${author}/${extName}/${file}`);
-                                    }
-                                } catch (err) {
-                                    // Skip files that can't be read
-                                }
+                            if (classes.length > 0) {
+                                console.log(`  Found ${classes.length} classes in ${filePath.slice(EXTENSIONS_DIR.length + 1)}`);
                             }
+                        } catch (err) {
+                            // Skip files that can't be read
                         }
-                    } catch (err) {
-                        // Skip if not a directory
                     }
                 }
             } catch (err) {

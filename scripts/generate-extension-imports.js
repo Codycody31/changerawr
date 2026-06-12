@@ -26,6 +26,10 @@ async function reportProgress(phase, progress, message) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phase, progress, message }),
+      // Bound the request so a slow/unresponsive builder service can't hang
+      // this script (and therefore `npm run extensions:generate` and the
+      // whole deploy) - progress reporting must always be best-effort.
+      signal: AbortSignal.timeout(5000),
     });
     if (!response.ok) {
       console.log(`[Warning] Failed to report progress: ${response.status}`);
