@@ -150,6 +150,41 @@ app.get('/startup/progress', (req, res) => {
   res.json(response);
 });
 
+// Startup console output (raw stdout/stderr captured by docker-entrypoint.sh)
+// Lets the maintenance page show what's actually happening during a deploy
+// when there's no other way to see container logs.
+const STARTUP_LOG_FILE = '/tmp/changerawr-startup.log';
+const STARTUP_LOG_MAX_BYTES = 200 * 1024; // tail to last ~200KB
+
+app.get('/startup/logs', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+
+  try {
+    const { stat } = await import('fs/promises');
+    const fileStat = await stat(STARTUP_LOG_FILE);
+
+    let content;
+    if (fileStat.size > STARTUP_LOG_MAX_BYTES) {
+      const { open } = await import('fs/promises');
+      const handle = await open(STARTUP_LOG_FILE, 'r');
+      try {
+        const buffer = Buffer.alloc(STARTUP_LOG_MAX_BYTES);
+        await handle.read(buffer, 0, STARTUP_LOG_MAX_BYTES, fileStat.size - STARTUP_LOG_MAX_BYTES);
+        content = buffer.toString('utf-8');
+      } finally {
+        await handle.close();
+      }
+    } else {
+      content = await readFile(STARTUP_LOG_FILE, 'utf-8');
+    }
+
+    res.json({ available: true, log: content });
+  } catch (error) {
+    // Log file doesn't exist (e.g. running locally outside Docker)
+    res.json({ available: false, log: '' });
+  }
+});
+
 // Update startup progress (called by docker-entrypoint.sh or install scripts)
 app.post('/startup/update', (req, res) => {
   const { phase, progress, message, type } = req.body;

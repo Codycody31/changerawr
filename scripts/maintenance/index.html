@@ -199,6 +199,66 @@
             border-radius: 4px;
         }
 
+        /* Console Output Section */
+        .console-container {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.25);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            text-align: left;
+        }
+
+        .console-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+
+        .console-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            opacity: 0.8;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .console-toggle {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.6rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+        }
+
+        .console-output {
+            max-height: 220px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.35);
+            border-radius: 6px;
+            padding: 0.75rem;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 0.7rem;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            word-break: break-all;
+            text-align: left;
+            color: rgba(255, 255, 255, 0.85);
+        }
+
+        .console-output.collapsed {
+            display: none;
+        }
+
+        .console-empty {
+            opacity: 0.5;
+            font-style: italic;
+        }
+
         .dots::after {
             content: '';
             animation: dots 1.5s infinite;
@@ -370,6 +430,15 @@
         Application is starting up. This usually takes 10-30 seconds.
     </div>
 
+    <!-- Console output: raw deployment logs, for debugging stuck/slow startups -->
+    <div class="console-container" id="consoleContainer" style="display: none;">
+        <div class="console-header">
+            <span class="console-title">Console Output</span>
+            <button class="console-toggle" id="consoleToggle" onclick="toggleConsole()">Hide</button>
+        </div>
+        <pre class="console-output" id="consoleOutput"><span class="console-empty">Waiting for logs...</span></pre>
+    </div>
+
     <!-- Debug controls (hidden in production) -->
     <div style="margin-top: 2rem; display: none; flex-wrap: wrap; gap: 0.5rem; justify-content: center;">
         <button onclick="triggerExtensionGeneration()" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; color: white; cursor: pointer; font-size: 0.85rem;">
@@ -461,6 +530,45 @@
         } catch (error) {
             // Extension builder not responding, fall back to basic mode
             useFallbackMode();
+        }
+    };
+
+    // Fetch raw console output captured by docker-entrypoint.sh
+    let consoleCollapsed = false;
+    let consoleAvailable = false;
+
+    function toggleConsole() {
+        consoleCollapsed = !consoleCollapsed;
+        const output = document.getElementById('consoleOutput');
+        const toggle = document.getElementById('consoleToggle');
+        output.classList.toggle('collapsed', consoleCollapsed);
+        toggle.textContent = consoleCollapsed ? 'Show' : 'Hide';
+    }
+
+    const fetchConsoleLogs = async () => {
+        try {
+            const response = await fetch(`${EXTENSION_BUILDER_URL}/startup/logs`, {
+                method: 'GET',
+                cache: 'no-cache',
+            });
+
+            if (!response.ok) return;
+
+            const data = await response.json();
+            if (!data.available) return;
+
+            consoleAvailable = true;
+            const container = document.getElementById('consoleContainer');
+            const output = document.getElementById('consoleOutput');
+            container.style.display = 'block';
+
+            const wasScrolledToBottom = output.scrollHeight - output.scrollTop - output.clientHeight < 10;
+            output.textContent = data.log || '';
+            if (wasScrolledToBottom) {
+                output.scrollTop = output.scrollHeight;
+            }
+        } catch (error) {
+            // Builder service not responding, just skip this poll
         }
     };
 
@@ -604,6 +712,9 @@
     // Poll for progress every 500ms
     const progressInterval = setInterval(fetchProgress, 500);
 
+    // Poll for raw console output every 2 seconds
+    const consoleInterval = setInterval(fetchConsoleLogs, 2000);
+
     // Check health every 2 seconds
     const healthCheckInterval = setInterval(checkAppReady, 2000);
 
@@ -611,12 +722,14 @@
     setTimeout(() => {
         clearInterval(healthCheckInterval);
         clearInterval(progressInterval);
+        clearInterval(consoleInterval);
         document.getElementById('statusText').innerHTML =
             '⚠️ Startup timeout. <a href="/" style="color: white; text-decoration: underline;">Click here to try accessing the app anyway</a>.';
     }, 120000);
 
     // Start checking immediately
     fetchProgress();
+    fetchConsoleLogs();
     checkAppReady();
 </script>
 </body>

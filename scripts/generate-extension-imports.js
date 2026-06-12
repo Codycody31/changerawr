@@ -388,7 +388,15 @@ async function main() {
   console.log('✨ Done! Restart your dev server to load the extensions.\n');
 }
 
-main().catch(err => {
-  console.error('❌ Error:', err);
-  process.exit(1);
-});
+main()
+  .then(() => {
+    // The reportProgress() fetch() calls above leave undici keep-alive
+    // sockets open, which keep the event loop alive and prevent this
+    // process from exiting on its own - hanging `npm run extensions:generate`
+    // (and the whole deploy) forever right after printing "Done!".
+    process.exit(0);
+  })
+  .catch(err => {
+    console.error('❌ Error:', err);
+    process.exit(1);
+  });

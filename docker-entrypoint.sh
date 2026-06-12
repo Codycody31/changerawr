@@ -1,6 +1,12 @@
 #!/bin/bash
 set -e
 
+# Mirror all stdout/stderr to a log file so the maintenance page can expose
+# the raw console output (via the builder service's /startup/logs endpoint)
+# for debugging deploys that get stuck with no terminal access.
+STARTUP_LOG="/tmp/changerawr-startup.log"
+exec > >(tee "$STARTUP_LOG") 2>&1
+
 echo "🦖 Starting Changerawr deployment..."
 
 # Start Extension Builder Service first (needed for progress tracking)
@@ -192,6 +198,11 @@ APP_PID=$!
 echo "🦖 Next.js running (PID: $APP_PID)"
 report_progress "ready" 100 "Application ready"
 curl -s -X POST http://localhost:3010/startup/complete >/dev/null 2>&1 || true
+
+# Startup is complete - the captured log has served its purpose (debugging a
+# stuck/slow deploy via the maintenance page) and would otherwise just grow
+# for the lifetime of the container. Remove it now, before the shutdown trap.
+rm -f "$STARTUP_LOG"
 
 # Function to handle shutdown gracefully
 shutdown() {
