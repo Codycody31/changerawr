@@ -12,11 +12,27 @@ import { mkdir, readFile, writeFile, rm } from 'fs/promises';
 import { join } from 'path';
 import https from 'https';
 import AdmZip from 'adm-zip';
-import { PrismaClient } from '@prisma/client';
 
 const app = express();
 const PORT = 3010;
-const prisma = new PrismaClient();
+
+// `@prisma/client`'s entry point does `require('.prisma/client/default')`
+// at import time, which throws synchronously if `npx prisma generate`
+// hasn't run yet. This service is started BEFORE the runtime
+// `prisma generate` step in docker-entrypoint.sh, so a static top-level
+// import here would crash the process before `app.listen()` - leaving
+// port 3010 closed and every /startup/progress proxy request 502ing for
+// the whole deploy. Load it lazily on first actual use instead.
+/** @type {import('@prisma/client').PrismaClient | null} */
+let _prisma = null;
+
+async function getPrisma() {
+  if (!_prisma) {
+    const { PrismaClient } = await import('@prisma/client');
+    _prisma = new PrismaClient();
+  }
+  return _prisma;
+}
 
 app.use(cors());
 app.use(express.json());
@@ -878,6 +894,7 @@ async function installExtension(jobId, githubUrl) {
     // Update database
     job.logs.push({ message: 'Updating database...', timestamp: Date.now(), type: 'info' });
     try {
+      const prisma = await getPrisma();
       await prisma.editorExtension.upsert({
         where: { name: metadata.name },
         update: {
@@ -1023,12 +1040,12 @@ app.listen(PORT, () => {
 // Cleanup on shutdown
 process.on('SIGINT', async () => {
   console.log('\nShutting down Extension Builder Service...');
-  await prisma.$disconnect();
+  if (_prisma) await _prisma.$disconnect();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
   console.log('\nShutting down Extension Builder Service...');
-  await prisma.$disconnect();
+  if (_prisma) await _prisma.$disconnect();
   process.exit(0);
 });

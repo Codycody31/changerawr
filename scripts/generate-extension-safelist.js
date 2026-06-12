@@ -5,7 +5,7 @@
  * to ensure they're included in the production build.
  */
 
-import { readdir, readFile, writeFile } from 'fs/promises';
+import { readdir, readFile, writeFile, lstat } from 'fs/promises';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -131,6 +131,20 @@ async function scanExtensions() {
 
                 for (const extName of extensions) {
                     const extPath = join(authorPath, extName);
+
+                    // Skip Windows junctions / symlinks - "linked" extensions point
+                    // outside the project root (often a whole dev checkout with
+                    // node_modules etc.), so a recursive readdir on them can take
+                    // forever and hang the "extensions" deploy step.
+                    try {
+                        const extLstat = await lstat(extPath);
+                        if (extLstat.isSymbolicLink()) {
+                            console.log(`  Skipping linked extension (junction): ${author}/${extName}`);
+                            continue;
+                        }
+                    } catch {
+                        // If lstat fails, just try to proceed normally
+                    }
 
                     try {
                         // Read all .ts, .tsx, .js, .jsx files in the extension
