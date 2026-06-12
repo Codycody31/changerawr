@@ -81,7 +81,38 @@ npm run extensions:generate
 if [ -n "$(find extensions -mindepth 2 -maxdepth 2 -type d 2>/dev/null)" ]; then
     echo "🦖 Installed extensions detected, rebuilding application..."
     report_progress "build" 78 "Rebuilding application with installed extensions"
-    CI_BUILD_MODE=1 DOCKER_BUILD=1 npm run build
+
+    # Pipe the build output so we can report fine-grained progress as
+    # Next.js moves through its own build phases. `set -o pipefail` ensures
+    # the pipeline's exit status reflects `npm run build`, not the `while` loop.
+    set -o pipefail
+    CI_BUILD_MODE=1 DOCKER_BUILD=1 npm run build 2>&1 | while IFS= read -r line; do
+        echo "$line"
+        case "$line" in
+            *"Creating an optimized production build"*)
+                report_progress "build" 79 "Creating an optimized production build"
+                ;;
+            *"Compiled successfully"*)
+                report_progress "build" 81 "Build compiled successfully"
+                ;;
+            *"Collecting page data"*)
+                report_progress "build" 82 "Collecting page data"
+                ;;
+            *"Generating static pages"*)
+                report_progress "build" 83 "Generating static pages"
+                ;;
+            *"Finalizing page optimization"*)
+                report_progress "build" 84 "Finalizing page optimization"
+                ;;
+        esac
+    done
+    build_status=$?
+    set +o pipefail
+
+    if [ "$build_status" -ne 0 ]; then
+        echo "❌ Application rebuild failed"
+        exit 1
+    fi
 else
     echo "🦖 No installed extensions, skipping rebuild"
 fi
