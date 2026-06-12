@@ -18,11 +18,15 @@ BUILDER_PID=$!
 sleep 2
 echo "🦖 Extension Builder Service running (PID: $BUILDER_PID)"
 
-# Helper function to report progress
+# Helper function to report progress. Optional 4th arg is the log "type"
+# ('info' | 'success' | 'warning' | 'error') so the maintenance page can
+# visually flag non-fatal step failures instead of burying them in the raw
+# console output.
 report_progress() {
     local phase=$1
     local progress=$2
     local message=$3
+    local type=${4:-info}
     # --max-time bounds the WHOLE request (connect + response). Without it, a
     # slow/unresponsive builder service (e.g. its event loop busy during the
     # CPU-heavy build step) can make curl hang forever - and since this runs
@@ -31,7 +35,7 @@ report_progress() {
     curl -s -X POST http://localhost:3010/startup/update \
         --connect-timeout 2 --max-time 5 \
         -H "Content-Type: application/json" \
-        -d "{\"phase\":\"$phase\",\"progress\":$progress,\"message\":\"$message\"}" \
+        -d "{\"phase\":\"$phase\",\"progress\":$progress,\"message\":\"$message\",\"type\":\"$type\"}" \
         >/dev/null 2>&1 || true
 }
 
@@ -65,40 +69,66 @@ echo "🦖 Starting application setup..."
 # Generate Prisma client
 echo "🦖 Generating Prisma client..."
 report_progress "prisma-generate" 10 "Generating Prisma client"
-npx prisma generate
+timeout 300 npx prisma generate
 
 # Run database migrations
 echo "🦖 Running database migrations..."
 report_progress "migrations" 25 "Running database migrations"
-npx prisma migrate deploy
+timeout 300 npx prisma migrate deploy
 
-# Run the widget build script
+# Run the widget build script. Non-fatal and time-bounded: a broken/hanging
+# widget build must not prevent the whole application from starting.
 echo "🦖 Building widget..."
 report_progress "widget" 40 "Building widget components"
-npm run build:widget
+timeout 180 npm run build:widget && widget_status=0 || widget_status=$?
+if [ "$widget_status" -ne 0 ]; then
+    echo "⚠️  Widget build failed or timed out (exit $widget_status) - continuing without it"
+    report_progress "widget" 40 "Widget build failed or timed out - continuing without it" "warning"
+fi
 
-# Generate Swagger documentation
+# Generate Swagger documentation. Non-fatal and time-bounded for the same
+# reason as the widget build above.
 echo "🦖 Generating Swagger documentation..."
 report_progress "swagger" 55 "Generating API documentation"
-npm run generate-swagger
+timeout 180 npm run generate-swagger && swagger_status=0 || swagger_status=$?
+if [ "$swagger_status" -ne 0 ]; then
+    echo "⚠️  Swagger generation failed or timed out (exit $swagger_status) - continuing without it"
+    report_progress "swagger" 55 "Swagger generation failed or timed out - continuing without it" "warning"
+fi
 
-# Generate extension imports
+# Generate extension imports + Tailwind safelist. This step has repeatedly
+# gotten the whole deploy stuck: with `set -e`, any failure here (or a hang
+# that runs past the timeout) used to abort the entire entrypoint script,
+# which - depending on the container's restart policy - can make the deploy
+# loop forever, always dying at this same point. Treat it as best-effort:
+# the app can run with the existing/default extensionLoader if this fails.
 echo "🦖 Generating extension imports..."
 report_progress "extensions" 70 "Generating extension imports"
-npm run extensions:generate
+timeout 180 npm run extensions:generate && extensions_status=0 || extensions_status=$?
+if [ "$extensions_status" -ne 0 ]; then
+    extensions_ok=false
+    echo "⚠️  Extension import/safelist generation failed or timed out (exit $extensions_status) - continuing with existing extensionLoader"
+    report_progress "extensions" 70 "Extension generation failed or timed out - continuing with existing extensions" "warning"
+else
+    extensions_ok=true
+fi
+report_progress "extensions" 77 "Finished extension import generation"
 
-# If any extensions are installed, the regenerated extensionLoader.ts (and the
-# extensions' own source files) must be compiled into .next before `next start`
-# can serve them - the image's prebuilt .next only has the default/empty loader.
-if [ -n "$(find extensions -mindepth 2 -maxdepth 2 -type d 2>/dev/null)" ]; then
+# If any extensions are installed AND the imports/safelist generation above
+# succeeded, the regenerated extensionLoader.ts (and the extensions' own
+# source files) must be compiled into .next before `next start` can serve
+# them - the image's prebuilt .next only has the default/empty loader.
+if [ "$extensions_ok" = true ] && [ -n "$(find extensions -mindepth 2 -maxdepth 2 -type d 2>/dev/null)" ]; then
     echo "🦖 Installed extensions detected, rebuilding application..."
     report_progress "build" 78 "Rebuilding application with installed extensions"
 
     # Pipe the build output so we can report fine-grained progress as
     # Next.js moves through its own build phases. `set -o pipefail` ensures
     # the pipeline's exit status reflects `npm run build`, not the `while` loop.
+    # `timeout` bounds the whole build so a Turbopack hang can't stall the
+    # deploy forever - if it times out, `build_status` will be non-zero (124).
     set -o pipefail
-    CI_BUILD_MODE=1 DOCKER_BUILD=1 npm run build 2>&1 | while IFS= read -r line; do
+    CI_BUILD_MODE=1 DOCKER_BUILD=1 timeout 1800 npm run build 2>&1 | while IFS= read -r line; do
         echo "$line"
         case "$line" in
             *"Creating an optimized production build"*)
@@ -122,9 +152,12 @@ if [ -n "$(find extensions -mindepth 2 -maxdepth 2 -type d 2>/dev/null)" ]; then
     set +o pipefail
 
     if [ "$build_status" -ne 0 ]; then
-        echo "❌ Application rebuild failed"
+        echo "❌ Application rebuild failed or timed out (exit $build_status)"
+        report_progress "build" 78 "Application rebuild failed or timed out (exit $build_status)" "error"
         exit 1
     fi
+elif [ "$extensions_ok" = false ]; then
+    echo "🦖 Skipping rebuild (extension generation failed above)"
 else
     echo "🦖 No installed extensions, skipping rebuild"
 fi

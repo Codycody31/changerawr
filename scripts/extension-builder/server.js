@@ -37,7 +37,7 @@ app.use(cors());
 app.use(express.json());
 
 /** @typedef {'downloading' | 'extracting' | 'validating' | 'testing' | 'installing' | 'complete' | 'failed'} JobStatus */
-/** @typedef {'info' | 'success' | 'error'} LogType */
+/** @typedef {'info' | 'success' | 'warning' | 'error'} LogType */
 
 /**
  * @typedef {Object} LogEntry

@@ -111,11 +111,51 @@
             animation: pulse 2s infinite;
         }
 
+        /* Non-fatal step warnings/errors reported by docker-entrypoint.sh
+           (e.g. "widget build failed - continuing without it") - surfaced
+           with distinct colors so they're visible without digging into the
+           raw console output, but without implying the deploy is stuck. */
+        .loading-text.log-warning {
+            color: #fbbf24;
+            opacity: 1;
+            animation: none;
+        }
+
+        .loading-text.log-error {
+            color: #f87171;
+            opacity: 1;
+            animation: none;
+        }
+
+        .loading-text.log-success {
+            color: #4ade80;
+            opacity: 1;
+            animation: none;
+        }
+
         .status-updates {
             margin-top: 2rem;
             font-size: 1.1rem;
             opacity: 0.7;
             min-height: 1.5rem;
+        }
+
+        /* Shown when progress hasn't moved for a long time - the build step
+           alone can legitimately take up to 30 minutes, so this is informational
+           rather than a hard "something is broken" message. */
+        .stuck-warning {
+            margin-top: 1rem;
+            padding: 0.75rem 1rem;
+            background: rgba(251, 191, 36, 0.15);
+            border: 1px solid rgba(251, 191, 36, 0.4);
+            border-radius: 8px;
+            font-size: 0.95rem;
+            color: #fde68a;
+        }
+
+        .stuck-warning a {
+            color: white;
+            text-decoration: underline;
         }
 
         /* Deployment Stats Section */
@@ -430,6 +470,14 @@
         Application is starting up. This usually takes 10-30 seconds.
     </div>
 
+    <!-- Shown when progress hasn't changed for a while - see STUCK_WARNING_MS -->
+    <div class="stuck-warning" id="stuckWarning" style="display: none;">
+        ⚠️ This step is taking unusually long. Some steps (like rebuilding the app
+        with installed extensions) can take up to 30 minutes. You can check the
+        console output below for details, or
+        <a href="/">try accessing the app anyway</a>.
+    </div>
+
     <!-- Console output: raw deployment logs, for debugging stuck/slow startups -->
     <div class="console-container" id="consoleContainer" style="display: none;">
         <div class="console-header">
@@ -467,6 +515,14 @@
     let fallbackMode = false;
     let elapsedSeconds = 0;
 
+    // Stuck-step detection: tracks how long phase/progress/logs have gone
+    // unchanged. Steps (especially the post-extension rebuild) can now
+    // legitimately run for up to 30 minutes via `timeout 1800`, so this is
+    // informational rather than a hard cutoff that stops polling.
+    let lastProgressKey = null;
+    let lastProgressChangeTime = Date.now();
+    const STUCK_WARNING_MS = 10 * 60 * 1000; // 10 minutes
+
     // Fetch real-time progress from extension builder service
     const fetchProgress = async () => {
         try {
@@ -483,10 +539,18 @@
                 const latestLog = data.logs && data.logs.length > 0 ? data.logs[data.logs.length - 1] : null;
                 const statusElement = document.getElementById('statusText');
                 const loadingElement = document.querySelector('.loading-text');
+                const stuckWarningElement = document.getElementById('stuckWarning');
 
-                // Update loading text with current phase
+                // Update loading text with current phase, visually flagging
+                // non-fatal warnings/errors reported by docker-entrypoint.sh
+                // (e.g. "widget build failed - continuing without it") so
+                // they're visible without digging into the raw console output.
                 if (latestLog) {
                     loadingElement.textContent = latestLog.message;
+                    loadingElement.classList.remove('log-warning', 'log-error', 'log-success');
+                    if (latestLog.type === 'warning' || latestLog.type === 'error' || latestLog.type === 'success') {
+                        loadingElement.classList.add(`log-${latestLog.type}`);
+                    }
                 }
 
                 // Update status text with elapsed time and warnings
@@ -498,6 +562,23 @@
                     statusElement.textContent = `${data.progress}% complete • ${data.elapsed}s elapsed • Taking longer than usual`;
                 } else {
                     statusElement.textContent = `${data.progress}% complete • ${data.elapsed}s elapsed • ⚠️ Unusually slow startup`;
+                }
+
+                // Track whether phase/progress/logs have changed since the
+                // last poll, and surface a soft warning if nothing has moved
+                // for a long time. This replaces the old fixed 2-minute
+                // "startup timeout" message, which became a false positive
+                // now that the rebuild step alone can take up to 30 minutes.
+                const progressKey = `${data.phase}:${data.progress}:${data.logs ? data.logs.length : 0}`;
+                if (progressKey !== lastProgressKey) {
+                    lastProgressKey = progressKey;
+                    lastProgressChangeTime = Date.now();
+                }
+
+                if (!data.complete && Date.now() - lastProgressChangeTime > STUCK_WARNING_MS) {
+                    stuckWarningElement.style.display = 'block';
+                } else {
+                    stuckWarningElement.style.display = 'none';
                 }
 
                 // Show/hide progress bars based on progress state
@@ -583,8 +664,10 @@
         const loadingElement = document.querySelector('.loading-text');
         const determinateBar = document.querySelector('.loading-bar');
         const indeterminateBar = document.querySelector('.loading-bar-indeterminate');
+        const stuckWarningElement = document.getElementById('stuckWarning');
 
         loadingElement.textContent = 'Starting up';
+        loadingElement.classList.remove('log-warning', 'log-error', 'log-success');
 
         // Show indeterminate bar in fallback mode
         determinateBar.style.display = 'none';
@@ -596,6 +679,14 @@
             statusElement.textContent = `${elapsedSeconds}s elapsed • Taking longer than usual`;
         } else {
             statusElement.textContent = `${elapsedSeconds}s elapsed • ⚠️ Unusually slow startup`;
+        }
+
+        // Unlike the normal progress path, fallback mode means the extension
+        // builder/proxy itself isn't responding at all - that's a different
+        // (more serious) problem than a slow step, so surface the "try
+        // anyway" link sooner.
+        if (elapsedSeconds * 1000 > STUCK_WARNING_MS / 2) {
+            stuckWarningElement.style.display = 'block';
         }
     }
 
@@ -718,14 +809,11 @@
     // Check health every 2 seconds
     const healthCheckInterval = setInterval(checkAppReady, 2000);
 
-    // Fallback redirect after 2 minutes (something is wrong)
-    setTimeout(() => {
-        clearInterval(healthCheckInterval);
-        clearInterval(progressInterval);
-        clearInterval(consoleInterval);
-        document.getElementById('statusText').innerHTML =
-            '⚠️ Startup timeout. <a href="/" style="color: white; text-decoration: underline;">Click here to try accessing the app anyway</a>.';
-    }, 120000);
+    // Note: there is no fixed-duration "startup timeout" anymore - polling
+    // continues indefinitely, and the #stuckWarning banner (driven by
+    // STUCK_WARNING_MS in fetchProgress/useFallbackMode) tells the user when
+    // a step has gone unusually long without killing the intervals, since
+    // legitimate steps can now take up to 30 minutes.
 
     // Start checking immediately
     fetchProgress();
