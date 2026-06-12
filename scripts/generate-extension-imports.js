@@ -275,10 +275,16 @@ export async function getExtensionsByCategory(category: string): Promise<Extensi
 async function cleanupBrokenLinks() {
   console.log('🔍 Checking for broken symlinks...\n');
 
+  // Tracked outside the try block so the `finally` can always disconnect -
+  // otherwise a thrown error (e.g. DB briefly unreachable) leaves the Prisma
+  // query-engine subprocess running, which keeps this script (and therefore
+  // `npm run extensions:generate` and the whole deploy) hanging forever.
+  let prisma;
+
   try {
     // Check if we have access to database (production might not)
     const { PrismaClient } = await import('@prisma/client');
-    const prisma = new PrismaClient();
+    prisma = new PrismaClient();
 
     // Get all linked extensions from database
     const linkedExtensions = await prisma.editorExtension.findMany({
@@ -287,7 +293,6 @@ async function cleanupBrokenLinks() {
 
     if (linkedExtensions.length === 0) {
       console.log('   No linked extensions found in database');
-      await prisma.$disconnect();
       return;
     }
 
@@ -351,16 +356,22 @@ async function cleanupBrokenLinks() {
     } else {
       console.log('   ✓ All linked extensions are valid\n');
     }
-
-    await prisma.$disconnect();
   } catch (err) {
     // Database might not be available in some contexts, that's okay
     console.log('   ⚠️  Could not check database (this is normal during build)\n');
+  } finally {
+    if (prisma) {
+      await prisma.$disconnect().catch(() => {});
+    }
   }
 }
 
 async function main() {
-  await reportProgress('extensions', 0, 'Scanning for installed extensions');
+  // Progress is reported within the 70-78 band that docker-entrypoint.sh
+  // reserves for the "extensions" phase (it sets 70 before this script runs,
+  // and the next phase, "build", starts at 78) - using lower numbers here
+  // would make the progress bar jump backwards.
+  await reportProgress('extensions', 70, 'Scanning for installed extensions');
   console.log('🔍 Scanning for installed extensions...\n');
 
   // Clean up broken symlinks first
@@ -369,10 +380,10 @@ async function main() {
   const extensions = await scanExtensions();
 
   console.log(`\n📦 Found ${extensions.length} installed extension(s)`);
-  await reportProgress('extensions', 50, `Found ${extensions.length} extension(s)`);
+  await reportProgress('extensions', 74, `Found ${extensions.length} extension(s)`);
 
   await generateLoaderFile(extensions);
-  await reportProgress('extensions', 100, `Generated imports for ${extensions.length} extension(s)`);
+  await reportProgress('extensions', 77, `Generated imports for ${extensions.length} extension(s)`);
 
   console.log('✨ Done! Restart your dev server to load the extensions.\n');
 }

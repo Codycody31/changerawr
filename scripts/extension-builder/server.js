@@ -116,6 +116,14 @@ function updateStartupProgress(phase, progress, message, type = 'info') {
 }
 
 // Startup progress endpoint (for maintenance page)
+// The maintenance page polls this every 500ms, so logging on every request
+// floods production logs. In development, log every poll (useful while
+// building the progress UI); in production, only log when the phase/progress
+// actually changes, or at most once every 10s as a heartbeat.
+const isDev = process.env.NODE_ENV !== 'production';
+let lastLoggedProgressState = null;
+let lastProgressLogTime = 0;
+
 app.get('/startup/progress', (req, res) => {
   const elapsed = Date.now() - startupProgress.startTime;
 
@@ -127,7 +135,17 @@ app.get('/startup/progress', (req, res) => {
     complete: startupProgress.complete,
   };
 
-  console.log(`[Progress GET] Phase: ${response.phase}, Progress: ${response.progress}%, Elapsed: ${response.elapsed}s, Logs: ${startupProgress.logs.length}`);
+  const currentState = `${response.phase}:${response.progress}`;
+  const now = Date.now();
+  const shouldLog = isDev
+    || currentState !== lastLoggedProgressState
+    || now - lastProgressLogTime >= 10000;
+
+  if (shouldLog) {
+    console.log(`[Progress GET] Phase: ${response.phase}, Progress: ${response.progress}%, Elapsed: ${response.elapsed}s, Logs: ${startupProgress.logs.length}`);
+    lastLoggedProgressState = currentState;
+    lastProgressLogTime = now;
+  }
 
   res.json(response);
 });
