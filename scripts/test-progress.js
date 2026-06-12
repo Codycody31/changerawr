@@ -55,6 +55,19 @@ async function simulateDeployment() {
   await sendProgress('extensions', 70, 'Generating extension imports');
   await sleep(2000);
 
+  await sendProgress('build', 78, 'Rebuilding application with installed extensions');
+  await sleep(1000);
+  await sendProgress('build', 79, 'Creating an optimized production build');
+  await sleep(2000);
+  await sendProgress('build', 81, 'Build compiled successfully');
+  await sleep(1000);
+  await sendProgress('build', 82, 'Collecting page data');
+  await sleep(1000);
+  await sendProgress('build', 83, 'Generating static pages');
+  await sleep(2000);
+  await sendProgress('build', 84, 'Finalizing page optimization');
+  await sleep(1000);
+
   await sendProgress('starting-app', 85, 'Starting Next.js application');
   await sleep(3000);
 
