@@ -177,7 +177,7 @@ function SessionList({entries, selectedIndex, currentIndex, onSelect}: {
                                         {index === 0 ? 'Initial version' : `Edit #${index}`}
                                     </span>
                                     <p className={cn(
-                                        'truncate text-xs',
+                                        'min-w-0 truncate text-xs',
                                         changeSummary.type === 'added' && 'text-emerald-600 dark:text-emerald-400',
                                         changeSummary.type === 'removed' && 'text-red-500 dark:text-red-400',
                                         changeSummary.type === 'none' && 'text-muted-foreground/80'
