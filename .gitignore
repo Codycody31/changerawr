@@ -73,6 +73,10 @@ null
 # sponsorer server
 /sponsor-server
 
+# persisted deploy step-duration history (for the maintenance page's ETA)
+/scripts/maintenance/maintenance-storage/*
+!/scripts/maintenance/maintenance-storage/.gitkeep
+
 # user requests to add
 CLAUDE.md
 

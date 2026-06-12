@@ -7,7 +7,7 @@
 
 import express from 'express';
 import cors from 'cors';
-import { createWriteStream } from 'fs';
+import { createWriteStream, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { mkdir, readFile, writeFile, rm } from 'fs/promises';
 import { join } from 'path';
 import https from 'https';
@@ -80,7 +80,6 @@ const updateChains = new Map();
 let startupProgress = {
   phase: 'waiting',
   progress: 0,
-  eta: null,
   startTime: Date.now(),
   logs: [
     {
@@ -92,26 +91,84 @@ let startupProgress = {
   complete: false,
 };
 
+// Each (phase, progress) pair reported by docker-entrypoint.sh (and the
+// install/build scripts) represents one "step" of the deploy - e.g.
+// "prisma-generate:10" or "build:79". We record how long each step took to
+// reach the *next* step and persist that to disk, so the next deploy can show
+// a live ETA countdown for the step currently in progress - including steps
+// like the Turbopack "build:79" -> "build:81" gap where no intermediate
+// output is available to track real progress.
+const STEP_DURATIONS_DIR = join(process.cwd(), 'scripts', 'maintenance', 'maintenance-storage');
+const STEP_DURATIONS_FILE = join(STEP_DURATIONS_DIR, 'step-durations.json');
+
+/** @type {Record<string, number>} step key ("phase:progress") -> seconds */
+let stepDurations = {};
+try {
+  stepDurations = JSON.parse(readFileSync(STEP_DURATIONS_FILE, 'utf-8'));
+} catch {
+  stepDurations = {};
+}
+
+let stepStartTime = Date.now();
+
+// While a step is in flight, smoothly animate the *displayed* progress from
+// the previous checkpoint towards the new one, over however long the
+// previous step took last time - instead of holding flat then jumping
+// straight to the next checkpoint the instant the update arrives. `duration`
+// is null when we have no history yet, in which case we just snap to `to`.
+/** @type {{ from: number, to: number, start: number, duration: number | null } | null} */
+let progressInterpolation = null;
+
+function stepKey(phase, progress) {
+  return `${phase}:${progress}`;
+}
+
+function persistStepDurations() {
+  try {
+    mkdirSync(STEP_DURATIONS_DIR, { recursive: true });
+    writeFileSync(STEP_DURATIONS_FILE, JSON.stringify(stepDurations));
+  } catch {
+    // Best-effort - if the directory isn't writable, we just won't have ETAs
+  }
+}
+
 /**
  * Update startup progress
  * @param {string} phase
  * @param {number} progress
  * @param {string} message
  * @param {LogType} type
- * @param {number | null} [eta] - estimated seconds remaining, if known
  */
-function updateStartupProgress(phase, progress, message, type = 'info', eta = null) {
-  // Ignore backward progress - e.g. a throttled webpack ProgressPlugin POST
-  // from next.config.ts arriving slightly out of order with
-  // docker-entrypoint.sh's own phase updates would otherwise make the bar
-  // visibly jump backwards.
-  if (progress < startupProgress.progress) {
+function updateStartupProgress(phase, progress, message, type = 'info') {
+  // Ignore backward progress - phases/steps should only move forward.
+  if (phase === startupProgress.phase && progress < startupProgress.progress) {
     return;
+  }
+
+  // If we're moving to a new step, record how long the previous step took so
+  // future deploys can estimate it, and set up the smooth-progress animation
+  // towards the new checkpoint.
+  const isNewStep = phase !== startupProgress.phase || progress !== startupProgress.progress;
+  if (isNewStep) {
+    const prevKey = stepKey(startupProgress.phase, startupProgress.progress);
+    const elapsedSeconds = (Date.now() - stepStartTime) / 1000;
+    if (elapsedSeconds > 0.05) {
+      stepDurations[prevKey] = elapsedSeconds;
+      persistStepDurations();
+    }
+
+    progressInterpolation = {
+      from: startupProgress.progress,
+      to: progress,
+      start: Date.now(),
+      duration: stepDurations[prevKey] ?? null,
+    };
+
+    stepStartTime = Date.now();
   }
 
   startupProgress.phase = phase;
   startupProgress.progress = progress;
-  startupProgress.eta = eta;
   startupProgress.logs.push({
     message,
     timestamp: Date.now(),
@@ -123,7 +180,44 @@ function updateStartupProgress(phase, progress, message, type = 'info', eta = nu
     startupProgress.logs = startupProgress.logs.slice(-20);
   }
 
+  const eta = getCurrentStepEta();
   console.log(`[Startup] ${phase} (${progress}%)${eta !== null ? ` ~${eta}s remaining` : ''} - ${message}`);
+}
+
+/**
+ * Estimate seconds remaining in the current step, based on how long this
+ * step took on a previous run. Returns null if we have no history for it yet.
+ * @returns {number | null}
+ */
+function getCurrentStepEta() {
+  const historical = stepDurations[stepKey(startupProgress.phase, startupProgress.progress)];
+  if (historical === undefined) {
+    return null;
+  }
+  const elapsedSeconds = (Date.now() - stepStartTime) / 1000;
+  return Math.max(0, Math.round(historical - elapsedSeconds));
+}
+
+/**
+ * The progress percentage to show in the UI. Animates smoothly from the
+ * previous checkpoint to the current one over the previous run's duration
+ * for that step, so the bar creeps forward continuously instead of sitting
+ * still and then jumping by 10-20 points all at once.
+ * @returns {number}
+ */
+function getDisplayProgress() {
+  if (!progressInterpolation) {
+    return startupProgress.progress;
+  }
+
+  const { from, to, start, duration } = progressInterpolation;
+  if (!duration) {
+    return to;
+  }
+
+  const elapsedSeconds = (Date.now() - start) / 1000;
+  const t = Math.min(1, elapsedSeconds / duration);
+  return Math.round(from + (to - from) * t);
 }
 
 // Startup progress endpoint (for maintenance page)
@@ -140,14 +234,14 @@ app.get('/startup/progress', (req, res) => {
 
   const response = {
     phase: startupProgress.phase,
-    progress: startupProgress.progress,
-    eta: startupProgress.eta,
+    progress: getDisplayProgress(),
+    eta: getCurrentStepEta(),
     elapsed: Math.floor(elapsed / 1000), // seconds
     logs: startupProgress.logs.slice(-10), // Last 10 logs
     complete: startupProgress.complete,
   };
 
-  const currentState = `${response.phase}:${response.progress}`;
+  const currentState = `${startupProgress.phase}:${startupProgress.progress}`;
   const now = Date.now();
   const shouldLog = isDev
     || currentState !== lastLoggedProgressState
@@ -197,19 +291,18 @@ app.get('/startup/logs', async (req, res) => {
   }
 });
 
-// Update startup progress (called by docker-entrypoint.sh, install scripts, or
-// the webpack ProgressPlugin in next.config.ts during the production rebuild)
+// Update startup progress (called by docker-entrypoint.sh and the install/build scripts)
 app.post('/startup/update', (req, res) => {
-  const { phase, progress, message, type, eta } = req.body;
+  const { phase, progress, message, type } = req.body;
 
-  console.log(`[Progress POST] Received update: phase=${phase}, progress=${progress}, message=${message}${eta !== undefined && eta !== null ? `, eta=${eta}s` : ''}`);
+  console.log(`[Progress POST] Received update: phase=${phase}, progress=${progress}, message=${message}`);
 
   if (!phase || progress === undefined) {
     console.log('[Progress POST] ERROR: Missing phase or progress');
     return res.status(400).json({ error: 'phase and progress are required' });
   }
 
-  updateStartupProgress(phase, progress, message || phase, type || 'info', eta ?? null);
+  updateStartupProgress(phase, progress, message || phase, type || 'info');
 
   res.json({ success: true });
 });
@@ -219,11 +312,12 @@ app.post('/startup/reset', (req, res) => {
   startupProgress = {
     phase: 'starting',
     progress: 0,
-    eta: null,
     startTime: Date.now(),
     logs: [],
     complete: false,
   };
+  stepStartTime = Date.now();
+  progressInterpolation = null;
 
   updateStartupProgress('starting', 0, 'Deployment started');
 
