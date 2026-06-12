@@ -86,6 +86,10 @@ function buildConfigSchema(sponsored: boolean) {
             z.literal(-1),
             z.number().min(10).max(sponsored ? 999999 : 10000),
         ]),
+        maxRevisionsPerEntry: z.union([
+            z.literal(-1),
+            z.number().min(5).max(sponsored ? 10000 : 500),
+        ]),
         enableAnalytics: z.boolean(),
         enableNotifications: z.boolean(),
         allowTelemetry: z.enum(['prompt', 'enabled', 'disabled']),
@@ -101,6 +105,7 @@ type SystemConfig = {
     defaultInvitationExpiry: number
     requireApprovalForChangelogs: boolean
     maxChangelogEntriesPerProject: number
+    maxRevisionsPerEntry: number
     enableAnalytics: boolean
     enableNotifications: boolean
     allowTelemetry: 'prompt' | 'enabled' | 'disabled'
@@ -160,6 +165,7 @@ export default function SystemConfigPage() {
             defaultInvitationExpiry: 7,
             requireApprovalForChangelogs: true,
             maxChangelogEntriesPerProject: 100,
+            maxRevisionsPerEntry: 50,
             enableAnalytics: true,
             enableNotifications: true,
             allowTelemetry: 'prompt' as const,
@@ -172,6 +178,7 @@ export default function SystemConfigPage() {
             defaultInvitationExpiry: config.defaultInvitationExpiry,
             requireApprovalForChangelogs: config.requireApprovalForChangelogs,
             maxChangelogEntriesPerProject: config.maxChangelogEntriesPerProject,
+            maxRevisionsPerEntry: config.maxRevisionsPerEntry,
             enableAnalytics: config.enableAnalytics,
             enableNotifications: config.enableNotifications,
             allowTelemetry: config.allowTelemetry,
@@ -470,12 +477,55 @@ export default function SystemConfigPage() {
                                                                         }}
                                                                     />
                                                                 </FormControl>
-                                                                <FormDescription>
+                                                <FormDescription>
                                                                     {isUnlimited && !isLicensed
                                                                         ? 'Set to unlimited, but no active license was found - capped at 10,000 until a license is active.'
                                                                         : isLicensed
                                                                             ? 'Maximum number of changelog entries allowed per project (10 - 999,999). Set to -1 for unlimited.'
                                                                             : 'Maximum number of changelog entries allowed per project (10 - 10,000)'}
+                                                                </FormDescription>
+                                                                <FormMessage/>
+                                                            </FormItem>
+                                                        )
+                                                    }}
+                                                />
+
+                                                <FormField
+                                                    control={form.control}
+                                                    name="maxRevisionsPerEntry"
+                                                    render={({field}) => {
+                                                        const isUnlimited = field.value === -1
+                                                        return (
+                                                            <FormItem>
+                                                                <FormLabel className="flex items-center gap-2">
+                                                                    Max Saved Versions per Changelog Entry
+                                                                    {isUnlimited && (
+                                                                        <Badge variant="default"
+                                                                               className="text-xs">Unlimited</Badge>
+                                                                    )}
+                                                                </FormLabel>
+                                                                <FormControl>
+                                                                    <Input
+                                                                        type="number"
+                                                                        {...field}
+                                                                        min={isLicensed ? -1 : 5}
+                                                                        max={isLicensed ? 10000 : 500}
+                                                                        onChange={(e) => {
+                                                                            const raw = e.target.value
+                                                                            if (raw === '' || raw === '-') {
+                                                                                field.onChange(raw)
+                                                                                return
+                                                                            }
+                                                                            field.onChange(Number(raw))
+                                                                        }}
+                                                                    />
+                                                                </FormControl>
+                                                                <FormDescription>
+                                                                    {isUnlimited && !isLicensed
+                                                                        ? 'Set to unlimited, but no active license was found - capped at 50 until a license is active.'
+                                                                        : isLicensed
+                                                                            ? 'Maximum number of saved version history checkpoints kept per changelog entry (5 - 10,000). Oldest unpinned versions are pruned beyond this. Set to -1 for unlimited.'
+                                                                            : 'Maximum number of saved version history checkpoints kept per changelog entry (5 - 500). Oldest unpinned versions are pruned beyond this.'}
                                                                 </FormDescription>
                                                                 <FormMessage/>
                                                             </FormItem>

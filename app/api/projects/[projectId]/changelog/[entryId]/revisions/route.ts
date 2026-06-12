@@ -13,6 +13,7 @@ const MAX_LIMIT = 50;
  * @param {string} entryId - The ID of the changelog entry.
  * @query {string} [cursor] - Revision ID to start after (for pagination).
  * @query {number} [limit] - Number of revisions to return (default 20, max 50).
+ * @query {string} [search] - Filter revisions by title, marker label, or version (case-insensitive substring match).
  * @response 200 {
  *   "type": "object",
  *   "properties": {
@@ -70,13 +71,23 @@ export async function GET(
 
         const {searchParams} = new URL(request.url);
         const cursor = searchParams.get('cursor');
+        const search = searchParams.get('search')?.trim();
         const requestedLimit = parseInt(searchParams.get('limit') || `${DEFAULT_LIMIT}`, 10);
         const limit = Number.isFinite(requestedLimit) && requestedLimit > 0
             ? Math.min(requestedLimit, MAX_LIMIT)
             : DEFAULT_LIMIT;
 
         const revisions = await db.changelogEntryRevision.findMany({
-            where: {entryId},
+            where: {
+                entryId,
+                ...(search ? {
+                    OR: [
+                        {title: {contains: search, mode: 'insensitive'}},
+                        {label: {contains: search, mode: 'insensitive'}},
+                        {version: {contains: search, mode: 'insensitive'}},
+                    ]
+                } : {})
+            },
             orderBy: [{pinned: 'desc'}, {createdAt: 'desc'}],
             take: limit + 1,
             ...(cursor ? {cursor: {id: cursor}, skip: 1} : {}),

@@ -216,6 +216,33 @@ export class SponsorService {
         return isLicensed ? Number.MAX_SAFE_INTEGER : configMax;
     }
 
+    static getEffectiveMaxRevisions(configMax: number, isLicensed: boolean): number {
+        if (configMax === -1) {
+            return isLicensed ? Number.MAX_SAFE_INTEGER : 50;
+        }
+        return configMax;
+    }
+
+    /**
+     * Returns the effective cap on saved version-history revisions per changelog
+     * entry, honoring the -1 ("unlimited") config value only when a sponsor
+     * license is active. Returns Number.MAX_SAFE_INTEGER for "unlimited" (skip pruning).
+     */
+    static async getMaxRevisionsPerEntry(): Promise<number> {
+        const config = await db.systemConfig.findFirst({
+            select: {maxRevisionsPerEntry: true},
+        });
+
+        const configMax = config?.maxRevisionsPerEntry ?? 50;
+
+        if (configMax !== -1) {
+            return configMax;
+        }
+
+        const {active} = await SponsorService.getLicenseStatus();
+        return SponsorService.getEffectiveMaxRevisions(configMax, active);
+    }
+
     static async storeLicenseActivation(
         licenseKey: string, valid: boolean, proof?: string, payload?: string
     ): Promise<void> {

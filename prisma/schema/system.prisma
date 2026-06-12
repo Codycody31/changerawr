@@ -42,6 +42,7 @@ model SystemConfig {
   defaultInvitationExpiry       Int            @default(7)
   requireApprovalForChangelogs  Boolean        @default(true)
   maxChangelogEntriesPerProject Int            @default(100)
+  maxRevisionsPerEntry          Int            @default(50) // Max saved version history checkpoints per changelog entry
   enableAnalytics               Boolean        @default(true)
   enableNotifications           Boolean        @default(true)
   enablePasswordReset           Boolean        @default(false)
@@ -77,12 +78,12 @@ model SystemConfig {
   panelIpWhitelistEnabled       Boolean        @default(false)
   panelIpWhitelist              String[]
   // LanguageTool Spellchecker Configuration
-  languageToolEnabled              Boolean        @default(false) // Enable/disable LanguageTool spellchecker
-  languageToolApiUrl               String?        @default("https://api.languagetool.org/v2") // LanguageTool API endpoint
-  languageToolApiKey               String? // Optional API key for premium features
-  languageToolLanguage             String?        @default("en-US") // Default language for spellchecking
-  languageToolUsername             String? // Username for LanguageTool premium
-  languageToolAllowUserOverride    Boolean        @default(true) // Allow users to set custom URL/credentials
+  languageToolEnabled           Boolean        @default(false) // Enable/disable LanguageTool spellchecker
+  languageToolApiUrl            String?        @default("https://api.languagetool.org/v2") // LanguageTool API endpoint
+  languageToolApiKey            String? // Optional API key for premium features
+  languageToolLanguage          String?        @default("en-US") // Default language for spellchecking
+  languageToolUsername          String? // Username for LanguageTool premium
+  languageToolAllowUserOverride Boolean        @default(true) // Allow users to set custom URL/credentials
   // Changelog Tagger service (external ML-based tag classifier)
   changelogTaggerUrl            String? // e.g. http://localhost:31672
   changelogTaggerApiKey         String? // Optional bearer token

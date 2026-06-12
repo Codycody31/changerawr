@@ -17,6 +17,7 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip';
 import {Badge} from '@/components/ui/badge';
 import {Button} from '@/components/ui/button';
 import {DiffView, DiffHunk} from '@/components/markdown-editor/history/DiffView';
@@ -150,34 +151,45 @@ export function RevisionDetailPanel({projectId, entryId, revisionId, onRestore, 
     const {Icon: MarkerIcon, label: markerLabel, color: markerColor} = getRevisionDisplay(revision);
 
     return (
+        <TooltipProvider delayDuration={300}>
         <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex flex-col gap-1.5 border-b p-3 shrink-0">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                        <h3 className="mr-1 truncate text-sm font-semibold">{revision.title}</h3>
-                        <Badge variant="secondary" className="gap-1" customColor={markerColor ?? undefined}>
-                            <MarkerIcon className="h-3 w-3"/>
-                            {markerLabel}
-                        </Badge>
-                        {revision.version && <Badge variant="outline">{formatVersion(revision.version)}</Badge>}
-                        {revision.linesAdded > 0 && (
-                            <span className="text-xs tabular-nums text-emerald-600 dark:text-emerald-400">
-                                +{revision.linesAdded}
-                            </span>
-                        )}
-                        {revision.linesRemoved > 0 && (
-                            <span className="text-xs tabular-nums text-red-500 dark:text-red-400">
-                                -{revision.linesRemoved}
-                            </span>
-                        )}
-                        <span className="text-xs text-muted-foreground">
-                            {formatDistanceToNow(new Date(revision.createdAt), {addSuffix: true})}
+                <div className="flex items-center justify-between gap-2">
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <h3 className="min-w-0 flex-1 truncate text-sm font-semibold">{revision.title}</h3>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="max-w-[320px] break-words">
+                            {revision.title}
+                        </TooltipContent>
+                    </Tooltip>
+                    <ViewModeTabs value={viewMode} onChange={setViewMode} showBlame/>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                    <Badge variant="secondary" className="gap-1" customColor={markerColor ?? undefined}>
+                        <MarkerIcon className="h-3 w-3"/>
+                        {markerLabel}
+                    </Badge>
+                    {revision.version && <Badge variant="outline">{formatVersion(revision.version)}</Badge>}
+                    {revision.linesAdded > 0 && (
+                        <span className="text-xs tabular-nums text-emerald-600 dark:text-emerald-400">
+                            +{revision.linesAdded}
                         </span>
-                        {revision.createdBy && (
-                            <span className="text-xs text-muted-foreground">
-                                by {revision.createdBy.name || revision.createdBy.email}
-                            </span>
-                        )}
+                    )}
+                    {revision.linesRemoved > 0 && (
+                        <span className="text-xs tabular-nums text-red-500 dark:text-red-400">
+                            -{revision.linesRemoved}
+                        </span>
+                    )}
+                    <span className="text-xs text-muted-foreground">
+                        {formatDistanceToNow(new Date(revision.createdAt), {addSuffix: true})}
+                    </span>
+                    {revision.createdBy && (
+                        <span className="text-xs text-muted-foreground">
+                            by {revision.createdBy.name || revision.createdBy.email}
+                        </span>
+                    )}
+                    <div className="ml-auto flex items-center gap-0.5 rounded-md border p-0.5">
                         <PinRevisionButton
                             projectId={projectId}
                             entryId={entryId}
@@ -193,7 +205,6 @@ export function RevisionDetailPanel({projectId, entryId, revisionId, onRestore, 
                             color={revision.color}
                         />
                     </div>
-                    <ViewModeTabs value={viewMode} onChange={setViewMode} showBlame/>
                 </div>
                 {data.restoredFrom && (
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -258,5 +269,6 @@ export function RevisionDetailPanel({projectId, entryId, revisionId, onRestore, 
                 </AlertDialog>
             </div>
         </div>
+        </TooltipProvider>
     );
 }

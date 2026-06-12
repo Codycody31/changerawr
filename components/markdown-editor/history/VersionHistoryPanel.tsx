@@ -2,16 +2,19 @@
 
 'use client';
 
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {AnimatePresence, motion} from 'framer-motion';
 import {diffLines} from 'diff';
 import {formatDistanceToNow} from 'date-fns';
 import {useInfiniteQuery, useQuery} from '@tanstack/react-query';
-import {History, Pin, X} from 'lucide-react';
+import {useDebounce} from 'use-debounce';
+import {History, Loader2, Pin, Search, X} from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {Button} from '@/components/ui/button';
 import {Badge} from '@/components/ui/badge';
+import {Input} from '@/components/ui/input';
+import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover';
 import {ScrollArea} from '@/components/ui/scroll-area';
 import {Tabs, TabsList, TabsTrigger} from '@/components/ui/tabs';
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip';
@@ -83,6 +86,28 @@ function formatShortRelativeTime(date: Date): string {
     return `${Math.round(diffMonth / 12)}y`;
 }
 
+interface ChangeSummary {
+    type: 'added' | 'removed' | 'none';
+    text: string;
+}
+
+/** Summarizes what actually changed between two content snapshots, for sidebar previews. */
+function getChangeSummary(prevContent: string, content: string): ChangeSummary {
+    if (!prevContent) {
+        const firstLine = content.split('\n').find((line) => line.trim().length > 0);
+        return {type: 'none', text: firstLine ? firstLine.trim().slice(0, 80) : 'Empty document'};
+    }
+
+    for (const change of diffLines(prevContent, content)) {
+        if (!change.added && !change.removed) continue;
+        const firstLine = change.value.split('\n').find((line) => line.trim().length > 0);
+        if (!firstLine) continue;
+        return {type: change.added ? 'added' : 'removed', text: firstLine.trim().slice(0, 78)};
+    }
+
+    return {type: 'none', text: 'No changes'};
+}
+
 /** Sidebar list of this session's edit snapshots. */
 function SessionList({entries, selectedIndex, currentIndex, onSelect}: {
     entries: ToolbarHistoryEntry[];
@@ -92,11 +117,15 @@ function SessionList({entries, selectedIndex, currentIndex, onSelect}: {
 }) {
     const rows = useMemo(() => {
         return entries
-            .map((entry, index) => ({
-                entry,
-                index,
-                wordDelta: index === 0 ? 0 : countWords(entry.content) - countWords(entries[index - 1].content),
-            }))
+            .map((entry, index) => {
+                const prevContent = index > 0 ? entries[index - 1].content : '';
+                return {
+                    entry,
+                    index,
+                    wordDelta: index === 0 ? 0 : countWords(entry.content) - countWords(prevContent),
+                    changeSummary: getChangeSummary(prevContent, entry.content),
+                };
+            })
             .reverse();
     }, [entries]);
 
@@ -108,10 +137,9 @@ function SessionList({entries, selectedIndex, currentIndex, onSelect}: {
                 </div>
             ) : (
                 <ol className="flex flex-col gap-0.5 p-2">
-                    {rows.map(({entry, index, wordDelta}) => {
+                    {rows.map(({entry, index, wordDelta, changeSummary}) => {
                         const isSelected = index === selectedIndex;
                         const isCurrent = index === currentIndex;
-                        const preview = entry.content.trim().split('\n')[0]?.slice(0, 60) || 'Empty document';
 
                         return (
                             <li key={`${entry.timestamp}-${index}`}>
@@ -148,7 +176,16 @@ function SessionList({entries, selectedIndex, currentIndex, onSelect}: {
                                     <span className="text-xs text-muted-foreground">
                                         {index === 0 ? 'Initial version' : `Edit #${index}`}
                                     </span>
-                                    <p className="truncate text-xs text-muted-foreground/80">{preview}</p>
+                                    <p className={cn(
+                                        'truncate text-xs',
+                                        changeSummary.type === 'added' && 'text-emerald-600 dark:text-emerald-400',
+                                        changeSummary.type === 'removed' && 'text-red-500 dark:text-red-400',
+                                        changeSummary.type === 'none' && 'text-muted-foreground/80'
+                                    )}>
+                                        {changeSummary.type === 'added' && '+ '}
+                                        {changeSummary.type === 'removed' && '− '}
+                                        {changeSummary.text}
+                                    </p>
                                 </button>
                             </li>
                         );
@@ -221,7 +258,9 @@ function SavedList({
                        isFetchingNextPage,
                        fetchNextPage,
                        selectedRevisionId,
-                       onSelect
+                       onSelect,
+                       search,
+                       onSearchChange,
                    }: {
     revisions: SavedRevisionListItem[];
     isLoading: boolean;
@@ -230,9 +269,84 @@ function SavedList({
     fetchNextPage: () => void;
     selectedRevisionId: string | null;
     onSelect: (revisionId: string) => void;
+    search: string;
+    onSearchChange: (value: string) => void;
 }) {
+    const loadMoreRef = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+        const el = loadMoreRef.current;
+        if (!el || !hasNextPage) return;
+
+        const observer = new IntersectionObserver(([entry]) => {
+            if (entry?.isIntersecting && !isFetchingNextPage) {
+                fetchNextPage();
+            }
+        }, {rootMargin: '150px'});
+
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
     return (
         <TooltipProvider delayDuration={200}>
+            <div className="flex flex-col gap-1.5 px-2 pt-2">
+                <div className="flex items-center justify-between gap-1.5">
+                    <span className="px-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Saved versions
+                    </span>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className={cn('relative h-6 w-6', search && 'text-primary')}
+                                title="Search saved versions"
+                            >
+                                <Search className="h-3.5 w-3.5"/>
+                                {search && (
+                                    <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-primary"/>
+                                )}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent align="end" className="w-72 p-2">
+                            <div className="relative">
+                                <Input
+                                    autoFocus
+                                    placeholder="Search title, label, version…"
+                                    value={search}
+                                    onChange={(e) => onSearchChange(e.target.value)}
+                                    className="h-8 pr-7 text-xs"
+                                />
+                                {search && (
+                                    <button
+                                        type="button"
+                                        onClick={() => onSearchChange('')}
+                                        className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                    >
+                                        <X className="h-3.5 w-3.5"/>
+                                    </button>
+                                )}
+                            </div>
+                        </PopoverContent>
+                    </Popover>
+                </div>
+                {search && (
+                    <div className="flex items-center gap-1 px-1 text-[11px] text-muted-foreground">
+                        <Search className="h-2.5 w-2.5 shrink-0"/>
+                        <span className="min-w-0 truncate">
+                            Searching for &ldquo;{search}&rdquo;
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => onSearchChange('')}
+                            className="shrink-0 hover:text-foreground"
+                        >
+                            <X className="h-3 w-3"/>
+                        </button>
+                    </div>
+                )}
+            </div>
             <ScrollArea className="min-h-0 flex-1">
                 {isLoading ? (
                     <div className="flex h-32 items-center justify-center">
@@ -240,7 +354,7 @@ function SavedList({
                     </div>
                 ) : revisions.length === 0 ? (
                     <div className="px-3 py-6 text-center text-xs text-muted-foreground">
-                        No saved versions yet
+                        {search ? 'No matching saved versions' : 'No saved versions yet'}
                     </div>
                 ) : (
                     <ol className="flex flex-col gap-0.5 p-2">
@@ -328,16 +442,10 @@ function SavedList({
                     </ol>
                 )}
                 {hasNextPage && (
-                    <div className="px-3 pb-2">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-full text-xs"
-                            onClick={() => fetchNextPage()}
-                            disabled={isFetchingNextPage}
-                        >
-                            {isFetchingNextPage ? 'Loading...' : 'Load more'}
-                        </Button>
+                    <div ref={loadMoreRef} className="flex h-8 items-center justify-center">
+                        {isFetchingNextPage && (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground"/>
+                        )}
                     </div>
                 )}
             </ScrollArea>
@@ -381,6 +489,8 @@ export function VersionHistoryPanel({
     const [activeTab, setActiveTab] = useState<'session' | 'saved'>('session');
     const [selectedSessionIndex, setSelectedSessionIndex] = useState<number | null>(null);
     const [selectedRevisionId, setSelectedRevisionId] = useState<string | null>(null);
+    const [savedSearchInput, setSavedSearchInput] = useState('');
+    const [savedSearch] = useDebounce(savedSearchInput.trim(), 400);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -404,11 +514,12 @@ export function VersionHistoryPanel({
 
     // Paginated revision content, lazy-loaded only once the "Saved" tab is opened.
     const {data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage} = useInfiniteQuery({
-        queryKey: ['changelog-revisions', versionHistory?.projectId, versionHistory?.entryId],
+        queryKey: ['changelog-revisions', versionHistory?.projectId, versionHistory?.entryId, savedSearch],
         queryFn: async ({pageParam}: { pageParam?: string }): Promise<SavedRevisionsPage> => {
             const {projectId, entryId} = versionHistory!;
             const url = new URL(`/api/projects/${projectId}/changelog/${entryId}/revisions`, window.location.origin);
             if (pageParam) url.searchParams.set('cursor', pageParam);
+            if (savedSearch) url.searchParams.set('search', savedSearch);
             const res = await fetch(url.toString().replace(window.location.origin, ''));
             if (!res.ok) throw new Error('Failed to load saved versions');
             return res.json();
@@ -507,6 +618,8 @@ export function VersionHistoryPanel({
                                             fetchNextPage={fetchNextPage}
                                             selectedRevisionId={selectedRevisionId}
                                             onSelect={setSelectedRevisionId}
+                                            search={savedSearchInput}
+                                            onSearchChange={setSavedSearchInput}
                                         />
                                     ) : (
                                         <SessionList
