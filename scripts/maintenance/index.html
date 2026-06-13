@@ -13,46 +13,62 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #000000;
+            color: #f5f5f7;
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: white;
-            overflow-x: hidden;
+            overflow: hidden;
             padding: 1rem;
         }
 
+        /* Live console output rendered full-bleed behind the content, very
+           low-contrast so it reads as ambient texture rather than content.
+           Anchored to the bottom via flex so the most recent lines are what
+           shows, with older lines clipped off the top. */
+        .console-bg {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            overflow: hidden;
+            padding: 1.5rem 2rem;
+            pointer-events: none;
+        }
+
+        .console-bg pre {
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 0.7rem;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-all;
+            color: #2c2c2e;
+        }
+
         .container {
+            position: relative;
+            z-index: 1;
             text-align: center;
-            max-width: 1000px;
+            max-width: 460px;
             width: 100%;
-            padding: 3rem;
-            animation: fadeIn 1s ease-out;
+            padding: 1rem;
+            animation: fadeIn 0.6s ease-out;
         }
 
         .logo {
-            font-size: 6rem;
-            margin-bottom: 1.5rem;
-            animation: bounce 2s infinite;
-            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
-        }
-
-        h1 {
-            font-size: 3rem;
-            font-weight: 700;
-            margin-bottom: 1.5rem;
-            background: linear-gradient(45deg, #fff, #f0f0f0);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: center;
         }
 
         .subtitle {
-            font-size: 1.5rem;
-            margin-bottom: 3rem;
-            opacity: 0.9;
-            font-weight: 300;
+            font-size: 1rem;
+            margin-bottom: 2.5rem;
+            color: #98989d;
+            font-weight: 400;
         }
 
         .loading-container {
@@ -62,16 +78,16 @@
         .progress-bar-wrapper {
             position: relative;
             width: 100%;
-            height: 8px;
-            margin-bottom: 1.5rem;
+            height: 4px;
+            margin-bottom: 1.25rem;
         }
 
         .loading-bar,
         .loading-bar-indeterminate {
             width: 100%;
-            height: 8px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 3px;
+            height: 4px;
+            background: #2c2c2e;
+            border-radius: 2px;
             overflow: hidden;
             position: absolute;
             top: 0;
@@ -80,20 +96,18 @@
 
         .loading-progress {
             height: 100%;
-            background: linear-gradient(90deg, #4ade80, #22c55e);
-            border-radius: 3px;
+            background: #f5f5f7;
+            border-radius: 2px;
             width: 0%;
             transition: width 0.5s ease-out;
-            box-shadow: 0 0 10px rgba(74, 222, 128, 0.5);
         }
 
         .loading-progress-indeterminate {
             height: 100%;
-            background: linear-gradient(90deg, #4ade80, #22c55e);
-            border-radius: 3px;
+            background: #f5f5f7;
+            border-radius: 2px;
             width: 30%;
             animation: indeterminate 1.5s ease-in-out infinite;
-            box-shadow: 0 0 10px rgba(74, 222, 128, 0.5);
         }
 
         @keyframes indeterminate {
@@ -106,149 +120,41 @@
         }
 
         .loading-text {
-            font-size: 1.1rem;
-            opacity: 0.8;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% {
-                opacity: 0.8;
-            }
-            50% {
-                opacity: 1;
-            }
+            font-size: 1.05rem;
+            font-weight: 500;
+            color: #f5f5f7;
         }
 
         .status-updates {
-            margin-top: 2rem;
-            font-size: 1.1rem;
-            opacity: 0.7;
-            min-height: 1.5rem;
+            margin-top: 1.5rem;
+            font-size: 0.85rem;
+            color: #6e6e73;
+            min-height: 1.25rem;
         }
 
         /* Shown when progress hasn't moved for a long time - the build step
            alone can legitimately take up to 30 minutes, so this is informational
            rather than a hard "something is broken" message. */
         .stuck-warning {
-            margin-top: 1rem;
+            margin-top: 1.5rem;
             padding: 0.75rem 1rem;
-            background: rgba(251, 191, 36, 0.15);
-            border: 1px solid rgba(251, 191, 36, 0.4);
-            border-radius: 8px;
-            font-size: 0.95rem;
-            color: #fde68a;
+            background: #1c1c1e;
+            border: 1px solid #2c2c2e;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            color: #98989d;
+            text-align: left;
         }
 
         .stuck-warning a {
-            color: white;
+            color: #f5f5f7;
             text-decoration: underline;
-        }
-
-        /* Console Output Section */
-        .console-container {
-            margin-top: 1.5rem;
-            padding: 1rem;
-            background: rgba(0, 0, 0, 0.25);
-            backdrop-filter: blur(10px);
-            border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            text-align: left;
-        }
-
-        .console-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 0.5rem;
-        }
-
-        .console-title {
-            font-size: 0.8rem;
-            font-weight: 600;
-            opacity: 0.8;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .console-toggle {
-            font-size: 0.75rem;
-            padding: 0.25rem 0.6rem;
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 4px;
-            color: white;
-            cursor: pointer;
-        }
-
-        .console-output {
-            max-height: 220px;
-            overflow-y: auto;
-            background: rgba(0, 0, 0, 0.35);
-            border-radius: 6px;
-            padding: 0.75rem;
-            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-            font-size: 0.7rem;
-            line-height: 1.4;
-            white-space: pre-wrap;
-            word-break: break-all;
-            text-align: left;
-            color: rgba(255, 255, 255, 0.85);
-        }
-
-        .console-output.collapsed {
-            display: none;
-        }
-
-        .console-empty {
-            opacity: 0.5;
-            font-style: italic;
-        }
-
-        .dots::after {
-            content: '';
-            animation: dots 1.5s infinite;
-        }
-
-        /* Background animation */
-        .bg-shapes {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: -1;
-        }
-
-        .shape {
-            position: absolute;
-            opacity: 0.1;
-            animation: float 6s ease-in-out infinite;
-        }
-
-        .shape:nth-child(1) {
-            top: 20%;
-            left: 10%;
-            animation-delay: 0s;
-        }
-
-        .shape:nth-child(2) {
-            top: 60%;
-            right: 10%;
-            animation-delay: 2s;
-        }
-
-        .shape:nth-child(3) {
-            bottom: 20%;
-            left: 20%;
-            animation-delay: 4s;
         }
 
         @keyframes fadeIn {
             from {
                 opacity: 0;
-                transform: translateY(20px);
+                transform: translateY(12px);
             }
             to {
                 opacity: 1;
@@ -256,99 +162,45 @@
             }
         }
 
-        @keyframes bounce {
-            0%, 20%, 50%, 80%, 100% {
-                transform: translateY(0);
-            }
-            40% {
-                transform: translateY(-10px);
-            }
-            60% {
-                transform: translateY(-5px);
-            }
-        }
-
-
-        @keyframes dots {
-            0%, 24% {
-                content: '';
-            }
-            25%, 49% {
-                content: '.';
-            }
-            50%, 74% {
-                content: '..';
-            }
-            75%, 100% {
-                content: '...';
-            }
-        }
-
-        @keyframes float {
-            0%, 100% {
-                transform: translateY(0px) rotate(0deg);
-            }
-            50% {
-                transform: translateY(-20px) rotate(180deg);
-            }
-        }
-
         @media (max-width: 640px) {
             .container {
-                padding: 1rem;
-            }
-
-            .logo {
-                font-size: 3rem;
-            }
-
-            h1 {
-                font-size: 2rem;
-            }
-
-            .subtitle {
-                font-size: 1rem;
-            }
-
-            .stats-grid {
-                grid-template-columns: 1fr;
+                padding: 2rem 1.5rem;
             }
         }
     </style>
 </head>
 <body>
-<div class="bg-shapes">
-    <div class="shape">🦖</div>
-    <div class="shape">⚡</div>
-    <div class="shape">🚀</div>
+<div class="console-bg" id="consoleBg">
+    <pre id="consoleOutput"></pre>
 </div>
 
 <div class="container">
-    <div class="logo">🦖</div>
-    <svg width="225" height="50" viewBox="0 0 225 50" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-            <linearGradient id="rainbowGradient" x1="0%" y1="0%" x2="100%" y2="100%" gradientUnits="objectBoundingBox">
-                <stop offset="0%" stop-color="#186cb8"/>
-                <stop offset="19%" stop-color="#186cb8"/>
-                <stop offset="20%" stop-color="#2a9a9f"/>
-                <stop offset="39%" stop-color="#2a9a9f"/>
-                <stop offset="40%" stop-color="#f1b211"/>
-                <stop offset="59%" stop-color="#f1b211"/>
-                <stop offset="60%" stop-color="#e83611"/>
-                <stop offset="79%" stop-color="#e83611"/>
-                <stop offset="80%" stop-color="#f9002f"/>
-                <stop offset="100%" stop-color="#f9002f"/>
-            </linearGradient>
-        </defs>
-        <text x="0" y="40" font-family="Inter, sans-serif" font-size="36" font-weight="bold" fill="white" letter-spacing="1px" stroke="black" stroke-width="2" paint-order="stroke">
-            Change
-        </text>
-        <text x="138" y="40" font-family="Inter, sans-serif" font-size="36" font-weight="bold" fill="url(#rainbowGradient)" letter-spacing="1px" stroke="black" stroke-width="2" paint-order="stroke">
-            rawr
-        </text>
-    </svg>
+    <div class="logo">
+        <svg width="225" height="50" viewBox="0 0 225 50" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <linearGradient id="rainbowGradient" x1="0%" y1="0%" x2="100%" y2="100%" gradientUnits="objectBoundingBox">
+                    <stop offset="0%" stop-color="#186cb8"/>
+                    <stop offset="19%" stop-color="#186cb8"/>
+                    <stop offset="20%" stop-color="#2a9a9f"/>
+                    <stop offset="39%" stop-color="#2a9a9f"/>
+                    <stop offset="40%" stop-color="#f1b211"/>
+                    <stop offset="59%" stop-color="#f1b211"/>
+                    <stop offset="60%" stop-color="#e83611"/>
+                    <stop offset="79%" stop-color="#e83611"/>
+                    <stop offset="80%" stop-color="#f9002f"/>
+                    <stop offset="100%" stop-color="#f9002f"/>
+                </linearGradient>
+            </defs>
+            <text x="0" y="40" font-family="Inter, sans-serif" font-size="36" font-weight="bold" fill="#f5f5f7" letter-spacing="1px">
+                Change
+            </text>
+            <text x="138" y="40" font-family="Inter, sans-serif" font-size="36" font-weight="bold" fill="url(#rainbowGradient)" letter-spacing="1px">
+                rawr
+            </text>
+        </svg>
+    </div>
 
-    <p class="subtitle">Roaring to life! We're starting up the application.</p>
+    <p class="subtitle">Starting up the application</p>
 
     <div class="loading-container">
         <div class="progress-bar-wrapper">
@@ -363,26 +215,15 @@
     </div>
 
     <div class="status-updates" id="statusText">
-        Application is starting up. This usually takes 10-30 seconds.
+        This usually takes 10-30 seconds.
     </div>
 
     <!-- Shown when the current step has been running for a long time - see STUCK_WARNING_MS -->
     <div class="stuck-warning" id="stuckWarning" style="display: none;">
-        ⚠️ This step is taking unusually long. Some steps (like rebuilding the app
-        with installed extensions) can take up to 30 minutes. You can check the
-        console output below for details, or
+        This step is taking unusually long. Some steps (like rebuilding the app
+        with installed extensions) can take up to 30 minutes. You can
         <a href="/">try accessing the app anyway</a>.
     </div>
-
-    <!-- Console output: raw deployment logs, for debugging stuck/slow startups -->
-    <div class="console-container" id="consoleContainer" style="display: none;">
-        <div class="console-header">
-            <span class="console-title">Console Output</span>
-            <button class="console-toggle" id="consoleToggle" onclick="toggleConsole()">Hide</button>
-        </div>
-        <pre class="console-output" id="consoleOutput"><span class="console-empty">Waiting for logs...</span></pre>
-    </div>
-
 </div>
 
 <script>
@@ -435,7 +276,7 @@
         } else if (data.elapsed < 60) {
             statusElement.textContent = `${data.percent}% complete • ${data.elapsed}s elapsed${etaSuffix} • Taking longer than usual`;
         } else {
-            statusElement.textContent = `${data.percent}% complete • ${data.elapsed}s elapsed${etaSuffix} • ⚠️ Unusually slow startup`;
+            statusElement.textContent = `${data.percent}% complete • ${data.elapsed}s elapsed${etaSuffix} • Unusually slow startup`;
         }
 
         // Show the stuck-warning if the currently-running step has been
@@ -461,17 +302,9 @@
         }
     };
 
-    // Fetch raw console output captured by docker-entrypoint.sh
-    let consoleCollapsed = false;
-
-    function toggleConsole() {
-        consoleCollapsed = !consoleCollapsed;
-        const output = document.getElementById('consoleOutput');
-        const toggle = document.getElementById('consoleToggle');
-        output.classList.toggle('collapsed', consoleCollapsed);
-        toggle.textContent = consoleCollapsed ? 'Show' : 'Hide';
-    }
-
+    // Fetch raw console output captured by docker-entrypoint.sh and render
+    // it as the page background. Only the tail is kept on screen - the
+    // flex/overflow setup on .console-bg clips older lines off the top.
     const fetchConsoleLogs = async () => {
         try {
             const response = await fetch('/startup/logs', {
@@ -484,15 +317,7 @@
             const data = await response.json();
             if (!data.available) return;
 
-            const container = document.getElementById('consoleContainer');
-            const output = document.getElementById('consoleOutput');
-            container.style.display = 'block';
-
-            const wasScrolledToBottom = output.scrollHeight - output.scrollTop - output.clientHeight < 10;
-            output.textContent = data.log || '';
-            if (wasScrolledToBottom) {
-                output.scrollTop = output.scrollHeight;
-            }
+            document.getElementById('consoleOutput').textContent = data.log || '';
         } catch (error) {
             // Skip this poll
         }
