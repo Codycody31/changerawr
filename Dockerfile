@@ -92,4 +92,5 @@ ENV HOSTNAME "0.0.0.0"
 
 # Use entrypoint for running the build scripts before starting the server
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
+# cascade
 CMD ["npm", "start"]
