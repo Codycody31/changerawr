@@ -487,10 +487,9 @@
 </div>
 
 <script>
-    // Both endpoints below are served directly by the same maintenance
-    // server that's serving this page (scripts/maintenance/server.js),
-    // reading a plain step log written by docker-entrypoint.sh. There is no
-    // separate service to proxy to and nothing here can 502.
+    // Step updates arrive over Server-Sent Events, pushed by the maintenance
+    // server (scripts/maintenance/server.js) the instant docker-entrypoint.sh
+    // appends to its step log - no polling, no separate service to proxy to.
 
     const STEP_ICONS = {
         pending: '○',
@@ -506,51 +505,51 @@
     // legitimately take up to 30 minutes.
     const STUCK_WARNING_MS = 10 * 60 * 1000; // 10 minutes
 
-    const fetchProgress = async () => {
-        try {
-            const response = await fetch('/startup/progress', {
-                method: 'GET',
-                cache: 'no-cache',
-            });
-            if (!response.ok) return;
+    const renderProgress = (data) => {
+        const statusElement = document.getElementById('statusText');
+        const stuckWarningElement = document.getElementById('stuckWarning');
+        const stepsListElement = document.getElementById('stepsList');
 
-            const data = await response.json();
+        stepsListElement.innerHTML = data.steps.map((step) => `
+            <div class="step-item ${step.state}">
+                <span class="step-icon">${STEP_ICONS[step.state] || '○'}</span>
+                <span class="step-text">
+                    <span class="step-label">${step.label}</span>
+                    <span class="step-message">${step.message}</span>
+                </span>
+            </div>
+        `).join('');
 
-            const statusElement = document.getElementById('statusText');
-            const stuckWarningElement = document.getElementById('stuckWarning');
-            const stepsListElement = document.getElementById('stepsList');
-
-            stepsListElement.innerHTML = data.steps.map((step) => `
-                <div class="step-item ${step.state}">
-                    <span class="step-icon">${STEP_ICONS[step.state] || '○'}</span>
-                    <span class="step-text">
-                        <span class="step-label">${step.label}</span>
-                        <span class="step-message">${step.message}</span>
-                    </span>
-                </div>
-            `).join('');
-
-            if (data.complete) {
-                statusElement.textContent = `Application ready! Redirecting... (${data.elapsed}s total)`;
-            } else if (data.elapsed < 30) {
-                statusElement.textContent = `${data.elapsed}s elapsed`;
-            } else if (data.elapsed < 60) {
-                statusElement.textContent = `${data.elapsed}s elapsed • Taking longer than usual`;
-            } else {
-                statusElement.textContent = `${data.elapsed}s elapsed • ⚠️ Unusually slow startup`;
-            }
-
-            // Show the stuck-warning if the currently-running step has been
-            // running for a long time.
-            const runningStep = data.steps.find((step) => step.state === 'running');
-            const runningFor = runningStep && runningStep.timestamp ? Date.now() - runningStep.timestamp : 0;
-            stuckWarningElement.style.display =
-                !data.complete && runningFor > STUCK_WARNING_MS ? 'block' : 'none';
-        } catch (error) {
-            // Maintenance server itself not responding - if we're seeing this
-            // page at all it should be, but don't let a transient blip break
-            // the rest of the polling loop.
+        if (data.complete) {
+            statusElement.textContent = `Application ready! Redirecting... (${data.elapsed}s total)`;
+        } else if (data.elapsed < 30) {
+            statusElement.textContent = `${data.elapsed}s elapsed`;
+        } else if (data.elapsed < 60) {
+            statusElement.textContent = `${data.elapsed}s elapsed • Taking longer than usual`;
+        } else {
+            statusElement.textContent = `${data.elapsed}s elapsed • ⚠️ Unusually slow startup`;
         }
+
+        // Show the stuck-warning if the currently-running step has been
+        // running for a long time.
+        const runningStep = data.steps.find((step) => step.state === 'running');
+        const runningFor = runningStep && runningStep.timestamp ? Date.now() - runningStep.timestamp : 0;
+        stuckWarningElement.style.display =
+            !data.complete && runningFor > STUCK_WARNING_MS ? 'block' : 'none';
+    };
+
+    const progressStream = new EventSource('/startup/stream');
+    progressStream.onmessage = (event) => {
+        try {
+            renderProgress(JSON.parse(event.data));
+        } catch (error) {
+            // Ignore malformed/empty frames
+        }
+    };
+    progressStream.onerror = () => {
+        // The maintenance server is killed once setup finishes (right before
+        // Next.js starts), which closes this connection - that's expected.
+        // checkAppReady() below takes over from here.
     };
 
     // Fetch raw console output captured by docker-entrypoint.sh
@@ -605,9 +604,6 @@
         }
     };
 
-    // Poll for progress every 500ms
-    setInterval(fetchProgress, 500);
-
     // Poll for raw console output every 2 seconds
     setInterval(fetchConsoleLogs, 2000);
 
@@ -615,7 +611,6 @@
     setInterval(checkAppReady, 2000);
 
     // Start checking immediately
-    fetchProgress();
     fetchConsoleLogs();
     checkAppReady();
 </script>

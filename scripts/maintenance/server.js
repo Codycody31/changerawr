@@ -55,6 +55,35 @@ function readSteps() {
     });
 }
 
+function getProgress() {
+    const steps = readSteps();
+    const elapsed = Math.floor((Date.now() - SERVER_START_TIME) / 1000);
+    const readyStep = steps[steps.length - 1];
+    return { steps, elapsed, complete: readyStep.state === 'done' };
+}
+
+// Server-Sent Events: push step updates to connected maintenance pages the
+// instant docker-entrypoint.sh appends a line to STATUS_LOG, instead of the
+// page polling on a timer.
+const sseClients = new Set();
+
+function broadcastProgress() {
+    const payload = `data: ${JSON.stringify(getProgress())}\n\n`;
+    for (const res of sseClients) {
+        res.write(payload);
+    }
+}
+
+try {
+    fs.watch(STATUS_LOG, { persistent: false }, () => broadcastProgress());
+} catch {
+    // Log doesn't exist yet - the 1s heartbeat below still keeps clients in sync
+}
+
+// Heartbeat: ticks the "elapsed" counter and covers any missed fs.watch
+// events (e.g. log not created yet when the watcher was set up).
+setInterval(broadcastProgress, 1000);
+
 // Matches Next.js build assets and any other file-extensioned request
 // (fonts, css, js, images, source maps, etc.) so they get a 503 instead of
 // the maintenance HTML page.
@@ -90,18 +119,17 @@ const server = http.createServer((req, res) => {
         return;
     }
 
-    // Boot progress, read straight from the step log written by
-    // docker-entrypoint.sh.
-    if (req.url === '/startup/progress') {
-        const steps = readSteps();
-        const elapsed = Math.floor((Date.now() - SERVER_START_TIME) / 1000);
-        const readyStep = steps[steps.length - 1];
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-            steps,
-            elapsed,
-            complete: readyStep.state === 'done',
-        }));
+    // Boot progress, pushed via Server-Sent Events as docker-entrypoint.sh
+    // appends to the step log - no polling.
+    if (req.url === '/startup/stream') {
+        res.writeHead(200, {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache, no-transform',
+            Connection: 'keep-alive',
+        });
+        res.write(`data: ${JSON.stringify(getProgress())}\n\n`);
+        sseClients.add(res);
+        req.on('close', () => sseClients.delete(res));
         return;
     }
 
@@ -144,9 +172,9 @@ server.listen(PORT, '0.0.0.0', () => {
 // Graceful shutdown
 process.on('SIGTERM', () => {
     console.log('🦖 Maintenance server shutting down...');
-    // Force-close keep-alive connections too. Otherwise a browser tab that's
-    // been polling /startup/progress on a persistent connection keeps that
-    // socket alive to this (now zombie) process, and reuses it for
+    // Force-close keep-alive connections too. Otherwise a browser tab with an
+    // open /startup/stream SSE connection (or any other persistent socket)
+    // keeps it alive to this (now zombie) process, and reuses it for
     // subsequent requests (e.g. _next/static/* chunks) that should go to the
     // Next.js server taking over this port.
     server.closeAllConnections();
