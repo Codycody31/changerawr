@@ -20,15 +20,16 @@ const SERVER_START_TIME = Date.now();
 function readStatus() {
     try {
         const line = fs.readFileSync(STATUS_FILE, 'utf8').trim();
-        const [phase, progress, message, timestamp] = line.split('|');
+        const [phase, progress, message, timestamp, type] = line.split('|');
         return {
             phase,
             progress: Number(progress) || 0,
             message,
             timestamp: Number(timestamp) * 1000,
+            type: type || (Number(progress) >= 100 ? 'success' : 'info'),
         };
     } catch {
-        return { phase: 'starting', progress: 0, message: 'Starting Changerawr', timestamp: SERVER_START_TIME };
+        return { phase: 'starting', progress: 0, message: 'Starting Changerawr', timestamp: SERVER_START_TIME, type: 'info' };
     }
 }
 
@@ -36,11 +37,11 @@ function readStatusLogs() {
     try {
         const lines = fs.readFileSync(STATUS_LOG, 'utf8').trim().split('\n').filter(Boolean);
         return lines.slice(-10).map((line) => {
-            const [, progress, message, timestamp] = line.split('|');
+            const [, progress, message, timestamp, type] = line.split('|');
             return {
                 message,
                 timestamp: Number(timestamp) * 1000,
-                type: Number(progress) >= 100 ? 'success' : 'info',
+                type: type || (Number(progress) >= 100 ? 'success' : 'info'),
             };
         });
     } catch {

@@ -8,15 +8,18 @@ STARTUP_LOG="/tmp/changerawr-startup.log"
 exec > >(tee "$STARTUP_LOG") 2>&1
 
 # Plain-text status file the maintenance server reads directly off disk.
-# This is the whole "different approach": no HTTP service, no curl, no JSON
-# server is involved in reporting boot progress anymore - just a file write.
+# No HTTP service, no curl, no JSON server is involved in reporting boot
+# progress - just a file write.
 STATUS_FILE="/tmp/changerawr-status"
 STATUS_LOG="/tmp/changerawr-status-log"
 : > "$STATUS_LOG"
 
-# write_status PHASE PROGRESS MESSAGE
+# write_status PHASE PROGRESS MESSAGE [TYPE]
+# TYPE is one of info|success|warning|error (default info) and is used by the
+# maintenance page to color-code individual log lines.
 write_status() {
-    local line="$1|$2|$3|$(date +%s)"
+    local type="${4:-info}"
+    local line="$1|$2|$3|$(date +%s)|$type"
     printf '%s\n' "$line" > "${STATUS_FILE}.tmp"
     mv "${STATUS_FILE}.tmp" "$STATUS_FILE"
     printf '%s\n' "$line" >> "$STATUS_LOG"
@@ -27,9 +30,9 @@ write_status "starting" 0 "Starting Changerawr"
 
 # Start the Extension Builder Service early as a long-running background
 # service (lazy-Prisma, so it's safe before `prisma generate` below). It is
-# NOT on the critical path for boot progress anymore - it just needs to be up
-# by the time Next.js's instrumentation (app/startup.ts) checks for it on
-# port 3010, so it doesn't spawn a second instance.
+# not on the critical path for boot progress - it just needs to be up by the
+# time Next.js's instrumentation (app/startup.ts) checks for it on port 3010,
+# so it doesn't spawn a second instance.
 echo "🦖 Starting Extension Builder Service..."
 node scripts/extension-builder/server.js > /tmp/changerawr-builder.log 2>&1 &
 BUILDER_PID=$!
@@ -54,23 +57,64 @@ sleep 1
 echo "🦖 Maintenance server running (PID: $MAINTENANCE_PID)"
 
 # ---------------------------------------------------------------------------
-# BLOCKING PHASE - this is everything the maintenance page waits on.
-# Deliberately minimal: just the two things the app cannot run without.
-# Everything else (widget, swagger, extensions, extension-aware rebuild) has
-# been moved to a background phase below so it can NEVER make the deploy
-# "stuck" again - the app starts as soon as the database is ready.
+# BLOCKING PHASE - everything the maintenance page waits on. Nothing starts
+# (nginx, Next.js) until this entire phase finishes. Steps that aren't
+# strictly required for the app to run (widget, swagger, extension imports)
+# are timeout-bounded and non-fatal so a transient failure there can't hang
+# the deploy forever; the extension-aware rebuild is also timeout-bounded as
+# a last-resort safety net, but is expected to complete normally every time.
 # ---------------------------------------------------------------------------
 
 echo "🦖 Generating Prisma client..."
-write_status "prisma-generate" 20 "Generating Prisma client"
+write_status "prisma-generate" 10 "Generating Prisma client"
 timeout 300 npx prisma generate
 
 echo "🦖 Running database migrations..."
-write_status "migrations" 60 "Running database migrations"
+write_status "migrations" 30 "Running database migrations"
 timeout 300 npx prisma migrate deploy
 
+echo "🦖 Building widget..."
+write_status "widget" 45 "Building widget"
+if timeout 180 npm run build:widget; then
+    echo "✅ Widget build complete"
+else
+    echo "⚠️  Widget build failed or timed out - continuing without it"
+    write_status "widget" 45 "Widget build failed - continuing without it" "warning"
+fi
+
+echo "🦖 Generating Swagger documentation..."
+write_status "swagger" 60 "Generating API documentation"
+if timeout 180 npm run generate-swagger; then
+    echo "✅ Swagger documentation generated"
+else
+    echo "⚠️  Swagger generation failed or timed out - continuing without it"
+    write_status "swagger" 60 "Swagger generation failed - continuing without it" "warning"
+fi
+
+if [ -n "$(find extensions -mindepth 2 -maxdepth 2 -type d 2>/dev/null)" ]; then
+    echo "🦖 Installed extensions detected - regenerating imports..."
+    write_status "extensions-generate" 70 "Preparing installed extensions"
+    if timeout 180 npm run extensions:generate; then
+        echo "✅ Extension imports regenerated - rebuilding application..."
+        write_status "rebuild" 75 "Rebuilding application with extensions (this can take several minutes)"
+        if CI_BUILD_MODE=1 DOCKER_BUILD=1 timeout 1800 npm run build; then
+            echo "✅ Rebuild complete"
+            write_status "rebuild" 95 "Rebuild complete"
+        else
+            echo "⚠️  Rebuild failed or timed out (exit $?) - extensions unavailable until next deploy"
+            write_status "rebuild" 95 "Extension rebuild failed - continuing without new extensions" "error"
+        fi
+    else
+        echo "⚠️  Extension import/safelist generation failed or timed out - continuing with existing extensionLoader"
+        write_status "extensions-generate" 95 "Extension import generation failed - continuing without changes" "warning"
+    fi
+else
+    echo "🦖 No installed extensions, nothing to rebuild"
+    write_status "extensions-generate" 95 "No installed extensions"
+fi
+
 echo "🦖 Setup complete! Stopping maintenance server..."
-write_status "starting-app" 90 "Starting Next.js application"
+write_status "starting-app" 97 "Starting Next.js application"
 cleanup_maintenance
 
 # Small delay to ensure port is released
@@ -142,71 +186,9 @@ APP_PID=$!
 echo "🦖 Next.js running (PID: $APP_PID)"
 write_status "ready" 100 "Application ready"
 
-# ---------------------------------------------------------------------------
-# BACKGROUND PHASE - runs entirely after the app is already serving traffic.
-# Nothing here can block the deploy or get the maintenance page "stuck":
-# the maintenance page is already gone by the time this starts.
-#
-# - Widget build and Swagger docs write directly into /public, which
-#   `next start` serves straight off disk - no restart needed for those.
-# - The extension import/safelist generation + `next build` rebuild only
-#   apply if extensions are actually installed (via a mounted volume). If
-#   that succeeds, it signals the watcher loop below to restart the Next.js
-#   process so the rebuilt .next (with extensions) takes effect. The app
-#   keeps serving the previous build the entire time this runs, even if it
-#   takes the full 30 minutes.
-# ---------------------------------------------------------------------------
-BACKGROUND_LOG="/tmp/changerawr-background.log"
-REBUILD_DONE_FLAG="/tmp/changerawr-rebuild-done"
-rm -f "$REBUILD_DONE_FLAG"
-
-(
-    {
-        echo "🦖 [background] Building widget..."
-        if timeout 180 npm run build:widget; then
-            echo "✅ [background] Widget build complete"
-        else
-            echo "⚠️  [background] Widget build failed or timed out - continuing without it"
-        fi
-
-        echo "🦖 [background] Generating Swagger documentation..."
-        if timeout 180 npm run generate-swagger; then
-            echo "✅ [background] Swagger documentation generated"
-        else
-            echo "⚠️  [background] Swagger generation failed or timed out - continuing without it"
-        fi
-
-        if [ -n "$(find extensions -mindepth 2 -maxdepth 2 -type d 2>/dev/null)" ]; then
-            echo "🦖 [background] Installed extensions detected - regenerating imports..."
-            if timeout 180 npm run extensions:generate; then
-                echo "✅ [background] Extension imports regenerated - rebuilding application..."
-                if CI_BUILD_MODE=1 DOCKER_BUILD=1 timeout 1800 npm run build; then
-                    echo "✅ [background] Rebuild complete - signaling Next.js restart"
-                    touch "$REBUILD_DONE_FLAG"
-                else
-                    echo "⚠️  [background] Rebuild failed or timed out (exit $?) - extensions unavailable until next deploy"
-                fi
-            else
-                echo "⚠️  [background] Extension import/safelist generation failed or timed out - continuing with existing extensionLoader"
-            fi
-        else
-            echo "🦖 [background] No installed extensions, nothing to rebuild"
-        fi
-
-        echo "🦖 [background] Background setup complete"
-    } 2>&1 | tee "$BACKGROUND_LOG"
-) &
-BACKGROUND_PID=$!
-
 # Function to handle shutdown gracefully
 shutdown() {
     echo "🦖 Shutting down..."
-
-    # Stop the background extension/rebuild job (and anything it spawned)
-    if [ -n "$BACKGROUND_PID" ]; then
-        echo "🦖 Stopping background setup job (PID: $BACKGROUND_PID)..."
-        kill -TERM "$BACKGROUND_PID" 2>/dev/null || true
-    fi
 
     # Stop Next.js
     if [ -n "$APP_PID" ]; then
@@ -237,7 +219,7 @@ shutdown() {
     # deploy via the maintenance page). Keep it around for the whole container
     # lifetime so it stays available while Next.js boots and runs, only
     # removing it now as part of shutdown.
-    rm -f "$STARTUP_LOG" "$STATUS_FILE" "$STATUS_LOG" "$REBUILD_DONE_FLAG"
+    rm -f "$STARTUP_LOG" "$STATUS_FILE" "$STATUS_LOG"
 
     echo "🦖 Shutdown complete"
     exit 0
@@ -246,29 +228,8 @@ shutdown() {
 # Trap signals for graceful shutdown
 trap shutdown SIGTERM SIGINT
 
-# Wait for Next.js, restarting it in place if the background phase produces a
-# rebuilt .next with extensions. nginx and the background job are unaffected
-# by this restart - only the Next.js process itself briefly cycles.
+# Wait for the Next.js process and exit when it does
 echo "🦖 All services started. Waiting for Next.js process..."
-while true; do
-    if [ -f "$REBUILD_DONE_FLAG" ]; then
-        rm -f "$REBUILD_DONE_FLAG"
-        echo "🦖 New build available - restarting Next.js to load extensions..."
-        kill -TERM "$APP_PID" 2>/dev/null || true
-        wait "$APP_PID" 2>/dev/null || true
-
-        "$@" &
-        APP_PID=$!
-        echo "🦖 Next.js restarted (PID: $APP_PID)"
-    fi
-
-    if ! kill -0 "$APP_PID" 2>/dev/null; then
-        break
-    fi
-
-    sleep 2
-done
-
 wait "$APP_PID" && APP_EXIT=0 || APP_EXIT=$?
 echo "🦖 Next.js process exited (code $APP_EXIT)"
 shutdown

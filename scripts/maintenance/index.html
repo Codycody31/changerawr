@@ -117,6 +117,18 @@
             animation: none;
         }
 
+        .loading-text.log-warning {
+            color: #fde047;
+            opacity: 1;
+            animation: none;
+        }
+
+        .loading-text.log-error {
+            color: #f87171;
+            opacity: 1;
+            animation: none;
+        }
+
         .status-updates {
             margin-top: 2rem;
             font-size: 1.1rem;
@@ -505,6 +517,8 @@
             if (latestLog) {
                 loadingElement.textContent = latestLog.message;
                 loadingElement.classList.toggle('log-success', latestLog.type === 'success');
+                loadingElement.classList.toggle('log-warning', latestLog.type === 'warning');
+                loadingElement.classList.toggle('log-error', latestLog.type === 'error');
             }
 
             if (data.complete) {
