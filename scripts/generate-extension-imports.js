@@ -19,26 +19,6 @@ const PROJECT_ROOT = join(__dirname, '..');
 const EXTENSIONS_DIR = join(PROJECT_ROOT, 'extensions');
 const LOADER_FILE = join(PROJECT_ROOT, 'lib', 'services', 'core', 'markdown', 'extensionLoader.ts');
 
-// Report progress to Extension Builder Service
-async function reportProgress(phase, progress, message) {
-  try {
-    const response = await fetch('http://localhost:3010/startup/update', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phase, progress, message }),
-      // Bound the request so a slow/unresponsive builder service can't hang
-      // this script (and therefore `npm run extensions:generate` and the
-      // whole deploy) - progress reporting must always be best-effort.
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!response.ok) {
-      console.log(`[Warning] Failed to report progress: ${response.status}`);
-    }
-  } catch (error) {
-    // Extension builder might not be running, that's okay
-  }
-}
-
 async function scanExtensions() {
   const extensions = [];
 
@@ -371,11 +351,6 @@ async function cleanupBrokenLinks() {
 }
 
 async function main() {
-  // Progress is reported within the 70-78 band that docker-entrypoint.sh
-  // reserves for the "extensions" phase (it sets 70 before this script runs,
-  // and the next phase, "build", starts at 78) - using lower numbers here
-  // would make the progress bar jump backwards.
-  await reportProgress('extensions', 70, 'Scanning for installed extensions');
   console.log('🔍 Scanning for installed extensions...\n');
 
   // Clean up broken symlinks first
@@ -384,20 +359,14 @@ async function main() {
   const extensions = await scanExtensions();
 
   console.log(`\n📦 Found ${extensions.length} installed extension(s)`);
-  await reportProgress('extensions', 74, `Found ${extensions.length} extension(s)`);
 
   await generateLoaderFile(extensions);
-  await reportProgress('extensions', 77, `Generated imports for ${extensions.length} extension(s)`);
 
   console.log('✨ Done! Restart your dev server to load the extensions.\n');
 }
 
 main()
   .then(() => {
-    // The reportProgress() fetch() calls above leave undici keep-alive
-    // sockets open, which keep the event loop alive and prevent this
-    // process from exiting on its own - hanging `npm run extensions:generate`
-    // (and the whole deploy) forever right after printing "Done!".
     process.exit(0);
   })
   .catch(err => {

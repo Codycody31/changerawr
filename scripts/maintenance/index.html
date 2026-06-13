@@ -111,22 +111,6 @@
             animation: pulse 2s infinite;
         }
 
-        /* Non-fatal step warnings/errors reported by docker-entrypoint.sh
-           (e.g. "widget build failed - continuing without it") - surfaced
-           with distinct colors so they're visible without digging into the
-           raw console output, but without implying the deploy is stuck. */
-        .loading-text.log-warning {
-            color: #fbbf24;
-            opacity: 1;
-            animation: none;
-        }
-
-        .loading-text.log-error {
-            color: #f87171;
-            opacity: 1;
-            animation: none;
-        }
-
         .loading-text.log-success {
             color: #4ade80;
             opacity: 1;
@@ -487,136 +471,92 @@
         <pre class="console-output" id="consoleOutput"><span class="console-empty">Waiting for logs...</span></pre>
     </div>
 
-    <!-- Debug controls (hidden in production) -->
-    <div style="margin-top: 2rem; display: none; flex-wrap: wrap; gap: 0.5rem; justify-content: center;">
-        <button onclick="triggerExtensionGeneration()" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; color: white; cursor: pointer; font-size: 0.85rem;">
-            🔧 Extensions
-        </button>
-        <button onclick="buildWidget()" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; color: white; cursor: pointer; font-size: 0.85rem;">
-            📦 Widget
-        </button>
-        <button onclick="buildSwagger()" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; color: white; cursor: pointer; font-size: 0.85rem;">
-            📚 API Docs
-        </button>
-        <button onclick="simulateDeployment()" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; color: white; cursor: pointer; font-size: 0.85rem;">
-            🧪 Full Deploy
-        </button>
-        <button onclick="resetProgress()" style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; color: white; cursor: pointer; font-size: 0.85rem;">
-            🔄 Reset
-        </button>
-    </div>
 </div>
 
 <script>
-    // Same-origin: the maintenance server (and later Next.js) proxy these
-    // requests to the internal Extension Builder Service on port 3010.
-    const EXTENSION_BUILDER_URL = '';
+    // Both endpoints below are served directly by the same maintenance
+    // server that's serving this page (scripts/maintenance/server.js),
+    // reading plain status/log files written by docker-entrypoint.sh. There
+    // is no separate service to proxy to and nothing here can 502.
 
-    let fallbackMode = false;
-    let elapsedSeconds = 0;
-
-    // Stuck-step detection: tracks how long phase/progress/logs have gone
-    // unchanged. Steps (especially the post-extension rebuild) can now
-    // legitimately run for up to 30 minutes via `timeout 1800`, so this is
-    // informational rather than a hard cutoff that stops polling.
+    // Stuck-step detection: tracks how long phase/progress has gone
+    // unchanged. The blocking boot phase is now just Prisma generate +
+    // migrations (typically seconds), so this is purely a generous
+    // fallback in case migrations hang on a large database.
     let lastProgressKey = null;
     let lastProgressChangeTime = Date.now();
     const STUCK_WARNING_MS = 10 * 60 * 1000; // 10 minutes
 
-    // Fetch real-time progress from extension builder service
     const fetchProgress = async () => {
         try {
-            const response = await fetch(`${EXTENSION_BUILDER_URL}/startup/progress`, {
+            const response = await fetch('/startup/progress', {
                 method: 'GET',
                 cache: 'no-cache',
             });
+            if (!response.ok) return;
 
-            if (response.ok) {
-                const data = await response.json();
-                fallbackMode = false;
+            const data = await response.json();
 
-                // Get the latest log message
-                const latestLog = data.logs && data.logs.length > 0 ? data.logs[data.logs.length - 1] : null;
-                const statusElement = document.getElementById('statusText');
-                const loadingElement = document.querySelector('.loading-text');
-                const stuckWarningElement = document.getElementById('stuckWarning');
+            const latestLog = data.logs && data.logs.length > 0 ? data.logs[data.logs.length - 1] : null;
+            const statusElement = document.getElementById('statusText');
+            const loadingElement = document.querySelector('.loading-text');
+            const stuckWarningElement = document.getElementById('stuckWarning');
 
-                // Update loading text with current phase, visually flagging
-                // non-fatal warnings/errors reported by docker-entrypoint.sh
-                // (e.g. "widget build failed - continuing without it") so
-                // they're visible without digging into the raw console output.
-                if (latestLog) {
-                    loadingElement.textContent = latestLog.message;
-                    loadingElement.classList.remove('log-warning', 'log-error', 'log-success');
-                    if (latestLog.type === 'warning' || latestLog.type === 'error' || latestLog.type === 'success') {
-                        loadingElement.classList.add(`log-${latestLog.type}`);
-                    }
-                }
+            if (latestLog) {
+                loadingElement.textContent = latestLog.message;
+                loadingElement.classList.toggle('log-success', latestLog.type === 'success');
+            }
 
-                // Update status text with elapsed time and warnings
-                if (data.complete) {
-                    statusElement.textContent = `Application ready! Redirecting... (${data.elapsed}s total)`;
-                } else if (data.elapsed < 30) {
-                    statusElement.textContent = `${data.progress}% complete • ${data.elapsed}s elapsed`;
-                } else if (data.elapsed < 60) {
-                    statusElement.textContent = `${data.progress}% complete • ${data.elapsed}s elapsed • Taking longer than usual`;
-                } else {
-                    statusElement.textContent = `${data.progress}% complete • ${data.elapsed}s elapsed • ⚠️ Unusually slow startup`;
-                }
-
-                // Track whether phase/progress/logs have changed since the
-                // last poll, and surface a soft warning if nothing has moved
-                // for a long time. This replaces the old fixed 2-minute
-                // "startup timeout" message, which became a false positive
-                // now that the rebuild step alone can take up to 30 minutes.
-                const progressKey = `${data.phase}:${data.progress}:${data.logs ? data.logs.length : 0}`;
-                if (progressKey !== lastProgressKey) {
-                    lastProgressKey = progressKey;
-                    lastProgressChangeTime = Date.now();
-                }
-
-                if (!data.complete && Date.now() - lastProgressChangeTime > STUCK_WARNING_MS) {
-                    stuckWarningElement.style.display = 'block';
-                } else {
-                    stuckWarningElement.style.display = 'none';
-                }
-
-                // Show/hide progress bars based on progress state
-                const determinateBar = document.querySelector('.loading-bar');
-                const indeterminateBar = document.querySelector('.loading-bar-indeterminate');
-                const progressBar = document.querySelector('.loading-progress');
-
-                if (data.progress > 0 && data.progress < 100) {
-                    // Show determinate progress bar
-                    determinateBar.style.display = 'block';
-                    indeterminateBar.style.display = 'none';
-                    if (progressBar) {
-                        progressBar.style.width = data.progress + '%';
-                    }
-                } else if (data.progress === 0) {
-                    // Show indeterminate progress bar when starting
-                    determinateBar.style.display = 'none';
-                    indeterminateBar.style.display = 'block';
-                } else {
-                    // Complete - show full determinate bar
-                    determinateBar.style.display = 'block';
-                    indeterminateBar.style.display = 'none';
-                    if (progressBar) {
-                        progressBar.style.width = '100%';
-                    }
-                }
+            if (data.complete) {
+                statusElement.textContent = `Application ready! Redirecting... (${data.elapsed}s total)`;
+            } else if (data.elapsed < 30) {
+                statusElement.textContent = `${data.progress}% complete • ${data.elapsed}s elapsed`;
+            } else if (data.elapsed < 60) {
+                statusElement.textContent = `${data.progress}% complete • ${data.elapsed}s elapsed • Taking longer than usual`;
             } else {
-                useFallbackMode();
+                statusElement.textContent = `${data.progress}% complete • ${data.elapsed}s elapsed • ⚠️ Unusually slow startup`;
+            }
+
+            // Surface a soft warning if phase/progress hasn't moved for a
+            // long time, without ever stopping polling.
+            const progressKey = `${data.phase}:${data.progress}`;
+            if (progressKey !== lastProgressKey) {
+                lastProgressKey = progressKey;
+                lastProgressChangeTime = Date.now();
+            }
+            stuckWarningElement.style.display =
+                !data.complete && Date.now() - lastProgressChangeTime > STUCK_WARNING_MS ? 'block' : 'none';
+
+            // Show/hide progress bars based on progress state
+            const determinateBar = document.querySelector('.loading-bar');
+            const indeterminateBar = document.querySelector('.loading-bar-indeterminate');
+            const progressBar = document.querySelector('.loading-progress');
+
+            if (data.progress > 0 && data.progress < 100) {
+                determinateBar.style.display = 'block';
+                indeterminateBar.style.display = 'none';
+                if (progressBar) {
+                    progressBar.style.width = data.progress + '%';
+                }
+            } else if (data.progress === 0) {
+                determinateBar.style.display = 'none';
+                indeterminateBar.style.display = 'block';
+            } else {
+                determinateBar.style.display = 'block';
+                indeterminateBar.style.display = 'none';
+                if (progressBar) {
+                    progressBar.style.width = '100%';
+                }
             }
         } catch (error) {
-            // Extension builder not responding, fall back to basic mode
-            useFallbackMode();
+            // Maintenance server itself not responding - if we're seeing this
+            // page at all it should be, but don't let a transient blip break
+            // the rest of the polling loop.
         }
     };
 
     // Fetch raw console output captured by docker-entrypoint.sh
     let consoleCollapsed = false;
-    let consoleAvailable = false;
 
     function toggleConsole() {
         consoleCollapsed = !consoleCollapsed;
@@ -628,7 +568,7 @@
 
     const fetchConsoleLogs = async () => {
         try {
-            const response = await fetch(`${EXTENSION_BUILDER_URL}/startup/logs`, {
+            const response = await fetch('/startup/logs', {
                 method: 'GET',
                 cache: 'no-cache',
             });
@@ -638,7 +578,6 @@
             const data = await response.json();
             if (!data.available) return;
 
-            consoleAvailable = true;
             const container = document.getElementById('consoleContainer');
             const output = document.getElementById('consoleOutput');
             container.style.display = 'block';
@@ -649,140 +588,9 @@
                 output.scrollTop = output.scrollHeight;
             }
         } catch (error) {
-            // Builder service not responding, just skip this poll
+            // Skip this poll
         }
     };
-
-    // Fallback mode when extension builder isn't available
-    function useFallbackMode() {
-        if (!fallbackMode) {
-            console.log('Extension builder not available, using fallback mode');
-            fallbackMode = true;
-        }
-
-        const statusElement = document.getElementById('statusText');
-        const loadingElement = document.querySelector('.loading-text');
-        const determinateBar = document.querySelector('.loading-bar');
-        const indeterminateBar = document.querySelector('.loading-bar-indeterminate');
-        const stuckWarningElement = document.getElementById('stuckWarning');
-
-        loadingElement.textContent = 'Starting up';
-        loadingElement.classList.remove('log-warning', 'log-error', 'log-success');
-
-        // Show indeterminate bar in fallback mode
-        determinateBar.style.display = 'none';
-        indeterminateBar.style.display = 'block';
-
-        if (elapsedSeconds < 30) {
-            statusElement.textContent = `${elapsedSeconds}s elapsed`;
-        } else if (elapsedSeconds < 60) {
-            statusElement.textContent = `${elapsedSeconds}s elapsed • Taking longer than usual`;
-        } else {
-            statusElement.textContent = `${elapsedSeconds}s elapsed • ⚠️ Unusually slow startup`;
-        }
-
-        // Unlike the normal progress path, fallback mode means the extension
-        // builder/proxy itself isn't responding at all - that's a different
-        // (more serious) problem than a slow step, so surface the "try
-        // anyway" link sooner.
-        if (elapsedSeconds * 1000 > STUCK_WARNING_MS / 2) {
-            stuckWarningElement.style.display = 'block';
-        }
-    }
-
-    // Track elapsed time in fallback mode
-    setInterval(() => {
-        elapsedSeconds++;
-    }, 1000);
-
-    // Trigger extension import generation
-    async function triggerExtensionGeneration() {
-        try {
-            const response = await fetch(`${EXTENSION_BUILDER_URL}/extensions/generate-imports`, {
-                method: 'POST',
-            });
-            if (response.ok) {
-                console.log('✓ Extension import generation triggered');
-            } else {
-                console.error('✗ Failed to trigger generation');
-            }
-        } catch (error) {
-            console.error('✗ Error:', error);
-        }
-    }
-
-    // Build widget
-    async function buildWidget() {
-        try {
-            const response = await fetch(`${EXTENSION_BUILDER_URL}/build/widget`, {
-                method: 'POST',
-            });
-            if (response.ok) {
-                console.log('✓ Widget build triggered');
-            } else {
-                console.error('✗ Failed to trigger widget build');
-            }
-        } catch (error) {
-            console.error('✗ Error:', error);
-        }
-    }
-
-    // Generate API documentation
-    async function buildSwagger() {
-        try {
-            const response = await fetch(`${EXTENSION_BUILDER_URL}/build/swagger`, {
-                method: 'POST',
-            });
-            if (response.ok) {
-                console.log('✓ API doc generation triggered');
-            } else {
-                console.error('✗ Failed to trigger API doc generation');
-            }
-        } catch (error) {
-            console.error('✗ Error:', error);
-        }
-    }
-
-    // Simulate full deployment
-    async function simulateDeployment() {
-        const steps = [
-            { phase: 'maintenance', progress: 5, message: 'Maintenance server started' },
-            { phase: 'prisma-generate', progress: 10, message: 'Generating Prisma client' },
-            { phase: 'migrations', progress: 25, message: 'Running database migrations' },
-            { phase: 'widget', progress: 40, message: 'Building widget components' },
-            { phase: 'swagger', progress: 55, message: 'Generating API documentation' },
-            { phase: 'extensions', progress: 70, message: 'Generating extension imports' },
-            { phase: 'build', progress: 78, message: 'Rebuilding application with installed extensions' },
-            { phase: 'build', progress: 79, message: 'Creating an optimized production build' },
-            { phase: 'build', progress: 81, message: 'Build compiled successfully' },
-            { phase: 'build', progress: 82, message: 'Collecting page data' },
-            { phase: 'build', progress: 83, message: 'Generating static pages' },
-            { phase: 'build', progress: 84, message: 'Finalizing page optimization' },
-            { phase: 'starting-app', progress: 85, message: 'Starting Next.js application' },
-            { phase: 'ready', progress: 100, message: 'Application ready' },
-        ];
-
-        // Reset first
-        await fetch(`${EXTENSION_BUILDER_URL}/startup/reset`, { method: 'POST' });
-
-        for (const step of steps) {
-            await fetch(`${EXTENSION_BUILDER_URL}/startup/update`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(step),
-            });
-            await new Promise(resolve => setTimeout(resolve, 2000));
-        }
-
-        await fetch(`${EXTENSION_BUILDER_URL}/startup/complete`, { method: 'POST' });
-        console.log('✓ Simulated deployment complete');
-    }
-
-    // Reset progress
-    async function resetProgress() {
-        await fetch(`${EXTENSION_BUILDER_URL}/startup/reset`, { method: 'POST' });
-        console.log('✓ Progress reset');
-    }
 
     // Check if main app is ready
     const checkAppReady = async () => {
@@ -792,7 +600,6 @@
                 cache: 'no-cache'
             });
             if (response.ok) {
-                // App is ready, redirect
                 window.location.href = '/';
             }
         } catch (error) {
@@ -801,19 +608,13 @@
     };
 
     // Poll for progress every 500ms
-    const progressInterval = setInterval(fetchProgress, 500);
+    setInterval(fetchProgress, 500);
 
     // Poll for raw console output every 2 seconds
-    const consoleInterval = setInterval(fetchConsoleLogs, 2000);
+    setInterval(fetchConsoleLogs, 2000);
 
     // Check health every 2 seconds
-    const healthCheckInterval = setInterval(checkAppReady, 2000);
-
-    // Note: there is no fixed-duration "startup timeout" anymore - polling
-    // continues indefinitely, and the #stuckWarning banner (driven by
-    // STUCK_WARNING_MS in fetchProgress/useFallbackMode) tells the user when
-    // a step has gone unusually long without killing the intervals, since
-    // legitimate steps can now take up to 30 minutes.
+    setInterval(checkAppReady, 2000);
 
     // Start checking immediately
     fetchProgress();
