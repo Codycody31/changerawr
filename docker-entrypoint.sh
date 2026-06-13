@@ -31,6 +31,26 @@ echo "🦖 Starting Extension Builder Service..."
 node scripts/extension-builder/server.js > /tmp/changerawr-builder.log 2>&1 &
 BUILDER_PID=$!
 
+# Re-download the maintenance page and its server from GitHub before
+# launching them. This is a self-healing step for deploy platforms whose
+# build cache can leave a stale scripts/maintenance/ in the image even after
+# a fresh push - since server.js itself is what's stale in that case, fixing
+# it from inside server.js isn't possible, so it has to happen here, before
+# the file is ever executed. Falls back to the bundled copies if GitHub is
+# unreachable (e.g. air-gapped deployments).
+MAINTENANCE_BRANCH="${MAINTENANCE_BRANCH:-1.0.7}"
+MAINTENANCE_BASE_URL="https://raw.githubusercontent.com/Supernova3339/changerawr/${MAINTENANCE_BRANCH}/scripts/maintenance"
+echo "🦖 Refreshing maintenance page from GitHub (branch: $MAINTENANCE_BRANCH)..."
+for f in index.html server.js; do
+    if wget -q -T 10 -O "/tmp/maintenance-$f" "$MAINTENANCE_BASE_URL/$f"; then
+        mv "/tmp/maintenance-$f" "scripts/maintenance/$f"
+        echo "✅ Updated scripts/maintenance/$f from GitHub"
+    else
+        rm -f "/tmp/maintenance-$f"
+        echo "⚠️  Could not fetch scripts/maintenance/$f from GitHub, using bundled copy"
+    fi
+done
+
 # Start maintenance server in the background. This is the ONLY thing
 # blocking startup waits on for UI - it's a tiny static HTTP server with no
 # dependencies on Prisma, the extension builder, or anything else that could
