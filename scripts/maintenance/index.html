@@ -16,10 +16,6 @@
             background: #000000;
             color: #f5f5f7;
             min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 3rem;
         }
 
         /* Live console output rendered full-bleed behind the content, low-
@@ -50,57 +46,56 @@
             color: #2c2c2e;
         }
 
-        .container {
-            position: relative;
+        /* Logo sits on its own, vertically centered in the viewport - not
+           grouped with the progress UI below. */
+        .logo {
+            position: fixed;
+            inset: 0;
             z-index: 1;
-            text-align: center;
-            max-width: 720px;
-            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
             animation: fadeIn 0.6s ease-out;
         }
 
-        .logo {
-            margin-bottom: 2.5rem;
-            display: flex;
-            justify-content: center;
-        }
-
         .logo svg {
-            width: 300px;
+            width: 320px;
             height: auto;
         }
 
-        .subtitle {
-            font-size: 1.15rem;
-            margin-bottom: 3.5rem;
-            color: #98989d;
-            font-weight: 400;
+        /* Progress UI lives near the bottom of the screen, separate from the
+           logo - mirrors the classic OS boot-screen layout. Hidden until the
+           first /startup/steps response comes in. */
+        .loading-container {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 8vh;
+            z-index: 1;
+            text-align: center;
+            padding: 0 2rem;
+            opacity: 0;
+            transition: opacity 0.4s ease;
         }
 
-        .loading-container {
-            margin: 2.5rem 0;
-            max-width: 420px;
-            margin-left: auto;
-            margin-right: auto;
+        .loading-container.visible {
+            opacity: 1;
         }
 
         .progress-bar-wrapper {
             position: relative;
-            width: 100%;
+            width: 240px;
             height: 4px;
-            margin-bottom: 1.25rem;
+            margin: 0 auto 1.5rem;
         }
 
-        .loading-bar,
-        .loading-bar-indeterminate {
+        .loading-bar {
             width: 100%;
             height: 4px;
             background: #2c2c2e;
             border-radius: 2px;
             overflow: hidden;
-            position: absolute;
-            top: 0;
-            left: 0;
         }
 
         .loading-progress {
@@ -111,53 +106,18 @@
             transition: width 0.5s ease-out;
         }
 
-        .loading-progress-indeterminate {
-            height: 100%;
-            background: #f5f5f7;
-            border-radius: 2px;
-            width: 30%;
-            animation: indeterminate 1.5s ease-in-out infinite;
-        }
-
-        @keyframes indeterminate {
-            0% {
-                transform: translateX(-100%);
-            }
-            100% {
-                transform: translateX(400%);
-            }
-        }
-
         .loading-text {
             font-size: 1.05rem;
             font-weight: 500;
             color: #f5f5f7;
+            padding: 0 1rem;
         }
 
         .status-updates {
-            margin-top: 1.5rem;
+            margin-top: 0.75rem;
             font-size: 0.85rem;
             color: #6e6e73;
-            min-height: 1.25rem;
-        }
-
-        /* Shown when progress hasn't moved for a long time - the build step
-           alone can legitimately take up to 30 minutes, so this is informational
-           rather than a hard "something is broken" message. */
-        .stuck-warning {
-            margin-top: 1.5rem;
-            padding: 0.75rem 1rem;
-            background: #1c1c1e;
-            border: 1px solid #2c2c2e;
-            border-radius: 10px;
-            font-size: 0.85rem;
-            color: #98989d;
-            text-align: left;
-        }
-
-        .stuck-warning a {
-            color: #f5f5f7;
-            text-decoration: underline;
+            padding: 0 1rem;
         }
 
         @keyframes fadeIn {
@@ -172,8 +132,12 @@
         }
 
         @media (max-width: 640px) {
-            .container {
-                padding: 2rem 1.5rem;
+            .logo svg {
+                width: 240px;
+            }
+
+            .loading-container {
+                bottom: 6vh;
             }
         }
     </style>
@@ -183,8 +147,7 @@
     <pre id="consoleOutput"></pre>
 </div>
 
-<div class="container">
-    <div class="logo">
+<div class="logo">
         <svg width="225" height="50" viewBox="0 0 225 50" xmlns="http://www.w3.org/2000/svg">
             <defs>
                 <linearGradient id="rainbowGradient" x1="0%" y1="0%" x2="100%" y2="100%" gradientUnits="objectBoundingBox">
@@ -207,32 +170,16 @@
                 rawr
             </text>
         </svg>
-    </div>
+</div>
 
-    <p class="subtitle">Starting up the application</p>
-
-    <div class="loading-container">
-        <div class="progress-bar-wrapper">
-            <div class="loading-bar">
-                <div class="loading-progress" id="loadingProgress"></div>
-            </div>
-            <div class="loading-bar-indeterminate" id="loadingIndeterminate">
-                <div class="loading-progress-indeterminate"></div>
-            </div>
+<div class="loading-container" id="loadingContainer">
+    <div class="progress-bar-wrapper">
+        <div class="loading-bar">
+            <div class="loading-progress" id="loadingProgress"></div>
         </div>
-        <div class="loading-text" id="currentStepText">Starting up</div>
     </div>
-
-    <div class="status-updates" id="statusText">
-        This usually takes 10-30 seconds.
-    </div>
-
-    <!-- Shown when the current step has been running for a long time - see STUCK_WARNING_MS -->
-    <div class="stuck-warning" id="stuckWarning" style="display: none;">
-        This step is taking unusually long. Some steps (like rebuilding the app
-        with installed extensions) can take up to 30 minutes. You can
-        <a href="/">try accessing the app anyway</a>.
-    </div>
+    <div class="loading-text" id="currentStepText"></div>
+    <div class="status-updates" id="statusText"></div>
 </div>
 
 <script>
@@ -240,9 +187,9 @@
     // (scripts/maintenance/server.js), which derives a percent/ETA from the
     // plain-text step log docker-entrypoint.sh writes to.
 
-    // If the currently-running step hasn't changed for a long time, show a
-    // reassurance banner. Some steps (extension-aware rebuild) can
-    // legitimately take up to 30 minutes.
+    // If the currently-running step hasn't changed for a long time, append a
+    // reassurance note. Some steps (extension-aware rebuild) can legitimately
+    // take up to 30 minutes.
     const STUCK_WARNING_MS = 10 * 60 * 1000; // 10 minutes
 
     const formatEta = (seconds) => {
@@ -253,27 +200,22 @@
     };
 
     const renderProgress = (data) => {
+        const loadingContainer = document.getElementById('loadingContainer');
         const statusElement = document.getElementById('statusText');
-        const stuckWarningElement = document.getElementById('stuckWarning');
         const determinateBar = document.getElementById('loadingProgress');
-        const indeterminateBar = document.getElementById('loadingIndeterminate');
         const currentStepElement = document.getElementById('currentStepText');
+
+        // Stay hidden until there's real progress to show - just the logo on
+        // black at first, like a classic OS boot screen.
+        if (data.percent > 0 || data.complete) {
+            loadingContainer.classList.add('visible');
+        }
 
         currentStepElement.textContent = data.complete
             ? 'Application ready!'
             : (data.currentStep ? data.currentStep.message : 'Starting up');
 
-        // Show the indeterminate sliding bar until we have a real, non-zero
-        // percent to display - otherwise the bar would just sit flat at 0%
-        // for the entire first step.
-        if (data.percent > 0) {
-            determinateBar.parentElement.style.display = 'block';
-            indeterminateBar.style.display = 'none';
-            determinateBar.style.width = `${data.percent}%`;
-        } else {
-            determinateBar.parentElement.style.display = 'none';
-            indeterminateBar.style.display = 'block';
-        }
+        determinateBar.style.width = `${data.percent}%`;
 
         const eta = !data.complete ? formatEta(data.etaSeconds) : '';
         const etaSuffix = eta ? ` • ${eta}` : '';
@@ -293,13 +235,14 @@
             statusElement.textContent = `${data.percent}% complete • ${data.elapsed}s elapsed${etaSuffix} • Unusually slow startup`;
         }
 
-        // Show the stuck-warning if the currently-running step has been
-        // running for a long time. Skipped during the extension rebuild,
-        // which can legitimately take up to 30 minutes on its own.
+        // Append a note if the currently-running step has been running for a
+        // long time. Skipped during the extension rebuild, which can
+        // legitimately take up to 30 minutes on its own.
         const runningStep = data.steps.find((step) => step.state === 'running');
         const runningFor = runningStep && runningStep.timestamp ? Date.now() - runningStep.timestamp : 0;
-        stuckWarningElement.style.display =
-            !data.complete && !isRebuilding && runningFor > STUCK_WARNING_MS ? 'block' : 'none';
+        if (!data.complete && !isRebuilding && runningFor > STUCK_WARNING_MS) {
+            statusElement.textContent += ' • This is taking longer than expected';
+        }
     };
 
     const fetchProgress = async () => {

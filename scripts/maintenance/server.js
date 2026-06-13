@@ -109,7 +109,11 @@ function getProgress() {
 
     const readyStep = steps[steps.length - 1];
     const complete = readyStep.state === 'done';
-    const percent = complete ? 100 : Math.min(99, Math.floor((completedUnits / countedSteps.length) * 100));
+    // Guard against countedSteps.length === 0 (would divide by zero -> NaN
+    // -> Math.min(99, NaN) === NaN) ever producing a default-ish percent.
+    const percent = complete
+        ? 100
+        : Math.min(99, Math.max(0, Math.floor((completedUnits / countedSteps.length) * 100) || 0));
 
     if (!currentStep && !complete) {
         // Nothing "running" yet (e.g. right at startup) - the first pending
