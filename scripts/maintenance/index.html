@@ -19,30 +19,32 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            overflow: hidden;
-            padding: 1rem;
+            padding: 3rem;
         }
 
-        /* Live console output rendered full-bleed behind the content, very
-           low-contrast so it reads as ambient texture rather than content.
-           Anchored to the bottom via flex so the most recent lines are what
-           shows, with older lines clipped off the top. */
+        /* Live console output rendered full-bleed behind the content, low-
+           contrast so it reads as ambient texture rather than content. Flows
+           top-to-bottom like a normal log; JS keeps it scrolled to the latest
+           line. */
         .console-bg {
             position: fixed;
             inset: 0;
             z-index: 0;
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-end;
-            overflow: hidden;
-            padding: 1.5rem 2rem;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 2rem 3rem;
             pointer-events: none;
+            scrollbar-width: none;
+        }
+
+        .console-bg::-webkit-scrollbar {
+            display: none;
         }
 
         .console-bg pre {
             font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-            font-size: 0.7rem;
-            line-height: 1.6;
+            font-size: 0.75rem;
+            line-height: 1.8;
             white-space: pre-wrap;
             word-break: break-all;
             color: #2c2c2e;
@@ -52,27 +54,34 @@
             position: relative;
             z-index: 1;
             text-align: center;
-            max-width: 460px;
+            max-width: 720px;
             width: 100%;
-            padding: 1rem;
             animation: fadeIn 0.6s ease-out;
         }
 
         .logo {
-            margin-bottom: 2rem;
+            margin-bottom: 2.5rem;
             display: flex;
             justify-content: center;
         }
 
+        .logo svg {
+            width: 300px;
+            height: auto;
+        }
+
         .subtitle {
-            font-size: 1rem;
-            margin-bottom: 2.5rem;
+            font-size: 1.15rem;
+            margin-bottom: 3.5rem;
             color: #98989d;
             font-weight: 400;
         }
 
         .loading-container {
-            margin: 2rem 0;
+            margin: 2.5rem 0;
+            max-width: 420px;
+            margin-left: auto;
+            margin-right: auto;
         }
 
         .progress-bar-wrapper {
@@ -269,9 +278,14 @@
         const eta = !data.complete ? formatEta(data.etaSeconds) : '';
         const etaSuffix = eta ? ` • ${eta}` : '';
 
+        // The extension-aware rebuild step can legitimately run for up to 30
+        // minutes, so the elapsed-time-based "taking longer than usual" /
+        // "unusually slow" messaging below doesn't apply while it's running.
+        const isRebuilding = data.currentStep && data.currentStep.id === 'rebuild';
+
         if (data.complete) {
             statusElement.textContent = `Application ready! Redirecting... (${data.elapsed}s total)`;
-        } else if (data.elapsed < 30) {
+        } else if (isRebuilding || data.elapsed < 30) {
             statusElement.textContent = `${data.percent}% complete • ${data.elapsed}s elapsed${etaSuffix}`;
         } else if (data.elapsed < 60) {
             statusElement.textContent = `${data.percent}% complete • ${data.elapsed}s elapsed${etaSuffix} • Taking longer than usual`;
@@ -280,11 +294,12 @@
         }
 
         // Show the stuck-warning if the currently-running step has been
-        // running for a long time.
+        // running for a long time. Skipped during the extension rebuild,
+        // which can legitimately take up to 30 minutes on its own.
         const runningStep = data.steps.find((step) => step.state === 'running');
         const runningFor = runningStep && runningStep.timestamp ? Date.now() - runningStep.timestamp : 0;
         stuckWarningElement.style.display =
-            !data.complete && runningFor > STUCK_WARNING_MS ? 'block' : 'none';
+            !data.complete && !isRebuilding && runningFor > STUCK_WARNING_MS ? 'block' : 'none';
     };
 
     const fetchProgress = async () => {
@@ -318,6 +333,11 @@
             if (!data.available) return;
 
             document.getElementById('consoleOutput').textContent = data.log || '';
+
+            // Keep the latest line in view - the text itself stays in
+            // chronological (top-to-bottom) order.
+            const consoleBg = document.getElementById('consoleBg');
+            consoleBg.scrollTop = consoleBg.scrollHeight;
         } catch (error) {
             // Skip this poll
         }
