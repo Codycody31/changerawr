@@ -260,6 +260,50 @@
         }
     };
 
+    // /api/health flipping to ok is the real signal the app is up, but
+    // redirecting on the very first ok response can cut away mid-step. Hold
+    // for a moment so /startup/steps keeps polling and the bar/text keep
+    // updating normally for a beat before we navigate away.
+    const REDIRECT_DELAY_MS = 2000;
+    let redirectScheduled = false;
+
+    const finishAndRedirect = () => {
+        if (redirectScheduled) return;
+        redirectScheduled = true;
+
+        setTimeout(() => {
+            window.location.href = '/';
+        }, REDIRECT_DELAY_MS);
+    };
+
+    // docker-entrypoint.sh prints this line right before it kills the
+    // maintenance server and hands off to Next.js - /startup/steps stops
+    // updating after this point, so it's the real "almost done" signal.
+    // Once seen, give Next.js a few seconds to come up, then finish the bar
+    // to 100% and start the redirect.
+    const SETUP_COMPLETE_MARKER = '🦖 Setup complete! Stopping maintenance server';
+    const SETUP_COMPLETE_DELAY_MS = 3000;
+    let setupCompleteDetected = false;
+
+    const onSetupComplete = () => {
+        if (setupCompleteDetected) return;
+        setupCompleteDetected = true;
+
+        setTimeout(() => {
+            const loadingContainer = document.getElementById('loadingContainer');
+            const determinateBar = document.getElementById('loadingProgress');
+            const currentStepElement = document.getElementById('currentStepText');
+            const statusElement = document.getElementById('statusText');
+
+            loadingContainer.classList.add('visible');
+            determinateBar.style.width = '100%';
+            currentStepElement.textContent = 'Application ready!';
+            statusElement.textContent = 'Redirecting...';
+
+            finishAndRedirect();
+        }, SETUP_COMPLETE_DELAY_MS);
+    };
+
     // Fetch raw console output captured by docker-entrypoint.sh and render
     // it as the page background. Only the tail is kept on screen - the
     // flex/overflow setup on .console-bg clips older lines off the top.
@@ -275,12 +319,17 @@
             const data = await response.json();
             if (!data.available) return;
 
-            document.getElementById('consoleOutput').textContent = data.log || '';
+            const log = data.log || '';
+            document.getElementById('consoleOutput').textContent = log;
 
             // Keep the latest line in view - the text itself stays in
             // chronological (top-to-bottom) order.
             const consoleBg = document.getElementById('consoleBg');
             consoleBg.scrollTop = consoleBg.scrollHeight;
+
+            if (log.includes(SETUP_COMPLETE_MARKER)) {
+                onSetupComplete();
+            }
         } catch (error) {
             // Skip this poll
         }
@@ -294,7 +343,7 @@
                 cache: 'no-cache'
             });
             if (response.ok) {
-                window.location.href = '/';
+                finishAndRedirect();
             }
         } catch (error) {
             // App not ready yet, continue polling
