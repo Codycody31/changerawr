@@ -487,9 +487,9 @@
 </div>
 
 <script>
-    // Step updates arrive over Server-Sent Events, pushed by the maintenance
-    // server (scripts/maintenance/server.js) the instant docker-entrypoint.sh
-    // appends to its step log - no polling, no separate service to proxy to.
+    // Step updates are polled from the maintenance server
+    // (scripts/maintenance/server.js), which reads them off the plain-text
+    // step log docker-entrypoint.sh writes to.
 
     const STEP_ICONS = {
         pending: '○',
@@ -538,18 +538,19 @@
             !data.complete && runningFor > STUCK_WARNING_MS ? 'block' : 'none';
     };
 
-    const progressStream = new EventSource('/startup/stream');
-    progressStream.onmessage = (event) => {
+    const fetchProgress = async () => {
         try {
-            renderProgress(JSON.parse(event.data));
+            const response = await fetch('/startup/steps', {
+                method: 'GET',
+                cache: 'no-cache',
+            });
+            if (!response.ok) return;
+            renderProgress(await response.json());
         } catch (error) {
-            // Ignore malformed/empty frames
+            // The maintenance server is killed once setup finishes (right
+            // before Next.js starts) - this poll will start failing then.
+            // checkAppReady() below takes over from here.
         }
-    };
-    progressStream.onerror = () => {
-        // The maintenance server is killed once setup finishes (right before
-        // Next.js starts), which closes this connection - that's expected.
-        // checkAppReady() below takes over from here.
     };
 
     // Fetch raw console output captured by docker-entrypoint.sh
@@ -604,6 +605,9 @@
         }
     };
 
+    // Poll step progress every second
+    setInterval(fetchProgress, 1000);
+
     // Poll for raw console output every 2 seconds
     setInterval(fetchConsoleLogs, 2000);
 
@@ -611,6 +615,7 @@
     setInterval(checkAppReady, 2000);
 
     // Start checking immediately
+    fetchProgress();
     fetchConsoleLogs();
     checkAppReady();
 </script>
