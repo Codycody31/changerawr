@@ -20,8 +20,8 @@ const PORT = 3010;
 // hasn't run yet. This service is started BEFORE the runtime
 // `prisma generate` step in docker-entrypoint.sh, so a static top-level
 // import here would crash the process before `app.listen()` - leaving
-// port 3010 closed and every /startup/progress proxy request 502ing for
-// the whole deploy. Load it lazily on first actual use instead.
+// port 3010 closed and `app/startup.ts`'s health check failing for the
+// whole deploy. Load it lazily on first actual use instead.
 /** @type {import('@prisma/client').PrismaClient | null} */
 let _prisma = null;
 
@@ -82,226 +82,13 @@ const jobs = new Map();
 /** @type {Map<string, UpdateChain>} */
 const updateChains = new Map();
 
-/**
- * @typedef {Object} StartupProgress
- * @property {string} phase
- * @property {number} progress
- * @property {number} startTime
- * @property {LogEntry[]} logs
- * @property {boolean} complete
- */
-
-/** In-memory startup progress tracking */
-let startupProgress = {
-  phase: 'waiting',
-  progress: 0,
-  startTime: Date.now(),
-  logs: [
-    {
-      message: 'Extension Builder Service started',
-      timestamp: Date.now(),
-      type: 'info'
-    }
-  ],
-  complete: false,
-};
-
-/**
- * Update startup progress
- * @param {string} phase
- * @param {number} progress
- * @param {string} message
- * @param {LogType} type
- */
-function updateStartupProgress(phase, progress, message, type = 'info') {
-  // Ignore backward progress - phases/steps should only move forward.
-  if (phase === startupProgress.phase && progress < startupProgress.progress) {
-    return;
-  }
-
-  startupProgress.phase = phase;
-  startupProgress.progress = progress;
-  startupProgress.logs.push({
-    message,
-    timestamp: Date.now(),
-    type,
-  });
-
-  // Keep only last 20 logs
-  if (startupProgress.logs.length > 20) {
-    startupProgress.logs = startupProgress.logs.slice(-20);
-  }
-
-  console.log(`[Startup] ${phase} (${progress}%) - ${message}`);
-}
-
-// Startup progress endpoint (for maintenance page)
-// The maintenance page polls this every 500ms, so logging on every request
-// floods production logs. In development, log every poll (useful while
-// building the progress UI); in production, only log when the phase/progress
-// actually changes, or at most once every 10s as a heartbeat.
-const isDev = process.env.NODE_ENV !== 'production';
-let lastLoggedProgressState = null;
-let lastProgressLogTime = 0;
-
-app.get('/startup/progress', (req, res) => {
-  const elapsed = Date.now() - startupProgress.startTime;
-
-  const response = {
-    phase: startupProgress.phase,
-    progress: startupProgress.progress,
-    elapsed: Math.floor(elapsed / 1000), // seconds
-    logs: startupProgress.logs.slice(-10), // Last 10 logs
-    complete: startupProgress.complete,
-  };
-
-  const currentState = `${startupProgress.phase}:${startupProgress.progress}`;
-  const now = Date.now();
-  const shouldLog = isDev
-    || currentState !== lastLoggedProgressState
-    || now - lastProgressLogTime >= 10000;
-
-  if (shouldLog) {
-    console.log(`[Progress GET] Phase: ${response.phase}, Progress: ${response.progress}%, Elapsed: ${response.elapsed}s, Logs: ${startupProgress.logs.length}`);
-    lastLoggedProgressState = currentState;
-    lastProgressLogTime = now;
-  }
-
-  res.json(response);
-});
-
-// Startup console output (raw stdout/stderr captured by docker-entrypoint.sh)
-// Lets the maintenance page show what's actually happening during a deploy
-// when there's no other way to see container logs.
-const STARTUP_LOG_FILE = '/tmp/changerawr-startup.log';
-const STARTUP_LOG_MAX_BYTES = 200 * 1024; // tail to last ~200KB
-
-app.get('/startup/logs', async (req, res) => {
-  res.set('Cache-Control', 'no-store');
-
-  try {
-    const { stat } = await import('fs/promises');
-    const fileStat = await stat(STARTUP_LOG_FILE);
-
-    let content;
-    if (fileStat.size > STARTUP_LOG_MAX_BYTES) {
-      const { open } = await import('fs/promises');
-      const handle = await open(STARTUP_LOG_FILE, 'r');
-      try {
-        const buffer = Buffer.alloc(STARTUP_LOG_MAX_BYTES);
-        await handle.read(buffer, 0, STARTUP_LOG_MAX_BYTES, fileStat.size - STARTUP_LOG_MAX_BYTES);
-        content = buffer.toString('utf-8');
-      } finally {
-        await handle.close();
-      }
-    } else {
-      content = await readFile(STARTUP_LOG_FILE, 'utf-8');
-    }
-
-    res.json({ available: true, log: content });
-  } catch (error) {
-    // Log file doesn't exist (e.g. running locally outside Docker)
-    res.json({ available: false, log: '' });
-  }
-});
-
-// Update startup progress (called by docker-entrypoint.sh and the install/build scripts)
-app.post('/startup/update', (req, res) => {
-  const { phase, progress, message, type } = req.body;
-
-  console.log(`[Progress POST] Received update: phase=${phase}, progress=${progress}, message=${message}`);
-
-  if (!phase || progress === undefined) {
-    console.log('[Progress POST] ERROR: Missing phase or progress');
-    return res.status(400).json({ error: 'phase and progress are required' });
-  }
-
-  updateStartupProgress(phase, progress, message || phase, type || 'info');
-
-  res.json({ success: true });
-});
-
-// Reset startup progress (called when deployment starts)
-app.post('/startup/reset', (req, res) => {
-  startupProgress = {
-    phase: 'starting',
-    progress: 0,
-    startTime: Date.now(),
-    logs: [],
-    complete: false,
-  };
-
-  updateStartupProgress('starting', 0, 'Deployment started');
-
-  res.json({ success: true });
-});
-
-// Mark startup as complete
-app.post('/startup/complete', (req, res) => {
-  startupProgress.complete = true;
-  startupProgress.progress = 100;
-  updateStartupProgress('complete', 100, 'Application ready', 'success');
-
-  res.json({ success: true });
-});
-
-/**
- * Helper to run a build script with progress tracking
- * @param {string} scriptCommand - npm script to run
- * @param {string} phase - Phase name for progress tracking
- * @param {string} displayName - Display name for the operation
- * @param {number} minDuration - Minimum duration in ms for realistic feel
- */
-async function runBuildScript(scriptCommand, phase, displayName, minDuration = 0) {
-  const startTime = Date.now();
-  updateStartupProgress(phase, 0, `${displayName}...`);
-
-  const { spawn } = await import('child_process');
-
-  return new Promise((resolve, reject) => {
-    // Use shell mode on Windows only, with safe argument passing
-    const isWindows = process.platform === 'win32';
-
-    const buildProcess = spawn('npm', ['run', scriptCommand], {
-      cwd: process.cwd(),
-      stdio: 'pipe',
-      shell: isWindows // Only use shell on Windows where it's needed
-    });
-
-    let output = '';
-    buildProcess.stdout?.on('data', (data) => {
-      output += data.toString();
-    });
-
-    buildProcess.stderr?.on('data', (data) => {
-      output += data.toString();
-    });
-
-    buildProcess.on('close', async (code) => {
-      if (code === 0) {
-        // Add simulated delay if operation was too fast
-        const elapsed = Date.now() - startTime;
-        const remaining = minDuration - elapsed;
-        if (remaining > 0) {
-          await new Promise(r => setTimeout(r, remaining));
-        }
-
-        console.log(`[${phase}] ${displayName} complete`);
-        resolve(output);
-      } else {
-        reject(new Error(`${displayName} failed with code ${code}`));
-      }
-    });
-
-    buildProcess.on('error', reject);
-  });
-}
-
-// Trigger extension import generation
+// Trigger extension import generation (called at runtime when extensions are
+// installed/updated via the admin UI, to pick up new imports without a full
+// container restart). Not part of the boot/maintenance flow - that runs
+// `npm run extensions:generate` directly from docker-entrypoint.sh.
 app.post('/extensions/generate-imports', async (req, res) => {
   try {
     console.log('[Extensions] Triggering import generation...');
-    updateStartupProgress('extensions', 0, 'Scanning for installed extensions');
 
     const { spawn } = await import('child_process');
 
@@ -326,41 +113,6 @@ app.post('/extensions/generate-imports', async (req, res) => {
     res.json({ success: true, message: 'Extension imports generated' });
   } catch (error) {
     console.error('[Extensions] Import generation failed:', error);
-    updateStartupProgress('extensions', 0, 'Import generation failed', 'error');
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Build widget
-app.post('/build/widget', async (req, res) => {
-  try {
-    console.log('[Build] Triggering widget build...');
-    updateStartupProgress('widget', 40, 'Compiling widget components');
-
-    await runBuildScript('build:widget', 'widget', 'Building widget', 1500);
-
-    updateStartupProgress('widget', 100, 'Widget built successfully', 'success');
-    res.json({ success: true, message: 'Widget built successfully' });
-  } catch (error) {
-    console.error('[Build] Widget build failed:', error);
-    updateStartupProgress('widget', 0, 'Widget build failed', 'error');
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Generate API documentation
-app.post('/build/swagger', async (req, res) => {
-  try {
-    console.log('[Build] Generating API documentation...');
-    updateStartupProgress('swagger', 55, 'Scanning API routes');
-
-    await runBuildScript('generate-swagger', 'swagger', 'Generating API docs', 1000);
-
-    updateStartupProgress('swagger', 100, 'API documentation generated', 'success');
-    res.json({ success: true, message: 'API documentation generated' });
-  } catch (error) {
-    console.error('[Build] API doc generation failed:', error);
-    updateStartupProgress('swagger', 0, 'API doc generation failed', 'error');
     res.status(500).json({ error: error.message });
   }
 });
