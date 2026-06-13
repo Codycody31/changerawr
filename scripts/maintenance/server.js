@@ -140,7 +140,14 @@ const server = http.createServer((req, res) => {
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     // Never let nginx/CDNs/browsers cache anything served while starting up.
+    // Plain Cache-Control is sometimes overridden at the edge by a Cloudflare
+    // "Cache Everything" rule with a fixed Edge TTL, which would otherwise
+    // keep serving a stale maintenance page (e.g. from a previous deploy)
+    // long after the origin has moved on. Cloudflare-CDN-Cache-Control takes
+    // precedence over Cache Rules for Cloudflare's edge cache specifically.
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('CDN-Cache-Control', 'no-store');
+    res.setHeader('Cloudflare-CDN-Cache-Control', 'no-store');
 
     // Handle OPTIONS requests
     if (req.method === 'OPTIONS') {
