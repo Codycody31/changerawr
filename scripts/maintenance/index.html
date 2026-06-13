@@ -59,74 +59,83 @@
             margin: 2rem 0;
         }
 
-        .progress-bar-wrapper {
-            position: relative;
-            width: 100%;
-            height: 8px;
-            margin-bottom: 1.5rem;
+        .steps-list {
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
         }
 
-        .loading-bar,
-        .loading-bar-indeterminate {
-            width: 100%;
-            height: 8px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 3px;
-            overflow: hidden;
-            position: absolute;
-            top: 0;
-            left: 0;
+        .step-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.6rem 0.9rem;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            font-size: 1rem;
+            opacity: 0.55;
+            transition: opacity 0.3s ease, background 0.3s ease, border-color 0.3s ease;
         }
 
-        .loading-progress {
-            height: 100%;
-            background: linear-gradient(90deg, #4ade80, #22c55e);
-            border-radius: 3px;
-            width: 0%;
-            transition: width 0.5s ease-out;
-            box-shadow: 0 0 10px rgba(74, 222, 128, 0.5);
-        }
-
-        .loading-progress-indeterminate {
-            height: 100%;
-            background: linear-gradient(90deg, #4ade80, #22c55e);
-            border-radius: 3px;
-            width: 30%;
-            animation: indeterminate 1.5s ease-in-out infinite;
-            box-shadow: 0 0 10px rgba(74, 222, 128, 0.5);
-        }
-
-        @keyframes indeterminate {
-            0% {
-                transform: translateX(-100%);
-            }
-            100% {
-                transform: translateX(400%);
-            }
-        }
-
-        .loading-text {
+        .step-icon {
+            flex: 0 0 auto;
+            width: 1.4rem;
+            text-align: center;
             font-size: 1.1rem;
-            opacity: 0.8;
-            animation: pulse 2s infinite;
         }
 
-        .loading-text.log-success {
+        .step-text {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            text-align: left;
+        }
+
+        .step-message {
+            font-size: 0.85rem;
+            opacity: 0.7;
+        }
+
+        .step-item.running {
+            opacity: 1;
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+
+        .step-item.running .step-icon {
+            animation: pulse 1.2s infinite;
+        }
+
+        .step-item.done {
+            opacity: 0.85;
+        }
+
+        .step-item.done .step-icon {
             color: #4ade80;
-            opacity: 1;
-            animation: none;
         }
 
-        .loading-text.log-warning {
+        .step-item.skipped {
+            opacity: 0.4;
+        }
+
+        .step-item.warning {
+            opacity: 1;
+            border-color: rgba(251, 191, 36, 0.4);
+        }
+
+        .step-item.warning .step-icon {
             color: #fde047;
-            opacity: 1;
-            animation: none;
         }
 
-        .loading-text.log-error {
-            color: #f87171;
+        .step-item.error {
             opacity: 1;
-            animation: none;
+            border-color: rgba(248, 113, 113, 0.4);
+        }
+
+        .step-item.error .step-icon {
+            color: #f87171;
         }
 
         .status-updates {
@@ -451,22 +460,14 @@
     <p class="subtitle">Roaring to life! We're starting up the application.</p>
 
     <div class="loading-container">
-        <div class="progress-bar-wrapper">
-            <div class="loading-bar">
-                <div class="loading-progress"></div>
-            </div>
-            <div class="loading-bar-indeterminate">
-                <div class="loading-progress-indeterminate"></div>
-            </div>
-        </div>
-        <div class="loading-text">Starting up</div>
+        <div class="steps-list" id="stepsList"></div>
     </div>
 
     <div class="status-updates" id="statusText">
         Application is starting up. This usually takes 10-30 seconds.
     </div>
 
-    <!-- Shown when progress hasn't changed for a while - see STUCK_WARNING_MS -->
+    <!-- Shown when the current step has been running for a long time - see STUCK_WARNING_MS -->
     <div class="stuck-warning" id="stuckWarning" style="display: none;">
         ⚠️ This step is taking unusually long. Some steps (like rebuilding the app
         with installed extensions) can take up to 30 minutes. You can check the
@@ -488,15 +489,21 @@
 <script>
     // Both endpoints below are served directly by the same maintenance
     // server that's serving this page (scripts/maintenance/server.js),
-    // reading plain status/log files written by docker-entrypoint.sh. There
-    // is no separate service to proxy to and nothing here can 502.
+    // reading a plain step log written by docker-entrypoint.sh. There is no
+    // separate service to proxy to and nothing here can 502.
 
-    // Stuck-step detection: tracks how long phase/progress has gone
-    // unchanged. The blocking boot phase is now just Prisma generate +
-    // migrations (typically seconds), so this is purely a generous
-    // fallback in case migrations hang on a large database.
-    let lastProgressKey = null;
-    let lastProgressChangeTime = Date.now();
+    const STEP_ICONS = {
+        pending: '○',
+        running: '◐',
+        done: '✅',
+        warning: '⚠️',
+        error: '❌',
+        skipped: '⏭️',
+    };
+
+    // If the currently-running step hasn't changed for a long time, show a
+    // reassurance banner. Some steps (extension-aware rebuild) can
+    // legitimately take up to 30 minutes.
     const STUCK_WARNING_MS = 10 * 60 * 1000; // 10 minutes
 
     const fetchProgress = async () => {
@@ -509,59 +516,36 @@
 
             const data = await response.json();
 
-            const latestLog = data.logs && data.logs.length > 0 ? data.logs[data.logs.length - 1] : null;
             const statusElement = document.getElementById('statusText');
-            const loadingElement = document.querySelector('.loading-text');
             const stuckWarningElement = document.getElementById('stuckWarning');
+            const stepsListElement = document.getElementById('stepsList');
 
-            if (latestLog) {
-                loadingElement.textContent = latestLog.message;
-                loadingElement.classList.toggle('log-success', latestLog.type === 'success');
-                loadingElement.classList.toggle('log-warning', latestLog.type === 'warning');
-                loadingElement.classList.toggle('log-error', latestLog.type === 'error');
-            }
+            stepsListElement.innerHTML = data.steps.map((step) => `
+                <div class="step-item ${step.state}">
+                    <span class="step-icon">${STEP_ICONS[step.state] || '○'}</span>
+                    <span class="step-text">
+                        <span class="step-label">${step.label}</span>
+                        <span class="step-message">${step.message}</span>
+                    </span>
+                </div>
+            `).join('');
 
             if (data.complete) {
                 statusElement.textContent = `Application ready! Redirecting... (${data.elapsed}s total)`;
             } else if (data.elapsed < 30) {
-                statusElement.textContent = `${data.progress}% complete • ${data.elapsed}s elapsed`;
+                statusElement.textContent = `${data.elapsed}s elapsed`;
             } else if (data.elapsed < 60) {
-                statusElement.textContent = `${data.progress}% complete • ${data.elapsed}s elapsed • Taking longer than usual`;
+                statusElement.textContent = `${data.elapsed}s elapsed • Taking longer than usual`;
             } else {
-                statusElement.textContent = `${data.progress}% complete • ${data.elapsed}s elapsed • ⚠️ Unusually slow startup`;
+                statusElement.textContent = `${data.elapsed}s elapsed • ⚠️ Unusually slow startup`;
             }
 
-            // Surface a soft warning if phase/progress hasn't moved for a
-            // long time, without ever stopping polling.
-            const progressKey = `${data.phase}:${data.progress}`;
-            if (progressKey !== lastProgressKey) {
-                lastProgressKey = progressKey;
-                lastProgressChangeTime = Date.now();
-            }
+            // Show the stuck-warning if the currently-running step has been
+            // running for a long time.
+            const runningStep = data.steps.find((step) => step.state === 'running');
+            const runningFor = runningStep && runningStep.timestamp ? Date.now() - runningStep.timestamp : 0;
             stuckWarningElement.style.display =
-                !data.complete && Date.now() - lastProgressChangeTime > STUCK_WARNING_MS ? 'block' : 'none';
-
-            // Show/hide progress bars based on progress state
-            const determinateBar = document.querySelector('.loading-bar');
-            const indeterminateBar = document.querySelector('.loading-bar-indeterminate');
-            const progressBar = document.querySelector('.loading-progress');
-
-            if (data.progress > 0 && data.progress < 100) {
-                determinateBar.style.display = 'block';
-                indeterminateBar.style.display = 'none';
-                if (progressBar) {
-                    progressBar.style.width = data.progress + '%';
-                }
-            } else if (data.progress === 0) {
-                determinateBar.style.display = 'none';
-                indeterminateBar.style.display = 'block';
-            } else {
-                determinateBar.style.display = 'block';
-                indeterminateBar.style.display = 'none';
-                if (progressBar) {
-                    progressBar.style.width = '100%';
-                }
-            }
+                !data.complete && runningFor > STUCK_WARNING_MS ? 'block' : 'none';
         } catch (error) {
             // Maintenance server itself not responding - if we're seeing this
             // page at all it should be, but don't let a transient blip break

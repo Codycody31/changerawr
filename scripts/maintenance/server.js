@@ -8,45 +8,51 @@ const MAINTENANCE_HTML_PATH = path.join(__dirname, '../maintenance', 'index.html
 // Read the maintenance page HTML
 const maintenanceHTML = fs.readFileSync(MAINTENANCE_HTML_PATH, 'utf8');
 
-// Plain-text status files written directly by docker-entrypoint.sh - no HTTP
+// Plain-text step log written directly by docker-entrypoint.sh - no HTTP
 // service, no curl, no JSON server involved. Reading a file off disk is the
 // one thing that can't hang or 502.
-const STATUS_FILE = '/tmp/changerawr-status';
 const STATUS_LOG = '/tmp/changerawr-status-log';
 const STARTUP_LOG = '/tmp/changerawr-startup.log';
 
 const SERVER_START_TIME = Date.now();
 
-function readStatus() {
-    try {
-        const line = fs.readFileSync(STATUS_FILE, 'utf8').trim();
-        const [phase, progress, message, timestamp, type] = line.split('|');
-        return {
-            phase,
-            progress: Number(progress) || 0,
-            message,
-            timestamp: Number(timestamp) * 1000,
-            type: type || (Number(progress) >= 100 ? 'success' : 'info'),
-        };
-    } catch {
-        return { phase: 'starting', progress: 0, message: 'Starting Changerawr', timestamp: SERVER_START_TIME, type: 'info' };
-    }
-}
+// Ordered, fixed list of deploy steps. docker-entrypoint.sh writes
+// "step|state|message|timestamp" lines as each step starts/finishes; we
+// just look up the latest known state per step here. Steps not yet seen
+// are rendered as "pending" - no progress-percentage or "stuck" inference.
+const STEP_DEFINITIONS = [
+    { id: 'prisma-generate', label: 'Generating Prisma client' },
+    { id: 'migrations', label: 'Running database migrations' },
+    { id: 'widget', label: 'Building widget' },
+    { id: 'swagger', label: 'Generating API documentation' },
+    { id: 'extensions-generate', label: 'Preparing installed extensions' },
+    { id: 'rebuild', label: 'Rebuilding application with extensions' },
+    { id: 'starting-app', label: 'Starting application services' },
+    { id: 'ready', label: 'Application ready' },
+];
 
-function readStatusLogs() {
+function readSteps() {
+    const latest = {};
     try {
         const lines = fs.readFileSync(STATUS_LOG, 'utf8').trim().split('\n').filter(Boolean);
-        return lines.slice(-10).map((line) => {
-            const [, progress, message, timestamp, type] = line.split('|');
-            return {
-                message,
-                timestamp: Number(timestamp) * 1000,
-                type: type || (Number(progress) >= 100 ? 'success' : 'info'),
-            };
-        });
+        for (const line of lines) {
+            const [id, state, message, timestamp] = line.split('|');
+            latest[id] = { state, message, timestamp: Number(timestamp) * 1000 };
+        }
     } catch {
-        return [];
+        // No log yet - everything is pending
     }
+
+    return STEP_DEFINITIONS.map((def) => {
+        const entry = latest[def.id];
+        return {
+            id: def.id,
+            label: def.label,
+            state: entry ? entry.state : 'pending',
+            message: entry ? entry.message : def.label,
+            timestamp: entry ? entry.timestamp : null,
+        };
+    });
 }
 
 // Matches Next.js build assets and any other file-extensioned request
@@ -84,18 +90,17 @@ const server = http.createServer((req, res) => {
         return;
     }
 
-    // Boot progress, read straight from the status file written by
+    // Boot progress, read straight from the step log written by
     // docker-entrypoint.sh.
     if (req.url === '/startup/progress') {
-        const status = readStatus();
+        const steps = readSteps();
         const elapsed = Math.floor((Date.now() - SERVER_START_TIME) / 1000);
+        const readyStep = steps[steps.length - 1];
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
-            phase: status.phase,
-            progress: status.progress,
+            steps,
             elapsed,
-            logs: readStatusLogs(),
-            complete: status.phase === 'ready',
+            complete: readyStep.state === 'done',
         }));
         return;
     }

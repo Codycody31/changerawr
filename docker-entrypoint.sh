@@ -7,26 +7,20 @@ set -e
 STARTUP_LOG="/tmp/changerawr-startup.log"
 exec > >(tee "$STARTUP_LOG") 2>&1
 
-# Plain-text status file the maintenance server reads directly off disk.
-# No HTTP service, no curl, no JSON server is involved in reporting boot
-# progress - just a file write.
-STATUS_FILE="/tmp/changerawr-status"
+# Plain-text step log the maintenance server reads directly off disk. Each
+# line is one state transition for one step: STEP|STATE|MESSAGE|TIMESTAMP.
+# STATE is one of: running|done|warning|error|skipped. The maintenance page
+# renders a checklist from this log directly - no HTTP service, no curl, no
+# progress-percentage guessing, no "stuck" inference.
 STATUS_LOG="/tmp/changerawr-status-log"
 : > "$STATUS_LOG"
 
-# write_status PHASE PROGRESS MESSAGE [TYPE]
-# TYPE is one of info|success|warning|error (default info) and is used by the
-# maintenance page to color-code individual log lines.
-write_status() {
-    local type="${4:-info}"
-    local line="$1|$2|$3|$(date +%s)|$type"
-    printf '%s\n' "$line" > "${STATUS_FILE}.tmp"
-    mv "${STATUS_FILE}.tmp" "$STATUS_FILE"
-    printf '%s\n' "$line" >> "$STATUS_LOG"
+# write_step STEP STATE MESSAGE
+write_step() {
+    printf '%s|%s|%s|%s\n' "$1" "$2" "$3" "$(date +%s)" >> "$STATUS_LOG"
 }
 
 echo "🦖 Starting Changerawr deployment..."
-write_status "starting" 0 "Starting Changerawr"
 
 # Start the Extension Builder Service early as a long-running background
 # service (lazy-Prisma, so it's safe before `prisma generate` below). It is
@@ -66,55 +60,62 @@ echo "🦖 Maintenance server running (PID: $MAINTENANCE_PID)"
 # ---------------------------------------------------------------------------
 
 echo "🦖 Generating Prisma client..."
-write_status "prisma-generate" 10 "Generating Prisma client"
+write_step "prisma-generate" "running" "Generating Prisma client"
 timeout 300 npx prisma generate
+write_step "prisma-generate" "done" "Prisma client generated"
 
 echo "🦖 Running database migrations..."
-write_status "migrations" 30 "Running database migrations"
+write_step "migrations" "running" "Running database migrations"
 timeout 300 npx prisma migrate deploy
+write_step "migrations" "done" "Database migrations complete"
 
 echo "🦖 Building widget..."
-write_status "widget" 45 "Building widget"
+write_step "widget" "running" "Building widget"
 if timeout 180 npm run build:widget; then
     echo "✅ Widget build complete"
+    write_step "widget" "done" "Widget built"
 else
     echo "⚠️  Widget build failed or timed out - continuing without it"
-    write_status "widget" 45 "Widget build failed - continuing without it" "warning"
+    write_step "widget" "warning" "Widget build failed - continuing without it"
 fi
 
 echo "🦖 Generating Swagger documentation..."
-write_status "swagger" 60 "Generating API documentation"
+write_step "swagger" "running" "Generating API documentation"
 if timeout 180 npm run generate-swagger; then
     echo "✅ Swagger documentation generated"
+    write_step "swagger" "done" "API documentation generated"
 else
     echo "⚠️  Swagger generation failed or timed out - continuing without it"
-    write_status "swagger" 60 "Swagger generation failed - continuing without it" "warning"
+    write_step "swagger" "warning" "Swagger generation failed - continuing without it"
 fi
 
 if [ -n "$(find extensions -mindepth 2 -maxdepth 2 -type d 2>/dev/null)" ]; then
     echo "🦖 Installed extensions detected - regenerating imports..."
-    write_status "extensions-generate" 70 "Preparing installed extensions"
+    write_step "extensions-generate" "running" "Preparing installed extensions"
     if timeout 180 npm run extensions:generate; then
         echo "✅ Extension imports regenerated - rebuilding application..."
-        write_status "rebuild" 75 "Rebuilding application with extensions (this can take several minutes)"
+        write_step "extensions-generate" "done" "Extension imports regenerated"
+        write_step "rebuild" "running" "Rebuilding application with extensions (this can take several minutes)"
         if CI_BUILD_MODE=1 DOCKER_BUILD=1 timeout 1800 npm run build; then
             echo "✅ Rebuild complete"
-            write_status "rebuild" 95 "Rebuild complete"
+            write_step "rebuild" "done" "Rebuild complete"
         else
             echo "⚠️  Rebuild failed or timed out (exit $?) - extensions unavailable until next deploy"
-            write_status "rebuild" 95 "Extension rebuild failed - continuing without new extensions" "error"
+            write_step "rebuild" "error" "Extension rebuild failed - continuing without new extensions"
         fi
     else
         echo "⚠️  Extension import/safelist generation failed or timed out - continuing with existing extensionLoader"
-        write_status "extensions-generate" 95 "Extension import generation failed - continuing without changes" "warning"
+        write_step "extensions-generate" "warning" "Extension import generation failed - continuing without changes"
+        write_step "rebuild" "skipped" "Skipped due to extension import failure"
     fi
 else
     echo "🦖 No installed extensions, nothing to rebuild"
-    write_status "extensions-generate" 95 "No installed extensions"
+    write_step "extensions-generate" "skipped" "No installed extensions"
+    write_step "rebuild" "skipped" "No installed extensions"
 fi
 
 echo "🦖 Setup complete! Stopping maintenance server..."
-write_status "starting-app" 97 "Starting Next.js application"
+write_step "starting-app" "running" "Starting application services"
 cleanup_maintenance
 
 # Small delay to ensure port is released
@@ -184,7 +185,8 @@ export HOSTNAME="0.0.0.0"
 "$@" &
 APP_PID=$!
 echo "🦖 Next.js running (PID: $APP_PID)"
-write_status "ready" 100 "Application ready"
+write_step "starting-app" "done" "Application services started"
+write_step "ready" "done" "Application ready"
 
 # Function to handle shutdown gracefully
 shutdown() {
@@ -219,7 +221,7 @@ shutdown() {
     # deploy via the maintenance page). Keep it around for the whole container
     # lifetime so it stays available while Next.js boots and runs, only
     # removing it now as part of shutdown.
-    rm -f "$STARTUP_LOG" "$STATUS_FILE" "$STATUS_LOG"
+    rm -f "$STARTUP_LOG" "$STATUS_LOG"
 
     echo "🦖 Shutdown complete"
     exit 0
