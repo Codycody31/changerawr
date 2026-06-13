@@ -5,8 +5,37 @@ const path = require('path');
 const PORT = process.env.PORT || 3000;
 const MAINTENANCE_HTML_PATH = path.join(__dirname, '../maintenance', 'index.html');
 
-// Read the maintenance page HTML
-const maintenanceHTML = fs.readFileSync(MAINTENANCE_HTML_PATH, 'utf8');
+// Read the bundled maintenance page as an immediate fallback - this is what
+// gets served if the remote fetch below fails or the deployment has no
+// outbound internet access.
+let maintenanceHTML = fs.readFileSync(MAINTENANCE_HTML_PATH, 'utf8');
+
+// The maintenance page is a static loading screen with no server-side
+// templating - all dynamic data comes from /startup/steps, /startup/logs and
+// /api/health, which are still served locally. So it's safe to pull the
+// latest copy from GitHub at boot, sidestepping any Docker build/cache issue
+// that could leave a stale copy baked into the image. Override via env var
+// when cutting a new release branch.
+const MAINTENANCE_PAGE_URL = process.env.MAINTENANCE_PAGE_URL
+    || 'https://raw.githubusercontent.com/Supernova3339/changerawr/1.0.7/scripts/maintenance/index.html';
+
+(async () => {
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
+        const response = await fetch(MAINTENANCE_PAGE_URL, { signal: controller.signal });
+        clearTimeout(timeout);
+        if (response.ok) {
+            const html = await response.text();
+            if (html.includes('<html')) {
+                maintenanceHTML = html;
+                console.log('🦖 Loaded latest maintenance page from GitHub');
+            }
+        }
+    } catch (err) {
+        console.log(`🦖 Could not fetch latest maintenance page (${err.message}), using bundled copy`);
+    }
+})();
 
 // Plain-text step log written directly by docker-entrypoint.sh - no HTTP
 // service, no curl, no JSON server involved. Reading a file off disk is the
