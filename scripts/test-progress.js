@@ -1,86 +1,74 @@
 /**
  * Test Progress Updates
  *
- * Simulates deployment progress for testing the maintenance page
- * Run with: node scripts/test-progress.js
+ * Simulates docker-entrypoint.sh's step log so the maintenance page can be
+ * exercised without a full Docker build. Writes the same
+ * "step|state|message|timestamp" lines to /tmp/changerawr-status-log that
+ * docker-entrypoint.sh's write_step() does - scripts/maintenance/server.js
+ * reads this file directly.
+ *
+ * Usage:
+ *   1. npm run maintenance   (in one terminal)
+ *   2. node scripts/test-progress.js   (in another)
+ *   3. Open http://localhost:3000
  */
 
-async function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+const fs = require('fs');
+const path = require('path');
+
+const STATUS_LOG = '/tmp/changerawr-status-log';
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function sendProgress(phase, progress, message) {
-  try {
-    const response = await fetch('http://localhost:3010/startup/update', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ phase, progress, message }),
-    });
-
-    if (response.ok) {
-      console.log(`✓ ${progress}% - ${message}`);
-    } else {
-      console.error(`✗ Failed to update progress: ${response.status}`);
-    }
-  } catch (error) {
-    console.error(`✗ Error: ${error.message}`);
-  }
+function writeStep(id, state, message) {
+  const line = `${id}|${state}|${message}|${Math.floor(Date.now() / 1000)}\n`;
+  fs.appendFileSync(STATUS_LOG, line);
+  console.log(`✓ [${id}] ${state} - ${message}`);
 }
 
 async function simulateDeployment() {
-  console.log('🦖 Starting simulated deployment...\n');
+  console.log('🦖 Simulating deployment steps...\n');
 
-  // Reset progress
-  await fetch('http://localhost:3010/startup/reset', { method: 'POST' });
-  await sleep(500);
+  fs.mkdirSync(path.dirname(STATUS_LOG), { recursive: true });
+  fs.writeFileSync(STATUS_LOG, '');
 
-  // Simulate deployment steps
-  await sendProgress('maintenance', 5, 'Maintenance server started');
+  writeStep('prisma-generate', 'running', 'Generating Prisma client');
   await sleep(2000);
+  writeStep('prisma-generate', 'done', 'Prisma client generated');
 
-  await sendProgress('prisma-generate', 10, 'Generating Prisma client');
+  writeStep('migrations', 'running', 'Running database migrations');
+  await sleep(2000);
+  writeStep('migrations', 'done', 'Database migrations complete');
+
+  writeStep('widget', 'running', 'Building widget');
+  await sleep(2000);
+  writeStep('widget', 'done', 'Widget built');
+
+  writeStep('swagger', 'running', 'Generating API documentation');
+  await sleep(2000);
+  writeStep('swagger', 'done', 'API documentation generated');
+
+  writeStep('extensions-generate', 'running', 'Preparing installed extensions');
+  await sleep(2000);
+  writeStep('extensions-generate', 'done', 'Extension imports regenerated');
+
+  writeStep('rebuild', 'running', 'Rebuilding application with extensions (this can take several minutes)');
   await sleep(3000);
+  writeStep('rebuild', 'done', 'Rebuild complete');
 
-  await sendProgress('migrations', 25, 'Running database migrations');
-  await sleep(2000);
-
-  await sendProgress('widget', 40, 'Building widget components');
-  await sleep(3000);
-
-  await sendProgress('swagger', 55, 'Generating API documentation');
-  await sleep(2000);
-
-  await sendProgress('extensions', 70, 'Generating extension imports');
-  await sleep(2000);
-
-  await sendProgress('build', 78, 'Rebuilding application with installed extensions');
+  writeStep('starting-app', 'running', 'Starting application services');
   await sleep(1000);
-  await sendProgress('build', 79, 'Creating an optimized production build');
-  await sleep(2000);
-  await sendProgress('build', 81, 'Build compiled successfully');
-  await sleep(1000);
-  await sendProgress('build', 82, 'Collecting page data');
-  await sleep(1000);
-  await sendProgress('build', 83, 'Generating static pages');
-  await sleep(2000);
-  await sendProgress('build', 84, 'Finalizing page optimization');
-  await sleep(1000);
+  writeStep('starting-app', 'done', 'Application services started');
 
-  await sendProgress('starting-app', 85, 'Starting Next.js application');
-  await sleep(3000);
-
-  await sendProgress('ready', 100, 'Application ready');
-
-  // Mark as complete
-  await fetch('http://localhost:3010/startup/complete', { method: 'POST' });
+  writeStep('ready', 'done', 'Application ready');
 
   console.log('\n✅ Simulated deployment complete!');
   console.log('Visit http://localhost:3000 to see the maintenance page\n');
 }
 
-simulateDeployment().catch(err => {
+simulateDeployment().catch((err) => {
   console.error('Error:', err);
   process.exit(1);
 });

@@ -54,12 +54,9 @@ RUN npm install -g jsdoc
 # Add bash and curl for the entry script and health checks
 RUN apk add --no-cache bash curl
 
-# Copy the entire project from the builder stage
+# Copy the entire project from the builder stage (includes
+# scripts/maintenance/index.html and server.js)
 COPY --from=builder /app .
-
-# Copy maintenance page and server script
-COPY scripts/maintenance/index.html ./index.html
-COPY scripts/maintenance/server.js ./scripts/maintenance/server.js
 
 # Copy entrypoint script and fix line endings
 COPY docker-entrypoint-compose.sh /app/docker-entrypoint-compose.sh

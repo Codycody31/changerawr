@@ -19,17 +19,21 @@ const SERVER_START_TIME = Date.now();
 // Ordered, fixed list of deploy steps. docker-entrypoint.sh writes
 // "step|state|message|timestamp" lines as each step starts/finishes; we
 // just look up the latest known state per step here. Steps not yet seen
-// are rendered as "pending" - no progress-percentage or "stuck" inference.
+// are rendered as "pending". `estimateSeconds` is a rough typical duration,
+// used only to drive the progress bar / ETA - it has no effect on when
+// steps actually run.
 const STEP_DEFINITIONS = [
-    { id: 'prisma-generate', label: 'Generating Prisma client' },
-    { id: 'migrations', label: 'Running database migrations' },
-    { id: 'widget', label: 'Building widget' },
-    { id: 'swagger', label: 'Generating API documentation' },
-    { id: 'extensions-generate', label: 'Preparing installed extensions' },
-    { id: 'rebuild', label: 'Rebuilding application with extensions' },
-    { id: 'starting-app', label: 'Starting application services' },
-    { id: 'ready', label: 'Application ready' },
+    { id: 'prisma-generate', label: 'Generating Prisma client', estimateSeconds: 10 },
+    { id: 'migrations', label: 'Running database migrations', estimateSeconds: 8 },
+    { id: 'widget', label: 'Building widget', estimateSeconds: 20 },
+    { id: 'swagger', label: 'Generating API documentation', estimateSeconds: 15 },
+    { id: 'extensions-generate', label: 'Preparing installed extensions', estimateSeconds: 10 },
+    { id: 'rebuild', label: 'Rebuilding application with extensions', estimateSeconds: 180 },
+    { id: 'starting-app', label: 'Starting application services', estimateSeconds: 3 },
+    { id: 'ready', label: 'Application ready', estimateSeconds: 1 },
 ];
+
+const TERMINAL_STATES = new Set(['done', 'warning', 'error', 'skipped']);
 
 function readSteps() {
     const latest = {};
@@ -55,11 +59,69 @@ function readSteps() {
     });
 }
 
+// Turns the step log into a single progress bar + ETA. `estimateSeconds`
+// per step gives the bar's relative weights; a step that's "skipped"
+// contributes nothing to either the completed or total weight, so e.g. a
+// deploy with no extensions reaches 100% without ever accounting for the
+// (skipped) rebuild step's weight.
 function getProgress() {
     const steps = readSteps();
-    const elapsed = Math.floor((Date.now() - SERVER_START_TIME) / 1000);
+    const now = Date.now();
+    const elapsed = Math.floor((now - SERVER_START_TIME) / 1000);
+
+    // Percent is step-count based (each non-skipped step is an equal slice
+    // of the bar) so finishing a step always produces a clearly visible
+    // jump, even if that step's actual duration was way off from its
+    // estimate. `estimateSeconds` is only used for the ETA and for giving
+    // the currently-running step partial credit within its own slice.
+    const countedSteps = steps.filter((step) => step.state !== 'skipped');
+    let completedUnits = 0;
+    let etaSeconds = 0;
+    let currentStep = null;
+
+    for (const step of steps) {
+        const def = STEP_DEFINITIONS.find((d) => d.id === step.id);
+        const estimate = def.estimateSeconds;
+
+        if (step.state === 'skipped') {
+            continue;
+        }
+
+        if (TERMINAL_STATES.has(step.state)) {
+            completedUnits += 1;
+        } else if (step.state === 'running') {
+            currentStep = step;
+            const elapsedInStep = step.timestamp ? (now - step.timestamp) / 1000 : 0;
+            // Linear progress toward the estimate, capped at 95% of this
+            // step's slice so a step running longer than expected doesn't
+            // claim to be done.
+            const fraction = Math.min(0.95, elapsedInStep / estimate);
+            completedUnits += fraction;
+            etaSeconds += Math.max(estimate - elapsedInStep, estimate * 0.05);
+        } else {
+            // pending
+            etaSeconds += estimate;
+        }
+    }
+
     const readyStep = steps[steps.length - 1];
-    return { steps, elapsed, complete: readyStep.state === 'done' };
+    const complete = readyStep.state === 'done';
+    const percent = complete ? 100 : Math.min(99, Math.floor((completedUnits / countedSteps.length) * 100));
+
+    if (!currentStep && !complete) {
+        // Nothing "running" yet (e.g. right at startup) - the first pending
+        // step is effectively next up.
+        currentStep = steps.find((step) => step.state === 'pending') || null;
+    }
+
+    return {
+        steps,
+        elapsed,
+        complete,
+        percent,
+        etaSeconds: complete ? 0 : Math.round(etaSeconds),
+        currentStep,
+    };
 }
 
 // Matches Next.js build assets and any other file-extensioned request

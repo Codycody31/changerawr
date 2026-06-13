@@ -71,12 +71,9 @@ RUN wget -q https://github.com/Changerawr/nginx-agent/archive/refs/heads/master.
 # Create nginx directories
 RUN mkdir -p /etc/nginx/sites-enabled /etc/nginx/sites-available /etc/ssl/changerawr /var/log/nginx /var/lib/nginx/tmp /run/nginx
 
-# Copy the entire project from the builder stage
+# Copy the entire project from the builder stage (includes
+# scripts/maintenance/index.html and server.js)
 COPY --from=builder /app .
-
-# Copy maintenance page and server script
-COPY scripts/maintenance/index.html ./index.html
-COPY scripts/maintenance/server.js ./scripts/maintenance/server.js
 
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
