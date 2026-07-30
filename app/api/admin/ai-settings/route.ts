@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { validateAuthAndGetUser } from '@/lib/utils/changelog'
 import { encryptToken, decryptToken } from '@/lib/utils/encryption'
+import { resolveTaggerConfig } from '@/lib/services/ai/tagger-detect'
 
 interface AISettingsResponse {
     enableAIAssistant: boolean
@@ -11,6 +12,8 @@ interface AISettingsResponse {
     aiDefaultModel: string | null
     changelogTaggerUrl: string | null
     changelogTaggerApiKey: boolean | null
+    /** true when no changelogTaggerUrl is configured but the bundled sidecar was found running */
+    changelogTaggerAutoDetected: boolean
 }
 
 interface AISettingsUpdateRequest {
@@ -43,6 +46,11 @@ export async function GET() {
             },
         })
 
+        const tagger = await resolveTaggerConfig({
+            changelogTaggerUrl: config?.changelogTaggerUrl ?? null,
+            changelogTaggerApiKey: config?.changelogTaggerApiKey ?? null,
+        })
+
         const response: AISettingsResponse = {
             enableAIAssistant: config?.enableAIAssistant ?? false,
             aiApiKey: config?.aiApiKey ? true : null,
@@ -51,6 +59,7 @@ export async function GET() {
             aiDefaultModel: config?.aiDefaultModel ?? null,
             changelogTaggerUrl: config?.changelogTaggerUrl ?? null,
             changelogTaggerApiKey: config?.changelogTaggerApiKey ? true : null,
+            changelogTaggerAutoDetected: !!tagger?.autoDetected,
         }
 
         return NextResponse.json(response)

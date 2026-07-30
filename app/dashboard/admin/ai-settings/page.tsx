@@ -19,6 +19,7 @@ interface Settings {
     aiApiKey: boolean | null
     changelogTaggerUrl: string | null
     changelogTaggerApiKey: boolean | null
+    changelogTaggerAutoDetected: boolean
 }
 
 type ActivePanel = 'secton' | 'tagger'
@@ -186,7 +187,7 @@ export default function AISettingsPage() {
                         Services
                     </p>
                     <NavItem icon={Cloud} label="Secton" configured={!!settings?.aiApiKey} active={panel === 'secton'} onClick={() => setPanel('secton')} />
-                    <NavItem icon={Tag}   label="Changelog Tagger" configured={!!taggerUrl}  active={panel === 'tagger'} onClick={() => setPanel('tagger')} />
+                    <NavItem icon={Tag}   label="Changelog Tagger" configured={!!taggerUrl || !!settings?.changelogTaggerAutoDetected}  active={panel === 'tagger'} onClick={() => setPanel('tagger')} />
                 </div>
 
                 {/* Content + footer */}
@@ -272,10 +273,22 @@ export default function AISettingsPage() {
                                         <h2 className="text-lg font-semibold">Changelog Tagger</h2>
                                         {taggerUrl
                                             ? <Badge variant="secondary" className="gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-green-500" />Configured</Badge>
-                                            : <Badge variant="outline" className="text-muted-foreground">Optional</Badge>}
+                                            : settings?.changelogTaggerAutoDetected
+                                                ? <Badge variant="secondary" className="gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-green-500" />Auto-detected</Badge>
+                                                : <Badge variant="outline" className="text-muted-foreground">Optional</Badge>}
                                     </div>
 
                                     <Separator />
+
+                                    {!taggerUrl && settings?.changelogTaggerAutoDetected && (
+                                        <Alert variant="success">
+                                            <AlertDescription>
+                                                A changelog-tagger service was found running locally (bundled with this
+                                                image) and is being used automatically — no setup needed. Set a Service
+                                                URL below only if you want to point at a different instance.
+                                            </AlertDescription>
+                                        </Alert>
+                                    )}
 
                                     <div className="space-y-2">
                                         <Label>Service URL</Label>
@@ -286,6 +299,9 @@ export default function AISettingsPage() {
                                                 {testingTagger ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Test'}
                                             </Button>
                                         </div>
+                                        <p className="text-sm text-muted-foreground">
+                                            Leave empty to use the auto-detected local service, if any.
+                                        </p>
                                     </div>
 
                                     <div className="space-y-2">

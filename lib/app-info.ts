@@ -13,7 +13,7 @@ export const appInfo = {
 
     framework: 'Next.js App Router',
     database: 'PostgreSQL with Prisma ORM',
-    cumEngine: '2.0.0', // package version of @changerawr/markdown
+    cumEngine: '2.0.1', // package version of @changerawr/markdown
 
     // Repository and documentation links
     repository: 'https://github.com/supernova3339/changerawr',

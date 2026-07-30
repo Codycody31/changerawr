@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { Prisma } from '@prisma/client'
+import { revalidateTag } from 'next/cache'
 import { db } from '@/lib/db'
 import { validateAuthAndGetUser } from '@/lib/utils/changelog'
 import { createAuditLog } from '@/lib/utils/auditLog' // Add this import
@@ -462,6 +463,12 @@ export async function PATCH(
             );
         } catch (auditLogError) {
             console.error('Failed to create update audit log:', auditLogError);
+        }
+
+        // Public changelog pages cache their data for 5 minutes; bust that
+        // cache immediately so changes (e.g. maintenance mode) take effect right away.
+        if (Object.keys(changes).length > 0) {
+            revalidateTag(`changelog-${updatedProject.id}`, 'max')
         }
 
         return new NextResponse(JSON.stringify(updatedProject), {

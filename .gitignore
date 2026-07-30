@@ -85,7 +85,8 @@ CLAUDE.md
 temp_migration.sql
 temp
 # this one is super important - if your code errors ensure you generate it!
-lib/services/core/markdown/extensionLoader.ts
+/lib/services/core/markdown/extensionLoader.ts
+tailwind.config.ts
 
 # documentation files
 CLAIM_VALIDATION_FEATURE.md

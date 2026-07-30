@@ -43,6 +43,8 @@ services:
       NGINX_AGENT_URL: "http://chr-nginx-agent:8080" # Optional: nginx-agent URL
       NGINX_AGENT_SECRET: "your_nginx_agent_secret_here_change_me" # Optional: webhook signature secret
       CRON_SECRET: "your_cron_secret_here_change_me"
+      # Changelog tagger (AI tag suggestions) — auto-detected by the app when reachable, no manual config needed
+      CHANGELOG_TAGGER_URL: "http://tagger:31672"
     ports:
       - "3000:3000"  # Next.js app (internal)
       - "80:80"      # HTTP (nginx)
@@ -59,6 +61,25 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+    restart: unless-stopped
+
+  # Optional: AI changelog tagger. The app auto-detects it via CHANGELOG_TAGGER_URL
+  # above — nothing else to configure. Remove this service if you don't want it.
+  tagger:
+    image: ghcr.io/changerawr/tag-ai:latest
+    container_name: changerawr_tagger
+    environment:
+      PORT: "31672"
+    volumes:
+      - tagger_models:/app/models
+      # Config (ctag.conf) + runtime data (tag feedback, auto-training state)
+      - tagger_data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:31672/health')\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
     restart: unless-stopped
 
   # Caddy reverse proxy with on-demand TLS
@@ -110,4 +131,8 @@ volumes:
   nginx_certs:
     driver: local
   nginx_configs:
+    driver: local
+  tagger_models:
+    driver: local
+  tagger_data:
     driver: local

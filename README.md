@@ -202,6 +202,26 @@ docker run -p 3000:3000 \
   changerawr
 ```
 
+#### Optional: AI changelog tagger
+
+`docker-compose.yml` / `docker-compose-online.yml` already run this alongside the app automatically — nothing to configure. If you're deploying from the bare `Dockerfile` (no compose), start it yourself as a sibling container on a shared network and point Changerawr at it:
+
+```bash
+# Shared network so the containers can reach each other by name
+docker network create changerawr-net
+
+# Start the tagger (own image — separate from the app, ~1GB of model weights)
+docker run -d --name changerawr-tagger --network changerawr-net \
+  -e PORT=31672 \
+  -v tagger_models:/app/models -v tagger_data:/app/data \
+  ghcr.io/changerawr/tag-ai:latest
+
+# Point the app at it (add to the `docker run` above, plus --network changerawr-net)
+-e CHANGELOG_TAGGER_URL="http://changerawr-tagger:31672"
+```
+
+Changerawr auto-detects it via that URL — no admin UI setup needed. If it's unreachable, tag suggestions are just silently unavailable; nothing else is affected. See [Changerawr/tag-ai](https://github.com/Changerawr/tag-ai) for details.
+
 ### Manual Deployment
 
 ```bash

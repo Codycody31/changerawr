@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateAuthAndGetUser } from '@/lib/utils/changelog';
 import { db } from '@/lib/db';
-import { decryptToken } from '@/lib/utils/encryption';
+import { resolveTaggerConfig } from '@/lib/services/ai/tagger-detect';
 
 const SECTON_BASE = 'https://api.secton.org/v1';
 
@@ -37,15 +37,18 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // --- Priority 1: changelog-tagger ---
-    if (config?.changelogTaggerUrl) {
-      const base = config.changelogTaggerUrl.replace(/\/$/, '');
+    // --- Priority 1: changelog-tagger (explicit config, or auto-detected sidecar) ---
+    const tagger = await resolveTaggerConfig({
+      changelogTaggerUrl: config?.changelogTaggerUrl ?? null,
+      changelogTaggerApiKey: config?.changelogTaggerApiKey ?? null,
+    });
+
+    if (tagger) {
+      const base = tagger.url.replace(/\/$/, '');
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
 
-      if (config.changelogTaggerApiKey) {
-        try {
-          headers['Authorization'] = `Bearer ${decryptToken(config.changelogTaggerApiKey)}`;
-        } catch { /* proceed without auth */ }
+      if (tagger.apiKey) {
+        headers['Authorization'] = `Bearer ${tagger.apiKey}`;
       }
 
       // Always pass project tags so the tagger scores against them.

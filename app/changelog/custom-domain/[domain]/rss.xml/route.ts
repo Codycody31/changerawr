@@ -36,6 +36,7 @@ export async function GET(
                 rssItemLimit: true,
                 rssFullContent: true,
                 rssFeedConfig: true,
+                maintenanceMode: true,
                 changelog: {
                     select: {
                         id: true
@@ -47,6 +48,13 @@ export async function GET(
         if (!project?.changelog) {
             return NextResponse.json(
                 { error: 'Changelog not found or not public' },
+                { status: 404 }
+            )
+        }
+
+        if (project.maintenanceMode) {
+            return NextResponse.json(
+                { error: 'Changelog is under maintenance' },
                 { status: 404 }
             )
         }
