@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Project" ADD COLUMN "rssItemLimit" INTEGER NOT NULL DEFAULT 10;
+ALTER TABLE "Project" ADD COLUMN "rssFullContent" BOOLEAN NOT NULL DEFAULT true;

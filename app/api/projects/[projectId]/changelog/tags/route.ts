@@ -99,13 +99,13 @@ export async function GET(
             );
         }
 
-        // Build optimized query - get tags that are used in this project's changelog entries
+        // Build optimized query - get tags used in this project's changelog entries,
+        // plus newly created tags that aren't assigned to any entries yet
         const whereClause = {
-            entries: {
-                some: {
-                    changelogId: project.changelog.id
-                }
-            },
+            OR: [
+                {entries: {some: {changelogId: project.changelog.id}}},
+                {entries: {none: {}}}
+            ],
             ...(search && {
                 name: {
                     contains: search,

@@ -4,9 +4,18 @@
 model Project {
   id                  String                     @id @default(cuid())
   name                String
+  color               String?
+  icon                String?
   isPublic            Boolean                    @default(false)
   allowAutoPublish    Boolean                    @default(false)
   requireApproval     Boolean                    @default(true)
+  maintenanceMode     Boolean                    @default(false)
+  maintenanceMessage  String?                    @db.Text
+  allowIndexing       Boolean                    @default(true)
+  enableRss           Boolean                    @default(true)
+  rssItemLimit        Int                        @default(10)
+  rssFullContent      Boolean                    @default(true)
+  rssFeedConfig       Json?
   defaultTags         String[]                   @default([])
   changelog           Changelog?
   createdAt           DateTime                   @default(now())

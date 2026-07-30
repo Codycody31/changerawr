@@ -54,6 +54,7 @@ import {
     MessageSquare,
     ExternalLink,
     RefreshCw,
+    History,
 } from 'lucide-react'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
@@ -61,7 +62,7 @@ import { Label } from '@/components/ui/label'
 import {motion, AnimatePresence} from 'framer-motion'
 
 // Updated type definitions
-export type RequestType = 'DELETE_PROJECT' | 'DELETE_TAG' | 'DELETE_ENTRY' | 'ALLOW_PUBLISH' | 'ALLOW_SCHEDULE';
+export type RequestType = 'DELETE_PROJECT' | 'DELETE_TAG' | 'DELETE_ENTRY' | 'DELETE_ALL_ENTRIES' | 'DELETE_ALL_HISTORY' | 'ALLOW_PUBLISH' | 'ALLOW_SCHEDULE';
 
 export const REQUEST_TYPES: Record<RequestType, {
     label: string;
@@ -161,6 +162,70 @@ export const REQUEST_TYPES: Record<RequestType, {
                     <div>
                         <span className="text-muted-foreground">Project:</span>
                         <p className="font-medium">{request.project.name}</p>
+                    </div>
+                </div>
+            </div>
+        )
+    },
+    DELETE_ALL_ENTRIES: {
+        label: 'Delete All Entries',
+        description: 'Permanently remove every changelog entry in a project',
+        targetDisplay: (request) => `All entries in ${request.project.name}`,
+        icon: <AlertTriangle className="h-3 w-3"/>,
+        variant: 'destructive',
+        severity: 'critical',
+        getDetails: (request) => (
+            <div className="space-y-3">
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="flex items-center gap-2 text-red-800 font-medium">
+                        <AlertTriangle className="h-4 w-4"/>
+                        Critical Action - Irreversible
+                    </div>
+                    <p className="text-sm text-red-700 mt-1">
+                        Every changelog entry in this project (published, scheduled, and draft) will be permanently
+                        deleted. The project itself and its settings will be kept.
+                    </p>
+                </div>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <span className="text-muted-foreground">Project:</span>
+                        <p className="font-medium">{request.project.name}</p>
+                    </div>
+                    <div>
+                        <span className="text-muted-foreground">Impact:</span>
+                        <p className="font-medium text-red-600">All entries will be lost</p>
+                    </div>
+                </div>
+            </div>
+        )
+    },
+    DELETE_ALL_HISTORY: {
+        label: 'Delete All History',
+        description: 'Permanently remove all saved version history for every entry in a project',
+        targetDisplay: (request) => `All history in ${request.project.name}`,
+        icon: <History className="h-3 w-3"/>,
+        variant: 'destructive',
+        severity: 'critical',
+        getDetails: (request) => (
+            <div className="space-y-3">
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="flex items-center gap-2 text-red-800 font-medium">
+                        <AlertTriangle className="h-4 w-4"/>
+                        Critical Action - Irreversible
+                    </div>
+                    <p className="text-sm text-red-700 mt-1">
+                        Every saved version history revision for every entry in this project will be permanently
+                        deleted. The entries themselves will be kept.
+                    </p>
+                </div>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <span className="text-muted-foreground">Project:</span>
+                        <p className="font-medium">{request.project.name}</p>
+                    </div>
+                    <div>
+                        <span className="text-muted-foreground">Impact:</span>
+                        <p className="font-medium text-red-600">All version history will be lost</p>
                     </div>
                 </div>
             </div>

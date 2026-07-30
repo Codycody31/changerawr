@@ -7,7 +7,7 @@ import {createOrReopenRequest} from '@/lib/services/request/changelog-request'
 import {Prisma} from "@prisma/client";
 
 const requestSchema = z.object({
-    type: z.enum(['DELETE_PROJECT', 'DELETE_TAG', 'DELETE_ENTRY', 'ALLOW_PUBLISH', 'ALLOW_SCHEDULE']),
+    type: z.enum(['DELETE_PROJECT', 'DELETE_TAG', 'DELETE_ENTRY', 'DELETE_ALL_ENTRIES', 'DELETE_ALL_HISTORY', 'ALLOW_PUBLISH', 'ALLOW_SCHEDULE']),
     projectId: z.string(),
     targetId: z.string().optional()
 })

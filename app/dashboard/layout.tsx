@@ -184,6 +184,7 @@ export default function DashboardLayout({
     const [sidebarExpanded, setSidebarExpanded] = useState(true)
     const [sidebarVisible, setSidebarVisible] = useState(true)
     const [isProjectSidebarActive, setProjectSidebarActive] = useState(false)
+    const [isProjectSidebarCollapsed, setProjectSidebarCollapsed] = useState(false)
     const isMobile = useMediaQuery('(max-width: 768px)')
     const isTablet = useMediaQuery('(max-width: 1024px)')
 
@@ -237,8 +238,26 @@ export default function DashboardLayout({
         }
     }, [sidebarExpanded, sidebarVisible, isTablet, isMobile])
 
+    // Store project sidebar collapsed state in localStorage
+    useEffect(() => {
+        try {
+            localStorage.setItem('projectSidebarCollapsed', String(isProjectSidebarCollapsed))
+        } catch (error) {
+            console.error('Error saving project sidebar state:', error)
+        }
+    }, [isProjectSidebarCollapsed])
+
     // Load sidebar state from localStorage on initial load
     useEffect(() => {
+        try {
+            const savedProjectCollapsedState = localStorage.getItem('projectSidebarCollapsed')
+            if (savedProjectCollapsedState !== null) {
+                setProjectSidebarCollapsed(savedProjectCollapsedState === 'true')
+            }
+        } catch (error) {
+            console.error('Error loading project sidebar state:', error)
+        }
+
         if (!isTablet && !isMobile) {
             try {
                 const savedExpandedState = localStorage.getItem('sidebarExpanded')
@@ -266,7 +285,7 @@ export default function DashboardLayout({
     }
 
     return (
-        <SidebarOverrideContext.Provider value={{ isProjectSidebarActive, setProjectSidebarActive }}>
+        <SidebarOverrideContext.Provider value={{ isProjectSidebarActive, setProjectSidebarActive, isProjectSidebarCollapsed, setProjectSidebarCollapsed }}>
         <CommandPaletteProvider>
             <div className="min-h-screen bg-background">
                 {!isProjectSidebarActive && (
@@ -291,7 +310,7 @@ export default function DashboardLayout({
                         "pt-14 md:pt-0",
                         // Desktop: adjust margin based on sidebar state
                         isProjectSidebarActive
-                            ? "md:ml-64"
+                            ? (isProjectSidebarCollapsed ? "md:ml-16" : "md:ml-64")
                             : (!isMobile && (
                                 sidebarVisible
                                     ? (sidebarExpanded ? "md:ml-64" : "md:ml-16")

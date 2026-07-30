@@ -5,6 +5,8 @@ import {validateAuthAndGetUser} from '@/lib/utils/changelog'
 interface ProjectPreview {
     id: string
     name: string
+    color: string | null
+    icon: string | null
     lastUpdated: string
     changelogCount: number
 }
@@ -122,6 +124,8 @@ export async function GET(): Promise<NextResponse<DashboardStats | { error: stri
         const projectPreviews: ProjectPreview[] = recentProjects.map(project => ({
             id: project.id,
             name: project.name,
+            color: project.color,
+            icon: project.icon,
             lastUpdated: project.changelog?.entries[0]?.updatedAt.toISOString() || project.updatedAt.toISOString(),
             changelogCount: project.changelog?._count.entries || 0
         }))

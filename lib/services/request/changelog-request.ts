@@ -196,6 +196,30 @@ class DeleteEntryProcessor implements RequestProcessor {
     }
 }
 
+class DeleteAllEntriesProcessor implements RequestProcessor {
+    async processRequest({tx, request}: RequestContext): Promise<void> {
+        if (!request.project.changelog?.id) {
+            throw new Error('Changelog not found for this project');
+        }
+
+        await tx.changelogEntry.deleteMany({
+            where: {changelogId: request.project.changelog.id}
+        });
+    }
+}
+
+class DeleteAllHistoryProcessor implements RequestProcessor {
+    async processRequest({tx, request}: RequestContext): Promise<void> {
+        if (!request.project.changelog?.id) {
+            throw new Error('Changelog not found for this project');
+        }
+
+        await tx.changelogEntryRevision.deleteMany({
+            where: {entry: {changelogId: request.project.changelog.id}}
+        });
+    }
+}
+
 class AllowPublishProcessor implements RequestProcessor {
     async processRequest({tx, request}: RequestContext): Promise<void> {
         if (!request.ChangelogEntry?.id) {
@@ -271,6 +295,8 @@ class RequestProcessorRegistry {
         'DELETE_PROJECT': new DeleteProjectProcessor(),
         'DELETE_TAG': new DeleteTagProcessor(),
         'DELETE_ENTRY': new DeleteEntryProcessor(),
+        'DELETE_ALL_ENTRIES': new DeleteAllEntriesProcessor(),
+        'DELETE_ALL_HISTORY': new DeleteAllHistoryProcessor(),
         'ALLOW_PUBLISH': new AllowPublishProcessor(),
         'ALLOW_SCHEDULE': new AllowScheduleProcessor()
     };

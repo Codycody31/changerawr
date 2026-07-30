@@ -39,7 +39,10 @@ import {
     Save,
     AlertCircle,
     Tag as TagIcon,
-    Loader2
+    Loader2,
+    Plus,
+    Search,
+    X
 } from 'lucide-react';
 import {ColorPicker, ColoredTag} from '@/components/changelog/editor/TagColorPicker';
 import {toast} from '@/hooks/use-toast';
@@ -94,6 +97,7 @@ export default function TagManagement({projectId}: TagManagementProps) {
     const [deletingTag, setDeletingTag] = useState<Tag | null>(null);
     const [newTagData, setNewTagData] = useState<CreateTagData>({name: '', color: null});
     const [editTagData, setEditTagData] = useState<UpdateTagData>({tagId: '', name: '', color: null});
+    const [search, setSearch] = useState('');
 
     const queryClient = useQueryClient();
 
@@ -231,6 +235,10 @@ export default function TagManagement({projectId}: TagManagementProps) {
         deleteTagMutation.mutate(deletingTag.id);
     }, [deletingTag, deleteTagMutation]);
 
+    const filteredTags = (tags || []).filter((tag) =>
+        tag.name.toLowerCase().includes(search.trim().toLowerCase())
+    );
+
     // Reset form data when dialogs close
     useEffect(() => {
         if (!isCreateDialogOpen) {
@@ -260,43 +268,70 @@ export default function TagManagement({projectId}: TagManagementProps) {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center justify-between">
+            <Card className="border-border/50 shadow-sm">
+                <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between gap-3">
                         <div>
-                            <CardTitle className="flex items-center gap-2">
-                                <TagIcon className="h-5 w-5"/>
-                                Tag Management
-                            </CardTitle>
+                            <div className="flex items-center gap-2">
+                                <div className="p-1.5 rounded-lg bg-primary/10 dark:bg-primary/20">
+                                    <TagIcon className="h-4 w-4 text-primary"/>
+                                </div>
+                                <CardTitle className="text-xl">Tags</CardTitle>
+                                {!isLoading && !!tags?.length && (
+                                    <span className="text-xs font-medium text-muted-foreground bg-muted rounded-full px-2 py-0.5">
+                                        {tags.length}
+                                    </span>
+                                )}
+                            </div>
                             <CardDescription>
-                                Manage tags for your changelog entries. Tags help organize and categorize
-                                your releases.
+                                Manage tags used to organize and categorize your changelog entries
                             </CardDescription>
                         </div>
-                        {/*<Button*/}
-                        {/*    onClick={() => setIsCreateDialogOpen(true)}*/}
-                        {/*    className="shrink-0"*/}
-                        {/*>*/}
-                        {/*    <Plus className="h-4 w-4 mr-2"/>*/}
-                        {/*    Create Tag*/}
-                        {/*</Button>*/}
+                        <Button
+                            onClick={() => setIsCreateDialogOpen(true)}
+                            size="sm"
+                            className="shrink-0"
+                        >
+                            <Plus className="h-4 w-4 mr-1.5"/>
+                            New Tag
+                        </Button>
                     </div>
+
+                    {!isLoading && tags && tags.length > 6 && (
+                        <div className="relative mt-3">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground"/>
+                            <Input
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Filter tags…"
+                                className="h-8 pl-8 pr-8 text-sm"
+                            />
+                            {search && (
+                                <button
+                                    onClick={() => setSearch('')}
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                >
+                                    <X className="h-3.5 w-3.5"/>
+                                </button>
+                            )}
+                        </div>
+                    )}
                 </CardHeader>
 
                 <CardContent>
                     {isLoading ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                             {Array.from({length: 6}).map((_, i) => (
-                                <div key={i} className="border rounded-lg p-4 space-y-3">
+                                <div key={i} className="border rounded-lg p-3 space-y-2.5">
                                     <div className="flex items-center justify-between">
-                                        <Skeleton className="h-6 w-24"/>
+                                        <Skeleton className="h-5 w-20"/>
                                         <div className="flex gap-1">
-                                            <Skeleton className="h-8 w-8"/>
-                                            <Skeleton className="h-8 w-8"/>
+                                            <Skeleton className="h-7 w-7"/>
+                                            <Skeleton className="h-7 w-7"/>
                                         </div>
                                     </div>
-                                    <Skeleton className="h-4 w-32"/>
-                                    <Skeleton className="h-5 w-16"/>
+                                    <Skeleton className="h-3.5 w-24"/>
+                                    <Skeleton className="h-5 w-14"/>
                                 </div>
                             ))}
                         </div>
@@ -305,63 +340,64 @@ export default function TagManagement({projectId}: TagManagementProps) {
                             <TagIcon className="h-12 w-12 mx-auto mb-4 opacity-50"/>
                             <h3 className="text-lg font-medium mb-2">No tags yet</h3>
                             <p className="mb-4">Create your first tag to help organize your changelog entries.</p>
+                            <Button onClick={() => setIsCreateDialogOpen(true)} variant="outline">
+                                <Plus className="h-4 w-4 mr-1.5"/>
+                                Create Tag
+                            </Button>
+                        </div>
+                    ) : filteredTags.length === 0 ? (
+                        <div className="text-center py-12 text-muted-foreground">
+                            <Search className="h-10 w-10 mx-auto mb-3 opacity-40"/>
+                            <p>No tags match &ldquo;{search}&rdquo;.</p>
                         </div>
                     ) : (
                         <motion.div
-                            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+                            className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3"
                             variants={containerVariants}
                             initial="hidden"
                             animate="visible"
                         >
                             <AnimatePresence>
-                                {tags.map((tag) => (
+                                {filteredTags.map((tag) => (
                                     <motion.div
                                         key={tag.id}
                                         variants={itemVariants}
                                         layout
-                                        className="border rounded-lg p-4 space-y-3 hover:border-primary/50 transition-colors"
+                                        className="border rounded-lg p-3 space-y-2 hover:border-primary/50 transition-colors"
                                     >
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2">
+                                        <div className="flex items-center justify-between gap-1">
+                                            <div className="flex items-center gap-2 min-w-0">
                                                 {tag.color && (
                                                     <div
-                                                        className="h-4 w-4 rounded-full border border-gray-300"
+                                                        className="h-3 w-3 rounded-full border border-gray-300 shrink-0"
                                                         style={{backgroundColor: tag.color}}
                                                     />
                                                 )}
-                                                <h4 className="font-medium truncate">{tag.name}</h4>
+                                                <h4 className="font-medium text-sm truncate">{tag.name}</h4>
                                             </div>
-                                            <div className="flex gap-1">
+                                            <div className="flex gap-0.5 shrink-0">
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
                                                     onClick={() => handleEditTag(tag)}
-                                                    className="h-8 w-8 p-0"
+                                                    className="h-7 w-7 p-0"
                                                 >
-                                                    <Edit2 className="h-4 w-4"/>
+                                                    <Edit2 className="h-3.5 w-3.5"/>
                                                 </Button>
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
                                                     onClick={() => handleDeleteTag(tag)}
-                                                    className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                                    className="h-7 w-7 p-0 text-destructive hover:text-destructive"
                                                 >
-                                                    <Trash2 className="h-4 w-4"/>
+                                                    <Trash2 className="h-3.5 w-3.5"/>
                                                 </Button>
                                             </div>
                                         </div>
 
-                                        <div className="text-sm text-muted-foreground">
-                                            Used
-                                            in {tag._count?.entries || 0} entr{tag._count?.entries === 1 ? 'y' : 'ies'}
+                                        <div className="text-xs text-muted-foreground">
+                                            {tag._count?.entries || 0} entr{tag._count?.entries === 1 ? 'y' : 'ies'}
                                         </div>
-
-                                        <ColoredTag
-                                            name={tag.name}
-                                            color={tag.color}
-                                            size="sm"
-                                            className="w-fit"
-                                        />
                                     </motion.div>
                                 ))}
                             </AnimatePresence>

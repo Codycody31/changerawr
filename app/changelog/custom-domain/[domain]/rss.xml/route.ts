@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { generateRSSFeed } from '@/lib/services/changelog/rss'
+import { generateRSSFeed, parseRssFeedConfig } from '@/lib/services/changelog/rss'
 import { getDomainByDomain } from '@/lib/custom-domains/service'
 
 export async function GET(
@@ -32,19 +32,13 @@ export async function GET(
             select: {
                 id: true,
                 name: true,
+                enableRss: true,
+                rssItemLimit: true,
+                rssFullContent: true,
+                rssFeedConfig: true,
                 changelog: {
                     select: {
-                        id: true,
-                        entries: {
-                            where: {
-                                publishedAt: { not: null }
-                            },
-                            orderBy: [
-                                { publishedAt: 'desc' },
-                                { id: 'desc' }
-                            ],
-                            take: 10
-                        }
+                        id: true
                     }
                 }
             }
@@ -57,13 +51,42 @@ export async function GET(
             )
         }
 
+        if (!project.enableRss) {
+            return NextResponse.json(
+                { error: 'RSS feed is disabled for this project' },
+                { status: 404 }
+            )
+        }
+
+        const feedConfig = parseRssFeedConfig(project.rssFeedConfig)
+
+        const entries = await db.changelogEntry.findMany({
+            where: {
+                changelogId: project.changelog.id,
+                publishedAt: { not: null },
+                ...(feedConfig.tagFilter.length > 0
+                    ? { tags: { some: { id: { in: feedConfig.tagFilter } } } }
+                    : {})
+            },
+            orderBy: [
+                { publishedAt: 'desc' },
+                { id: 'desc' }
+            ],
+            take: project.rssItemLimit,
+            include: {
+                tags: { select: { name: true } }
+            }
+        })
+
         // Use the custom domain as the base URL
         const feedUrl = `https://${domain}`
 
-        const rss = generateRSSFeed(project.changelog.entries, {
+        const rss = generateRSSFeed(entries, {
             title: `${project.name} Changelog`,
             description: `Latest changes and updates for ${project.name}`,
-            link: feedUrl
+            link: feedUrl,
+            useExcerpt: !project.rssFullContent,
+            feedConfig
         })
 
         return new NextResponse(rss, {

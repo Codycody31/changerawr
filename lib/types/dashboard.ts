@@ -1,6 +1,8 @@
 export interface ProjectPreview {
     id: string
     name: string
+    color: string | null
+    icon: string | null
     changelogCount: number
     lastUpdated: string
 }
