@@ -81,6 +81,7 @@ export default function AISettingsPage() {
     const [testingSecton, setTestingSecton]   = useState(false)
     const [testingTagger, setTestingTagger]   = useState(false)
     const [trainingStatus, setTrainingStatus] = useState<TrainingStatus | null>(null)
+    const [connectionState, setConnectionState] = useState<'connecting' | 'open' | 'error'>('connecting')
 
     const { data: settings, isLoading } = useQuery<Settings>({
         queryKey: ['ai-settings'],
@@ -100,13 +101,17 @@ export default function AISettingsPage() {
         setTaggerKey(settings.changelogTaggerApiKey ? MASKED : '')
     }, [settings])
 
-    // Live training progress — connects once a tagger is configured/detected,
-    // closes itself once the stream reports a terminal (non-running) status.
+    // Live training progress. Stays connected for as long as this page is
+    // open — it deliberately does NOT close itself on an idle/terminal
+    // status, since the server never closes the stream either; letting
+    // EventSource's native reconnect handle only genuine connection drops.
     const hasTagger = !!settings?.changelogTaggerUrl || !!settings?.changelogTaggerAutoDetected
     useEffect(() => {
         if (!hasTagger) return
         const es = new EventSource('/api/admin/ai-settings/tagger-status')
         let prevStatus: string | null = null
+        setConnectionState('connecting')
+        es.onopen = () => setConnectionState('open')
         es.onmessage = (e) => {
             const data: TrainingStatus = JSON.parse(e.data)
             setTrainingStatus(data)
@@ -116,9 +121,8 @@ export default function AISettingsPage() {
                 toast({ title: 'Tagger training failed', description: data.error, variant: 'destructive' })
             }
             prevStatus = data.status
-            if (data.status !== 'running') es.close()
         }
-        es.onerror = () => es.close()
+        es.onerror = () => setConnectionState('error')
         return () => es.close()
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [hasTagger])
@@ -329,7 +333,7 @@ export default function AISettingsPage() {
                                         </Alert>
                                     )}
 
-                                    {trainingStatus?.status === 'running' && (
+                                    {hasTagger && trainingStatus?.status === 'running' && (
                                         <div className="rounded-lg border bg-muted/30 p-4 space-y-2.5">
                                             <div className="flex items-center gap-2 text-sm font-medium">
                                                 <BrainCircuit className="h-4 w-4 text-primary animate-pulse" />
@@ -352,6 +356,28 @@ export default function AISettingsPage() {
                                                 {' · '}the current model keeps serving requests until this finishes
                                             </p>
                                         </div>
+                                    )}
+
+                                    {hasTagger && trainingStatus?.status === 'error' && (
+                                        <Alert variant="destructive">
+                                            <AlertDescription>
+                                                Last training run failed: {trainingStatus.error || 'unknown error'}
+                                            </AlertDescription>
+                                        </Alert>
+                                    )}
+
+                                    {hasTagger && (
+                                        <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                                            {connectionState === 'connecting' && (
+                                                <><Loader2 className="h-3 w-3 animate-spin" /> Connecting to live status…</>
+                                            )}
+                                            {connectionState === 'error' && (
+                                                <><span className="h-1.5 w-1.5 rounded-full bg-destructive flex-shrink-0" /> Can&apos;t reach live training status right now — retrying…</>
+                                            )}
+                                            {connectionState === 'open' && (!trainingStatus || trainingStatus.status !== 'running') && (
+                                                <><span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50 flex-shrink-0" /> Not currently training{trainingStatus?.status === 'done' && ' — last run finished successfully'}</>
+                                            )}
+                                        </p>
                                     )}
 
                                     <div className="space-y-2">

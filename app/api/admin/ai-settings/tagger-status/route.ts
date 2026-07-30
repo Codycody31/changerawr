@@ -35,12 +35,12 @@ export async function GET() {
 
   let upstream: Response;
   try {
-    // Generous bound — training duration scales with feedback volume, and the
-    // upstream stream sends its own keep-alive heartbeats while running.
-    upstream = await fetch(`${base}/api/v1/training/stream`, {
-      headers,
-      signal: AbortSignal.timeout(15 * 60_000),
-    });
+    // No timeout here — this is a live status feed meant to stay open for as
+    // long as the admin page is. A hard deadline would kill a perfectly
+    // healthy connection and force the browser's EventSource into an
+    // endless reconnect loop. The upstream sends its own keep-alive
+    // heartbeats, and the connection closes naturally when the client does.
+    upstream = await fetch(`${base}/api/v1/training/stream`, { headers });
   } catch {
     return NextResponse.json({ error: 'Tagger service unreachable' }, { status: 502 });
   }

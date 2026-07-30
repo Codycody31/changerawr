@@ -56,8 +56,12 @@ services:
       PORT: "31672"
     volumes:
       - tagger_models:/app/models
-      # Config (ctag.conf) + runtime data (tag feedback, auto-training state)
-      - tagger_data:/app/data
+      # Config (ctag.conf) + runtime data (tag feedback, auto-training state).
+      # Mounted at /app/runtime, NOT /app/data — seed training data lives at
+      # /app/data baked into the image itself, so it always stays current
+      # across image upgrades instead of getting stuck with whatever this
+      # volume happened to contain the first time it was created.
+      - tagger_data:/app/runtime
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:31672/health')\" || exit 1"]
       interval: 30s
