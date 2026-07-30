@@ -12,7 +12,7 @@ const testSchema = z.object({
     smtpPort: z.number().int().min(1).max(65535),
     smtpUser: z.string().optional().nullable(),
     smtpPassword: z.string().optional().nullable(),
-    smtpSecure: z.boolean().default(false), // Default to false for local testing
+    smtpSecure: z.boolean().default(false),
     fromEmail: z.string().email('Invalid email address'),
     testEmail: z.string().email('Invalid test email address'),
 });
@@ -51,20 +51,16 @@ export async function POST(
             password: validatedData.smtpPassword ? '(provided)' : '(empty)'
         });
 
-        // Create a transporter with correct typing for local test servers
+        // Create a transporter using the submitted configuration.
+        // secure:true = implicit TLS (port 465). secure:false lets nodemailer
+        // negotiate STARTTLS on its own (port 587/25) when the server offers it.
         const transportConfig: SMTPTransport.Options = {
             host: validatedData.smtpHost,
             port: validatedData.smtpPort,
-            // Force secure to false for local testing regardless of the input
-            secure: false,
-            // Configure TLS options to avoid certificate validation issues
+            secure: validatedData.smtpSecure,
             tls: {
-                // Disable certificate validation for testing
-                rejectUnauthorized: false
+                rejectUnauthorized: validatedData.smtpSecure
             },
-            // Disable STARTTLS for localhost test servers that don't support it
-            ignoreTLS: true,
-            // Set connection timeout to a lower value to fail faster
             connectionTimeout: 5000
         };
 
@@ -122,7 +118,7 @@ export async function POST(
                     smtpPort: validatedData.smtpPort,
                     smtpUser: validatedData.smtpUser || '',
                     smtpPassword: validatedData.smtpPassword || '',
-                    smtpSecure: false, // Force save as false for local testing
+                    smtpSecure: validatedData.smtpSecure,
                     fromEmail: validatedData.fromEmail,
                     lastTestedAt: new Date(),
                     testStatus: 'success',
@@ -152,7 +148,7 @@ export async function POST(
                     smtpPort: validatedData.smtpPort,
                     smtpUser: validatedData.smtpUser || '',
                     smtpPassword: validatedData.smtpPassword || '',
-                    smtpSecure: false, // Force save as false
+                    smtpSecure: validatedData.smtpSecure,
                     fromEmail: validatedData.fromEmail,
                     lastTestedAt: new Date(),
                     testStatus: error instanceof Error ? `failed: ${error.message}` : 'failed: unknown error',
