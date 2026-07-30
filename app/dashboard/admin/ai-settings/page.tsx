@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/hooks/use-toast'
-import { Sparkles, CheckCircle, Loader2, Lock, Copy, ExternalLink, Cloud, Tag } from 'lucide-react'
+import { Sparkles, CheckCircle, Loader2, Lock, Copy, ExternalLink, Cloud, Tag, BrainCircuit } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -22,16 +22,29 @@ interface Settings {
     changelogTaggerAutoDetected: boolean
 }
 
+interface TrainingStatus {
+    status: 'idle' | 'running' | 'done' | 'error'
+    current_step: number
+    total_steps: number
+    current_epoch: number
+    total_epochs: number
+    loss: number | null
+    progress_pct: number
+    error: string
+    records_used: number
+}
+
 type ActivePanel = 'secton' | 'tagger'
 
 const MASKED = '••••••••••••••••'
 const isMasked = (v: string) => v.includes('•')
 
-function NavItem({ icon: Icon, label, configured, active, onClick }: {
+function NavItem({ icon: Icon, label, configured, active, training, onClick }: {
     icon: React.ElementType
     label: string
     configured: boolean
     active: boolean
+    training?: boolean
     onClick: () => void
 }) {
     return (
@@ -44,7 +57,9 @@ function NavItem({ icon: Icon, label, configured, active, onClick }: {
         >
             <Icon className={cn('h-4 w-4 flex-shrink-0', active ? 'text-primary' : 'text-muted-foreground')} />
             <span className={cn('text-sm font-medium flex-1', active && 'text-primary')}>{label}</span>
-            {configured && <span className="h-1.5 w-1.5 rounded-full bg-green-500 flex-shrink-0" />}
+            {training
+                ? <Loader2 className="h-3 w-3 flex-shrink-0 animate-spin text-primary" />
+                : configured && <span className="h-1.5 w-1.5 rounded-full bg-green-500 flex-shrink-0" />}
         </button>
     )
 }
@@ -65,6 +80,7 @@ export default function AISettingsPage() {
     const [taggerResult, setTaggerResult]     = useState<{ success: boolean; message: string } | null>(null)
     const [testingSecton, setTestingSecton]   = useState(false)
     const [testingTagger, setTestingTagger]   = useState(false)
+    const [trainingStatus, setTrainingStatus] = useState<TrainingStatus | null>(null)
 
     const { data: settings, isLoading } = useQuery<Settings>({
         queryKey: ['ai-settings'],
@@ -83,6 +99,29 @@ export default function AISettingsPage() {
         setTaggerUrl(settings.changelogTaggerUrl ?? '')
         setTaggerKey(settings.changelogTaggerApiKey ? MASKED : '')
     }, [settings])
+
+    // Live training progress — connects once a tagger is configured/detected,
+    // closes itself once the stream reports a terminal (non-running) status.
+    const hasTagger = !!settings?.changelogTaggerUrl || !!settings?.changelogTaggerAutoDetected
+    useEffect(() => {
+        if (!hasTagger) return
+        const es = new EventSource('/api/admin/ai-settings/tagger-status')
+        let prevStatus: string | null = null
+        es.onmessage = (e) => {
+            const data: TrainingStatus = JSON.parse(e.data)
+            setTrainingStatus(data)
+            if (prevStatus === 'running' && data.status === 'done') {
+                toast({ title: 'Tagger training complete', description: `Fine-tuned on ${data.records_used} records.` })
+            } else if (prevStatus === 'running' && data.status === 'error') {
+                toast({ title: 'Tagger training failed', description: data.error, variant: 'destructive' })
+            }
+            prevStatus = data.status
+            if (data.status !== 'running') es.close()
+        }
+        es.onerror = () => es.close()
+        return () => es.close()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [hasTagger])
 
     const { mutate: save, isPending: isSaving } = useMutation({
         mutationFn: async (body: Record<string, unknown>) => {
@@ -187,7 +226,7 @@ export default function AISettingsPage() {
                         Services
                     </p>
                     <NavItem icon={Cloud} label="Secton" configured={!!settings?.aiApiKey} active={panel === 'secton'} onClick={() => setPanel('secton')} />
-                    <NavItem icon={Tag}   label="Changelog Tagger" configured={!!taggerUrl || !!settings?.changelogTaggerAutoDetected}  active={panel === 'tagger'} onClick={() => setPanel('tagger')} />
+                    <NavItem icon={Tag}   label="Changelog Tagger" configured={!!taggerUrl || !!settings?.changelogTaggerAutoDetected} training={trainingStatus?.status === 'running'} active={panel === 'tagger'} onClick={() => setPanel('tagger')} />
                 </div>
 
                 {/* Content + footer */}
@@ -288,6 +327,31 @@ export default function AISettingsPage() {
                                                 URL below only if you want to point at a different instance.
                                             </AlertDescription>
                                         </Alert>
+                                    )}
+
+                                    {trainingStatus?.status === 'running' && (
+                                        <div className="rounded-lg border bg-muted/30 p-4 space-y-2.5">
+                                            <div className="flex items-center gap-2 text-sm font-medium">
+                                                <BrainCircuit className="h-4 w-4 text-primary animate-pulse" />
+                                                Training in progress…
+                                                <span className="ml-auto text-muted-foreground font-normal">
+                                                    {trainingStatus.total_steps > 0
+                                                        ? `step ${trainingStatus.current_step}/${trainingStatus.total_steps} (${trainingStatus.progress_pct}%)`
+                                                        : 'starting…'}
+                                                </span>
+                                            </div>
+                                            <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                                                <div
+                                                    className="h-full bg-primary transition-all duration-300"
+                                                    style={{ width: `${Math.max(trainingStatus.progress_pct, 3)}%` }}
+                                                />
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                                Epoch {trainingStatus.current_epoch}/{trainingStatus.total_epochs || '—'}
+                                                {trainingStatus.loss !== null && ` · loss ${trainingStatus.loss.toFixed(4)}`}
+                                                {' · '}the current model keeps serving requests until this finishes
+                                            </p>
+                                        </div>
                                     )}
 
                                     <div className="space-y-2">
