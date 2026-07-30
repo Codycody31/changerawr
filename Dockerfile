@@ -23,6 +23,11 @@ COPY . .
 # Generate Prisma client
 RUN npx prisma generate
 
+# extensionLoader.ts is gitignored (generated, not committed) — regenerate it
+# here so the build has a valid file even on a checkout with no extensions
+# installed yet. Also generates the Tailwind extension safelist.
+RUN npm run extensions:generate
+
 # Next.js collects completely anonymous telemetry data about general usage.
 # Learn more here: https://nextjs.org/telemetry
 # Uncomment the following line in case you want to disable telemetry during the build.
