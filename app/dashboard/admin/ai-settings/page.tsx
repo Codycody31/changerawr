@@ -32,6 +32,8 @@ interface TrainingStatus {
     progress_pct: number
     error: string
     records_used: number
+    is_full: boolean
+    round: number
 }
 
 type ActivePanel = 'secton' | 'tagger'
@@ -337,7 +339,7 @@ export default function AISettingsPage() {
                                         <div className="rounded-lg border bg-muted/30 p-4 space-y-2.5">
                                             <div className="flex items-center gap-2 text-sm font-medium">
                                                 <BrainCircuit className="h-4 w-4 text-primary animate-pulse" />
-                                                Training in progress…
+                                                {trainingStatus.is_full ? 'Full retrain in progress…' : 'Quick update in progress…'}
                                                 <span className="ml-auto text-muted-foreground font-normal">
                                                     {trainingStatus.total_steps > 0
                                                         ? `step ${trainingStatus.current_step}/${trainingStatus.total_steps} (${trainingStatus.progress_pct}%)`
@@ -353,6 +355,7 @@ export default function AISettingsPage() {
                                             <p className="text-xs text-muted-foreground">
                                                 Epoch {trainingStatus.current_epoch}/{trainingStatus.total_epochs || '—'}
                                                 {trainingStatus.loss !== null && ` · loss ${trainingStatus.loss.toFixed(4)}`}
+                                                {' · '}{trainingStatus.is_full ? 'reprocessing the full seed dataset' : 'training on new feedback only'}
                                                 {' · '}the current model keeps serving requests until this finishes
                                             </p>
                                         </div>

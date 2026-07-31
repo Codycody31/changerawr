@@ -21,6 +21,14 @@ export default function AboutPage() {
     const [licenseActive, setLicenseActive] = useState(false);
     const [sslEnabled, setSslEnabled] = useState(false);
     const [agentVersion, setAgentVersion] = useState<{ version?: string; status?: string } | null>(null);
+    const [taggerStatus, setTaggerStatus] = useState<{
+        configured: boolean;
+        autoDetected?: boolean;
+        reachable?: boolean;
+        modelLoaded?: boolean;
+        training?: boolean;
+        version?: string | null;
+    } | null>(null);
     const timezone = useTimezone();
 
     const {
@@ -81,6 +89,14 @@ export default function AboutPage() {
                         }
                     } catch {}
                 }
+
+                // Fetch changelog-tagger status
+                try {
+                    const taggerResponse = await fetch('/api/system/tagger-status');
+                    if (taggerResponse.ok) {
+                        setTaggerStatus(await taggerResponse.json());
+                    }
+                } catch {}
             } catch (error) {
                 console.error('Failed to fetch system info:', error);
             }
@@ -208,6 +224,17 @@ export default function AboutPage() {
                                 <span className="flex items-center gap-1">
                                     {agentVersion.version || 'Unknown'}
                                     {agentVersion.status === 'live' && (
+                                        <Activity className="h-3 w-3 text-green-500"/>
+                                    )}
+                                </span>
+                            </div>
+                        )}
+                        {taggerStatus?.configured && (
+                            <div className="flex justify-between py-1 border-b border-border/40">
+                                <span>Changelog Tagger</span>
+                                <span className="flex items-center gap-1">
+                                    {taggerStatus.version || 'Unknown'}
+                                    {taggerStatus.reachable && taggerStatus.modelLoaded && (
                                         <Activity className="h-3 w-3 text-green-500"/>
                                     )}
                                 </span>
