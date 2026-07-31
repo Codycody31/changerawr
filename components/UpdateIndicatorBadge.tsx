@@ -49,9 +49,6 @@ export const UpdateIndicatorBadge: React.FC = () => {
     }
 
     return (
-        <div className="flex items-center gap-1.5 px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full text-xs font-medium">
-            <AlertCircle className="h-3 w-3 flex-shrink-0" />
-            <span>Update available</span>
-        </div>
+        <AlertCircle className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400 shrink-0" />
     )
 }

@@ -9,7 +9,9 @@ import {
 } from '@/lib/utils/changelog'
 import {z} from "zod";
 import {NextResponse} from 'next/server';
+import {createOrReopenRequest} from '@/lib/services/request/changelog-request';
 import {useEntryViewTracking} from '@/app/changelog/[projectId]/changelog-view'
+import {maybeCreateRevision} from '@/lib/services/core/changelog/revisions'
 
 // Helper to get project ID from changelog entry
 async function getProjectIdFromEntry(entryId: string) {
@@ -249,8 +251,19 @@ export async function PUT(
         const json = await request.json()
         const body: ChangelogEntryInput = changelogEntrySchema.parse(json)
 
+        const entryId = (await params).entryId
+
+        const existingEntry = await db.changelogEntry.findUnique({
+            where: {id: entryId},
+            select: {title: true, content: true, excerpt: true, version: true}
+        })
+
+        if (!existingEntry) {
+            return sendError('Changelog entry not found', 404)
+        }
+
         const entry = await db.changelogEntry.update({
-            where: {id: (await params).entryId},
+            where: {id: entryId},
             data: {
                 title: body.title,
                 content: body.content,
@@ -268,6 +281,29 @@ export async function PUT(
                 tags: true
             }
         })
+
+        // Record a version history checkpoint (best-effort, never blocks the save)
+        try {
+            await maybeCreateRevision({
+                entryId,
+                userId: user.id,
+                before: {
+                    title: existingEntry.title,
+                    content: existingEntry.content,
+                    excerpt: existingEntry.excerpt,
+                    version: existingEntry.version,
+                },
+                after: {
+                    title: entry.title,
+                    content: entry.content,
+                    excerpt: entry.excerpt,
+                    version: entry.version,
+                },
+                isManual: true,
+            })
+        } catch (revisionError) {
+            console.error('Failed to record changelog entry revision:', revisionError)
+        }
 
         return sendSuccess(entry)
     } catch (error) {
@@ -360,16 +396,13 @@ export async function DELETE(
             return sendError('Changelog entry not found', 404)
         }
 
-        // If user is staff, create a deletion request
+        // If user is staff, create (or reopen if CHANGES_REQUESTED) a deletion request
         if (user.role === 'STAFF') {
-            const request = await db.changelogRequest.create({
-                data: {
-                    type: 'DELETE_ENTRY',
-                    status: 'PENDING',
-                    staffId: user.id,
-                    changelogEntryId: (await params).entryId,
-                    projectId: projectId
-                }
+            const request = await createOrReopenRequest({
+                type: 'DELETE_ENTRY',
+                staffId: user.id,
+                changelogEntryId: (await params).entryId,
+                projectId: projectId,
             })
 
             return sendSuccess({

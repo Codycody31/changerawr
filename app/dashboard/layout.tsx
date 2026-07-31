@@ -3,6 +3,7 @@
 import React, {useEffect, useState} from 'react'
 import {useRouter} from 'next/navigation'
 import {useAuth} from '@/context/auth'
+import {SidebarOverrideContext} from '@/context/sidebar-override'
 import {
     BookmarkIcon,
     ChartNoAxesCombined,
@@ -17,6 +18,7 @@ import {
     LayoutGrid,
     Loader2,
     PanelRightClose,
+    Puzzle,
     ServerCog,
     Settings,
     Shield,
@@ -30,8 +32,11 @@ import {useWhatsNew} from '@/hooks/useWhatsNew'
 import {NavSection, Sidebar, SidebarUser} from '@/components/ui/sidebar'
 import {getGravatarUrl} from '@/lib/utils/gravatar'
 import {CommandPaletteProvider} from "@/components/providers/CommandPaletteProvider"
+import {UpdateIndicatorBadge} from '@/components/UpdateIndicatorBadge'
+import {PendingRequestsBadge} from '@/components/PendingRequestsBadge'
 import {TelemetryPromptModal} from '@/components/telemetry/PromptModal'
 import {useTelemetry} from '@/hooks/useTelemetry'
+import {DevToolsConsole} from '@/components/extensions/DevToolsConsole'
 
 // Navigation Configuration
 const NAV_SECTIONS: NavSection[] = [
@@ -98,6 +103,12 @@ const NAV_SECTIONS: NavSection[] = [
                 requiredRole: ['ADMIN']
             },
             {
+                href: "/dashboard/admin/extensions",
+                label: "Extensions",
+                icon: Puzzle,
+                requiredRole: ['ADMIN']
+            },
+            {
                 href: "/dashboard/admin/audit-logs",
                 label: "Audit Logs",
                 icon: FileText,
@@ -113,7 +124,8 @@ const NAV_SECTIONS: NavSection[] = [
                 href: "/dashboard/admin/requests",
                 label: "Requests",
                 icon: ClipboardCheck,
-                requiredRole: ['ADMIN']
+                requiredRole: ['ADMIN'],
+                badge: <PendingRequestsBadge />
             },
             {
                 href: "/dashboard/admin/system",
@@ -125,7 +137,8 @@ const NAV_SECTIONS: NavSection[] = [
                 href: "/dashboard/admin/about",
                 label: "About",
                 icon: Info,
-                requiredRole: ['ADMIN']
+                requiredRole: ['ADMIN'],
+                badge: <UpdateIndicatorBadge />
             },
         ]
     },
@@ -170,6 +183,8 @@ export default function DashboardLayout({
     const {user, isLoading, logout} = useAuth()
     const [sidebarExpanded, setSidebarExpanded] = useState(true)
     const [sidebarVisible, setSidebarVisible] = useState(true)
+    const [isProjectSidebarActive, setProjectSidebarActive] = useState(false)
+    const [isProjectSidebarCollapsed, setProjectSidebarCollapsed] = useState(false)
     const isMobile = useMediaQuery('(max-width: 768px)')
     const isTablet = useMediaQuery('(max-width: 1024px)')
 
@@ -223,8 +238,26 @@ export default function DashboardLayout({
         }
     }, [sidebarExpanded, sidebarVisible, isTablet, isMobile])
 
+    // Store project sidebar collapsed state in localStorage
+    useEffect(() => {
+        try {
+            localStorage.setItem('projectSidebarCollapsed', String(isProjectSidebarCollapsed))
+        } catch (error) {
+            console.error('Error saving project sidebar state:', error)
+        }
+    }, [isProjectSidebarCollapsed])
+
     // Load sidebar state from localStorage on initial load
     useEffect(() => {
+        try {
+            const savedProjectCollapsedState = localStorage.getItem('projectSidebarCollapsed')
+            if (savedProjectCollapsedState !== null) {
+                setProjectSidebarCollapsed(savedProjectCollapsedState === 'true')
+            }
+        } catch (error) {
+            console.error('Error loading project sidebar state:', error)
+        }
+
         if (!isTablet && !isMobile) {
             try {
                 const savedExpandedState = localStorage.getItem('sidebarExpanded')
@@ -252,36 +285,41 @@ export default function DashboardLayout({
     }
 
     return (
+        <SidebarOverrideContext.Provider value={{ isProjectSidebarActive, setProjectSidebarActive, isProjectSidebarCollapsed, setProjectSidebarCollapsed }}>
         <CommandPaletteProvider>
             <div className="min-h-screen bg-background">
-                <Sidebar
-                    user={sidebarUser}
-                    sections={NAV_SECTIONS}
-                    onLogout={logout}
-                    brandName="Changerawr"
-                    brandHref="/dashboard"
-                    isExpanded={sidebarExpanded}
-                    setIsExpanded={setSidebarExpanded}
-                    isVisible={sidebarVisible}
-                    // setIsVisible={setSidebarVisible}
-                />
+                {!isProjectSidebarActive && (
+                    <Sidebar
+                        user={sidebarUser}
+                        sections={NAV_SECTIONS}
+                        onLogout={logout}
+                        brandName="Changerawr"
+                        brandHref="/dashboard"
+                        isExpanded={sidebarExpanded}
+                        setIsExpanded={setSidebarExpanded}
+                        isVisible={sidebarVisible}
+                        // setIsVisible={setSidebarVisible}
+                    />
+                )}
 
                 {/* Main content area with proper responsive behavior */}
                 <main
                     className={cn(
                         "min-h-screen transition-all duration-300 ease-in-out",
                         // Mobile: always full width with top padding for mobile header
-                        "pt-16 md:pt-0",
+                        "pt-14 md:pt-0",
                         // Desktop: adjust margin based on sidebar state
-                        !isMobile && (
-                            sidebarVisible
-                                ? (sidebarExpanded ? "md:ml-64" : "md:ml-16")
-                                : "md:ml-0"
-                        )
+                        isProjectSidebarActive
+                            ? (isProjectSidebarCollapsed ? "md:ml-16" : "md:ml-64")
+                            : (!isMobile && (
+                                sidebarVisible
+                                    ? (sidebarExpanded ? "md:ml-64" : "md:ml-16")
+                                    : "md:ml-0"
+                            ))
                     )}
                 >
                     {/* Show sidebar toggle when hidden */}
-                    {!sidebarVisible && !isMobile && (
+                    {!isProjectSidebarActive && !sidebarVisible && !isMobile && (
                         <div className="fixed top-4 left-4 z-50 group">
                             {/* Larger invisible hover trigger area */}
                             <div className="absolute -inset-4 w-16 h-16"/>
@@ -308,6 +346,9 @@ export default function DashboardLayout({
                     </div>
                 </main>
 
+                {/* Dev Tools Console (only in development) */}
+                <DevToolsConsole />
+
                 {/* Telemetry Prompt Modal */}
                 {user && (
                     <TelemetryPromptModal
@@ -326,5 +367,6 @@ export default function DashboardLayout({
                 )}
             </div>
         </CommandPaletteProvider>
+        </SidebarOverrideContext.Provider>
     )
 }

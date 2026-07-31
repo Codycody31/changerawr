@@ -15,6 +15,7 @@ import {
     Code,
     ExternalLink,
     FileText,
+    FolderKanban,
     Globe,
     Mail,
     Plus,
@@ -37,6 +38,7 @@ import {
     CardContent,
 } from '@/components/ui/card';
 import {Separator} from '@/components/ui/separator';
+import {DynamicIcon} from '@/components/ui/icon-picker';
 import {useToast} from '@/hooks/use-toast';
 
 import {EmptyStateWithImport} from '@/components/projects/importing/ImportDataPrompt';
@@ -45,6 +47,8 @@ import {ImportResult} from '@/lib/types/projects/importing';
 interface Project {
     id: string;
     name: string;
+    color: string | null;
+    icon: string | null;
     isPublic: boolean;
     allowAutoPublish: boolean;
     requireApproval: boolean;
@@ -439,9 +443,19 @@ export default function ProjectPage({params}: ProjectPageProps) {
             >
                 <div className="flex gap-4 items-center">
                     <Avatar
-                        className="h-16 w-16 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-medium text-2xl border-2 border-primary/20">
-                        <AvatarFallback>
-                            {project.name.substring(0, 1).toUpperCase()}
+                        className="h-16 w-16 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-medium text-2xl border-2 border-primary/20"
+                        style={project.color ? {
+                            backgroundColor: `${project.color}1a`,
+                            borderColor: `${project.color}40`,
+                            color: project.color,
+                        } : undefined}
+                    >
+                        <AvatarFallback className="bg-transparent">
+                            {project.icon ? (
+                                <DynamicIcon name={project.icon} fallback={FolderKanban} className="h-7 w-7"/>
+                            ) : (
+                                project.name.substring(0, 1).toUpperCase()
+                            )}
                         </AvatarFallback>
                     </Avatar>
                     <div>

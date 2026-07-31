@@ -1,8 +1,10 @@
 'use client';
 
-import React, {useMemo} from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {renderMarkdown} from '@/lib/services/core/markdown/useCustomExtensions';
 import {useDebounce} from "use-debounce";
+import {useEmbedEnhancements} from '@/hooks/use-embed-enhancements';
+import {useCodeCopyButtons} from '@/lib/services/core/markdown/extensions/syntax-highlight/useCodeCopyButtons';
 
 interface RenderMarkdownProps {
     children: string;
@@ -16,17 +18,41 @@ export const RenderMarkdown: React.FC<RenderMarkdownProps> = ({
                                                               }) => {
     // Use our new markdown renderer
     const [debouncedContent] = useDebounce(children || '', 300);
+    const [renderedHtml, setRenderedHtml] = useState<string>('');
+    const containerRef = useRef<HTMLDivElement>(null);
 
-    const renderedHtml = useMemo(() => {
+    useEmbedEnhancements(containerRef, [renderedHtml]);
+    const copyButtonPortals = useCodeCopyButtons(containerRef, [renderedHtml]);
+
+    useEffect(() => {
+        let cancelled = false;
+
         const content = debouncedContent || '';
-        return renderMarkdown(content);
+        renderMarkdown(content).then((html) => {
+            if (!cancelled) {
+                setRenderedHtml(html);
+            }
+        }).catch((error) => {
+            console.error('Failed to render markdown:', error);
+            if (!cancelled) {
+                setRenderedHtml('<p>Error rendering markdown</p>');
+            }
+        });
+
+        return () => {
+            cancelled = true;
+        };
     }, [debouncedContent]);
 
     return (
-        <div
-            className={`prose max-w-none prose-img:my-4 prose-headings:mt-6 prose-headings:mb-4 prose-p:mb-4 prose-pre:my-4 prose-blockquote:my-4 ${className}`}
-            dangerouslySetInnerHTML={{__html: renderedHtml}}
-            suppressHydrationWarning
-        />
+        <>
+            <div
+                ref={containerRef}
+                className={`prose max-w-none prose-img:my-4 prose-headings:mt-6 prose-headings:mb-4 prose-p:mb-4 prose-pre:my-4 prose-blockquote:my-4 ${className}`}
+                dangerouslySetInnerHTML={{__html: renderedHtml}}
+                suppressHydrationWarning
+            />
+            {copyButtonPortals}
+        </>
     );
 };

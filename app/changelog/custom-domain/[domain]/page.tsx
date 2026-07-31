@@ -19,6 +19,7 @@ import SubscriptionForm from "@/components/subscription-form";
 import {trackChangelogView} from "@/lib/middleware/analytics";
 import {headers} from "next/headers";
 import {getDomainByDomain} from '@/lib/custom-domains/service';
+import MaintenancePage from '@/components/changelog/MaintenancePage';
 
 interface ChangelogResponse {
     project: {
@@ -26,6 +27,10 @@ interface ChangelogResponse {
         name: string;
         description?: string;
         emailNotificationsEnabled?: boolean;
+        maintenanceMode?: boolean;
+        maintenanceMessage?: string | null;
+        allowIndexing?: boolean;
+        enableRss?: boolean;
     };
     items: Array<{
         id: string;
@@ -45,7 +50,7 @@ type CustomDomainPageProps = {
 async function getInitialData(projectId: string): Promise<ChangelogResponse | null> {
     const res = await fetch(
         `${process.env.NEXT_PUBLIC_APP_URL}/api/changelog/${projectId}/entries`,
-        {next: {revalidate: 300}}
+        {next: {revalidate: 300, tags: [`changelog-${projectId}`]}}
     );
 
     if (!res.ok) {
@@ -109,10 +114,13 @@ export async function generateMetadata(
         },
         alternates: {
             canonical: `https://${domain}`,
-            types: {
+            types: data.project.enableRss === false ? undefined : {
                 'application/rss+xml': `https://${domain}/rss.xml`,
             },
         },
+        robots: data.project.allowIndexing === false
+            ? {index: false, follow: false}
+            : undefined,
     };
 }
 
@@ -235,6 +243,10 @@ export default async function CustomDomainPage({params}: CustomDomainPageProps) 
         notFound();
     }
 
+    if (data.project.maintenanceMode) {
+        return <MaintenancePage projectName={data.project.name} message={data.project.maintenanceMessage}/>;
+    }
+
     // Track the changelog view asynchronously (don't block rendering)
     try {
         const headersList = await headers();
@@ -329,25 +341,29 @@ export default async function CustomDomainPage({params}: CustomDomainPageProps) 
                                     </>
                                 )}
 
-                                <div className="hidden md:block w-1.5 h-1.5 rounded-full bg-border"/>
+                                {data.project.enableRss !== false && (
+                                    <>
+                                        <div className="hidden md:block w-1.5 h-1.5 rounded-full bg-border"/>
 
-                                <TooltipProvider>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Link
-                                                href="/rss.xml"
-                                                className="flex items-center gap-2 text-muted-foreground hover:text-orange-500 transition-colors duration-200"
-                                                aria-label="Subscribe to RSS feed"
-                                            >
-                                                <Rss className="w-5 h-5"/>
-                                                <span className="font-medium text-lg">RSS</span>
-                                            </Link>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            Subscribe to updates via RSS
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </TooltipProvider>
+                                        <TooltipProvider>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Link
+                                                        href="/rss.xml"
+                                                        className="flex items-center gap-2 text-muted-foreground hover:text-orange-500 transition-colors duration-200"
+                                                        aria-label="Subscribe to RSS feed"
+                                                    >
+                                                        <Rss className="w-5 h-5"/>
+                                                        <span className="font-medium text-lg">RSS</span>
+                                                    </Link>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    Subscribe to updates via RSS
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                    </>
+                                )}
 
                                 <div className="hidden md:block w-1.5 h-1.5 rounded-full bg-border"/>
 

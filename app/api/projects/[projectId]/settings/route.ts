@@ -1,15 +1,36 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { Prisma } from '@prisma/client'
+import { revalidateTag } from 'next/cache'
 import { db } from '@/lib/db'
 import { validateAuthAndGetUser } from '@/lib/utils/changelog'
 import { createAuditLog } from '@/lib/utils/auditLog' // Add this import
 
+// Validation schema for a custom RSS feed builder configuration
+const rssFeedConfigSchema = z.object({
+    feedTitle: z.string().max(200).nullable().optional(),
+    feedDescription: z.string().max(500).nullable().optional(),
+    includeTags: z.boolean().optional(),
+    includeVersion: z.boolean().optional(),
+    tagFilter: z.array(z.string()).max(50).optional(),
+    itemTemplate: z.string().max(5000).nullable().optional(),
+})
+
 // Validation schema for project settings
 const projectSettingsSchema = z.object({
     name: z.string().min(1).optional(),
+    color: z.string().max(20).nullable().optional(),
+    icon: z.string().max(50).nullable().optional(),
     isPublic: z.boolean().optional(),
     allowAutoPublish: z.boolean().optional(),
     requireApproval: z.boolean().optional(),
+    maintenanceMode: z.boolean().optional(),
+    maintenanceMessage: z.string().max(2000).nullable().optional(),
+    allowIndexing: z.boolean().optional(),
+    enableRss: z.boolean().optional(),
+    rssItemLimit: z.number().int().min(1).max(100).optional(),
+    rssFullContent: z.boolean().optional(),
+    rssFeedConfig: rssFeedConfigSchema.nullable().optional(),
     defaultTags: z.array(z.string()).optional(),
 })
 
@@ -51,9 +72,18 @@ export async function GET(
             select: {
                 id: true,
                 name: true,
+                color: true,
+                icon: true,
                 isPublic: true,
                 allowAutoPublish: true,
                 requireApproval: true,
+                maintenanceMode: true,
+                maintenanceMessage: true,
+                allowIndexing: true,
+                enableRss: true,
+                rssItemLimit: true,
+                rssFullContent: true,
+                rssFeedConfig: true,
                 defaultTags: true,
                 updatedAt: true,
             }
@@ -200,8 +230,8 @@ export async function PATCH(
         const body = await request.json()
         const validatedData = projectSettingsSchema.parse(body)
 
-        // Access settings (isPublic, allowAutoPublish, requireApproval) are admin-only
-        const accessFields = ['isPublic', 'allowAutoPublish', 'requireApproval'] as const
+        // Access settings (isPublic, allowAutoPublish, requireApproval, maintenance, indexing, rss) are admin-only
+        const accessFields = ['isPublic', 'allowAutoPublish', 'requireApproval', 'maintenanceMode', 'maintenanceMessage', 'allowIndexing', 'enableRss', 'rssItemLimit', 'rssFullContent', 'rssFeedConfig'] as const
         if (user.role !== 'ADMIN') {
             const attemptedAccessChange = accessFields.find(field => validatedData[field] !== undefined)
             if (attemptedAccessChange) {
@@ -255,6 +285,20 @@ export async function PATCH(
             };
         }
 
+        if (validatedData.color !== undefined && validatedData.color !== existingProject.color) {
+            changes.color = {
+                from: existingProject.color,
+                to: validatedData.color
+            };
+        }
+
+        if (validatedData.icon !== undefined && validatedData.icon !== existingProject.icon) {
+            changes.icon = {
+                from: existingProject.icon,
+                to: validatedData.icon
+            };
+        }
+
         if (validatedData.isPublic !== undefined && validatedData.isPublic !== existingProject.isPublic) {
             changes.isPublic = {
                 from: existingProject.isPublic,
@@ -276,6 +320,56 @@ export async function PATCH(
             };
         }
 
+        if (validatedData.maintenanceMode !== undefined && validatedData.maintenanceMode !== existingProject.maintenanceMode) {
+            changes.maintenanceMode = {
+                from: existingProject.maintenanceMode,
+                to: validatedData.maintenanceMode
+            };
+        }
+
+        if (validatedData.maintenanceMessage !== undefined && validatedData.maintenanceMessage !== existingProject.maintenanceMessage) {
+            changes.maintenanceMessage = {
+                from: existingProject.maintenanceMessage,
+                to: validatedData.maintenanceMessage
+            };
+        }
+
+        if (validatedData.allowIndexing !== undefined && validatedData.allowIndexing !== existingProject.allowIndexing) {
+            changes.allowIndexing = {
+                from: existingProject.allowIndexing,
+                to: validatedData.allowIndexing
+            };
+        }
+
+        if (validatedData.enableRss !== undefined && validatedData.enableRss !== existingProject.enableRss) {
+            changes.enableRss = {
+                from: existingProject.enableRss,
+                to: validatedData.enableRss
+            };
+        }
+
+        if (validatedData.rssItemLimit !== undefined && validatedData.rssItemLimit !== existingProject.rssItemLimit) {
+            changes.rssItemLimit = {
+                from: existingProject.rssItemLimit,
+                to: validatedData.rssItemLimit
+            };
+        }
+
+        if (validatedData.rssFullContent !== undefined && validatedData.rssFullContent !== existingProject.rssFullContent) {
+            changes.rssFullContent = {
+                from: existingProject.rssFullContent,
+                to: validatedData.rssFullContent
+            };
+        }
+
+        if (validatedData.rssFeedConfig !== undefined &&
+            JSON.stringify(validatedData.rssFeedConfig) !== JSON.stringify(existingProject.rssFeedConfig)) {
+            changes.rssFeedConfig = {
+                from: existingProject.rssFeedConfig,
+                to: validatedData.rssFeedConfig
+            };
+        }
+
         if (validatedData.defaultTags !== undefined) {
             const currentTags = existingProject.defaultTags || [];
             const newTags = validatedData.defaultTags;
@@ -290,20 +384,34 @@ export async function PATCH(
         }
 
         // Update project settings
+        const { rssFeedConfig, ...restValidatedData } = validatedData
+
         const updatedProject = await db.project.update({
             where: {
                 id: projectId
             },
             data: {
-                ...validatedData,
+                ...restValidatedData,
+                ...(rssFeedConfig !== undefined && {
+                    rssFeedConfig: rssFeedConfig === null ? Prisma.DbNull : (rssFeedConfig as Prisma.InputJsonValue)
+                }),
                 updatedAt: new Date()
             },
             select: {
                 id: true,
                 name: true,
+                color: true,
+                icon: true,
                 isPublic: true,
                 allowAutoPublish: true,
                 requireApproval: true,
+                maintenanceMode: true,
+                maintenanceMessage: true,
+                allowIndexing: true,
+                enableRss: true,
+                rssItemLimit: true,
+                rssFullContent: true,
+                rssFeedConfig: true,
                 defaultTags: true,
                 updatedAt: true,
             }
@@ -324,6 +432,18 @@ export async function PATCH(
                 auditAction = validatedData.allowAutoPublish ? 'ENABLE_AUTO_PUBLISH' : 'DISABLE_AUTO_PUBLISH';
             } else if (changedField === 'requireApproval') {
                 auditAction = validatedData.requireApproval ? 'ENABLE_APPROVAL_REQUIREMENT' : 'DISABLE_APPROVAL_REQUIREMENT';
+            } else if (changedField === 'maintenanceMode') {
+                auditAction = validatedData.maintenanceMode ? 'ENABLE_MAINTENANCE_MODE' : 'DISABLE_MAINTENANCE_MODE';
+            } else if (changedField === 'allowIndexing') {
+                auditAction = validatedData.allowIndexing ? 'ENABLE_SEARCH_INDEXING' : 'DISABLE_SEARCH_INDEXING';
+            } else if (changedField === 'enableRss') {
+                auditAction = validatedData.enableRss ? 'ENABLE_RSS_FEED' : 'DISABLE_RSS_FEED';
+            } else if (changedField === 'rssItemLimit') {
+                auditAction = 'UPDATE_RSS_ITEM_LIMIT';
+            } else if (changedField === 'rssFullContent') {
+                auditAction = validatedData.rssFullContent ? 'ENABLE_RSS_FULL_CONTENT' : 'DISABLE_RSS_FULL_CONTENT';
+            } else if (changedField === 'rssFeedConfig') {
+                auditAction = validatedData.rssFeedConfig === null ? 'RESET_RSS_FEED_BUILDER' : 'UPDATE_RSS_FEED_BUILDER';
             }
         }
 
@@ -343,6 +463,12 @@ export async function PATCH(
             );
         } catch (auditLogError) {
             console.error('Failed to create update audit log:', auditLogError);
+        }
+
+        // Public changelog pages cache their data for 5 minutes; bust that
+        // cache immediately so changes (e.g. maintenance mode) take effect right away.
+        if (Object.keys(changes).length > 0) {
+            revalidateTag(`changelog-${updatedProject.id}`, 'max')
         }
 
         return new NextResponse(JSON.stringify(updatedProject), {

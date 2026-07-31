@@ -4,7 +4,7 @@
 </p>
 
 
-[![Version](https://img.shields.io/badge/version-1.0.5-blue.svg)](https://github.com/supernova3339/changerawr)
+[![Version](https://img.shields.io/badge/version-1.0.7-blue.svg)](https://github.com/supernova3339/changerawr)
 [![Status](https://img.shields.io/badge/status-Production%20Ready-green.svg)](https://github.com/supernova3339/changerawr)
 [![License](https://img.shields.io/badge/license-CNC%20OSL-purple.svg)](LICENSE)
 
@@ -13,7 +13,7 @@
 Changerawr lets you write down what you changed, then share those changes with people. You write entries about updates you made, and Changerawr gives you ways to display them - like widgets for your website, public pages people can visit, or APIs to use however you want. \
 You can think of it as a **Changelog Management System** [CMS]
 
-If you don't know what a changelog is, check out [betterauth](https://www.better-auth.com/changelogs) for an example!
+If you don't know what a changelog is, check out [betterauth](https://www.better-auth.com/changelog) for an example!
 
 ## ✨ Why Changerawr?
 
@@ -23,26 +23,50 @@ If you don't know what a changelog is, check out [betterauth](https://www.better
 
 **For everyone.** Whether you're a solo developer, small business, or enterprise team - Changerawr scales with you. ( yes, this means you can use it for commercial usage! just please do reach out if you do, I would love to know how your using Changerawr! )
 
-## 🚀 Features
+## 🚀 A few of Changerawr's many features 👇
 
-- **📝 Beautiful Content Editor** - Write changelogs that look professional
-- **🤖 AI-Powered** - Let AI help you write better changelog entries
-- **📡 Headless API** - Beautifully documented REST API for full control
+- **📝 Beautiful Content Editor** - Write professional changelogs that look polished, with the tooling to make them perfect
+- **🕰️ Full Revision History** - Git-like experience flexible enough to satisfy authors and administrators alike
+- **🤖 AI-Powered** - Let AI help you write better changelog entries and more
+- **📡 Headless API**: Fully documented REST API mirrors core functionality, enabling complete application control without extra setup
 - **🧩 SDKs** - Pre-built libraries for popular languages
-- **🎨 Embeddable Widget** - Drop a changelog widget anywhere on your site
+- **🎨 Embeddable Widgets** - Drop a changelog widget anywhere on your site in four different flavors
 - **📧 Email Notifications** - Keep users informed of updates
-- **🏷️ Tags & Versioning** - Organize entries exactly how you want
-- **🔗 Multiple Integrations** - Connect with your existing tools
-- **🔐 Modern Authentication** - Custom-built auth with passkey support
+- **🏷️ Tags & Versioning** - Organize entries exactly how you want and color tags to match the mood
+- **🔗 Multiple Integrations** - Connect with your existing tools, e.g., Slack
+- **🔐 Modern Authentication** - Custom-built authentication with passkey, OAuth2, and SAML support out of the box
 - **🖥️ Desktop-First Design** - Built for desktop use (mobile works, but it's quirky)
 - **🔍 Full-Text Search** - Search everything, instantly
-- -**🌐 Custom Domains** - Link a custom domain to your changelog
+- **🔌 Fully Extendable** - Add your own [Changerawr Universal Markdown](https://github.com/changerawr/markdown) extensions to the content editor, and share them with everyone!*
+- **🌐 Custom Domains** - Link a custom domain to your changelog ( you can give it an SSL certificate, too!** )
+
+<sup><sub>* Sharing extensions is really easy! Just follow our [example repository](https://github.com/changerawr/extension-store) to get started! If you have any questions, send us an e-mail! We're more than happy to help you!</sub></sup> \
+<sup><sub>** SSL Certificates require having the [nginx-sidecar](https://github.com/Changerawr/nginx-agent) setup and configured correctly. - We reccomend following our [setup guide](https://github.com/Changerawr/nginx-agent/blob/master/chragent.conf.example) for the best possible results.</sub></sup>
+
+## 📸 A peek inside
+
+<!-- GALLERY:START -->
+<table align="center">
+  <tr>
+    <td width="25%"><img src="screenshots/gallery/screenshots_dashboard.png" width="100%" alt="Dashboard overview" /></td>
+    <td width="25%"><img src="screenshots/gallery/screenshots_dashboard_projects.png" width="100%" alt="Projects list" /></td>
+    <td width="25%"><img src="screenshots/gallery/screenshots_dashboard_projects_projectId_changelog.png" width="100%" alt="Changelog view" /></td>
+    <td width="25%"><img src="screenshots/gallery/screenshots_dashboard_projects_projectId_changelog_new.png" width="100%" alt="New changelog entry editor" /></td>
+  </tr>
+  <tr>
+    <td width="25%"><img src="screenshots/gallery/screenshots_dashboard_admin_users.png" width="100%" alt="Admin user management" /></td>
+    <td width="25%"><img src="screenshots/gallery/screenshots_dashboard_admin_audit-logs.png" width="100%" alt="Admin audit logs" /></td>
+    <td width="25%"><img src="screenshots/gallery/screenshots_dashboard_admin_ai-settings.png" width="100%" alt="AI settings" /></td>
+    <td width="25%"><img src="screenshots/gallery/screenshots_dashboard_projects_projectId_settings_tags.png" width="100%" alt="Tag management" /></td>
+  </tr>
+</table>
+<!-- GALLERY:END -->
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- Node.js 22+
+- Node.js 24+
 - PostgreSQL database
 
 ### Installation
@@ -80,7 +104,7 @@ docker-compose up --build
 
 ## ⚙️ Configuration
 
-### Environment Variables
+### Environment Variables*
 
 ```bash
 # Database
@@ -96,39 +120,7 @@ GITHUB_ENCRYPTION_KEY="your-github-encryption-key"
 # Analytics
 ANALYTICS_SALT="your-secure-random-salt-here"
 ```
-
-## 📦 Widget Integration
-
-The easiest way to add changelogs to your site - perfect for non-technical users:
-
-```html
-<!-- Basic widget -->
-<script 
-  src="https://your-changerawr.com/api/widget/your-project-id" 
-  data-theme="light"
-  async
-></script>
-
-<!-- Popup widget -->
-<button id="updates-btn">What's New?</button>
-<script 
-  src="https://your-changerawr.com/api/widget/your-project-id" 
-  data-popup="true"
-  data-trigger="updates-btn"
-  async
-></script>
-```
-
-### Widget Options
-
-| Option | Type    |     Default     | Description |
-|--------|---------|:---------------:|-------------|
-| `data-theme` | string  |     "light"     | Theme: "light" or "dark" |
-| `data-position` | string  | "bottom-right"  | Popup position |
-| `data-max-height` | string  |     "400px"     | Maximum height |
-| `data-popup` | boolean |      false      | Enable popup mode |
-| `data-trigger` | string  |      null       | Button ID or "immediate" |
- | `data-max-entries` | number  |        3        | Amount of entries to display, min 3 max 10
+<sup><sub>This is not a full list, refer to the .env.example for a full list.</sub></sup>
 
 ## 🛠️ Tech Stack
 
@@ -139,6 +131,7 @@ The easiest way to add changelogs to your site - perfect for non-technical users
 - **PostgreSQL** - Robust, scalable database
 - **Shadcn/UI** - Beautiful, accessible UI components
 - **TypeScript** - Full type safety throughout
+- **Changerawr Universal Markdown** - Our in-house content engine
 
 ## 🏗️ Development
 
@@ -197,6 +190,27 @@ docker run -p 3000:3000 \
   changerawr
 ```
 
+#### Optional: AI changelog tagger
+
+`docker-compose.yml` / `docker-compose-online.yml` already run this alongside the app automatically — nothing to configure. If you're deploying from the bare `Dockerfile` (no compose), start it yourself as a sibling container on a shared network and point Changerawr at it:
+
+```bash
+# Shared network so the containers can reach each other by name
+docker network create changerawr-net
+
+# Start the tagger (own image — separate from the app, ~1GB of model weights)
+docker run -d --name changerawr-tagger --network changerawr-net \
+  --memory=4g --memory-swap=4g \
+  -e PORT=31672 \
+  -v tagger_models:/app/models -v tagger_data:/app/runtime \
+  ghcr.io/changerawr/tag-ai:latest
+
+# Point the app at it (add to the `docker run` above, plus --network changerawr-net)
+-e CHANGELOG_TAGGER_URL="http://changerawr-tagger:31672"
+```
+
+Changerawr auto-detects it via that URL — no admin UI setup needed. If it's unreachable, tag suggestions are just silently unavailable; nothing else is affected. See [Changerawr/tag-ai](https://github.com/Changerawr/tag-ai) for details.
+
 ### Manual Deployment
 
 ```bash
@@ -206,23 +220,6 @@ npm run build:widget
 npm run generate-swagger
 npm start:with-maintenance
 ```
-
-## 🎯 Features in Detail
-
-### AI-Powered Writing
-Let AI help you craft professional changelog entries that your users will actually want to read.
-
-### Custom Authentication
-Built from scratch with modern features like passkeys. No third-party restrictions, full control.
-
-### Developer-First API
-Clean, well-documented REST API with SDKs for popular languages. Build exactly what you need.
-
-### Email Notifications
-Keep your users in the loop with beautiful email updates when you ship new features.
-
-### Full Customization
-Tags, versioning - organize your changelogs exactly how your team works.
 
 ## 🤝 Contributing
 

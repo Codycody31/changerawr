@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { User } from '@prisma/client';
+import { installFetchInterceptor } from '@/lib/auth/fetch-interceptor'
 
 interface AuthContextType {
     user: User | null
@@ -122,6 +123,12 @@ export function AuthProvider({
             router.push('/login')
         }
     }, [router])
+
+    // Self-heal expired access tokens on any 401, regardless of whether the
+    // scheduled refresh below has fired yet.
+    useEffect(() => {
+        installFetchInterceptor()
+    }, [])
 
     // Initial auth check
     useEffect(() => {

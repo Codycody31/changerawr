@@ -4,9 +4,18 @@
 model Project {
   id                  String                     @id @default(cuid())
   name                String
+  color               String?
+  icon                String?
   isPublic            Boolean                    @default(false)
   allowAutoPublish    Boolean                    @default(false)
   requireApproval     Boolean                    @default(true)
+  maintenanceMode     Boolean                    @default(false)
+  maintenanceMessage  String?                    @db.Text
+  allowIndexing       Boolean                    @default(true)
+  enableRss           Boolean                    @default(true)
+  rssItemLimit        Int                        @default(10)
+  rssFullContent      Boolean                    @default(true)
+  rssFeedConfig       Json?
   defaultTags         String[]                   @default([])
   changelog           Changelog?
   createdAt           DateTime                   @default(now())
@@ -50,10 +59,42 @@ model ChangelogEntry {
   requests       ChangelogRequest[]
   analyticsViews PublicChangelogAnalytics[]
   scheduledJobs  ScheduledJob[]
+  revisions      ChangelogEntryRevision[]
 
   @@index([changelogId])
   @@index([scheduledAt])
   @@index([scheduledAt, publishedAt])
+}
+
+model ChangelogEntryRevision {
+  id      String         @id @default(cuid())
+  entry   ChangelogEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  entryId String
+
+  title   String
+  content String  @db.Text
+  excerpt String? @db.Text
+  version String?
+
+  linesAdded   Int @default(0)
+  linesRemoved Int @default(0)
+
+  createdBy   User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdById String?
+
+  reason         String // 'manual' | 'autosave' | 'restore' | 'initial'
+  restoredFromId String?
+
+  label  String? // user-defined marker title
+  icon   String? // lucide-react icon name for the marker
+  color  String? // hex color for the marker, e.g. #3b82f6
+  pinned Boolean @default(false) // user-pinned checkpoint, surfaced at the top of the history list
+
+  createdAt DateTime @default(now())
+
+  @@index([entryId])
+  @@index([entryId, createdAt])
+  @@index([entryId, pinned, createdAt])
 }
 
 model ChangelogTag {

@@ -3,10 +3,11 @@ import {NextResponse} from 'next/server'
 import {db} from '@/lib/db'
 import {validateAuthAndGetUser} from '@/lib/utils/changelog'
 import {z} from 'zod'
+import {createOrReopenRequest} from '@/lib/services/request/changelog-request'
 import {Prisma} from "@prisma/client";
 
 const requestSchema = z.object({
-    type: z.enum(['DELETE_PROJECT', 'DELETE_TAG', 'DELETE_ENTRY', 'ALLOW_PUBLISH', 'ALLOW_SCHEDULE']),
+    type: z.enum(['DELETE_PROJECT', 'DELETE_TAG', 'DELETE_ENTRY', 'DELETE_ALL_ENTRIES', 'DELETE_ALL_HISTORY', 'ALLOW_PUBLISH', 'ALLOW_SCHEDULE']),
     projectId: z.string(),
     targetId: z.string().optional()
 })
@@ -73,9 +74,9 @@ export async function GET(request: Request) {
         const {searchParams} = new URL(request.url)
         const projectId = searchParams.get('projectId')
 
-        // Build the base query
+        // Build the base query — include resubmitted requests alongside pending ones
         const whereClause: Prisma.ChangelogRequestWhereInput = {
-            status: 'PENDING',
+            status: { in: ['PENDING', 'CHANGES_REQUESTED_PENDING'] },
         }
 
         // If projectId is provided, filter by it
@@ -188,31 +189,12 @@ export async function POST(request: Request) {
         const body = await request.json()
         const validatedData = requestSchema.parse(body)
 
-        // Create the request
-        const newRequest = await db.changelogRequest.create({
-            data: {
-                type: validatedData.type,
-                staffId: user.id,
-                projectId: validatedData.projectId,
-                targetId: validatedData.targetId,
-                status: 'PENDING'
-            },
-            include: {
-                staff: {
-                    select: {
-                        id: true,
-                        email: true,
-                        name: true
-                    }
-                },
-                project: {
-                    select: {
-                        id: true,
-                        name: true,
-                        defaultTags: true
-                    }
-                }
-            }
+        // Create (or reopen if CHANGES_REQUESTED) the request
+        const newRequest = await createOrReopenRequest({
+            type: validatedData.type,
+            staffId: user.id,
+            projectId: validatedData.projectId,
+            targetId: validatedData.targetId ?? null,
         })
 
         return NextResponse.json(newRequest, {status: 201})

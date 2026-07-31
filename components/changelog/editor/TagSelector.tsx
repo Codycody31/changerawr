@@ -1,5 +1,5 @@
 // components/changelog/editor/TagSelector.tsx
-import React, {useState, useCallback} from 'react';
+import React, {useState, useCallback, useRef, useEffect} from 'react';
 import {Button} from '@/components/ui/button';
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover';
 import {
@@ -9,9 +9,10 @@ import {
     CommandInput,
     CommandItem,
     CommandList,
-    CommandSeparator
 } from "@/components/ui/command";
-import {Tags, Check, Plus, Sparkles, Loader2, X, AlertCircle, CheckCircle, Palette, Lightbulb} from 'lucide-react';
+import {Tags, Check, Plus, Sparkles, Loader2, X, AlertCircle, CheckCircle, Palette, Lightbulb, ThumbsUp, ThumbsDown, Info, BrainCircuit, CheckCircle2} from 'lucide-react';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
+import { renderToTailwind } from '@changerawr/markdown';
 import {Separator} from '@/components/ui/separator';
 import {Badge} from "@/components/ui/badge";
 import {cn} from '@/lib/utils';
@@ -23,14 +24,6 @@ import {
     TooltipProvider
 } from '@/components/ui/tooltip';
 import {Input} from '@/components/ui/input';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
 import {ColorPicker, ColoredTag} from '@/components/changelog/editor/TagColorPicker';
 import {TAG_COLOR_OPTIONS} from '@/lib/types/changelog';
 
@@ -40,19 +33,27 @@ interface Tag {
     color?: string | null;
 }
 
+interface TrainingProgress {
+    status: 'idle' | 'running' | 'done' | 'error';
+    progress_pct: number;
+    current_step: number;
+    total_steps: number;
+    current_epoch: number;
+    total_epochs: number;
+    loss: number | null;
+    is_full: boolean;
+    error: string;
+}
+
 interface TagSelectorProps {
     selectedTags: Tag[];
     availableTags: Tag[];
     onTagsChange: (tags: Tag[]) => void;
-    content?: string; // For AI-powered tag suggestions
-    aiApiKey?: string; // API key for AI features
-    projectId: string; // Needed for creating new tags
+    content?: string;
+    aiApiKey?: string;
+    changelogTaggerConfigured?: boolean;
+    projectId: string;
 }
-
-// AI content processing parameters
-const MAX_CHARS_PER_SECTION = 150; // Characters per extracted section
-const SECTIONS_TO_EXTRACT = 3;     // Number of sections to extract
-const SECTIONS_TO_ANALYZE = 3;     // Number of sections to actually send to AI
 
 // Tag suggestions shown when no tags exist - hardcoded suggestions
 interface TagSuggestion {
@@ -74,6 +75,7 @@ export default function TagSelector({
                                         onTagsChange,
                                         content = '',
                                         aiApiKey,
+                                        changelogTaggerConfigured = false,
                                         projectId
                                     }: TagSelectorProps) {
     const [search, setSearch] = useState('');
@@ -86,9 +88,20 @@ export default function TagSelector({
     // AI suggestion state
     const [isGenerating, setIsGenerating] = useState(false);
     const [suggestedTags, setSuggestedTags] = useState<Tag[]>([]);
+    const [tagSynopses, setTagSynopses] = useState<Record<string, string>>({});
+    const [tagFeedback, setTagFeedback] = useState<Record<string, 'up' | 'down'>>({});
     const [suggestionError, setSuggestionError] = useState<string | null>(null);
     const [showSuggestions, setShowSuggestions] = useState(false);
+    const [training, setTraining] = useState<TrainingProgress | null>(null);
+    const [justFinished, setJustFinished] = useState(false);
+    const eventSourceRef = useRef<EventSource | null>(null);
 
+    const closeStream = useCallback(() => {
+        eventSourceRef.current?.close();
+        eventSourceRef.current = null;
+    }, []);
+
+    useEffect(() => () => closeStream(), [closeStream]);
     // Filter tags based on search
     const filteredTags = search
         ? availableTags.filter(tag =>
@@ -100,105 +113,30 @@ export default function TagSelector({
         tag => !selectedTags.some(selected => selected.id === tag.id)
     );
 
-    /**
-     * Extract meaningful sections from content optimized for tag detection
-     * This approach samples from beginning, middle and end of the document
-     * to get a better representation of the full content.
-     */
-    const extractContentSections = (text: string): string[] => {
-        if (!text) return [];
+    const submitFeedback = useCallback((confirmedTags: Tag[]) => {
+        if (!changelogTaggerConfigured || !content || confirmedTags.length === 0) return;
+        fetch('/api/ai/tag-feedback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content, tags: confirmedTags.map(t => t.name) }),
+        }).catch(() => {});
+    }, [content, changelogTaggerConfigured]);
 
-        const cleanedText = text.trim();
-        if (cleanedText.length <= MAX_CHARS_PER_SECTION * SECTIONS_TO_EXTRACT) {
-            return [cleanedText]; // Return all content if it's short enough
-        }
-
-        const sections: string[] = [];
-
-        // Extract beginning section (always include)
-        sections.push(extractSection(cleanedText, 0, MAX_CHARS_PER_SECTION));
-
-        // If there's more content, extract middle section
-        if (cleanedText.length > MAX_CHARS_PER_SECTION * 2) {
-            const middleStart = Math.floor(cleanedText.length / 2) - (MAX_CHARS_PER_SECTION / 2);
-            sections.push(extractSection(cleanedText, middleStart, MAX_CHARS_PER_SECTION));
-        }
-
-        // If there's more content, extract ending section
-        if (cleanedText.length > MAX_CHARS_PER_SECTION * 3) {
-            const endStart = Math.max(0, cleanedText.length - MAX_CHARS_PER_SECTION);
-            sections.push(extractSection(cleanedText, endStart, MAX_CHARS_PER_SECTION));
-        }
-
-        // Extract headings if there are any (often contains important context)
-        const headingMatches = cleanedText.match(/#+\s+.*$/gm) || [];
-        if (headingMatches.length > 0) {
-            const headings = headingMatches.slice(0, 5).join('\n');
-            if (headings.length > 0) {
-                sections.push(`Key sections:\n${headings}`);
-            }
-        }
-
-        return sections;
-    };
-
-    /**
-     * Extract a section of content with intelligent boundaries
-     */
-    const extractSection = (text: string, startPos: number, length: number): string => {
-        // Safety checks
-        if (!text || startPos >= text.length) return '';
-
-        // Find start at paragraph or sentence boundary if possible
-        let actualStart = startPos;
-        let actualEnd = Math.min(text.length, startPos + length);
-
-        // If not starting at beginning, find a good start boundary
-        if (startPos > 0) {
-            // Try to find paragraph start
-            const paraStart = text.lastIndexOf('\n\n', startPos) + 2;
-            if (paraStart > 0 && paraStart < startPos && (startPos - paraStart) < length / 2) {
-                actualStart = paraStart;
-            } else {
-                // Try to find sentence start
-                const sentStart = text.lastIndexOf('. ', startPos) + 2;
-                if (sentStart > 0 && sentStart < startPos && (startPos - sentStart) < length / 3) {
-                    actualStart = sentStart;
-                }
-            }
-        }
-
-        // Find a good end boundary
-        if (actualEnd < text.length) {
-            // Try to find paragraph end
-            const paraEnd = text.indexOf('\n\n', actualEnd - 20);
-            if (paraEnd > 0 && paraEnd < (actualEnd + length / 3)) {
-                actualEnd = paraEnd;
-            } else {
-                // Try to find sentence end
-                const sentEnd = text.indexOf('. ', actualEnd - 20);
-                if (sentEnd > 0 && sentEnd < (actualEnd + length / 4)) {
-                    actualEnd = sentEnd + 1; // Include the period
-                }
-            }
-        }
-
-        // If this is not the beginning, add indication
-        const prefix = actualStart > 0 ? '... ' : '';
-        // If this is not the end, add indication
-        const suffix = actualEnd < text.length ? ' ...' : '';
-
-        return prefix + text.substring(actualStart, actualEnd) + suffix;
-    };
-
-    // Apply all suggested tags at once
     const applyAllSuggestions = () => {
-        if (unselectedSuggestions.length === 0) return;
-
-        // Add all suggested tags that aren't already selected
-        const newTags = [...selectedTags, ...unselectedSuggestions];
+        const toApply = unselectedSuggestions.filter(t => t.id && tagFeedback[t.id] !== 'down');
+        if (toApply.length === 0) return;
+        const newTags = [...selectedTags, ...toApply].filter(t => !!t.id);
         onTagsChange(newTags);
+        submitFeedback(toApply);
     };
+
+    const handleFeedback = useCallback((tag: Tag, vote: 'up' | 'down') => {
+        setTagFeedback(prev => ({ ...prev, [tag.id]: vote }));
+        if (vote === 'up') submitFeedback([tag]);
+        if (vote === 'down' && selectedTags.some(t => t.id === tag.id)) {
+            onTagsChange(selectedTags.filter(t => t.id !== tag.id));
+        }
+    }, [submitFeedback, selectedTags, onTagsChange]);
 
     // Handle creating a new tag with color support
     const handleCreateTag = useCallback(async (name: string, color?: string | null) => {
@@ -238,15 +176,11 @@ export default function TagSelector({
         }
     }, [projectId, selectedTags, onTagsChange, newTagColor]);
 
-    // Handle AI tag suggestions
-    const generateTagSuggestions = useCallback(async () => {
-        if (!content || !aiApiKey || !availableTags.length) {
-            setSuggestionError('Cannot generate suggestions without content or available tags');
-            return;
-        }
+    const canSuggest = (!!aiApiKey || changelogTaggerConfigured) && content.trim().length > 10;
 
-        if (content.trim().length < 20) {
-            setSuggestionError('Content is too short for meaningful tag suggestions');
+    const generateTagSuggestions = useCallback(async () => {
+        if (!canSuggest) {
+            setSuggestionError('Cannot generate suggestions without content or available tags');
             return;
         }
 
@@ -254,97 +188,93 @@ export default function TagSelector({
         setSuggestionError(null);
 
         try {
-            // Prepare prompt for the AI
-            const tagNames = availableTags.map(tag => tag.name).join(', ');
-
-            // Extract key sections from the content
-            const contentSections = extractContentSections(content);
-
-            // Limit number of sections if too many
-            const sectionsToUse = contentSections.slice(0, SECTIONS_TO_ANALYZE);
-
-            // Combine sections with section numbers for readability
-            const formattedSections = sectionsToUse.map((section, index) =>
-                `Section ${index + 1}:\n${section}`
-            ).join('\n\n');
-
-            const prompt = `
-I need to categorize the following changelog content with appropriate tags.
-Available tags: ${tagNames}
-
-I'll provide key sections from the content below. Based on these sections, which tags (maximum 3) would be most relevant? 
-Only respond with tags from the provided list above, separated by commas.
-Do not add any explanations, just return the tag names.
-
-${formattedSections}
-            `.trim();
-
-            // Call AI API
-            const response = await fetch('https://api.secton.org/v1/chat/completions', {
+            const res = await fetch('/api/ai/suggest-tags', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${aiApiKey}`
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    model: 'copilot-zero',
-                    messages: [
-                        {
-                            role: 'system',
-                            content: 'You are a skilled content tagger for a changelog system. Your job is to select the most appropriate tags for content.'
-                        },
-                        {role: 'user', content: prompt}
-                    ],
-                    temperature: 0.3,
-                    max_tokens: 30 // Reduced to save tokens
-                })
+                    content,
+                    tags: availableTags.map(t => t.name),
+                }),
             });
 
-            if (!response.ok) {
-                throw new Error('Failed to get tag suggestions');
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                if (res.status === 503 && err.training) {
+                    setIsGenerating(false);
+                    // eslint-disable-next-line @typescript-eslint/no-use-before-define
+                    watchTraining();
+                    return;
+                }
+                throw new Error(err.error || 'Failed to get tag suggestions');
             }
 
-            const result = await response.json();
-            const suggestedTagsText = result.messages[result.messages.length - 1]?.content || '';
+            const { tags: suggestedNames, synopsis = {} } = await res.json();
 
-            // Process the AI's response
-            const suggestedTagNames = suggestedTagsText
-                .split(',')
-                .map((tag: string) => tag.trim())
-                .filter(Boolean);
+            const results: Tag[] = [];
+            for (const name of suggestedNames as string[]) {
+                const existing = availableTags.find(t => t.name.toLowerCase() === name.toLowerCase());
+                if (existing) results.push(existing);
+                // No match → silently skip; never create tags without explicit user action
+            }
 
-            // Map the suggested tag names to actual tag objects
-            const validSuggestions = suggestedTagNames
-                .map((name: string) => {
-                    // Find case-insensitive match
-                    return availableTags.find(tag =>
-                        tag.name.toLowerCase() === name.toLowerCase()
-                    );
-                })
-                .filter(Boolean) as Tag[];
-
-            if (validSuggestions.length === 0) {
+            if (results.length === 0) {
                 setSuggestionError('Could not generate suitable tag suggestions');
             } else {
-                setSuggestedTags(validSuggestions);
+                setSuggestedTags(results);
+                setTagSynopses(synopsis as Record<string, string>);
+                setTagFeedback({});
                 setShowSuggestions(true);
             }
         } catch (err) {
-            console.error('Error suggesting tags:', err);
+            console.error('[TagSelector] suggest-tags error:', err);
             setSuggestionError(err instanceof Error ? err.message : 'Failed to analyze content');
         } finally {
             setIsGenerating(false);
         }
-    }, [content, aiApiKey, availableTags]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [content, availableTags, canSuggest]);
+
+    const watchTraining = useCallback(() => {
+        if (eventSourceRef.current) return; // already watching
+        setSuggestionError(null);
+        setShowSuggestions(false);
+        setTraining({ status: 'running', progress_pct: 0, current_step: 0, total_steps: 0, current_epoch: 0, total_epochs: 0, loss: null, is_full: false, error: '' });
+
+        const es = new EventSource('/api/ai/tagger-progress');
+        eventSourceRef.current = es;
+
+        es.onmessage = (e) => {
+            const data: TrainingProgress = JSON.parse(e.data);
+            if (data.status !== 'running') {
+                closeStream();
+                setTraining(null);
+                if (data.status === 'done') {
+                    setJustFinished(true);
+                    setTimeout(() => setJustFinished(false), 2000);
+                    generateTagSuggestions(); // model's back — retry automatically
+                } else if (data.status === 'error') {
+                    setSuggestionError(data.error || 'Training failed.');
+                }
+                return;
+            }
+            setTraining(data);
+        };
+        es.onerror = () => {
+            closeStream();
+            setTraining(null);
+            setSuggestionError('Lost connection to the tagger — try again in a moment.');
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [closeStream]);
 
     // Toggle tag selection
     const toggleTag = useCallback((tag: Tag) => {
+        if (!tag.id) return;
         const isSelected = selectedTags.some(t => t.id === tag.id);
-
         if (isSelected) {
             onTagsChange(selectedTags.filter(t => t.id !== tag.id));
         } else {
-            onTagsChange([...selectedTags, tag]);
+            onTagsChange([...selectedTags.filter(t => !!t.id), tag]);
         }
     }, [selectedTags, onTagsChange]);
 
@@ -355,6 +285,7 @@ ${formattedSections}
     };
 
     return (
+        <>
         <TooltipProvider>
             <Popover open={isOpen} onOpenChange={setIsOpen}>
                 <PopoverTrigger asChild>
@@ -378,14 +309,13 @@ ${formattedSections}
                         </Badge>
                     </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[350px] p-0" align="start">
-                    {/* Header section with actions */}
-                    <div className="flex items-center justify-between p-2 border-b">
+                <PopoverContent className="w-[350px] p-0 rounded-t-none" align="start">
+                    {/* Header */}
+                    <div className="flex items-center justify-between px-3 py-2 border-b">
                         <div className="flex items-center gap-2">
                             <Tags className="h-4 w-4 text-muted-foreground"/>
                             <span className="text-sm font-medium">Tags</span>
                         </div>
-
                         <div className="flex items-center gap-1">
                             <Tooltip>
                                 <TooltipTrigger asChild>
@@ -405,108 +335,188 @@ ${formattedSections}
                         </div>
                     </div>
 
-                    <Command>
-                        <div className="flex items-center border-b p-1">
+                    <Command className="[&_[cmdk-input-wrapper]]:border-0 [&_[cmdk-input-wrapper]]:flex-1">
+                        {/* Search row */}
+                        <div className="flex items-center px-1 py-1">
                             <CommandInput
                                 placeholder="Search tags..."
                                 value={search}
                                 onValueChange={setSearch}
                                 className="flex-1"
                             />
-                            {aiApiKey && content.length > 20 && (
+                            {canSuggest && (
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            className="h-8 w-8 ml-1"
-                                            disabled={isGenerating}
-                                            onClick={() => {
-                                                generateTagSuggestions();
-                                            }}
+                                            className="h-8 w-8 flex-shrink-0"
+                                            disabled={isGenerating || !!training}
+                                            onClick={generateTagSuggestions}
                                         >
-                                            {isGenerating ? (
-                                                <Loader2 className="h-4 w-4 animate-spin"/>
-                                            ) : (
-                                                <Sparkles className="h-4 w-4"/>
-                                            )}
+                                            {isGenerating
+                                                ? <Loader2 className="h-4 w-4 animate-spin"/>
+                                                : <Sparkles className="h-4 w-4"/>}
                                         </Button>
                                     </TooltipTrigger>
-                                    <TooltipContent side="bottom">
-                                        Suggest tags with AI
-                                    </TooltipContent>
+                                    <TooltipContent side="bottom">Suggest tags</TooltipContent>
                                 </Tooltip>
                             )}
                         </div>
 
-                        <CommandList>
-                            {/* AI Suggestions Section */}
+                        <CommandList className="scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                            {/* Generating — shown immediately on click, swaps to results/training/error when the request settles */}
+                            {isGenerating && !training && (
+                                <p className="px-3 py-2.5 text-xs text-muted-foreground flex items-center gap-2 border-b border-border/60">
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin flex-shrink-0"/>
+                                    Generating suggestions, please wait…
+                                </p>
+                            )}
+
+                            {/* Tagger training progress */}
+                            <AnimatePresence>
+                                {training && (
+                                    <motion.div
+                                        initial={{opacity: 0, height: 0}}
+                                        animate={{opacity: 1, height: 'auto'}}
+                                        exit={{opacity: 0, height: 0}}
+                                        transition={{duration: 0.15}}
+                                        className="overflow-hidden border-b border-border/60"
+                                    >
+                                        <div className="px-3 py-2.5 space-y-2">
+                                            <p className="text-xs text-muted-foreground">
+                                                Hey — the tagger&apos;s mid-update right now, so suggestions are paused for a moment.
+                                            </p>
+                                            <div className="flex items-center gap-2 text-xs font-medium">
+                                                <BrainCircuit className="h-3.5 w-3.5 text-primary animate-pulse"/>
+                                                {training.is_full ? 'Full retrain…' : 'Quick update…'}
+                                                <span className="ml-auto text-muted-foreground font-normal">
+                                                    {training.total_steps > 0 ? `${training.progress_pct}%` : 'starting…'}
+                                                </span>
+                                            </div>
+                                            <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                                                <div
+                                                    className="h-full bg-primary transition-all duration-300"
+                                                    style={{width: `${Math.max(training.progress_pct, 3)}%`}}
+                                                />
+                                            </div>
+                                            {(training.total_epochs > 0 || training.loss !== null) && (
+                                                <p className="text-[11px] text-muted-foreground">
+                                                    {training.total_epochs > 0 && `Epoch ${training.current_epoch}/${training.total_epochs}`}
+                                                    {training.loss !== null && ` · loss ${training.loss.toFixed(4)}`}
+                                                </p>
+                                            )}
+                                            <p className="text-xs text-muted-foreground">
+                                                Suggestions resume automatically when it&apos;s done — leave this open to watch, or close and come back later.
+                                            </p>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+
+                            {!training && justFinished && (
+                                <p className="px-3 py-2 text-xs text-green-600 dark:text-green-500 flex items-center gap-1.5 border-b border-border/60">
+                                    <CheckCircle2 className="h-3.5 w-3.5"/>
+                                    All good — fetching suggestions…
+                                </p>
+                            )}
+
+                            {/* AI Suggestions */}
                             <AnimatePresence>
                                 {showSuggestions && suggestedTags.length > 0 && (
                                     <motion.div
                                         initial={{opacity: 0, height: 0}}
                                         animate={{opacity: 1, height: 'auto'}}
                                         exit={{opacity: 0, height: 0}}
-                                        transition={{duration: 0.2}}
+                                        transition={{duration: 0.15}}
                                         className="overflow-hidden"
                                     >
-                                        <Card className="border-0 shadow-none rounded-none bg-primary/5">
-                                            <CardHeader className="p-2 pb-0">
-                                                <CardTitle className="text-sm flex items-center gap-2">
-                                                    <Sparkles className="h-3.5 w-3.5 text-primary"/>
-                                                    AI Suggested Tags
-                                                </CardTitle>
-                                                <CardDescription className="text-xs">
-                                                    Based on your changelog content
-                                                </CardDescription>
-                                            </CardHeader>
-                                            <CardContent className="p-2 pt-0">
-                                                <div className="flex flex-wrap gap-1 mt-1">
-                                                    {suggestedTags.map((tag, index) => {
-                                                        const isSelected = selectedTags.some(t => t.id === tag.id);
-
-                                                        return (
-                                                            <Badge
-                                                                key={`suggested-${tag.id}-${index}`}
-                                                                variant={isSelected ? "default" : "outline"}
-                                                                color={tag.color || undefined}
-                                                                className={cn(
-                                                                    "cursor-pointer transition-all duration-200",
-                                                                    !tag.color && (isSelected ? "bg-primary" : "bg-primary/10 hover:bg-primary/20")
-                                                                )}
-                                                                onClick={() => toggleTag(tag)}
-                                                            >
-                                                                {isSelected && <Check className="h-3 w-3 mr-1"/>}
-                                                                {tag.name}
-                                                            </Badge>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </CardContent>
-
-                                            <CardFooter className="p-2 pt-0 flex justify-between">
+                                        {/* Section header */}
+                                        <div className="flex items-center justify-between px-3 py-1.5 bg-muted/40 border-y border-border/60">
+                                            <div className="flex items-center gap-1.5">
+                                                <Sparkles className="h-3 w-3 text-primary"/>
+                                                <span className="text-xs font-semibold text-foreground">AI Suggestions</span>
+                                            </div>
+                                            <div className="flex items-center gap-0.5">
                                                 {unselectedSuggestions.length > 0 && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="h-7 text-xs"
-                                                        onClick={applyAllSuggestions}
-                                                    >
+                                                    <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground" onClick={applyAllSuggestions}>
                                                         <CheckCircle className="h-3 w-3 mr-1"/>
                                                         Apply all
                                                     </Button>
                                                 )}
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className={cn("h-7 text-xs", unselectedSuggestions.length > 0 ? "" : "ml-auto")}
-                                                    onClick={() => setShowSuggestions(false)}
-                                                >
-                                                    Hide
+                                                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground" onClick={() => setShowSuggestions(false)}>
+                                                    Dismiss
                                                 </Button>
-                                            </CardFooter>
-                                        </Card>
-                                        <CommandSeparator/>
+                                            </div>
+                                        </div>
+
+                                        {/* Tag rows */}
+                                        <div className="divide-y divide-border/40 border-b border-border/60">
+                                            {suggestedTags.map((tag) => {
+                                                const isSelected = selectedTags.some(t => t.id === tag.id);
+                                                const hasSynopsis = !!tagSynopses[tag.name];
+                                                const fb = tagFeedback[tag.id];
+                                                return (
+                                                    <div key={tag.id} className="flex items-center gap-2 px-3 py-2 hover:bg-muted/30 transition-colors">
+                                                        {/* Toggle checkbox */}
+                                                        <button
+                                                            onClick={() => toggleTag(tag)}
+                                                            className={cn(
+                                                                'flex-shrink-0 h-4 w-4 rounded border flex items-center justify-center transition-colors',
+                                                                isSelected
+                                                                    ? 'bg-primary border-primary text-primary-foreground'
+                                                                    : 'border-border hover:border-primary/50'
+                                                            )}
+                                                        >
+                                                            {isSelected && <Check className="h-2.5 w-2.5"/>}
+                                                        </button>
+
+                                                        {/* Color dot + tag name */}
+                                                        <span className="flex items-center gap-1.5 flex-1 cursor-pointer select-none" onClick={() => toggleTag(tag)}>
+                                                            {tag.color && (
+                                                                <span className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color }}/>
+                                                            )}
+                                                            <span className="text-sm">{tag.name}</span>
+                                                        </span>
+
+                                                        {/* Info hover — tagger only */}
+                                                        {hasSynopsis && changelogTaggerConfigured && (
+                                                            <HoverCard openDelay={200} closeDelay={100}>
+                                                                <HoverCardTrigger asChild>
+                                                                    <button className="flex-shrink-0 text-blue-500 hover:text-blue-400 transition-colors">
+                                                                        <Info className="h-3.5 w-3.5"/>
+                                                                    </button>
+                                                                </HoverCardTrigger>
+                                                                <HoverCardContent side="left" className="w-64 text-sm p-3">
+                                                                    <p className="text-xs font-medium mb-1.5 text-foreground">Why this tag?</p>
+                                                                    <div
+                                                                        className="text-xs text-muted-foreground leading-relaxed"
+                                                                        dangerouslySetInnerHTML={{ __html: renderToTailwind(tagSynopses[tag.name]) }}
+                                                                    />
+                                                                </HoverCardContent>
+                                                            </HoverCard>
+                                                        )}
+
+                                                        {/* Feedback — tagger only */}
+                                                        {changelogTaggerConfigured && <div className="flex items-center flex-shrink-0">
+                                                            <button
+                                                                onClick={() => handleFeedback(tag, 'up')}
+                                                                className={cn('h-6 w-6 rounded flex items-center justify-center transition-colors', fb === 'up' ? 'text-green-500' : 'text-muted-foreground/40 hover:text-green-500')}
+                                                            >
+                                                                <ThumbsUp className="h-3 w-3"/>
+                                                            </button>
+                                                            <span className="text-muted-foreground/30 text-xs select-none px-0.5">/</span>
+                                                            <button
+                                                                onClick={() => handleFeedback(tag, 'down')}
+                                                                className={cn('h-6 w-6 rounded flex items-center justify-center transition-colors', fb === 'down' ? 'text-red-500' : 'text-muted-foreground/40 hover:text-red-500')}
+                                                            >
+                                                                <ThumbsDown className="h-3 w-3"/>
+                                                            </button>
+                                                        </div>}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
                                     </motion.div>
                                 )}
                             </AnimatePresence>
@@ -550,56 +560,36 @@ ${formattedSections}
                                         </div>
                                     )}
                                     {search && (
-                                        <>
-                                            <p className="text-muted-foreground mb-2">No tags found</p>
-                                        </>
-                                    )}
-                                    {search && (
-                                        <div className="mt-2 space-y-3">
-                                            <p className="text-xs text-muted-foreground mb-2">Create a new tag:</p>
-                                            <div className="flex gap-2">
+                                        <div className="space-y-2">
+                                            <p className="text-xs text-muted-foreground">No tags found — create one:</p>
+                                            <div className="flex gap-1.5">
                                                 <Input
                                                     type="text"
                                                     value={newTagName || search}
                                                     onChange={(e) => setNewTagName(e.target.value)}
-                                                    className="flex-1 h-8 px-2 text-sm border border-input rounded-md"
+                                                    className="flex-1 h-8 text-sm"
                                                     placeholder="Tag name"
                                                 />
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    className="h-8 px-2"
-                                                    onClick={() => setShowColorPicker(!showColorPicker)}
-                                                >
-                                                    <Palette className="h-3.5 w-3.5"/>
-                                                </Button>
-                                            </div>
-
-                                            {showColorPicker && (
-                                                <div className="w-full">
+                                                <div className="flex items-center gap-1 ml-auto">
                                                     <ColorPicker
                                                         value={newTagColor}
                                                         onChange={setNewTagColor}
-                                                        placeholder="Choose tag color"
-                                                        showCustomInput={true}
+                                                        minimal
+                                                        align="end"
+                                                        showCustomInput
                                                     />
+                                                    <Button
+                                                        size="icon"
+                                                        className="h-8 w-8 flex-shrink-0"
+                                                        disabled={isCreating || !(newTagName || search).trim()}
+                                                        onClick={() => handleCreateTag(newTagName || search)}
+                                                    >
+                                                        {isCreating
+                                                            ? <Loader2 className="h-3.5 w-3.5 animate-spin"/>
+                                                            : <Plus className="h-3.5 w-3.5"/>}
+                                                    </Button>
                                                 </div>
-                                            )}
-
-                                            <Button
-                                                variant="default"
-                                                size="sm"
-                                                className="h-8 w-full"
-                                                disabled={isCreating || !(newTagName || search).trim()}
-                                                onClick={() => handleCreateTag(newTagName || search)}
-                                            >
-                                                {isCreating ? (
-                                                    <Loader2 className="h-3.5 w-3.5 animate-spin mr-1"/>
-                                                ) : (
-                                                    <Plus className="h-3.5 w-3.5 mr-1"/>
-                                                )}
-                                                Create &ldquo;{(newTagName || search).trim()}&rdquo;
-                                            </Button>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -657,32 +647,13 @@ ${formattedSections}
                                 </div>
                             </CommandGroup>
 
-                            {selectedTags.length > 0 && (
-                                <div className="border-t p-2 bg-muted/10">
-                                    <div className="flex flex-wrap gap-1 mb-1">
-                                        <p className="text-xs text-muted-foreground w-full mb-1">Selected tags:</p>
-                                        {selectedTags.map((tag, index) => (
-                                            <Badge
-                                                key={`selected-${tag.id}-${index}`}
-                                                variant="default"
-                                                color={tag.color || undefined}
-                                                className={cn(
-                                                    "text-xs cursor-pointer flex items-center gap-1",
-                                                    !tag.color && "bg-primary"
-                                                )}
-                                                onClick={() => toggleTag(tag)}
-                                            >
-                                                {tag.name}
-                                                <X className="h-3 w-3 ml-1"/>
-                                            </Badge>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
                         </CommandList>
                     </Command>
                 </PopoverContent>
             </Popover>
         </TooltipProvider>
+
+            {/* Synopsis modal */}
+        </>
     );
 }

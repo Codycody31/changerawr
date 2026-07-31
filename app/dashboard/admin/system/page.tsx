@@ -72,13 +72,24 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog'
 import {SlackLogo} from "@/lib/services/slack/logo";
+import {LanguageToolLogo} from "@/lib/services/languagetool/logo";
 import {TIMEZONES, getTimezonesByRegion} from "@/lib/constants/timezones";
 
 function buildConfigSchema(sponsored: boolean) {
     return z.object({
         defaultInvitationExpiry: z.number().min(1).max(30),
         requireApprovalForChangelogs: z.boolean(),
-        maxChangelogEntriesPerProject: z.number().min(10).max(sponsored ? 999999 : 10000),
+        // -1 ("unlimited") is always accepted so a previously-licensed value
+        // doesn't fail validation after the license lapses; enforcement falls
+        // back to the unlicensed cap in that case (see SponsorService.checkEntryAllowed).
+        maxChangelogEntriesPerProject: z.union([
+            z.literal(-1),
+            z.number().min(10).max(sponsored ? 999999 : 10000),
+        ]),
+        maxRevisionsPerEntry: z.union([
+            z.literal(-1),
+            z.number().min(5).max(sponsored ? 10000 : 500),
+        ]),
         enableAnalytics: z.boolean(),
         enableNotifications: z.boolean(),
         allowTelemetry: z.enum(['prompt', 'enabled', 'disabled']),
@@ -94,6 +105,7 @@ type SystemConfig = {
     defaultInvitationExpiry: number
     requireApprovalForChangelogs: boolean
     maxChangelogEntriesPerProject: number
+    maxRevisionsPerEntry: number
     enableAnalytics: boolean
     enableNotifications: boolean
     allowTelemetry: 'prompt' | 'enabled' | 'disabled'
@@ -153,6 +165,7 @@ export default function SystemConfigPage() {
             defaultInvitationExpiry: 7,
             requireApprovalForChangelogs: true,
             maxChangelogEntriesPerProject: 100,
+            maxRevisionsPerEntry: 50,
             enableAnalytics: true,
             enableNotifications: true,
             allowTelemetry: 'prompt' as const,
@@ -165,6 +178,7 @@ export default function SystemConfigPage() {
             defaultInvitationExpiry: config.defaultInvitationExpiry,
             requireApprovalForChangelogs: config.requireApprovalForChangelogs,
             maxChangelogEntriesPerProject: config.maxChangelogEntriesPerProject,
+            maxRevisionsPerEntry: config.maxRevisionsPerEntry,
             enableAnalytics: config.enableAnalytics,
             enableNotifications: config.enableNotifications,
             allowTelemetry: config.allowTelemetry,
@@ -436,30 +450,87 @@ export default function SystemConfigPage() {
                                                 <FormField
                                                     control={form.control}
                                                     name="maxChangelogEntriesPerProject"
-                                                    render={({field}) => (
-                                                        <FormItem>
-                                                            <FormLabel className="flex items-center gap-2">
-                                                                Max Changelog Entries per Project
-                                                                {isLicensed && (
-                                                                    <Badge variant="default"
-                                                                           className="text-xs">Unlimited</Badge>
-                                                                )}
-                                                            </FormLabel>
-                                                            <FormControl>
-                                                                <Input
-                                                                    type="number"
-                                                                    {...field}
-                                                                    onChange={(e) => field.onChange(Number(e.target.value))}
-                                                                />
-                                                            </FormControl>
-                                                            <FormDescription>
-                                                                {isLicensed
-                                                                    ? 'Unlimited entries enabled. This value is used as a soft guideline.'
-                                                                    : 'Maximum number of changelog entries allowed per project (10 - 10,000)'}
-                                                            </FormDescription>
-                                                            <FormMessage/>
-                                                        </FormItem>
-                                                    )}
+                                                    render={({field}) => {
+                                                        const isUnlimited = field.value === -1
+                                                        return (
+                                                            <FormItem>
+                                                                <FormLabel className="flex items-center gap-2">
+                                                                    Max Changelog Entries per Project
+                                                                    {isUnlimited && (
+                                                                        <Badge variant="default"
+                                                                               className="text-xs">Unlimited</Badge>
+                                                                    )}
+                                                                </FormLabel>
+                                                                <FormControl>
+                                                                    <Input
+                                                                        type="number"
+                                                                        {...field}
+                                                                        min={isLicensed ? -1 : 10}
+                                                                        max={isLicensed ? 999999 : 10000}
+                                                                        onChange={(e) => {
+                                                                            const raw = e.target.value
+                                                                            if (raw === '' || raw === '-') {
+                                                                                field.onChange(raw)
+                                                                                return
+                                                                            }
+                                                                            field.onChange(Number(raw))
+                                                                        }}
+                                                                    />
+                                                                </FormControl>
+                                                <FormDescription>
+                                                                    {isUnlimited && !isLicensed
+                                                                        ? 'Set to unlimited, but no active license was found - capped at 10,000 until a license is active.'
+                                                                        : isLicensed
+                                                                            ? 'Maximum number of changelog entries allowed per project (10 - 999,999). Set to -1 for unlimited.'
+                                                                            : 'Maximum number of changelog entries allowed per project (10 - 10,000)'}
+                                                                </FormDescription>
+                                                                <FormMessage/>
+                                                            </FormItem>
+                                                        )
+                                                    }}
+                                                />
+
+                                                <FormField
+                                                    control={form.control}
+                                                    name="maxRevisionsPerEntry"
+                                                    render={({field}) => {
+                                                        const isUnlimited = field.value === -1
+                                                        return (
+                                                            <FormItem>
+                                                                <FormLabel className="flex items-center gap-2">
+                                                                    Max Saved Versions per Changelog Entry
+                                                                    {isUnlimited && (
+                                                                        <Badge variant="default"
+                                                                               className="text-xs">Unlimited</Badge>
+                                                                    )}
+                                                                </FormLabel>
+                                                                <FormControl>
+                                                                    <Input
+                                                                        type="number"
+                                                                        {...field}
+                                                                        min={isLicensed ? -1 : 5}
+                                                                        max={isLicensed ? 10000 : 500}
+                                                                        onChange={(e) => {
+                                                                            const raw = e.target.value
+                                                                            if (raw === '' || raw === '-') {
+                                                                                field.onChange(raw)
+                                                                                return
+                                                                            }
+                                                                            field.onChange(Number(raw))
+                                                                        }}
+                                                                    />
+                                                                </FormControl>
+                                                                <FormDescription>
+                                                                    {isUnlimited && !isLicensed
+                                                                        ? 'Set to unlimited, but no active license was found - capped at 50 until a license is active.'
+                                                                        : isLicensed
+                                                                            ? 'Maximum number of saved version history checkpoints kept per changelog entry (5 - 10,000). Oldest unpinned versions are pruned beyond this. Set to -1 for unlimited.'
+                                                                            : 'Maximum number of saved version history checkpoints kept per changelog entry (5 - 500). Oldest unpinned versions are pruned beyond this.'}
+                                                                </FormDescription>
+                                                                <FormMessage/>
+                                                            </FormItem>
+                                                        )
+                                                    }}
                                                 />
                                                 <Separator/>
 
@@ -961,6 +1032,29 @@ export default function SystemConfigPage() {
                                                 </div>
                                                 <Button asChild variant="outline" size="sm">
                                                     <Link href="/dashboard/admin/system/slack">
+                                                        Configure
+                                                    </Link>
+                                                </Button>
+                                            </motion.div>
+
+                                            <motion.div
+                                                variants={cardVariants}
+                                                initial="hidden"
+                                                animate="visible"
+                                                transition={{delay: 0.2}}
+                                                className="flex flex-row items-center justify-between rounded-lg border p-4"
+                                            >
+                                                <div className="flex gap-2">
+                                                    <LanguageToolLogo className="h-8 w-8 mt-0.5"/>
+                                                    <div className="space-y-1">
+                                                        <h3 className="text-base font-medium">LanguageTool Spellcheck</h3>
+                                                        <p className="text-sm text-muted-foreground">
+                                                            Configure LanguageTool API for spelling and grammar checking in the markdown editor.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <Button asChild variant="outline" size="sm">
+                                                    <Link href="/dashboard/admin/system/languagetool">
                                                         Configure
                                                     </Link>
                                                 </Button>

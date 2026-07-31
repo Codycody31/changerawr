@@ -5,7 +5,7 @@
 
 export const appInfo = {
     name: 'Changerawr',
-    version: '1.0.6',
+    version: '1.0.7',
     status: 'Stable',
     environment: process.env.NODE_ENV || 'development',
     license: 'CNC OSL',
@@ -13,7 +13,7 @@ export const appInfo = {
 
     framework: 'Next.js App Router',
     database: 'PostgreSQL with Prisma ORM',
-    cumEngine: '1.2.0', // package version of @changerawr/markdown
+    cumEngine: '2.0.1', // package version of @changerawr/markdown
 
     // Repository and documentation links
     repository: 'https://github.com/supernova3339/changerawr',

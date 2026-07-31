@@ -72,6 +72,7 @@ interface EditorHeaderProps {
     onTitleChange: (title: string) => void;
     content: string;
     aiApiKey?: string;
+    changelogTaggerConfigured?: boolean;
 }
 
 // ===== Bookmark Button Component =====
@@ -244,6 +245,7 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
                                                        onTitleChange,
                                                        content,
                                                        aiApiKey,
+                                                       changelogTaggerConfigured = false,
                                                    }) => {
     const queryClient = useQueryClient();
 
@@ -752,6 +754,7 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
                                                             onTagsChange={onTagsChange}
                                                             content={content}
                                                             aiApiKey={aiApiKey}
+                                                            changelogTaggerConfigured={changelogTaggerConfigured}
                                                             projectId={projectId}
                                                         />
                                                         <VersionSelector
@@ -839,6 +842,7 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
                                     onTagsChange={onTagsChange}
                                     content={content}
                                     aiApiKey={aiApiKey}
+                                    changelogTaggerConfigured={changelogTaggerConfigured}
                                     projectId={projectId}
                                 />
                                 <VersionSelector

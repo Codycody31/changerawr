@@ -6,55 +6,79 @@ import { useAuth } from '@/context/auth';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 import { Role } from '@prisma/client';
-import { motion } from 'framer-motion';
-
-// UI Components from shadcn
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-    AlertCircle,
-    CheckCircle,
-    Clock,
-    XCircle,
-    ArrowUpRight,
-    AlertTriangle,
-    FileText,
-    Tag,
-    Package,
-    Send
+    CheckCircle, Clock, XCircle, ArrowUpRight,
+    FileText, Tag, Package, Send, Inbox, MessageSquare
 } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
 
-// Types
 interface RequestData {
     id: string;
     type: string;
     status: string;
     createdAt: string;
     reviewedAt: string | null;
-    project: {
-        id: string;
-        name: string;
+    project: { id: string; name: string };
+    ChangelogEntry?: { id: string; title: string } | null;
+    ChangelogTag?: { id: string; name: string } | null;
+    admin?: { id: string; name: string | null; email: string } | null;
+    metadata?: { feedback?: string; [key: string]: unknown } | null;
+}
+
+type StatusFilter = 'all' | 'pending' | 'approved' | 'rejected' | 'changes';
+
+const TYPE_META: Record<string, { label: string; icon: React.ElementType; color: string }> = {
+    DELETE_ENTRY:   { label: 'Delete entry',   icon: FileText, color: 'text-red-500 bg-red-50 dark:bg-red-950/30' },
+    DELETE_TAG:     { label: 'Delete tag',     icon: Tag,      color: 'text-amber-500 bg-amber-50 dark:bg-amber-950/30' },
+    DELETE_PROJECT: { label: 'Delete project', icon: Package,  color: 'text-red-600 bg-red-50 dark:bg-red-950/30' },
+    ALLOW_PUBLISH:  { label: 'Publish entry',  icon: Send,     color: 'text-blue-500 bg-blue-50 dark:bg-blue-950/30' },
+    ALLOW_SCHEDULE: { label: 'Schedule entry', icon: Clock,    color: 'text-purple-500 bg-purple-50 dark:bg-purple-950/30' },
+};
+
+const STATUS_COLORS: Record<string, string> = {
+    PENDING:           'border-l-amber-400',
+    APPROVED:          'border-l-green-500',
+    REJECTED:          'border-l-red-500',
+    CHANGES_REQUESTED: 'border-l-orange-400',
+};
+
+function StatusBadge({ status }: { status: string }) {
+    const variants: Record<string, { icon: React.ElementType; label: string; className: string }> = {
+        PENDING:           { icon: Clock,           label: 'Pending',          className: 'text-amber-700 bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400' },
+        APPROVED:          { icon: CheckCircle,     label: 'Approved',         className: 'text-green-700 bg-green-50 border-green-200 dark:bg-green-950/30 dark:text-green-400' },
+        REJECTED:          { icon: XCircle,         label: 'Rejected',         className: 'text-red-700 bg-red-50 border-red-200 dark:bg-red-950/30 dark:text-red-400' },
+        CHANGES_REQUESTED: { icon: MessageSquare,   label: 'Changes requested', className: 'text-orange-700 bg-orange-50 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400' },
     };
-    ChangelogEntry?: {
-        id: string;
-        title: string;
-    } | null;
-    ChangelogTag?: {
-        id: string;
-        targetId: string;
-    } | null;
-    admin?: {
-        id: string;
-        name: string | null;
-        email: string;
-    } | null;
+    const v = variants[status] ?? { icon: Clock, label: status, className: '' };
+    const Icon = v.icon;
+    return (
+        <span className={cn('inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border', v.className)}>
+            <Icon className="h-3 w-3" />{v.label}
+        </span>
+    );
+}
+
+function FilterTab({ label, count, active, onClick }: { label: string; count: number; active: boolean; onClick: () => void }) {
+    return (
+        <button
+            onClick={onClick}
+            className={cn(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+                active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+            )}
+        >
+            {label}
+            {count > 0 && (
+                <span className={cn('text-xs px-1.5 py-0.5 rounded-full', active ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-muted-foreground/20')}>
+                    {count}
+                </span>
+            )}
+        </button>
+    );
 }
 
 export default function RequestsPage() {
@@ -63,364 +87,234 @@ export default function RequestsPage() {
     const { toast } = useToast();
     const [requests, setRequests] = useState<RequestData[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState('all');
+    const [filter, setFilter] = useState<StatusFilter>('all');
 
     useEffect(() => {
-        // Redirect to login if not authenticated
-        if (!authLoading && !user) {
-            router.push('/login');
-            return;
-        }
-
-        // Only staff and admin can access this page
+        if (!authLoading && !user) { router.push('/login'); return; }
         if (user && user.role === Role.VIEWER) {
             router.push('/dashboard');
-            toast({
-                title: 'Access Denied',
-                description: 'You do not have permission to view this page.',
-                variant: 'destructive'
-            });
+            toast({ title: 'Access Denied', variant: 'destructive' });
             return;
         }
+        if (!user) return;
 
-        async function fetchRequests() {
+        (async () => {
             try {
-                setIsLoading(true);
-                const response = await fetch('/api/requests');
-
-                if (!response.ok) {
-                    const data = await response.json();
-                    throw new Error(data.error || 'Failed to fetch requests');
-                }
-
-                const data = await response.json();
+                const res = await fetch('/api/requests');
+                if (!res.ok) throw new Error((await res.json()).error || 'Failed to fetch');
+                const data = await res.json();
                 setRequests(data.requests);
             } catch (err) {
-                const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
-                setError(errorMessage);
-                toast({
-                    title: 'Error',
-                    description: errorMessage,
-                    variant: 'destructive'
-                });
+                toast({ title: 'Error', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
             } finally {
                 setIsLoading(false);
             }
-        }
-
-        if (user) {
-            fetchRequests();
-        }
+        })();
     }, [user, authLoading, router, toast]);
 
-    // Filter requests based on active tab
-    const filteredRequests = requests.filter(request => {
-        if (activeTab === 'all') return true;
-        return request.status.toLowerCase() === activeTab;
-    });
-
-    // Get request icon based on type
-    const getRequestIcon = (type: string) => {
-        switch (type) {
-            case 'DELETE_ENTRY':
-                return <FileText className="h-5 w-5 text-red-500" />;
-            case 'DELETE_TAG':
-                return <Tag className="h-5 w-5 text-amber-500" />;
-            case 'DELETE_PROJECT':
-                return <Package className="h-5 w-5 text-red-600" />;
-            case 'ALLOW_PUBLISH':
-                return <Send className="h-5 w-5 text-blue-500" />;
-            default:
-                return <AlertCircle className="h-5 w-5" />;
-        }
+    const counts = {
+        all:      requests.length,
+        pending:  requests.filter(r => r.status === 'PENDING').length,
+        approved: requests.filter(r => r.status === 'APPROVED').length,
+        rejected: requests.filter(r => r.status === 'REJECTED').length,
+        changes:  requests.filter(r => r.status === 'CHANGES_REQUESTED').length,
     };
 
-    // Helper function to get the target name based on request type
-    const getTargetName = (request: RequestData) => {
-        if (request.type === 'DELETE_ENTRY' && request.ChangelogEntry) {
-            return request.ChangelogEntry.title;
-        } else if (request.type === 'DELETE_TAG' && request.ChangelogTag) {
-            return request.ChangelogTag.targetId;
-        } else if (request.type === 'DELETE_PROJECT') {
-            return request.project.name;
-        } else if (request.type === 'ALLOW_PUBLISH' && request.ChangelogEntry) {
-            return request.ChangelogEntry.title;
-        }
-        return 'Unknown';
+    const visible = filter === 'all' ? requests
+        : filter === 'changes' ? requests.filter(r => r.status === 'CHANGES_REQUESTED')
+        : requests.filter(r => r.status.toLowerCase() === filter);
+
+    const getTargetLabel = (r: RequestData) => {
+        if (r.ChangelogEntry) return r.ChangelogEntry.title;
+        if (r.ChangelogTag) return r.ChangelogTag.name || r.ChangelogTag.id;
+        return r.project.name;
     };
 
-    // Helper function to get human-readable request type
-    const getReadableType = (type: string) => {
-        switch (type) {
-            case 'DELETE_ENTRY':
-                return 'Delete Entry';
-            case 'DELETE_TAG':
-                return 'Delete Tag';
-            case 'DELETE_PROJECT':
-                return 'Delete Project';
-            case 'ALLOW_PUBLISH':
-                return 'Publish Entry';
-            default:
-                return type.replace(/_/g, ' ').toLowerCase();
-        }
-    };
-
-    // Helper function to render status badge
-    const renderStatusBadge = (status: string) => {
-        switch (status) {
-            case 'PENDING':
-                return (
-                    <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 hover:bg-yellow-50">
-                        <Clock className="mr-1 h-3 w-3" /> Pending
-                    </Badge>
-                );
-            case 'APPROVED':
-                return (
-                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 hover:bg-green-50">
-                        <CheckCircle className="mr-1 h-3 w-3" /> Approved
-                    </Badge>
-                );
-            case 'REJECTED':
-                return (
-                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 hover:bg-red-50">
-                        <XCircle className="mr-1 h-3 w-3" /> Rejected
-                    </Badge>
-                );
-            default:
-                return (
-                    <Badge variant="outline">
-                        {status}
-                    </Badge>
-                );
-        }
-    };
-
-    // Navigate to view project details
-    const navigateToProject = (projectId: string) => {
-        router.push(`/dashboard/projects/${projectId}`);
-    };
-
-    // Render admin info if request has been reviewed
-    const renderReviewer = (request: RequestData) => {
-        if (request.status === 'PENDING' || !request.admin) return null;
-
-        const reviewerName = request.admin.name || request.admin.email;
-        const initials = reviewerName
-            .split(' ')
-            .map(name => name[0])
-            .join('')
-            .toUpperCase()
-            .slice(0, 2);
-
-        return (
-            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-100">
-                <Avatar className="h-6 w-6">
-                    <AvatarFallback className="text-xs">{initials}</AvatarFallback>
-                </Avatar>
-                <div className="text-sm">
-                    <span className="text-muted-foreground">Reviewed by </span>
-                    <span className="font-medium">{reviewerName}</span>
-                    {request.reviewedAt && (
-                        <span className="text-muted-foreground text-xs ml-1">
-              ({formatDistanceToNow(new Date(request.reviewedAt), { addSuffix: true })})
-            </span>
-                    )}
-                </div>
-            </div>
-        );
+    const getEntryPath = (r: RequestData): string | null => {
+        if (r.ChangelogEntry) return `/dashboard/projects/${r.project.id}/changelog/${r.ChangelogEntry.id}`;
+        return null;
     };
 
     if (isLoading) {
         return (
-            <div className="container mx-auto px-4 py-8 max-w-6xl">
-                <div className="flex items-center justify-between mb-6">
-                    <div>
-                        <h1 className="text-3xl font-bold">Changelog Requests</h1>
-                        <p className="text-muted-foreground mt-1">Track the status of your submitted requests</p>
-                    </div>
+            <div className="space-y-6">
+                <div className="space-y-1">
+                    <Skeleton className="h-7 w-48" />
+                    <Skeleton className="h-4 w-72" />
                 </div>
-                <Separator className="my-6" />
-                <div className="space-y-4">
-                    {[1, 2, 3].map((i) => (
-                        <Card key={i} className="overflow-hidden">
-                            <CardHeader className="pb-2">
-                                <Skeleton className="h-4 w-1/3" />
-                                <Skeleton className="h-8 w-2/3" />
-                            </CardHeader>
-                            <CardContent>
-                                <Skeleton className="h-4 w-full mb-2" />
-                                <Skeleton className="h-4 w-1/2" />
-                            </CardContent>
-                        </Card>
-                    ))}
+                <div className="space-y-3">
+                    {[1, 2, 3].map(i => <Skeleton key={i} className="h-20 w-full rounded-xl" />)}
                 </div>
             </div>
         );
     }
-
-    if (error) {
-        return (
-            <div className="container mx-auto px-4 py-8 max-w-6xl">
-                <div className="flex items-center justify-between mb-6">
-                    <div>
-                        <h1 className="text-3xl font-bold">Changelog Requests</h1>
-                        <p className="text-muted-foreground mt-1">Track the status of your submitted requests</p>
-                    </div>
-                </div>
-                <Separator className="my-6" />
-                <Alert variant="destructive" className="my-8">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Error</AlertTitle>
-                    <AlertDescription>
-                        {error}
-                    </AlertDescription>
-                </Alert>
-                <div className="flex justify-center mt-6">
-                    <Button
-                        onClick={() => window.location.reload()}
-                        variant="outline"
-                    >
-                        Try Again
-                    </Button>
-                </div>
-            </div>
-        );
-    }
-
-    const pendingCount = requests.filter(r => r.status === 'PENDING').length;
-    const approvedCount = requests.filter(r => r.status === 'APPROVED').length;
-    const rejectedCount = requests.filter(r => r.status === 'REJECTED').length;
 
     return (
-        <div className="container mx-auto px-4 py-8 max-w-6xl">
-            <div className="flex items-center justify-between mb-6">
+        <div className="space-y-6">
+            {/* Header */}
+            <div className="flex items-start justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold">Changelog Requests</h1>
-                    <p className="text-muted-foreground mt-1">Track the status of your submitted requests</p>
+                    <h1 className="text-2xl font-bold tracking-tight">My Requests</h1>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                        Track approval requests you've submitted.
+                    </p>
                 </div>
             </div>
 
-            <Tabs
-                defaultValue="all"
-                value={activeTab}
-                onValueChange={setActiveTab}
-                className="w-full"
-            >
-                <div className="flex justify-between items-center mb-4">
-                    <TabsList className="grid grid-cols-4 md:w-auto">
-                        <TabsTrigger value="all" className="px-4">
-                            All
-                            <Badge variant="secondary" className="ml-2">{requests.length}</Badge>
-                        </TabsTrigger>
-                        <TabsTrigger value="pending" className="px-4">
-                            Pending
-                            {pendingCount > 0 && <Badge variant="secondary" className="ml-2">{pendingCount}</Badge>}
-                        </TabsTrigger>
-                        <TabsTrigger value="approved" className="px-4">
-                            Approved
-                            {approvedCount > 0 && <Badge variant="secondary" className="ml-2">{approvedCount}</Badge>}
-                        </TabsTrigger>
-                        <TabsTrigger value="rejected" className="px-4">
-                            Rejected
-                            {rejectedCount > 0 && <Badge variant="secondary" className="ml-2">{rejectedCount}</Badge>}
-                        </TabsTrigger>
-                    </TabsList>
-                </div>
+            {/* Filter bar */}
+            <div className="flex items-center gap-1 p-1 bg-muted/40 rounded-xl w-fit">
+                {([
+                    { key: 'all',      label: 'All' },
+                    { key: 'pending',  label: 'Pending' },
+                    { key: 'changes',  label: 'Changes' },
+                    { key: 'approved', label: 'Approved' },
+                    { key: 'rejected', label: 'Rejected' },
+                ] as { key: StatusFilter; label: string }[]).map(({ key, label }) => (
+                    <FilterTab
+                        key={key}
+                        label={label}
+                        count={key === 'all' ? 0 : (counts as Record<string, number>)[key] ?? 0}
+                        active={filter === key}
+                        onClick={() => setFilter(key)}
+                    />
+                ))}
+            </div>
 
-                <TabsContent value={activeTab} className="mt-0">
-                    {filteredRequests.length === 0 ? (
-                        <motion.div
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="text-center py-16 px-4 bg-muted/30 rounded-lg"
-                        >
-                            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
-                                {activeTab === 'pending' ? (
-                                    <Clock className="h-8 w-8 text-muted-foreground" />
-                                ) : activeTab === 'approved' ? (
-                                    <CheckCircle className="h-8 w-8 text-muted-foreground" />
-                                ) : activeTab === 'rejected' ? (
-                                    <XCircle className="h-8 w-8 text-muted-foreground" />
-                                ) : (
-                                    <AlertTriangle className="h-8 w-8 text-muted-foreground" />
-                                )}
-                            </div>
-                            <h3 className="text-xl font-semibold mb-2">No {activeTab !== 'all' ? activeTab : ''} Requests Found</h3>
-                            <p className="text-muted-foreground max-w-md mx-auto mb-6">
-                                {activeTab === 'pending'
-                                    ? "You don't have any pending requests awaiting approval."
-                                    : activeTab === 'approved'
-                                        ? "You don't have any approved requests yet."
-                                        : activeTab === 'rejected'
-                                            ? "You don't have any rejected requests."
-                                            : "You haven't submitted any requests yet."}
-                            </p>
-                        </motion.div>
-                    ) : (
-                        <ScrollArea className="h-[calc(100vh-250px)] pr-4">
-                            <div className="space-y-4">
-                                {filteredRequests.map((request, index) => (
-                                    <motion.div
-                                        key={request.id}
-                                        initial={{ opacity: 0, y: 20 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: index * 0.05 }}
-                                    >
-                                        <Card className="overflow-hidden border-l-4 shadow-sm hover:shadow-md transition-shadow"
-                                              style={{
-                                                  borderLeftColor: request.status === 'PENDING'
-                                                      ? 'rgb(234 179 8)'
-                                                      : request.status === 'APPROVED'
-                                                          ? 'rgb(22 163 74)'
-                                                          : 'rgb(220 38 38)'
-                                              }}
-                                        >
-                                            <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="rounded-md bg-muted p-2">
-                                                        {getRequestIcon(request.type)}
-                                                    </div>
-                                                    <div>
-                                                        <div className="flex items-center gap-2">
-                                                            <CardTitle className="text-lg">
-                                                                {getTargetName(request)}
-                                                            </CardTitle>
-                                                            {renderStatusBadge(request.status)}
-                                                        </div>
-                                                        <p className="text-sm text-muted-foreground mt-1">
-                                                            {getReadableType(request.type)} in <span className="font-medium">{request.project.name}</span>
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                <div className="text-sm text-muted-foreground">
-                                                    {formatDistanceToNow(new Date(request.createdAt), { addSuffix: true })}
-                                                </div>
-                                            </CardHeader>
+            {/* List */}
+            <AnimatePresence mode="wait">
+                {visible.length === 0 ? (
+                    <motion.div
+                        key="empty"
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        className="flex flex-col items-center justify-center py-20 text-center"
+                    >
+                        <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
+                            <Inbox className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                        <p className="font-medium">No {filter !== 'all' ? filter : ''} requests</p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                            {filter === 'pending' ? "Nothing waiting for approval." : "Nothing here yet."}
+                        </p>
+                    </motion.div>
+                ) : (
+                    <motion.div
+                        key="list"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="space-y-3"
+                    >
+                        {visible.map((request, i) => {
+                            const meta = TYPE_META[request.type] ?? { label: request.type, icon: FileText, color: 'text-muted-foreground bg-muted' };
+                            const Icon = meta.icon;
+                            const entryPath = getEntryPath(request);
+                            const reviewer = request.admin?.name || request.admin?.email;
 
-                                            <CardContent>
-                                                {renderReviewer(request)}
-                                            </CardContent>
+                            const feedback = request.metadata?.feedback;
+                            const isChangesRequested = request.status === 'CHANGES_REQUESTED';
 
-                                            <CardFooter className="pt-0 flex justify-end">
+                            return (
+                                <motion.div
+                                    key={request.id}
+                                    initial={{ opacity: 0, y: 12 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: i * 0.04 }}
+                                    className={cn(
+                                        'rounded-xl border bg-card shadow-sm border-l-4 overflow-hidden',
+                                        STATUS_COLORS[request.status] ?? 'border-l-border'
+                                    )}
+                                >
+                                    <div className="flex items-center gap-4 px-4 py-3.5">
+                                        {/* Type icon */}
+                                        <div className={cn('h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0', meta.color)}>
+                                            <Icon className="h-4 w-4" />
+                                        </div>
+
+                                        {/* Info */}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="text-sm font-medium truncate">{getTargetLabel(request)}</span>
+                                                <StatusBadge status={request.status} />
+                                            </div>
+                                            <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                                                <span>{meta.label}</span>
+                                                <span>·</span>
+                                                <span>{request.project.name}</span>
+                                                <span>·</span>
+                                                <span>{formatDistanceToNow(new Date(request.createdAt), { addSuffix: true })}</span>
+                                                {reviewer && request.status !== 'PENDING' && (
+                                                    <>
+                                                        <span>·</span>
+                                                        <span>by {reviewer}</span>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Actions */}
+                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                            {isChangesRequested && entryPath && (
+                                                <Button
+                                                    size="sm"
+                                                    className="h-8 gap-1 text-xs bg-orange-500 hover:bg-orange-600 text-white"
+                                                    onClick={() => router.push(entryPath)}
+                                                >
+                                                    Address changes
+                                                    <ArrowUpRight className="h-3.5 w-3.5" />
+                                                </Button>
+                                            )}
+                                            {!isChangesRequested && entryPath && (
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
-                                                    className="gap-1 text-primary"
-                                                    onClick={() => navigateToProject(request.project.id)}
+                                                    className="h-8 gap-1 text-xs"
+                                                    onClick={() => router.push(entryPath)}
                                                 >
-                                                    View Project
-                                                    <ArrowUpRight className="h-4 w-4" />
+                                                    View entry
+                                                    <ArrowUpRight className="h-3.5 w-3.5" />
                                                 </Button>
-                                            </CardFooter>
-                                        </Card>
-                                    </motion.div>
-                                ))}
-                            </div>
-                        </ScrollArea>
-                    )}
-                </TabsContent>
-            </Tabs>
+                                            )}
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-8 gap-1 text-xs text-muted-foreground"
+                                                onClick={() => router.push(`/dashboard/projects/${request.project.id}`)}
+                                            >
+                                                Project
+                                                <ArrowUpRight className="h-3.5 w-3.5" />
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    {/* Feedback / notes block — shown for any status that has metadata.feedback */}
+                                    {feedback && (
+                                        <div className={cn(
+                                            'border-t px-4 py-3',
+                                            isChangesRequested
+                                                ? 'border-orange-100 dark:border-orange-900/30 bg-orange-50/50 dark:bg-orange-950/20'
+                                                : 'border-border/50 bg-muted/30'
+                                        )}>
+                                            <div className="flex items-start gap-2">
+                                                <MessageSquare className={cn('h-3.5 w-3.5 mt-0.5 flex-shrink-0', isChangesRequested ? 'text-orange-500' : 'text-muted-foreground')} />
+                                                <div>
+                                                    <p className={cn('text-xs font-medium mb-0.5', isChangesRequested ? 'text-orange-700 dark:text-orange-400' : 'text-muted-foreground')}>
+                                                        Note from {reviewer ?? 'admin'}
+                                                    </p>
+                                                    <p className={cn('text-sm whitespace-pre-wrap leading-relaxed', isChangesRequested ? 'text-orange-800 dark:text-orange-300' : 'text-foreground')}>
+                                                        {feedback}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </motion.div>
+                            );
+                        })}
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

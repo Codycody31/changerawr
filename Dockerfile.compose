@@ -19,6 +19,11 @@ COPY . .
 # Generate Prisma client
 RUN npx prisma generate
 
+# extensionLoader.ts is gitignored (generated, not committed) — regenerate it
+# here so the build has a valid file even on a checkout with no extensions
+# installed yet. Also generates the Tailwind extension safelist.
+RUN npm run extensions:generate
+
 # Next.js collects completely anonymous telemetry data about general usage.
 ENV NEXT_TELEMETRY_DISABLED 1
 ENV DOCKER_BUILD 1
@@ -54,12 +59,9 @@ RUN npm install -g jsdoc
 # Add bash and curl for the entry script and health checks
 RUN apk add --no-cache bash curl
 
-# Copy the entire project from the builder stage
+# Copy the entire project from the builder stage (includes
+# scripts/maintenance/index.html and server.js)
 COPY --from=builder /app .
-
-# Copy maintenance page and server script
-COPY scripts/maintenance/index.html ./index.html
-COPY scripts/maintenance/server.js ./scripts/maintenance/server.js
 
 # Copy entrypoint script and fix line endings
 COPY docker-entrypoint-compose.sh /app/docker-entrypoint-compose.sh

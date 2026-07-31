@@ -1,79 +1,46 @@
-import {NextResponse} from 'next/server'
-import {PrismaClient} from '@prisma/client'
-import {validateAuthAndGetUser} from "@/lib/utils/changelog"
-import {encryptToken} from "@/lib/utils/encryption"
-
-const prisma = new PrismaClient()
-
-interface SystemConfig {
-    enableAIAssistant: boolean
-    aiApiKey: string | null
-    aiDefaultModel: string | null
-}
-
-interface AISettingsResponse {
-    enableAIAssistant: boolean
-    aiApiKey: string | null
-    aiDefaultModel: string | null
-}
-
-interface AISettingsErrorResponse {
-    error: string
-    enableAIAssistant: boolean
-    aiApiKey: null
-}
+import { NextResponse } from 'next/server'
+import { db } from '@/lib/db'
+import { validateAuthAndGetUser } from '@/lib/utils/changelog'
+import { encryptToken } from '@/lib/utils/encryption'
 
 /**
- * @method GET
- * @description Retrieve the system AI settings with encrypted API key for the editor
- * @response 200 {
- *   "type": "object",
- *   "properties": {
- *     "enableAIAssistant": { "type": "boolean" },
- *     "aiApiKey": { "type": "string", "nullable": true },
- *     "aiDefaultModel": { "type": "string", "nullable": true }
- *   }
- * }
+ * GET /api/ai/settings
+ * Returns AI config needed by editor components.
+ * The apiKey is re-encrypted for the client (decrypted on demand via /api/ai/decrypt).
  */
-export async function GET(): Promise<NextResponse<AISettingsResponse | AISettingsErrorResponse>> {
+export async function GET() {
     try {
         await validateAuthAndGetUser()
 
-        // Get the system configuration
-        const config = await prisma.systemConfig.findFirst({
-            where: {id: 1},
+        const config = await db.systemConfig.findFirst({
+            where: { id: 1 },
             select: {
                 enableAIAssistant: true,
                 aiApiKey: true,
-                aiDefaultModel: true
-            }
-        }) as SystemConfig | null
+                aiApiProvider: true,
+                aiApiUrl: true,
+                aiDefaultModel: true,
+                changelogTaggerUrl: true,
+            },
+        })
 
-        // Encrypt the API key before sending to client
-        let encryptedApiKey: string | null = null
-        if (config?.aiApiKey) {
-            encryptedApiKey = encryptToken(config.aiApiKey)
-        }
+        const encryptedApiKey = config?.aiApiKey ? encryptToken(config.aiApiKey) : null
 
-        const response: AISettingsResponse = {
-            enableAIAssistant: config?.enableAIAssistant || false,
+        return NextResponse.json({
+            enableAIAssistant: config?.enableAIAssistant ?? false,
             aiApiKey: encryptedApiKey,
-            aiDefaultModel: config?.aiDefaultModel || null,
-        }
-
-        return NextResponse.json(response)
+            aiApiProvider: config?.aiApiProvider ?? 'secton',
+            aiApiUrl: config?.aiApiUrl ?? null,
+            aiDefaultModel: config?.aiDefaultModel ?? null,
+            changelogTaggerConfigured: !!config?.changelogTaggerUrl,
+        })
     } catch (error) {
-        console.error('Error fetching AI system settings:', error)
-
-        const errorResponse: AISettingsErrorResponse = {
+        console.error('[ai/settings] GET error:', error)
+        return NextResponse.json({
             error: 'Failed to fetch AI settings',
             enableAIAssistant: false,
             aiApiKey: null,
-        }
-
-        return new NextResponse(
-            JSON.stringify(errorResponse),
-            {status: 500}
-        )
+            changelogTaggerConfigured: false,
+        }, { status: 500 })
     }
 }

@@ -2,6 +2,9 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
+// Always run this check live - never serve a build-time-cached response.
+export const dynamic = 'force-dynamic';
+
 /**
  * @method GET
  * @description Health check endpoint to verify application readiness
@@ -28,6 +31,8 @@ import { db } from '@/lib/db';
  * }
  */
 export async function GET() {
+    const headers = { 'Cache-Control': 'no-store, no-cache, must-revalidate' };
+
     try {
         // Check database connectivity
         await db.$queryRaw`SELECT 1`;
@@ -39,7 +44,7 @@ export async function GET() {
                 database: 'connected',
                 application: 'ready'
             }
-        }, { status: 200 });
+        }, { status: 200, headers });
 
     } catch (error) {
         console.error('Health check failed:', error);
@@ -47,6 +52,6 @@ export async function GET() {
         return NextResponse.json({
             status: 'unhealthy',
             error: 'Database connection failed'
-        }, { status: 503 });
+        }, { status: 503, headers });
     }
 }

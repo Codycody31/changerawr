@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,6 +19,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Card, CardContent } from '@/components/ui/card';
+import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import {
     Eye,
     EyeOff,
@@ -52,6 +53,41 @@ export const CUMTableModal: React.FC<CUMModalProps> = ({
     });
 
     const [showPreview, setShowPreview] = useState(true);
+    const [previewHtml, setPreviewHtml] = useState<string>('');
+
+    // Generate markdown table
+    const generateMarkdown = useCallback((): string => {
+        let markdown = '';
+
+        // Header row
+        markdown += '| ' + config.data[0].join(' | ') + ' |\n';
+
+        // Separator row
+        const separators = config.alignments.map(align => {
+            if (align === 'center') return ':-----:';
+            if (align === 'right') return '-----:';
+            return ':-----';
+        });
+        markdown += '| ' + separators.join(' | ') + ' |\n';
+
+        // Data rows
+        for (let i = 1; i < config.data.length; i++) {
+            markdown += '| ' + config.data[i].join(' | ') + ' |\n';
+        }
+
+        return markdown;
+    }, [config]);
+
+    // Render preview whenever config changes
+    useEffect(() => {
+        if (showPreview) {
+            const markdown = generateMarkdown();
+            renderMarkdown(markdown).then(setPreviewHtml).catch((err) => {
+                console.error('Failed to render table preview:', err);
+                setPreviewHtml('<p>Error rendering preview</p>');
+            });
+        }
+    }, [generateMarkdown, showPreview]);
 
     // Update table dimensions
     const updateDimensions = (newRows: number, newCols: number) => {
@@ -93,29 +129,6 @@ export const CUMTableModal: React.FC<CUMModalProps> = ({
         const newAlignments = [...config.alignments];
         newAlignments[col] = align;
         setConfig({ ...config, alignments: newAlignments });
-    };
-
-    // Generate markdown table
-    const generateMarkdown = (): string => {
-        let markdown = '';
-
-        // Header row
-        markdown += '| ' + config.data[0].join(' | ') + ' |\n';
-
-        // Separator row
-        const separators = config.alignments.map(align => {
-            if (align === 'center') return ':-----:';
-            if (align === 'right') return '-----:';
-            return ':-----';
-        });
-        markdown += '| ' + separators.join(' | ') + ' |\n';
-
-        // Data rows
-        for (let i = 1; i < config.data.length; i++) {
-            markdown += '| ' + config.data[i].join(' | ') + ' |\n';
-        }
-
-        return markdown;
     };
 
     const handleInsert = () => {
@@ -205,24 +218,24 @@ export const CUMTableModal: React.FC<CUMModalProps> = ({
                     <div className="space-y-3">
                         <Label className="text-sm font-medium">Table Content</Label>
                         <div className="border rounded-lg overflow-x-auto max-h-[300px] overflow-y-auto bg-muted/20">
-                            <table className="w-full border-collapse text-sm">
-                                <tbody>
+                            <Table>
+                                <TableBody>
                                     {config.data.map((row, rowIdx) => (
-                                        <tr key={rowIdx} className={rowIdx === 0 ? 'bg-muted' : ''}>
+                                        <TableRow key={rowIdx} className={rowIdx === 0 ? 'bg-muted' : ''}>
                                             {row.map((cell, colIdx) => (
-                                                <td key={`${rowIdx}-${colIdx}`} className="border p-1">
+                                                <TableCell key={`${rowIdx}-${colIdx}`} className="p-1">
                                                     <Input
                                                         value={cell}
                                                         onChange={(e) => updateCell(rowIdx, colIdx, e.target.value)}
                                                         placeholder={`Row ${rowIdx + 1}, Col ${colIdx + 1}`}
                                                         className="h-8 text-xs"
                                                     />
-                                                </td>
+                                                </TableCell>
                                             ))}
-                                        </tr>
+                                        </TableRow>
                                     ))}
-                                </tbody>
-                            </table>
+                                </TableBody>
+                            </Table>
                         </div>
                     </div>
 
@@ -287,7 +300,7 @@ export const CUMTableModal: React.FC<CUMModalProps> = ({
                                         <div
                                             className="inline-block"
                                             dangerouslySetInnerHTML={{
-                                                __html: renderMarkdown(generateMarkdown()),
+                                                __html: previewHtml,
                                             }}
                                         />
                                     </div>

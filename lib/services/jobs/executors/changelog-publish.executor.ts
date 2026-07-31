@@ -27,7 +27,38 @@ export class ChangelogPublishExecutor implements ScheduledJobExecutor {
 
             if (entry.publishedAt) {
                 console.log(`Changelog entry already published: ${entityId}`);
-                return; // Entry already published, nothing to do
+                return;
+            }
+
+            // Abort if there's an outstanding schedule-approval request that hasn't been approved.
+            // This covers the CHANGES_REQUESTED flow: the admin sent feedback, the staff hasn't
+            // resubmitted yet, but the originally-scheduled time has arrived.
+            const blockedRequest = await db.changelogRequest.findFirst({
+                where: {
+                    type: 'ALLOW_SCHEDULE',
+                    changelogEntryId: entityId,
+                    status: { in: ['PENDING', 'CHANGES_REQUESTED'] },
+                },
+                select: { id: true, status: true },
+            });
+
+            if (blockedRequest) {
+                console.log(
+                    `Aborting scheduled publish for entry ${entityId}: ` +
+                    `approval request ${blockedRequest.id} is still ${blockedRequest.status}.`
+                );
+                await createAuditLog(
+                    'CHANGELOG_ENTRY_SCHEDULE_ABORTED',
+                    'system',
+                    'system',
+                    {
+                        entryId: entityId,
+                        reason: `Schedule approval request is ${blockedRequest.status} — publish aborted.`,
+                        requestId: blockedRequest.id,
+                        timestamp: new Date().toISOString(),
+                    }
+                );
+                return; // Do not publish; job completes without error so it isn't retried
             }
 
             // Get the user who scheduled this entry for notification

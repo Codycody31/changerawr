@@ -7,6 +7,7 @@ import SMTPTransport from "nodemailer/lib/smtp-transport";
 import { nanoid } from 'nanoid';
 import ApprovalNotificationEmail from "@/emails/approval-notification";
 import RejectionNotificationEmail from "@/emails/rejection-notification";
+import ChangesRequestedNotificationEmail from "@/emails/changes-requested-notification";
 
 export interface SendEmailParams {
     projectId: string;
@@ -29,11 +30,14 @@ interface NotificationRequestInfo {
     projectName: string;
     entryTitle?: string;
     adminName?: string;
+    feedback?: string;
+    entryId?: string;
+    projectId?: string;
 }
 
 interface SendNotificationParams {
     userId: string;
-    status: 'APPROVED' | 'REJECTED' | 'PENDING';
+    status: 'APPROVED' | 'REJECTED' | 'PENDING' | 'CHANGES_REQUESTED';
     request: NotificationRequestInfo;
     dashboardUrl: string;
 }
@@ -377,13 +381,32 @@ export async function sendNotificationEmail({
             requestType: request.type,
             entryTitle: request.entryTitle,
             adminName: request.adminName || 'an administrator',
+            feedback: request.feedback,
             dashboardUrl
         };
 
-        // Use the appropriate email template based on status
-        const emailComponent = status === 'APPROVED'
-            ? ApprovalNotificationEmail(emailProps)
-            : RejectionNotificationEmail(emailProps);
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        const entryUrl = request.projectId && request.entryId
+            ? `${appUrl}/dashboard/projects/${request.projectId}/changelog/${request.entryId}`
+            : dashboardUrl;
+
+        // Choose email template
+        let emailComponent;
+        let subject: string;
+        if (status === 'APPROVED') {
+            emailComponent = ApprovalNotificationEmail(emailProps);
+            subject = `Request Approved for ${request.projectName}`;
+        } else if (status === 'CHANGES_REQUESTED') {
+            emailComponent = ChangesRequestedNotificationEmail({
+                ...emailProps,
+                feedback: request.feedback || 'Please review and update your entry.',
+                entryUrl,
+            });
+            subject = `Changes Requested — ${request.projectName}`;
+        } else {
+            emailComponent = RejectionNotificationEmail(emailProps);
+            subject = `Request Not Approved for ${request.projectName}`;
+        }
 
         // Render the email
         const html = isValidElement(emailComponent)
@@ -393,11 +416,6 @@ export async function sendNotificationEmail({
         const text = isValidElement(emailComponent)
             ? await render(emailComponent, { plainText: true })
             : '';
-
-        // Set the subject based on status
-        const subject = status === 'APPROVED'
-            ? `Request Approved for ${request.projectName}`
-            : `Request Not Approved for ${request.projectName}`;
 
         // Send the email
         const mailOptions: SendMailOptions = {

@@ -1,5 +1,6 @@
 'use client'
 
+import {cn} from '@/lib/utils'
 import {useAuth} from '@/context/auth'
 import {useQuery} from '@tanstack/react-query'
 import Link from 'next/link'
@@ -27,8 +28,10 @@ import {
     LayoutDashboard,
     TrendingUp,
     Target,
-    PenTool
+    PenTool,
+    FolderKanban
 } from 'lucide-react'
+import {DynamicIcon} from '@/components/ui/icon-picker'
 import {formatDistanceToNow} from "date-fns"
 import type {
     DashboardStats,
@@ -403,9 +406,20 @@ export default function DashboardPage() {
                                                     <div className="flex items-center justify-between">
                                                         <div className="flex items-center gap-3">
                                                             <div
-                                                                className="h-8 w-8 rounded-md bg-muted/50 flex items-center justify-center">
-                                                                <LayoutDashboard
-                                                                    className="h-4 w-4 text-muted-foreground"/>
+                                                                className={cn(
+                                                                    "h-8 w-8 rounded-md flex items-center justify-center",
+                                                                    !project.color && "bg-muted/50 text-muted-foreground"
+                                                                )}
+                                                                style={project.color ? {
+                                                                    backgroundColor: `${project.color}1a`,
+                                                                    color: project.color,
+                                                                } : undefined}
+                                                            >
+                                                                {project.id.startsWith('placeholder') ? (
+                                                                    <LayoutDashboard className="h-4 w-4"/>
+                                                                ) : (
+                                                                    <DynamicIcon name={project.icon} fallback={FolderKanban} className="h-4 w-4"/>
+                                                                )}
                                                             </div>
                                                             <div className="space-y-1">
                                                                 <h3 className="font-medium group-hover:text-primary transition-colors">

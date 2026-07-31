@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Plus, Search, Grid, List, Calendar, Star, Sparkles, Settings } from 'lucide-react'
+import { Plus, Search, Grid, List, Calendar, Star, Sparkles, Settings, FolderKanban } from 'lucide-react'
+import { DynamicIcon } from '@/components/ui/icon-picker'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,13 +26,16 @@ interface Project extends PrismaProject {
     }
 }
 
-// Generate vibrant pastel colors for project cards
+// Generate vibrant pastel colors for project cards as a fallback when no custom color is set
 const getProjectColor = (id: string) => {
     // Use the project id to generate a consistent color
     const hash = id.split('').reduce((acc, char) => char.charCodeAt(0) + acc, 0);
     const hue = hash % 360;
     return `hsl(${hue}, 85%, 88%)`;
 }
+
+// Resolves the accent color for a project, preferring its custom color over the generated fallback
+const getProjectAccentColor = (project: Project) => project.color || getProjectColor(project.id)
 
 // Format date helper function
 const formatDate = (dateString: string | number | Date, timeZone = 'UTC') => {
@@ -237,7 +241,7 @@ export default function ProjectsPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                         <AnimatePresence>
                             {sortedProjects.map((project, index) => {
-                                const projectColor = getProjectColor(project.id);
+                                const projectColor = getProjectAccentColor(project);
 
                                 return (
                                     <motion.div
@@ -255,7 +259,19 @@ export default function ProjectsPage() {
                                             <div className="h-2 group-hover:h-3 transition-all" style={{ background: projectColor }} />
                                             <CardHeader className="pb-2">
                                                 <div className="flex justify-between items-start">
-                                                    <CardTitle className="text-xl font-semibold line-clamp-1">{project.name}</CardTitle>
+                                                    <div className="flex items-center gap-2 min-w-0">
+                                                        <div
+                                                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border"
+                                                            style={{
+                                                                backgroundColor: project.color ? `${project.color}1a` : undefined,
+                                                                borderColor: project.color ? `${project.color}40` : undefined,
+                                                                color: project.color || undefined,
+                                                            }}
+                                                        >
+                                                            <DynamicIcon name={project.icon} fallback={FolderKanban} className="h-4 w-4"/>
+                                                        </div>
+                                                        <CardTitle className="text-xl font-semibold line-clamp-1">{project.name}</CardTitle>
+                                                    </div>
                                                     {project.isPublic && (
                                                         <Badge variant="secondary" className="text-xs">Public</Badge>
                                                     )}
@@ -319,7 +335,7 @@ export default function ProjectsPage() {
                     <div className="space-y-3">
                         <AnimatePresence>
                             {sortedProjects.map((project, index) => {
-                                const projectColor = getProjectColor(project.id);
+                                const projectColor = getProjectAccentColor(project);
 
                                 return (
                                     <motion.div
@@ -340,6 +356,17 @@ export default function ProjectsPage() {
                                                 className="absolute left-0 top-0 bottom-0 w-1 group-hover:w-1.5 transition-all"
                                                 style={{ background: projectColor }}
                                             />
+
+                                            <div
+                                                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border ml-3"
+                                                style={{
+                                                    backgroundColor: project.color ? `${project.color}1a` : undefined,
+                                                    borderColor: project.color ? `${project.color}40` : undefined,
+                                                    color: project.color || undefined,
+                                                }}
+                                            >
+                                                <DynamicIcon name={project.icon} fallback={FolderKanban} className="h-5 w-5"/>
+                                            </div>
 
                                             <div className="flex-1 ml-3">
                                                 <div className="flex items-center gap-2">

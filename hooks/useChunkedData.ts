@@ -43,7 +43,7 @@ export const useChunkedData = <T extends { id: string | number }>({
 
     // Debug logging
     const debugLog = useCallback((message: string, ...args: unknown[]) => {
-        console.log(`🦖 ChunkedData [${queryKey}]:`, message, ...args);
+        // console.log(`🦖 ChunkedData [${queryKey}]:`, message, ...args);
     }, [queryKey]);
 
     // Main query to fetch data

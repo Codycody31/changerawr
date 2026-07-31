@@ -1,4 +1,4 @@
-FROM node:22-alpine AS base
+FROM node:24-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
@@ -6,6 +6,8 @@ WORKDIR /app
 
 # Copy package files
 COPY package.json package-lock.json* ./
+# postinstall runs scripts/sync-markdown.js, so scripts/ must exist before npm install
+COPY scripts ./scripts
 # CACHEBUST forces npm install to re-run even when package files are unchanged
 ARG CACHEBUST=1
 RUN echo "Cache bust: $CACHEBUST" && npm install --legacy-peer-deps
@@ -20,6 +22,11 @@ COPY . .
 
 # Generate Prisma client
 RUN npx prisma generate
+
+# extensionLoader.ts is gitignored (generated, not committed) — regenerate it
+# here so the build has a valid file even on a checkout with no extensions
+# installed yet. Also generates the Tailwind extension safelist.
+RUN npm run extensions:generate
 
 # Next.js collects completely anonymous telemetry data about general usage.
 # Learn more here: https://nextjs.org/telemetry
@@ -40,6 +47,8 @@ ENV NEXT_TELEMETRY_DISABLED 1
 
 # Install all dependencies to satisfy entrypoint requirements
 COPY package.json package-lock.json* ./
+# postinstall runs scripts/sync-markdown.js, so scripts/ must exist before npm install
+COPY scripts ./scripts
 RUN npm install --legacy-peer-deps
 # Install Prisma client with exact version match
 RUN npm uninstall prisma @prisma/client --legacy-peer-deps
@@ -67,12 +76,9 @@ RUN wget -q https://github.com/Changerawr/nginx-agent/archive/refs/heads/master.
 # Create nginx directories
 RUN mkdir -p /etc/nginx/sites-enabled /etc/nginx/sites-available /etc/ssl/changerawr /var/log/nginx /var/lib/nginx/tmp /run/nginx
 
-# Copy the entire project from the builder stage
+# Copy the entire project from the builder stage (includes
+# scripts/maintenance/index.html and server.js)
 COPY --from=builder /app .
-
-# Copy maintenance page and server script
-COPY scripts/maintenance/index.html ./index.html
-COPY scripts/maintenance/server.js ./scripts/maintenance/server.js
 
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
@@ -91,4 +97,5 @@ ENV HOSTNAME "0.0.0.0"
 
 # Use entrypoint for running the build scripts before starting the server
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
+# cascade
 CMD ["npm", "start"]

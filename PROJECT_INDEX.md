@@ -1,250 +1,291 @@
 # Project Index: Changerawr
 
-Generated: 2026-04-15
-
-## Overview
-
-Changerawr is a self-hosted changelog management platform with AI assistance, custom domains, SSO/SAML, Slack/GitHub integrations, and embeddable widgets.
-
-**License**: CNC OSL (Non-Commercial Open Source)
-
----
+Generated: 2026-05-29 | Version: 1.0.7 (Stable) | License: CNC OSL
 
 ## 📁 Project Structure
 
 ```
 changerawr/
-├── app/                    # Next.js App Router (pages + API routes)
-│   ├── (auth)/             # Auth page group (login, register, setup, 2FA)
-│   ├── (email)/            # Email-related pages (unsubscribed)
-│   ├── api/                # 145+ API route handlers
-│   ├── dashboard/          # Authenticated dashboard
-│   │   ├── admin/          # Admin panel (users, system config, SSO, audit)
-│   │   ├── projects/       # Project management & changelog editor
-│   │   └── settings/       # User settings
-│   ├── changelog/          # Public changelog pages + RSS feeds
-│   └── .well-known/        # ACME challenge routes
-├── components/             # React UI components by feature
-├── lib/                    # Business logic, utils, auth, services
-├── hooks/                  # 13 custom React hooks
-├── prisma/schema/          # Modular Prisma schema (6 files)
-├── emails/                 # Email template components
-├── context/                # React context providers (auth, setup)
-├── widgets/                # Embeddable changelog widget source
-├── scripts/                # Build & maintenance scripts
-└── public/                 # Static assets
+├── app/                     # Next.js App Router pages & API routes
+│   ├── (auth)/              # Auth flows: login, register, setup, 2FA, OAuth callback
+│   ├── (email)/             # Unsubscribe email landing page
+│   ├── api/                 # REST API (route.ts files)
+│   ├── changelog/           # Public changelog viewer + RSS
+│   └── dashboard/           # Authenticated UI (projects, admin)
+├── components/              # React components
+│   ├── ui/                  # shadcn/ui primitives (Radix-based)
+│   ├── changelog/           # Changelog display & editor pieces
+│   ├── markdown-editor/     # Full markdown editor w/ extensions
+│   ├── admin/               # Admin-specific components
+│   ├── analytics/           # Chart + table components
+│   └── project/             # Project-scoped components
+├── lib/                     # Server-side logic & shared utilities
+│   ├── auth/                # JWT, OAuth, SAML, passkeys, CLI auth
+│   ├── api/                 # Middleware, permissions, route guards
+│   ├── services/            # Business logic services
+│   ├── custom-domains/      # Domain verification + SSL
+│   ├── utils/               # Date, encryption, analytics helpers
+│   ├── types/               # Shared TypeScript types
+│   └── constants/           # Timezones, etc.
+├── hooks/                   # React hooks (client-side)
+├── prisma/
+│   ├── schema/              # Split Prisma schema files
+│   └── migrations/          # DB migration history
+├── extensions/              # 3rd-party CUM extensions (changerawr/)
+└── scripts/                 # Dev tooling, widget build, Swagger gen
 ```
-
----
 
 ## 🚀 Entry Points
 
-| Path | Purpose |
-|------|---------|
-| `app/layout.tsx` | Root layout with providers |
-| `app/page.tsx` | Root redirect |
-| `app/(auth)/setup/page.tsx` | First-run setup wizard |
-| `lib/api/middleware.ts` | API request middleware (auth, permissions) |
-| `next.config.ts` | Next.js config (React Compiler, Turbopack) |
-| `docker-entrypoint.sh` | Container startup |
-
----
-
-## 🔐 Authentication System
-
-- **Token**: JWT in `accessToken` cookie — verified via `verifyAccessToken` from `lib/auth/tokens`
-- **Methods**: Password, OAuth, SAML/SSO, Passkey/WebAuthn
-- **Roles**: `ADMIN`, `STAFF`, `VIEWER`
-- **2FA Modes**: `NONE`, `PASSKEY_PLUS_PASSWORD`, `PASSWORD_PLUS_PASSKEY`
-- **CLI Auth**: Token-based code flow at `/api/auth/cli/*`
-
-Key auth files:
-- `lib/auth/tokens.ts` — JWT generation/verification
-- `lib/auth/oauth.ts` — OAuth 2.0 provider integration
-- `lib/auth/saml.ts` — SAML implementation
-- `lib/auth/webauthn.ts` — Passkey/WebAuthn
-- `lib/api/permissions.ts` — Permission checking
-- `lib/api/route-permissions.ts` — Route-level permission config
-
----
+| Target | Path | Command |
+|--------|------|---------|
+| Next.js dev | `app/` | `npm run dev` (port 3001) |
+| Extension builder | `scripts/extension-builder/server.js` | `npm run dev:builder` |
+| Maintenance server | `scripts/maintenance/server.js` | `npm run maintenance` |
+| Widget build | `scripts/widget/build.ts` | `npm run build:widget` |
+| Swagger gen | `scripts/api/generateSwagger.ts` | `npm run generate-swagger` |
+| Prisma Studio | — | `npm run prisma:studio` |
 
 ## 📦 Core Modules
 
-### API Layer (`app/api/`)
-Route groups:
-- `auth/` — Login, register, OAuth, SAML, passkeys, CLI, password reset
-- `admin/` — Config, users, AI settings, SSO providers, API keys, audit logs
-- `projects/[projectId]/` — CRUD, changelog entries, integrations, analytics
-- `changelog/` — Public access, subscriptions, RSS
-- `custom-domains/` — Domain verify, SSL management, browser rules
-- `acme/` — Let's Encrypt certificate issuance/renewal
-- `integrations/slack/` — Slack OAuth callback
-- `config/timezone` — Public effective timezone (no auth)
-- `health` — Health check
-
-### Services Layer (`lib/services/`)
-Business logic separated from API handlers:
-- `analytics/` — Analytics data processing
-- `changelog/` — Entry CRUD, publishing, scheduling
-- `email/` — SMTP sending, newsletter management
-- `github/` — Commit sync, tag creation
-- `slack/` — Slack bot notifications
-- `jobs/` — Background job execution (ScheduledJob queue)
-- `projects/` — Project operations
-- `sponsor/` — License/sponsor management
-- `telemetry/` — Telemetry tracking
-- `search/` — Full-text PostgreSQL search
-- `core/markdown/` — Markdown parsing & custom extensions
-
 ### Auth (`lib/auth/`)
-See Authentication System above.
+- `tokens.ts` — `verifyAccessToken`, JWT sign/verify; cookie name = `accessToken`
+- `authorization.ts` — RBAC helpers; roles: ADMIN, STAFF, VIEWER
+- `oauth.ts` / `saml.ts` — OAuth 2.0 + SAML SSO providers
+- `webauthn.ts` — Passkey/WebAuthn registration & authentication
+- `cli-auth.ts` — CLI device-code flow
+- `api-key.ts` — API key validation
+- `claim-validator.ts` / `email-domain-validator.ts` — SSO claim checks
 
-### Utils (`lib/utils/`)
-- `format-date.ts` — Timezone-aware date formatting
+### Database (`lib/db.ts`)
+- Prisma singleton exported as `db`; resolves `DATABASE_URL`
+- `prisma generate` must run after schema changes before runtime works
+
+### Services (`lib/services/`)
+- `core/markdown/` — CUM engine wrapper; built-in extensions: table, subtext, syntax-highlight, image, link
+- `core/markdown/extensionLoader.ts` — Dynamic extension discovery from `extensions/`
+- `github/changelog-generator.ts` + `github/client.ts` — GitHub integration
+- `email/notification.ts` + `email/schedule-notification.ts` — Email dispatch
+- `slack/` — Slack webhook posting
+- `analytics/geolocation.ts` — IP geolocation for analytics
+- `jobs/job-runner.service.ts` — Background job runner
+- `jobs/scheduled-job.service.ts` — Cron-style scheduled jobs
+- `jobs/executors/` — changelog-publish, ssl-renewal, telemetry-send
+- `projects/importing/` — Canny + Markdown import pipeline
+- `projects/catch-up/` — AI-powered catch-up summaries
+- `search/service.ts` — Full-text search (Postgres)
+- `changelog/rss.ts` — RSS feed generation
+- `custom-domains/ssl/` — ACME/Let's Encrypt SSL management
+- `bookmarks/bookmark.service.ts` — Bookmark management
+- `telemetry/service.ts` — Usage telemetry
+- `sponsor/service.ts` — Sponsor data (separate MySQL DB — no migrations here)
+- `easypanel/index.ts` — EasyPanel deployment integration
+
+### API Middleware (`lib/api/`)
+- `middleware.ts` — Auth guard wrapper for route handlers
+- `permissions.ts` — Permission definitions
+- `route-permissions.ts` — Per-route permission config
+
+### Utilities (`lib/utils/`)
+- `format-date.ts` — Date formatting with timezone support
+- `encryption.ts` — AES encryption (used for SSL private keys, etc.)
+- `auditLog.ts` — Audit log writer
+- `changelog.ts` — Changelog-specific helpers
+- `rate-limit.ts` — Request rate limiting
 - `cookies.ts` — Cookie helpers
-- `encryption.ts` — Encryption utilities
-- `auditLog.ts` — Audit log helpers
-- `api.ts` — API utilities
+- `ai/prompts.ts` + `ai/types.ts` — AI assistant prompt templates
+- `analytics.ts` — Analytics event helpers
 
-### Custom Domains (`lib/custom-domains/`)
-- `service.ts` — Domain management
-- `ssl/` — ACME/Let's Encrypt logic
-- `dns.ts` — DNS verification utilities
+### Hooks (`hooks/`)
+- `use-timezone.ts` — `useTimezone()` — resolves effective timezone (user → system → UTC)
+- `useAIAssistant.ts` — AI panel state management
+- `useCommandPalette.ts` — Global command palette
+- `useMarkdownState.ts` — Editor state
+- `useEditorHistory.ts` — Undo/redo history
+- `useBookmarks.ts` — Bookmark operations
+- `useTelemetry.ts` — Telemetry opt-in/out
+- `use-spellcheck.ts` — LanguageTool integration
 
----
+### App Info (`lib/app-info.ts`)
+- Single source of truth for version, license, repo URL, CUM engine version
 
-## 🗄️ Database (Prisma + PostgreSQL)
+## 🗄️ Data Models (Prisma)
 
-Schema split across `prisma/schema/`:
-- `base.prisma` — Datasource & generator
-- `users.prisma` — User, OAuth, SAML, Passkey, 2FA, Invite, PasswordReset
-- `projects.prisma` — Project, Changelog, ChangelogEntry, ChangelogTag, Widget
-- `system.prisma` — SystemConfig, ApiKey, AuditLog, ScheduledJob, Analytics, CustomDomain
-- `integrations.prisma` — EmailConfig, SlackIntegration, GitHubIntegration, Subscribers
-- `enums.prisma` — All enum definitions
+**Schema split across `prisma/schema/`:**
 
-Key models:
-- `User` — Core user with role, timezone
-- `SystemConfig` — Global app config (timezone, email, AI, Slack OAuth, customDateTemplates as JSONB)
-- `Project` / `Changelog` / `ChangelogEntry` — Main content models
-- `ScheduledJob` — Background job queue (publish, email, SSL renewal, telemetry)
-- `CustomDomain` / `DomainCertificate` — Domain management with SSL
+| File | Key Models |
+|------|-----------|
+| `base.prisma` | Datasource (PostgreSQL) + generator |
+| `users.prisma` | User, Settings, RefreshToken, OAuthProvider, OAuthConnection, SAMLProvider, SAMLConnection, Passkey, PasswordReset, TwoFactorSession, InvitationLink, CliAuthCode |
+| `projects.prisma` | Project, Changelog, ChangelogEntry, ChangelogTag, ChangelogRequest, Widget, CustomDomain, DomainCertificate, DomainBrowserRule, DomainThrottleConfig, AcmeAccount |
+| `integrations.prisma` | GitHubIntegration, EmailConfig, EmailLog, SlackIntegration, ProjectSubscription, SyncedCommit, ProjectSyncMetadata |
+| `system.prisma` | SystemConfig (timezone, email, Slack OAuth, AI, telemetry, LanguageTool), AuditLog, ScheduledJob |
+| `enums.prisma` | Role (ADMIN/STAFF/VIEWER), TwoFactorMode, SslMode, CertificateStatus, etc. |
+| `extensions.prisma` | Extension, ExtensionSetting |
 
----
+## 🌐 API Surface
 
-## 🧩 Components
+**Auth (`/api/auth/`)**
+- `POST /login`, `POST /logout`, `GET /me`, `GET /validate`
+- `POST /change-password`, `POST /reset-password/request`
+- `GET /invitation/[token]`
+- `GET/POST /oauth/authorize/[providerName]`, `GET /oauth/providers`
+- `GET/POST /passkeys`, `POST /passkeys/register/options+verify`, `POST /passkeys/authenticate/options`
+- `GET /security-settings`, `POST /cli/generate`, `GET /cli/token`, `POST /cli/refresh`
+- `GET /preview` — preview-mode token
 
-```
-components/
-├── changelog/editor/       # Entry editor (AI, versioning, scheduling)
-│   └── VersionSelector.tsx # Version/date template picker
-├── markdown-editor/        # Custom markdown editor with AI
-│   ├── MarkdownEditor.tsx
-│   ├── MarkdownToolbar.tsx
-│   ├── MarkdownPreview.tsx
-│   └── ai/                # AI assistant panel
-├── admin/                  # Admin UI (API keys, audit logs, requests)
-├── analytics/              # Chart components
-├── project/                # Project sidebar, navigation, settings
-│   └── catch-up/          # Feature recap display
-├── sso/                   # SSO configuration UI
-├── setup/                 # First-run setup wizard
-├── settings/              # User security settings
-├── ui/                    # Shadcn/Radix UI primitives
-├── CommandPalette.tsx      # Global command palette
-└── Logo.tsx
-```
+**Projects (`/api/projects/`)**
+- `GET/POST /` — list/create projects
+- `GET/PATCH/DELETE /[projectId]` — project CRUD
+- `GET/POST /[projectId]/changelog/tags`
+- `GET/PATCH/DELETE /[projectId]/changelog/[entryId]/schedule`
+- `POST /[projectId]/integrations/github`, `/github/test`, `/github/tags`, `/github/generate`
+- `POST /[projectId]/integrations/email/test`, `/email/send`
+- `GET/POST /[projectId]/api-keys`, `DELETE /[projectId]/api-keys/[keyId]`
+- `GET/POST /[projectId]/cli/link`, `/cli/sync`, `/cli/sync/status`, `/cli/unlink`
+- `GET/POST /[projectId]/catch-up`, `POST /[projectId]/catch-up/ai-summary`
+- `POST /import/canny/fetch+validate`, `/import/parse`, `/import/process`
 
----
+**Public Changelog (`/api/changelog/`)**
+- `GET /[projectId]/entries`, `GET /[projectId]/entries/all`
+- `POST /subscribe`, `GET /unsubscribe/[token]`
+- `GET /requests`, `GET/PATCH /requests/[requestId]`
+- `POST /verify-domain`
+- `GET /entries/[entryId]`
+- `GET /[projectId]/rss.xml` (via `app/changelog/`)
 
-## 🪝 Hooks (`hooks/`)
+**Admin (`/api/admin/`)**
+- `GET/POST /users`, `PATCH /users/[userId]`, `PATCH /users/[userId]/role`
+- `GET/POST /invitations`, `DELETE /invitations/[id]`
+- `GET/PATCH /config` — SystemConfig (requires ADMIN role)
+- `PATCH /config/system-email`
+- `GET/POST /api-keys`, `DELETE /api-keys/[keyId]`
+- `GET /audit-logs`, `GET /audit-logs/actions`
+- `GET /analytics`, `GET /dashboard`
+- `GET/PATCH /ai-settings`, `POST /ai-settings/test-key`
+- `GET/POST /oauth/providers`, `GET/PATCH/DELETE /oauth/providers/[id]`
+- `GET/POST /saml/providers`, `GET/PATCH/DELETE /saml/providers/[id]`
 
-| Hook | Purpose |
-|------|---------|
-| `use-timezone.ts` | Resolves effective timezone (user → system → UTC) |
-| `useAIAssistant.ts` | AI writing assistant |
-| `useMarkdownState.ts` | Markdown editor state management |
-| `useEditorHistory.ts` | Undo/redo for editor |
-| `useSlashCommands.ts` | Slash command handling |
-| `useCommandPalette.ts` | Command palette state |
-| `useBookmarks.ts` | Bookmark management |
-| `useChunkedData.ts` | Data chunking for large lists |
-| `useTelemetry.ts` | Telemetry tracking |
-| `useWhatsNew.ts` | What's new modal |
+**System (`/api/system/`)**
+- `GET /version`, `GET /update-status`, `POST /perform-update`
+- `GET /easypanel/status`
 
----
+**Widgets (`/api/integrations/widget/`)**
+- `GET /[projectId]` — single widget embed data
+- `GET /[projectId]/list`, `GET/PATCH/DELETE /[projectId]/[widgetId]`
 
-## ⚙️ Configuration
+**ACME/SSL (`/api/acme/`)**
+- `POST /issue`, `POST /renew/[certId]`, `POST /revoke/[certId]`
+- `GET /status/[certId]`, `POST /cancel/[certId]`, `POST /verify-dns`
+
+**Misc**
+- `GET /api/health` — health check
+- `GET /api/search` — full-text search
+- `POST /api/analytics/track` — public analytics tracking
+- `GET /api/telemetry/config`, `GET /api/telemetry/debug`
+- `GET/PATCH /api/ai/settings`, `POST /api/ai/decrypt`
+- `GET /api/dashboard/stats`
+- `GET/POST /api/setup`, `GET /api/setup/status`
+- `GET/POST/PATCH/DELETE /api/subscribers`
+- `GET/POST /api/changelog/requests`, `POST /api/requests`
+- `GET /api/config/timezone` — public, no auth, resolves effective timezone
+
+## 🧩 Extension System
+
+**Built-in (always loaded, `lib/services/core/markdown/extensions/`):**
+- `table` — GFM markdown tables
+- `subtext` — Discord-style `-#` subtext syntax
+- `syntax-highlight` — Code block syntax highlighting
+- `image` — Enhanced image (captions, sizing, alignment)
+- `link` — BetterLinks (markdown inside link text)
+
+**Loadable (from `extensions/changerawr/`):**
+- `spoiler`, `highlight`, `unsplash`, `geode`
+- Each has: `index.ts`, `extension.json`, `toolbar.tsx`, `README.md`, `CHANGELOG.md`
+
+**Extension loader:** `lib/services/core/markdown/extensionLoader.ts`
+**Safelist generation:** `npm run extensions:safelist`
+
+## 🔧 Configuration
 
 | File | Purpose |
 |------|---------|
-| `next.config.ts` | Next.js (React Compiler on, strictMode off, Turbopack) |
-| `tailwind.config.ts` | Tailwind CSS |
-| `components.json` | shadcn/ui component config |
-| `tsconfig.json` | TypeScript (strict, `@/*` alias) |
-| `prisma/schema/` | Database schema |
-| `.env.example` | Required environment variables |
-| `Dockerfile` + `docker-compose.yml` | Container deployment |
-| `Caddyfile` / `nginx.conf` | Reverse proxy configs |
+| `.env` | `DATABASE_URL`, JWT secrets, SMTP, OAuth credentials, GitHub tokens |
+| `prisma/schema/` | Database schema (split; run `prisma:generate` after changes) |
+| `tailwind.config.ts` | Tailwind + safelist for dynamic extension classes |
+| `next.config.*` | Next.js config |
+| `tsconfig.json` | TypeScript paths (`@/` → root) |
+| `docker-entrypoint.sh` | Production Docker startup |
 
----
+## 🔑 Auth Patterns
 
-## 📚 Documentation
+- Cookie: `accessToken` (JWT) — **not** `auth_token`
+- Verify with `verifyAccessToken` from `lib/auth/tokens`
+- Roles: ADMIN > STAFF > VIEWER
+- 2FA: TOTP or passkey (stored in `TwoFactorSession`)
+- CLI auth: device-code flow (`/api/auth/cli/generate → token → refresh`)
+- API keys: project-scoped or admin-level
+- SSO: OAuth 2.0 (generic) + SAML + EasyPanel + PocketID
 
-| File | Topic |
-|------|-------|
-| `README.md` | Features, quick start, deployment |
-| `CHANGELOG.md` | Version history |
-| `APIDOCGUIDE.md` | API documentation guide |
-| `ideas.md` | Feature ideas/roadmap |
-| `issues.md` | Known issues |
-| `useful-information-for-development/` | Dev notes (Slack scopes, etc.) |
+## 🌍 Timezone Hierarchy
 
----
+User `Settings.timezone` → `SystemConfig.timezone` → `'UTC'`
+- Client: `useTimezone()` hook from `hooks/use-timezone.ts`
+- Server/email: query DB directly
+- Public: `GET /api/config/timezone`
 
-## 🔗 Key Dependencies
+## 🗂️ Dashboard Pages
 
-| Package | Version | Purpose |
-|---------|---------|---------|
-| next | 16.1.6 | Framework |
-| react | 19.2.4 | UI library |
-| prisma | 6.7.0 | ORM |
-| jose | — | JWT tokens |
-| @node-saml/node-saml | — | SAML/SSO |
-| @simplewebauthn/* | — | Passkeys |
-| @tiptap/react | — | Rich text editing |
-| @tanstack/react-query | — | Server state |
-| @scalar/nextjs-api-reference | — | API docs UI |
-| recharts | — | Analytics charts |
-| framer-motion | — | Animations |
-| zod | — | Schema validation |
-| react-hook-form | — | Form handling |
-| nodemailer | — | Email sending |
-| @slack/bolt | — | Slack integration |
-
----
+```
+/dashboard                    → overview + stats
+/dashboard/projects           → project list
+/dashboard/projects/[id]      → project detail (changelog, analytics, integrations, settings)
+/dashboard/projects/[id]/changelog/new → entry editor
+/dashboard/requests           → staff: pending changelog requests
+/dashboard/admin/             → admin overview
+/dashboard/admin/system       → system config (email, slack, templates, etc.)
+/dashboard/admin/users        → user management
+/dashboard/admin/audit-logs   → audit log viewer
+/dashboard/admin/analytics    → site-wide analytics
+/dashboard/admin/ai-settings  → AI assistant config
+/dashboard/admin/requests     → admin: approve/reject requests
+```
 
 ## 📝 Quick Start
 
-1. `cp .env.example .env` and fill in required vars
-2. `npm install`
-3. `npx prisma migrate dev` — run DB migrations
-4. `npx prisma generate` — generate Prisma client
-5. `npm run dev` — starts on port 3001
-6. Visit `/setup` on first run
+```bash
+# 1. Install
+npm install
 
-**Build widget**: `npm run build:widget`
-**API docs**: `npm run generate-swagger` → visit `/api-docs`
+# 2. Configure
+cp .env.example .env  # fill DATABASE_URL + secrets
 
----
+# 3. Database
+npm run prisma:migrate    # run migrations
+npm run prisma:generate   # generate Prisma client
 
-## 🏗️ Architectural Patterns
+# 4. Extensions
+npm run extensions:generate  # build extension import maps
 
-1. **Auth**: JWT in `accessToken` cookie; `verifyAccessToken` from `lib/auth/tokens`
-2. **Permissions**: Role-based, configured in `lib/api/route-permissions.ts`
-3. **Services**: Business logic in `lib/services/`, not in route handlers
-4. **Timezone**: User.timezone → SystemConfig.timezone → UTC; use `useTimezone()` hook client-side
-5. **Admin layout**: `/^\/dashboard\/admin\/system/` pattern catches sub-pages
-6. **SystemConfig**: Single row, full object sent on PATCH — new fields need defaults
-7. **Background jobs**: `ScheduledJob` model polled by cron endpoints
-8. **Custom domains**: DNS verification + Let's Encrypt via ACME protocol
+# 5. Dev
+npm run dev              # Next.js (3001) + extension builder
+```
+
+## 🔗 Key Dependencies
+
+| Package | Purpose |
+|---------|---------|
+| `next ^16.1.6` | App Router framework |
+| `@prisma/client ^6.7.0` | Database ORM |
+| `@changerawr/markdown ^1.3.0` | CUM markdown engine |
+| `@tanstack/react-query ^5.66.0` | Server state management |
+| `jose ^5.9.6` | JWT creation/verification |
+| `bcryptjs ^3.0.0` | Password hashing |
+| `@simplewebauthn/*` | Passkey/WebAuthn |
+| `acme-client ^5.4.0` | Let's Encrypt SSL issuance |
+| `nodemailer ^8.0.5` | Email sending |
+| `framer-motion ^12.5.0` | Animations |
+| `recharts ^2.15.4` | Analytics charts |
+| `date-fns ^4.1.0` | Date manipulation |
+| `adm-zip ^0.5.17` | Extension package handling |
+| `express ^5.2.1` | Extension builder + maintenance servers |

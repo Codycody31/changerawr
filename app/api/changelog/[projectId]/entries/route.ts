@@ -108,6 +108,10 @@ export async function GET(
                 select: {
                     id: true,
                     name: true,
+                    maintenanceMode: true,
+                    maintenanceMessage: true,
+                    allowIndexing: true,
+                    enableRss: true,
                     changelog: {
                         select: {
                             id: true
@@ -225,6 +229,10 @@ export async function GET(
                 project: {
                     id: project.id,
                     name: project.name,
+                    maintenanceMode: project.maintenanceMode,
+                    maintenanceMessage: project.maintenanceMessage,
+                    allowIndexing: project.allowIndexing,
+                    enableRss: project.enableRss,
                     emailNotificationsEnabled: project.emailConfig?.enabled || false
                 },
                 items: entries,

@@ -4,7 +4,8 @@ import React, {useState} from 'react';
 import {z} from 'zod';
 import {useForm} from 'react-hook-form';
 import {zodResolver} from '@hookform/resolvers/zod';
-import {format, addDays, addHours, isAfter} from 'date-fns';
+import {format, addDays, addHours, isAfter, formatDistanceToNow} from 'date-fns';
+import {useQuery} from '@tanstack/react-query';
 import {
     Dialog,
     DialogContent,
@@ -22,6 +23,7 @@ import {
     FormLabel,
     FormMessage,
 } from '@/components/ui/form';
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Badge} from '@/components/ui/badge';
@@ -74,6 +76,24 @@ export const ScheduleEntryDialog: React.FC<ScheduleEntryDialogProps> = ({
     const [open, setOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const {toast} = useToast();
+
+    // Check for a pending ALLOW_SCHEDULE approval request for this entry
+    const {data: pendingRequests = []} = useQuery<Array<{id: string; type: string; status: string; createdAt: string; staff: {name: string | null; email: string}}>>({
+        queryKey: ['pending-requests', projectId, entryId],
+        queryFn: async () => {
+            if (!entryId) return [];
+            const res = await fetch(`/api/projects/${projectId}/changelog/${entryId}/requests`);
+            if (!res.ok) return [];
+            return res.json();
+        },
+        enabled: !!entryId,
+        staleTime: 30_000,
+    });
+
+    const pendingScheduleRequest = pendingRequests.find(
+        r => r.type === 'ALLOW_SCHEDULE' &&
+             (r.status === 'PENDING' || r.status === 'CHANGES_REQUESTED_PENDING')
+    );
 
     const form = useForm<ScheduleFormData>({
         resolver: zodResolver(scheduleSchema),
@@ -243,6 +263,31 @@ export const ScheduleEntryDialog: React.FC<ScheduleEntryDialogProps> = ({
             })(),
         },
     ];
+
+    // Pending state: show a disabled clock button with tooltip instead of opening the dialog
+    if (pendingScheduleRequest) {
+        const submittedBy = pendingScheduleRequest.staff.name || pendingScheduleRequest.staff.email;
+        const submittedAgo = formatDistanceToNow(new Date(pendingScheduleRequest.createdAt), {addSuffix: true});
+        return (
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button variant="outline" size="sm" disabled className="opacity-60 gap-2">
+                            <Calendar className="h-4 w-4"/>
+                            Schedule
+                            <Clock className="h-3.5 w-3.5 text-amber-500"/>
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-xs">
+                        <p className="font-medium">Schedule approval pending</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                            Submitted by {submittedBy} {submittedAgo}
+                        </p>
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
+        );
+    }
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>

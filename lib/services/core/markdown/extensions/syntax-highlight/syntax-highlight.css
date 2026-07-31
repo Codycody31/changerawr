@@ -1,0 +1,35 @@
+/*
+ * Styles for the syntax-highlight markdown extension's `code_block` output.
+ *
+ * Token colors come from Shiki's dual light/dark themes baked into each
+ * `<pre class="shiki">` as `--shiki-light`/`--shiki-dark` CSS variables
+ * (see https://shiki.style/guide/dual-themes). The wrapper/header chrome and
+ * the copy button are styled with Tailwind utility classes directly in the
+ * rendered HTML / `CopyButton` component, so this file only wires up the
+ * Shiki theme switch.
+ */
+
+.shiki,
+.shiki span {
+  color: var(--shiki-light);
+  background-color: var(--shiki-light-bg);
+}
+
+.dark .shiki,
+.dark .shiki span {
+  color: var(--shiki-dark);
+  background-color: var(--shiki-dark-bg);
+}
+
+.code-block-wrapper .shiki {
+  margin: 0;
+  padding: 0.875rem 1rem;
+  overflow-x: auto;
+  border-radius: 0;
+}
+
+.code-block-wrapper .shiki code {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}

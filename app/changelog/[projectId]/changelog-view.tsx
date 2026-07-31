@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar, Rss } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTimezone } from '@/hooks/use-timezone';
+import { useCodeCopyButtons } from '@/lib/services/core/markdown/extensions/syntax-highlight/useCodeCopyButtons';
 import Link from 'next/link';
 
 interface ChangelogEntry {
@@ -79,6 +80,9 @@ export function useEntryViewTracking(entryId: string, projectId: string) {
 
 function ChangelogEntry({ entry, projectId, timezone }: { entry: ChangelogEntry; projectId: string; timezone: string }) {
     const entryRef = useEntryViewTracking(entry.id, projectId);
+    const contentRef = useRef<HTMLDivElement>(null);
+
+    const copyButtonPortals = useCodeCopyButtons(contentRef, [entry.content]);
 
     const fadeIn = {
         initial: { opacity: 0, y: 20 },
@@ -139,9 +143,11 @@ function ChangelogEntry({ entry, projectId, timezone }: { entry: ChangelogEntry;
 
                 {/* Entry content */}
                 <div
+                    ref={contentRef}
                     className="prose prose-neutral dark:prose-invert max-w-none"
                     dangerouslySetInnerHTML={{ __html: entry.content }}
                 />
+                {copyButtonPortals}
             </div>
         </motion.article>
     );

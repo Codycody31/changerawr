@@ -30,6 +30,16 @@ export class ScheduledJobService {
      * Create a new scheduled job
      */
     static async createJob(params: CreateScheduledJobParams): Promise<string> {
+        // Cancel any existing pending jobs for this entity+type before creating a new one
+        await db.scheduledJob.updateMany({
+            where: {
+                entityId: params.entityId,
+                type: params.type,
+                status: JobStatus.PENDING,
+            },
+            data: { status: JobStatus.CANCELLED },
+        });
+
         const job = await db.scheduledJob.create({
             data: {
                 type: params.type,

@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Project" ADD COLUMN "allowIndexing" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "Project" ADD COLUMN "enableRss" BOOLEAN NOT NULL DEFAULT true;

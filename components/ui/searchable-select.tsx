@@ -16,7 +16,7 @@ import {
 
 interface SearchableSelectItem {
   value: string
-  label: string
+  label: string | React.ReactNode
   searchValue?: string
 }
 
@@ -102,7 +102,7 @@ function SearchableSelect({
                   <CommandItem
                     key={item.value}
                     value={item.value}
-                    keywords={[item.searchValue ?? item.label]}
+                    keywords={item.searchValue ? [item.searchValue] : undefined}
                     onSelect={(selected) => {
                       onValueChange?.(selected)
                       setOpen(false)
@@ -126,7 +126,7 @@ function SearchableSelect({
                   <CommandItem
                     key={item.value}
                     value={item.value}
-                    keywords={[item.searchValue ?? item.label]}
+                    keywords={item.searchValue ? [item.searchValue] : undefined}
                     onSelect={(selected) => {
                       onValueChange?.(selected)
                       setOpen(false)

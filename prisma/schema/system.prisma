@@ -42,12 +42,14 @@ model SystemConfig {
   defaultInvitationExpiry       Int            @default(7)
   requireApprovalForChangelogs  Boolean        @default(true)
   maxChangelogEntriesPerProject Int            @default(100)
+  maxRevisionsPerEntry          Int            @default(50) // Max saved version history checkpoints per changelog entry
   enableAnalytics               Boolean        @default(true)
   enableNotifications           Boolean        @default(true)
   enablePasswordReset           Boolean        @default(false)
   enableAIAssistant             Boolean        @default(false) // Enable/disable AI assistant globally
   aiApiKey                      String? // Global API key for AI service
-  aiApiProvider                 String?        @default("secton") // AI provider
+  aiApiProvider                 String?        @default("secton") // 'secton' | 'custom'
+  aiApiUrl                      String? // Custom provider base URL (e.g. http://localhost:11434/v1)
   aiDefaultModel                String?        @default("copilot-zero") // Default model to use
   smtpHost                      String?
   smtpPort                      Int?
@@ -75,6 +77,16 @@ model SystemConfig {
   // IP Whitelisting for panel access
   panelIpWhitelistEnabled       Boolean        @default(false)
   panelIpWhitelist              String[]
+  // LanguageTool Spellchecker Configuration
+  languageToolEnabled           Boolean        @default(false) // Enable/disable LanguageTool spellchecker
+  languageToolApiUrl            String?        @default("https://api.languagetool.org/v2") // LanguageTool API endpoint
+  languageToolApiKey            String? // Optional API key for premium features
+  languageToolLanguage          String?        @default("en-US") // Default language for spellchecking
+  languageToolUsername          String? // Username for LanguageTool premium
+  languageToolAllowUserOverride Boolean        @default(true) // Allow users to set custom URL/credentials
+  // Changelog Tagger service (external ML-based tag classifier)
+  changelogTaggerUrl            String? // e.g. http://localhost:31672
+  changelogTaggerApiKey         String? // Optional bearer token
   createdAt                     DateTime       @default(now())
   updatedAt                     DateTime       @updatedAt
 }

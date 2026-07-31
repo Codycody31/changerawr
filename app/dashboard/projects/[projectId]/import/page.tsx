@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/card';
 import {useToast} from '@/hooks/use-toast';
 
-import {ChangelogImportModal} from '@/components/projects/importing/ChangelogImportModal';
+import {ImportModal} from '@/components/changelog/import';
 import {ImportResult} from '@/lib/types/projects/importing';
 
 interface Project {
@@ -211,8 +211,11 @@ export default function ImportPage({params}: ImportPageProps) {
                                 <div className="flex flex-wrap justify-center gap-2">
                                     <Badge variant="secondary">Keep a Changelog</Badge>
                                     <Badge variant="secondary">GitHub Releases</Badge>
-                                    <Badge variant="secondary">Markdown Files</Badge>
-                                    <Badge variant="secondary">Plain Text</Badge>
+                                    <Badge variant="secondary">Markdown / Text</Badge>
+                                    <Badge variant="secondary">JSON</Badge>
+                                    <Badge variant="secondary">CSV</Badge>
+                                    <Badge variant="secondary">RSS / Atom</Badge>
+                                    <Badge variant="secondary">GitHub API</Badge>
                                     <Badge variant="secondary">Canny</Badge>
                                 </div>
                             </div>
@@ -234,7 +237,7 @@ export default function ImportPage({params}: ImportPageProps) {
             </div>
 
             {/* Import Modal */}
-            <ChangelogImportModal
+            <ImportModal
                 open={showImportModal}
                 onOpenChange={setShowImportModal}
                 projectId={projectId}

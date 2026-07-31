@@ -216,6 +216,33 @@ export class SponsorService {
         return isLicensed ? Number.MAX_SAFE_INTEGER : configMax;
     }
 
+    static getEffectiveMaxRevisions(configMax: number, isLicensed: boolean): number {
+        if (configMax === -1) {
+            return isLicensed ? Number.MAX_SAFE_INTEGER : 50;
+        }
+        return configMax;
+    }
+
+    /**
+     * Returns the effective cap on saved version-history revisions per changelog
+     * entry, honoring the -1 ("unlimited") config value only when a sponsor
+     * license is active. Returns Number.MAX_SAFE_INTEGER for "unlimited" (skip pruning).
+     */
+    static async getMaxRevisionsPerEntry(): Promise<number> {
+        const config = await db.systemConfig.findFirst({
+            select: {maxRevisionsPerEntry: true},
+        });
+
+        const configMax = config?.maxRevisionsPerEntry ?? 50;
+
+        if (configMax !== -1) {
+            return configMax;
+        }
+
+        const {active} = await SponsorService.getLicenseStatus();
+        return SponsorService.getEffectiveMaxRevisions(configMax, active);
+    }
+
     static async storeLicenseActivation(
         licenseKey: string, valid: boolean, proof?: string, payload?: string
     ): Promise<void> {
@@ -278,12 +305,23 @@ export class SponsorService {
         const count = changelog?._count?.entries || 0;
 
         let ceiling = config.maxChangelogEntriesPerProject;
+
+        let licenseActive = false;
         if (config.sponsorLicenseValid && config.sponsorProof && config.sponsorPayload && config.sponsorLastVerified) {
             const raw = Buffer.from(config.sponsorPayload, 'base64').toString('utf-8');
             if (_vSig(raw, config.sponsorProof)) {
                 const p = _vPayload(raw, config.telemetryInstanceId || '');
-                if (p.valid) ceiling = Number.MAX_SAFE_INTEGER;
+                if (p.valid) licenseActive = true;
             }
+        }
+
+        if (ceiling === -1) {
+            // "Unlimited" only applies while a license is active - fall back to the
+            // unlicensed default cap if the license has since lapsed.
+            if (licenseActive) return true;
+            ceiling = 10000;
+        } else if (licenseActive) {
+            ceiling = Number.MAX_SAFE_INTEGER;
         }
 
         return count < ceiling;

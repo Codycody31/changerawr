@@ -18,7 +18,7 @@ import { Loader2, Trash2, AlertCircle } from 'lucide-react'
 import { useAuth } from '@/context/auth'
 import { Role, hasAdminAccess } from '@/lib/types/auth'
 
-type ActionType = 'DELETE_PROJECT' | 'DELETE_TAG' | 'DELETE_ENTRY'
+type ActionType = 'DELETE_PROJECT' | 'DELETE_TAG' | 'DELETE_ENTRY' | 'DELETE_ALL_ENTRIES' | 'DELETE_ALL_HISTORY'
 
 interface ChangelogRequest {
     id: string
@@ -73,7 +73,7 @@ export function DestructiveActionRequest({
             req.status === 'PENDING' &&
             req.projectId === projectId &&
             req.type === action &&
-            (action === 'DELETE_PROJECT' || req.targetId === targetId)
+            (action === 'DELETE_PROJECT' || action === 'DELETE_ALL_ENTRIES' || action === 'DELETE_ALL_HISTORY' || req.targetId === targetId)
     )
 
     // Create request mutation
@@ -84,7 +84,7 @@ export function DestructiveActionRequest({
                 const requestData = {
                     type: action,
                     projectId,
-                    targetId: action !== 'DELETE_PROJECT' ? targetId : undefined
+                    targetId: (action === 'DELETE_PROJECT' || action === 'DELETE_ALL_ENTRIES' || action === 'DELETE_ALL_HISTORY') ? undefined : targetId
                 }
 
                 const response = await fetch('/api/changelog/requests', {
@@ -135,7 +135,11 @@ export function DestructiveActionRequest({
 
     const actionLabel = action === 'DELETE_PROJECT'
         ? 'Delete Project'
-        : `Delete ${action === 'DELETE_TAG' ? 'Tag' : 'Entry'} "${targetName}"`
+        : action === 'DELETE_ALL_ENTRIES'
+            ? 'Delete All Entries'
+            : action === 'DELETE_ALL_HISTORY'
+                ? 'Delete All History'
+                : `Delete ${action === 'DELETE_TAG' ? 'Tag' : 'Entry'} "${targetName}"`
 
     // Show disabled state for existing request
     if (existingRequest) {
@@ -188,7 +192,11 @@ export function DestructiveActionRequest({
                     <AlertDialogDescription>
                         {action === 'DELETE_PROJECT'
                             ? 'This will request deletion of the entire project and all its data.'
-                            : `This will request deletion of the ${action === 'DELETE_TAG' ? 'tag' : 'entry'} "${targetName}" from this project.`}
+                            : action === 'DELETE_ALL_ENTRIES'
+                                ? 'This will request deletion of every changelog entry in this project. The project and its settings will be kept.'
+                                : action === 'DELETE_ALL_HISTORY'
+                                    ? 'This will request deletion of all saved version history for every entry in this project. The entries themselves will be kept.'
+                                    : `This will request deletion of the ${action === 'DELETE_TAG' ? 'tag' : 'entry'} "${targetName}" from this project.`}
                         <br /><br />
                         This action requires admin approval. Would you like to submit a request?
                     </AlertDialogDescription>

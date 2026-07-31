@@ -77,7 +77,7 @@ import {Separator} from '@/components/ui/separator';
 import 'dotenv/config';
 
 // Enhanced form schema with custom URL options
-const providerFormSchema = z.object({
+const providerFormBaseSchema = z.object({
     name: z.string().min(1, 'Name is required'),
     urlMode: z.enum(['preset', 'custom']).default('preset'),
     preset: z.string().optional(),
@@ -86,7 +86,6 @@ const providerFormSchema = z.object({
     tokenUrl: z.string().optional(),
     userInfoUrl: z.string().optional(),
     clientId: z.string().min(1, 'Client ID is required'),
-    clientSecret: z.string().min(1, 'Client Secret is required'),
     scopes: z.string().refine(value => {
         const scopes = value.split(',').map(s => s.trim()).filter(Boolean);
         return scopes.length > 0;
@@ -97,20 +96,35 @@ const providerFormSchema = z.object({
     isDefault: z.boolean().default(false),
     allowedEmailDomains: z.string().default(''),
     blockExistingUsers: z.boolean().default(false),
-}).refine((data) => {
+});
+
+function urlModeRefinement(data: { urlMode: string; preset?: string; authorizationUrl?: string; tokenUrl?: string; userInfoUrl?: string }): boolean {
     if (data.urlMode === 'preset' && !data.preset) {
         return false;
     }
     if (data.urlMode === 'custom') {
-        return data.authorizationUrl && data.tokenUrl && data.userInfoUrl;
+        return !!(data.authorizationUrl && data.tokenUrl && data.userInfoUrl);
     }
     return true;
-}, {
+}
+
+const urlModeRefinementOptions = {
     message: 'Please select a preset or provide all custom URLs',
-    path: ['urlMode']
-});
+    path: ['urlMode'] as string[]
+};
+
+// Creating a provider always requires a client secret.
+const providerFormSchema = providerFormBaseSchema.extend({
+    clientSecret: z.string().min(1, 'Client Secret is required'),
+}).refine((data) => urlModeRefinement(data), urlModeRefinementOptions);
+
+// Editing a provider: leave the client secret blank to keep the existing one.
+const editProviderFormSchema = providerFormBaseSchema.extend({
+    clientSecret: z.string().optional(),
+}).refine((data) => urlModeRefinement(data), urlModeRefinementOptions);
 
 type ProviderFormValues = z.infer<typeof providerFormSchema>;
+type EditProviderFormValues = z.infer<typeof editProviderFormSchema>;
 
 // Provider presets with accurate configurations
 const PROVIDER_PRESETS = {
@@ -173,7 +187,7 @@ interface OAuthProvider {
     tokenUrl: string;
     userInfoUrl: string;
     clientId: string;
-    clientSecret: string;
+    hasSecret: boolean;
     scopes: string[];
     enabled: boolean;
     isDefault: boolean;
@@ -186,7 +200,7 @@ interface OAuthProvider {
 interface ProviderApiData {
     name: string;
     clientId: string;
-    clientSecret: string;
+    clientSecret?: string;
     scopes: string[];
     enabled: boolean;
     isDefault: boolean;
@@ -398,8 +412,8 @@ export default function OAuthProvidersPage() {
     });
 
     // Edit provider form
-    const editForm = useForm<ProviderFormValues>({
-        resolver: zodResolver(providerFormSchema),
+    const editForm = useForm<EditProviderFormValues>({
+        resolver: zodResolver(editProviderFormSchema),
         defaultValues: {
             name: '',
             urlMode: 'custom',
@@ -504,11 +518,10 @@ export default function OAuthProvidersPage() {
 
     // Edit provider mutation
     const updateProvider = useMutation({
-        mutationFn: async (data: ProviderFormValues & { id: string }) => {
+        mutationFn: async (data: EditProviderFormValues & { id: string }) => {
             const updateData: ProviderApiData = {
                 name: data.name,
                 clientId: data.clientId,
-                clientSecret: data.clientSecret,
                 scopes: data.scopes.split(',').map(s => s.trim()).filter(Boolean),
                 enabled: data.enabled,
                 isDefault: data.isDefault,
@@ -519,6 +532,12 @@ export default function OAuthProvidersPage() {
                 blockExistingUsers: data.blockExistingUsers,
                 requiredClaims: oauthEditClaims,
             };
+
+            // Only send a new client secret if the admin actually entered one -
+            // an empty field means "keep the existing secret".
+            if (data.clientSecret) {
+                updateData.clientSecret = data.clientSecret;
+            }
 
             if (data.urlMode === 'preset' && data.preset) {
                 const preset = PROVIDER_PRESETS[data.preset as keyof typeof PROVIDER_PRESETS];
@@ -599,7 +618,7 @@ export default function OAuthProvidersPage() {
     };
 
     // Handle edit form submission
-    const onEditSubmit = (data: ProviderFormValues) => {
+    const onEditSubmit = (data: EditProviderFormValues) => {
         if (!selectedProvider) return;
         updateProvider.mutate({...data, id: selectedProvider.id});
     };
@@ -632,7 +651,7 @@ export default function OAuthProvidersPage() {
             tokenUrl: provider.tokenUrl,
             userInfoUrl: provider.userInfoUrl,
             clientId: provider.clientId,
-            clientSecret: provider.clientSecret,
+            clientSecret: '',
             scopes: provider.scopes.join(','),
             enabled: provider.enabled,
             isDefault: provider.isDefault,
@@ -1524,8 +1543,15 @@ export default function OAuthProvidersPage() {
                                                 <FormItem>
                                                     <FormLabel>Client Secret</FormLabel>
                                                     <FormControl>
-                                                        <Input placeholder="client_secret" type="password" {...field} />
+                                                        <Input
+                                                            placeholder={selectedProvider?.hasSecret ? '•••••••• (unchanged)' : 'client_secret'}
+                                                            type="password"
+                                                            {...field}
+                                                        />
                                                     </FormControl>
+                                                    <FormDescription>
+                                                        Leave blank to keep the current client secret.
+                                                    </FormDescription>
                                                     <FormMessage/>
                                                 </FormItem>
                                             )}

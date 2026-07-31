@@ -13,124 +13,117 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #000000;
+            color: #f5f5f7;
             min-height: 100vh;
+        }
+
+        /* Live console output rendered full-bleed behind the content, low-
+           contrast so it reads as ambient texture rather than content. Flows
+           top-to-bottom like a normal log; JS keeps it scrolled to the latest
+           line. */
+        .console-bg {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 2rem 3rem;
+            pointer-events: none;
+            scrollbar-width: none;
+        }
+
+        .console-bg::-webkit-scrollbar {
+            display: none;
+        }
+
+        .console-bg pre {
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 0.75rem;
+            line-height: 1.8;
+            white-space: pre-wrap;
+            word-break: break-all;
+            color: #2c2c2e;
+        }
+
+        /* Logo sits on its own, vertically centered in the viewport - not
+           grouped with the progress UI below. */
+        .logo {
+            position: fixed;
+            inset: 0;
+            z-index: 1;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: white;
-            overflow: hidden;
+            pointer-events: none;
+            animation: fadeIn 0.6s ease-out;
         }
 
-        .container {
-            text-align: center;
-            max-width: 600px;
-            padding: 2rem;
-            animation: fadeIn 1s ease-out;
+        .logo svg {
+            width: 320px;
+            height: auto;
         }
 
-        .logo {
-            font-size: 4rem;
-            margin-bottom: 1rem;
-            animation: bounce 2s infinite;
-            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
-        }
-
-        h1 {
-            font-size: 2.5rem;
-            font-weight: 700;
-            margin-bottom: 1rem;
-            background: linear-gradient(45deg, #fff, #f0f0f0);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .subtitle {
-            font-size: 1.2rem;
-            margin-bottom: 2rem;
-            opacity: 0.9;
-            font-weight: 300;
-        }
-
+        /* Progress UI lives near the bottom of the screen, separate from the
+           logo - mirrors the classic OS boot-screen layout. Hidden until the
+           first /startup/steps response comes in. */
         .loading-container {
-            margin: 2rem 0;
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 8vh;
+            z-index: 1;
+            text-align: center;
+            padding: 0 2rem;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+
+        .loading-container.visible {
+            opacity: 1;
+        }
+
+        .progress-bar-wrapper {
+            position: relative;
+            width: 240px;
+            height: 4px;
+            margin: 0 auto 1.5rem;
         }
 
         .loading-bar {
             width: 100%;
-            height: 6px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 3px;
+            height: 4px;
+            background: #2c2c2e;
+            border-radius: 2px;
             overflow: hidden;
-            margin-bottom: 1rem;
         }
 
         .loading-progress {
             height: 100%;
-            background: linear-gradient(90deg, #4ade80, #22c55e);
-            border-radius: 3px;
-            animation: loading 3s infinite;
-            box-shadow: 0 0 10px rgba(74, 222, 128, 0.5);
+            background: #f5f5f7;
+            border-radius: 2px;
+            width: 0%;
+            transition: width 0.5s ease-out;
         }
 
         .loading-text {
-            font-size: 0.9rem;
-            opacity: 0.8;
-            animation: pulse 2s infinite;
+            font-size: 1.05rem;
+            font-weight: 500;
+            color: #f5f5f7;
+            padding: 0 1rem;
         }
 
         .status-updates {
-            margin-top: 2rem;
-            font-size: 0.9rem;
-            opacity: 0.7;
-            min-height: 1.5rem;
-        }
-
-        .dots::after {
-            content: '';
-            animation: dots 1.5s infinite;
-        }
-
-        /* Background animation */
-        .bg-shapes {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: -1;
-        }
-
-        .shape {
-            position: absolute;
-            opacity: 0.1;
-            animation: float 6s ease-in-out infinite;
-        }
-
-        .shape:nth-child(1) {
-            top: 20%;
-            left: 10%;
-            animation-delay: 0s;
-        }
-
-        .shape:nth-child(2) {
-            top: 60%;
-            right: 10%;
-            animation-delay: 2s;
-        }
-
-        .shape:nth-child(3) {
-            bottom: 20%;
-            left: 20%;
-            animation-delay: 4s;
+            margin-top: 0.75rem;
+            font-size: 0.85rem;
+            color: #6e6e73;
+            padding: 0 1rem;
         }
 
         @keyframes fadeIn {
             from {
                 opacity: 0;
-                transform: translateY(20px);
+                transform: translateY(12px);
             }
             to {
                 opacity: 1;
@@ -138,171 +131,209 @@
             }
         }
 
-        @keyframes bounce {
-            0%, 20%, 50%, 80%, 100% {
-                transform: translateY(0);
-            }
-            40% {
-                transform: translateY(-10px);
-            }
-            60% {
-                transform: translateY(-5px);
-            }
-        }
-
-        @keyframes loading {
-            0% {
-                transform: translateX(-100%);
-            }
-            50% {
-                transform: translateX(0%);
-            }
-            100% {
-                transform: translateX(100%);
-            }
-        }
-
-        @keyframes pulse {
-            0%, 100% {
-                opacity: 0.8;
-            }
-            50% {
-                opacity: 1;
-            }
-        }
-
-        @keyframes dots {
-            0% {
-                content: '';
-            }
-            25% {
-                content: '.';
-            }
-            50% {
-                content: '..';
-            }
-            75% {
-                content: '...';
-            }
-        }
-
-        @keyframes float {
-            0%, 100% {
-                transform: translateY(0px) rotate(0deg);
-            }
-            50% {
-                transform: translateY(-20px) rotate(180deg);
-            }
-        }
-
         @media (max-width: 640px) {
-            .container {
-                padding: 1rem;
+            .logo svg {
+                width: 240px;
             }
 
-            .logo {
-                font-size: 3rem;
-            }
-
-            h1 {
-                font-size: 2rem;
-            }
-
-            .subtitle {
-                font-size: 1rem;
+            .loading-container {
+                bottom: 6vh;
             }
         }
     </style>
 </head>
 <body>
-<div class="bg-shapes">
-    <div class="shape">🦖</div>
-    <div class="shape">⚡</div>
-    <div class="shape">🚀</div>
+<div class="console-bg" id="consoleBg">
+    <pre id="consoleOutput"></pre>
 </div>
 
-<div class="container">
-    <div class="logo">🦖</div>
-    <svg width="225" height="50" viewBox="0 0 225 50" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-            <!--Diagonal gradient for rainbow effect on "rawr"-->
-            <linearGradient id="rainbowGradient" x1="0%" y1="0%" x2="100%" y2="100%" gradientUnits="objectBoundingBox">
-                <stop offset="0%" stop-color="#186cb8"/>
-                <stop offset="19%" stop-color="#186cb8"/>
-                <stop offset="20%" stop-color="#2a9a9f"/>
-                <stop offset="39%" stop-color="#2a9a9f"/>
-                <stop offset="40%" stop-color="#f1b211"/>
-                <stop offset="59%" stop-color="#f1b211"/>
-                <stop offset="60%" stop-color="#e83611"/>
-                <stop offset="79%" stop-color="#e83611"/>
-                <stop offset="80%" stop-color="#f9002f"/>
-                <stop offset="100%" stop-color="#f9002f"/>
-            </linearGradient>
-        </defs>
-        <text x="0" y="40" font-family="Inter, sans-serif" font-size="36" font-weight="bold" fill="white" letter-spacing="1px" stroke="black" stroke-width="2" paint-order="stroke">
-            Change
-        </text>
-        <text x="138" y="40" font-family="Inter, sans-serif" font-size="36" font-weight="bold" fill="url(#rainbowGradient)" letter-spacing="1px" stroke="black" stroke-width="2" paint-order="stroke">
-            rawr
-        </text>
+<div class="logo">
+        <svg width="225" height="50" viewBox="0 0 225 50" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <linearGradient id="rainbowGradient" x1="0%" y1="0%" x2="100%" y2="100%" gradientUnits="objectBoundingBox">
+                    <stop offset="0%" stop-color="#186cb8"/>
+                    <stop offset="19%" stop-color="#186cb8"/>
+                    <stop offset="20%" stop-color="#2a9a9f"/>
+                    <stop offset="39%" stop-color="#2a9a9f"/>
+                    <stop offset="40%" stop-color="#f1b211"/>
+                    <stop offset="59%" stop-color="#f1b211"/>
+                    <stop offset="60%" stop-color="#e83611"/>
+                    <stop offset="79%" stop-color="#e83611"/>
+                    <stop offset="80%" stop-color="#f9002f"/>
+                    <stop offset="100%" stop-color="#f9002f"/>
+                </linearGradient>
+            </defs>
+            <text x="0" y="40" font-family="Inter, sans-serif" font-size="36" font-weight="bold" fill="#f5f5f7" letter-spacing="1px">
+                Change
+            </text>
+            <text x="138" y="40" font-family="Inter, sans-serif" font-size="36" font-weight="bold" fill="url(#rainbowGradient)" letter-spacing="1px">
+                rawr
+            </text>
+        </svg>
+</div>
 
-    </svg>
-
-    <p class="subtitle">Roaring to life! We're setting up your changelog platform.</p>
-
-    <div class="loading-container">
+<div class="loading-container" id="loadingContainer">
+    <div class="progress-bar-wrapper">
         <div class="loading-bar">
-            <div class="loading-progress"></div>
+            <div class="loading-progress" id="loadingProgress"></div>
         </div>
-        <div class="loading-text" id="loadingText">Starting services<span class="dots"></span></div>
     </div>
-
-    <div class="status-updates" id="statusText">
-        Initializing database connections...
-    </div>
+    <div class="loading-text" id="currentStepText"></div>
+    <div class="status-updates" id="statusText"></div>
 </div>
 
 <script>
-    const statusMessages = [
-        "Initializing database connections...",
-        "Generating Prisma client...",
-        "Running database migrations...",
-        "Building widget components...",
-        "Generating API documentation...",
-        "Starting Next.js server...",
-        "Almost ready to roar!"
-    ];
+    // Progress is polled from the maintenance server
+    // (scripts/maintenance/server.js), which derives a percent/ETA from the
+    // plain-text step log docker-entrypoint.sh writes to.
 
-    const loadingMessages = [
-        "Starting services",
-        "Loading components",
-        "Connecting database",
-        "Preparing interface",
-        "Finalizing setup"
-    ];
+    // If the currently-running step hasn't changed for a long time, append a
+    // reassurance note. Some steps (extension-aware rebuild) can legitimately
+    // take up to 30 minutes.
+    const STUCK_WARNING_MS = 10 * 60 * 1000; // 10 minutes
 
-    let messageIndex = 0;
-    let loadingIndex = 0;
+    const formatEta = (seconds) => {
+        if (!seconds || seconds <= 0) return '';
+        if (seconds < 45) return 'About a minute remaining';
+        const minutes = Math.round(seconds / 60);
+        return `About ${minutes} minute${minutes === 1 ? '' : 's'} remaining`;
+    };
 
-    // Update status messages
-    setInterval(() => {
+    const renderProgress = (data) => {
+        const loadingContainer = document.getElementById('loadingContainer');
         const statusElement = document.getElementById('statusText');
-        if (messageIndex < statusMessages.length) {
-            statusElement.textContent = statusMessages[messageIndex];
-            messageIndex++;
-        }
-    }, 2000);
+        const determinateBar = document.getElementById('loadingProgress');
+        const currentStepElement = document.getElementById('currentStepText');
 
-    // Update loading text
-    setInterval(() => {
-        const loadingElement = document.getElementById('loadingText');
-        if (loadingIndex < loadingMessages.length) {
-            loadingElement.innerHTML = loadingMessages[loadingIndex] + '<span class="dots"></span>';
-            loadingIndex++;
-        } else {
-            loadingIndex = 0;
+        // Stay hidden until there's real progress to show - just the logo on
+        // black at first, like a classic OS boot screen.
+        if (data.percent > 0 || data.complete) {
+            loadingContainer.classList.add('visible');
         }
-    }, 3000);
+
+        currentStepElement.textContent = data.complete
+            ? 'Application ready!'
+            : (data.currentStep ? data.currentStep.message : 'Starting up');
+
+        determinateBar.style.width = `${data.percent}%`;
+
+        const eta = !data.complete ? formatEta(data.etaSeconds) : '';
+        const etaSuffix = eta ? ` • ${eta}` : '';
+
+        // The extension-aware rebuild step can legitimately run for up to 30
+        // minutes, so the elapsed-time-based "taking longer than usual" /
+        // "unusually slow" messaging below doesn't apply while it's running.
+        const isRebuilding = data.currentStep && data.currentStep.id === 'rebuild';
+
+        if (data.complete) {
+            statusElement.textContent = `Application ready! Redirecting... (${data.elapsed}s total)`;
+        } else if (isRebuilding || data.elapsed < 30) {
+            statusElement.textContent = `${data.percent}% complete • ${data.elapsed}s elapsed${etaSuffix}`;
+        } else if (data.elapsed < 60) {
+            statusElement.textContent = `${data.percent}% complete • ${data.elapsed}s elapsed${etaSuffix} • Taking longer than usual`;
+        } else {
+            statusElement.textContent = `${data.percent}% complete • ${data.elapsed}s elapsed${etaSuffix} • Unusually slow startup`;
+        }
+
+        // Append a note if the currently-running step has been running for a
+        // long time. Skipped during the extension rebuild, which can
+        // legitimately take up to 30 minutes on its own.
+        const runningStep = data.steps.find((step) => step.state === 'running');
+        const runningFor = runningStep && runningStep.timestamp ? Date.now() - runningStep.timestamp : 0;
+        if (!data.complete && !isRebuilding && runningFor > STUCK_WARNING_MS) {
+            statusElement.textContent += ' • This is taking longer than expected';
+        }
+    };
+
+    const fetchProgress = async () => {
+        try {
+            const response = await fetch('/startup/steps', {
+                method: 'GET',
+                cache: 'no-cache',
+            });
+            if (!response.ok) return;
+            renderProgress(await response.json());
+        } catch (error) {
+            // The maintenance server is killed once setup finishes (right
+            // before Next.js starts) - this poll will start failing then.
+            // checkAppReady() below takes over from here.
+        }
+    };
+
+    // /api/health flipping to ok is the real signal the app is up, but
+    // redirecting on the very first ok response can cut away mid-step. Hold
+    // for a moment so /startup/steps keeps polling and the bar/text keep
+    // updating normally for a beat before we navigate away.
+    const REDIRECT_DELAY_MS = 2000;
+    let redirectScheduled = false;
+
+    const finishAndRedirect = () => {
+        if (redirectScheduled) return;
+        redirectScheduled = true;
+
+        setTimeout(() => {
+            window.location.href = '/';
+        }, REDIRECT_DELAY_MS);
+    };
+
+    // docker-entrypoint.sh prints this line right before it kills the
+    // maintenance server and hands off to Next.js - /startup/steps stops
+    // updating after this point, so it's the real "almost done" signal.
+    // Once seen, give Next.js a few seconds to come up, then finish the bar
+    // to 100% and start the redirect.
+    const SETUP_COMPLETE_MARKER = '🦖 Setup complete! Stopping maintenance server';
+    const SETUP_COMPLETE_DELAY_MS = 3000;
+    let setupCompleteDetected = false;
+
+    const onSetupComplete = () => {
+        if (setupCompleteDetected) return;
+        setupCompleteDetected = true;
+
+        setTimeout(() => {
+            const loadingContainer = document.getElementById('loadingContainer');
+            const determinateBar = document.getElementById('loadingProgress');
+            const currentStepElement = document.getElementById('currentStepText');
+            const statusElement = document.getElementById('statusText');
+
+            loadingContainer.classList.add('visible');
+            determinateBar.style.width = '100%';
+            currentStepElement.textContent = 'Application ready!';
+            statusElement.textContent = 'Redirecting...';
+
+            finishAndRedirect();
+        }, SETUP_COMPLETE_DELAY_MS);
+    };
+
+    // Fetch raw console output captured by docker-entrypoint.sh and render
+    // it as the page background. Only the tail is kept on screen - the
+    // flex/overflow setup on .console-bg clips older lines off the top.
+    const fetchConsoleLogs = async () => {
+        try {
+            const response = await fetch('/startup/logs', {
+                method: 'GET',
+                cache: 'no-cache',
+            });
+
+            if (!response.ok) return;
+
+            const data = await response.json();
+            if (!data.available) return;
+
+            const log = data.log || '';
+            document.getElementById('consoleOutput').textContent = log;
+
+            // Keep the latest line in view - the text itself stays in
+            // chronological (top-to-bottom) order.
+            const consoleBg = document.getElementById('consoleBg');
+            consoleBg.scrollTop = consoleBg.scrollHeight;
+
+            if (log.includes(SETUP_COMPLETE_MARKER)) {
+                onSetupComplete();
+            }
+        } catch (error) {
+            // Skip this poll
+        }
+    };
 
     // Check if main app is ready
     const checkAppReady = async () => {
@@ -312,24 +343,25 @@
                 cache: 'no-cache'
             });
             if (response.ok) {
-                // App is ready, redirect to main page
-                window.location.href = '/';
+                finishAndRedirect();
             }
         } catch (error) {
-            // App not ready yet, keep checking
+            // App not ready yet, continue polling
         }
     };
 
-    // Check every 2 seconds if the main app is ready
-    const healthCheckInterval = setInterval(checkAppReady, 2000);
+    // Poll step progress every second
+    setInterval(fetchProgress, 1000);
 
-    // Fallback: redirect after 60 seconds regardless
-    setTimeout(() => {
-        clearInterval(healthCheckInterval);
-        window.location.href = '/';
-    }, 60000);
+    // Poll for raw console output every 2 seconds
+    setInterval(fetchConsoleLogs, 2000);
+
+    // Check health every 2 seconds
+    setInterval(checkAppReady, 2000);
 
     // Start checking immediately
+    fetchProgress();
+    fetchConsoleLogs();
     checkAppReady();
 </script>
 </body>

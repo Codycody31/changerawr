@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/dialog';
 import {PasskeysSection} from "@/components/settings/passkeys-section";
 import ConnectedSsoProviders from '@/components/settings/connected-sso-section';
+import {SpellcheckerSettingsLink} from '@/components/settings/spellchecker-settings-link';
 import {SearchableSelect} from '@/components/ui/searchable-select';
 import {getTimezonesByRegion} from '@/lib/constants/timezones';
 
@@ -522,6 +523,9 @@ export default function SettingsPage() {
 
                 {/* Passkeys Section */}
                 <PasskeysSection/>
+
+                {/* Spellchecker Settings */}
+                <SpellcheckerSettingsLink />
 
                 {/* Password Reset Dialog */}
                 <Dialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>

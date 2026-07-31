@@ -12,7 +12,20 @@ function buildConfigSchema(sponsored: boolean) {
     return z.object({
         defaultInvitationExpiry: z.number().min(1).max(30),
         requireApprovalForChangelogs: z.boolean(),
-        maxChangelogEntriesPerProject: z.number().min(10).max(sponsored ? 999999 : 10000),
+        // -1 ("unlimited") is always accepted so a previously-licensed value
+        // doesn't fail validation after the license lapses; enforcement falls
+        // back to the unlicensed cap in that case (see SponsorService.checkEntryAllowed).
+        maxChangelogEntriesPerProject: z.union([
+            z.literal(-1),
+            z.number().min(10).max(sponsored ? 999999 : 10000),
+        ]),
+        // -1 ("unlimited") is always accepted so a previously-licensed value
+        // doesn't fail validation after the license lapses; enforcement falls
+        // back to the unlicensed cap in that case (see SponsorService.getMaxRevisionsPerEntry).
+        maxRevisionsPerEntry: z.union([
+            z.literal(-1),
+            z.number().min(5).max(sponsored ? 10000 : 500),
+        ]),
         enableAnalytics: z.boolean(),
         enableNotifications: z.boolean(),
         allowTelemetry: z.enum(['prompt', 'enabled', 'disabled']),
@@ -78,6 +91,7 @@ export async function GET() {
                 defaultInvitationExpiry: 7,
                 requireApprovalForChangelogs: true,
                 maxChangelogEntriesPerProject: 100,
+                maxRevisionsPerEntry: 50,
                 enableAnalytics: true,
                 enableNotifications: true,
                 allowTelemetry: 'prompt',
@@ -97,6 +111,7 @@ export async function GET() {
             defaultInvitationExpiry: config.defaultInvitationExpiry,
             requireApprovalForChangelogs: config.requireApprovalForChangelogs,
             maxChangelogEntriesPerProject: config.maxChangelogEntriesPerProject,
+            maxRevisionsPerEntry: config.maxRevisionsPerEntry,
             enableAnalytics: config.enableAnalytics,
             enableNotifications: config.enableNotifications,
             allowTelemetry: mapTelemetryStateToString(config.allowTelemetry),
@@ -188,6 +203,13 @@ export async function PATCH(request: NextRequest) {
                 changes.maxChangelogEntriesPerProject = {
                     from: existingConfig.maxChangelogEntriesPerProject,
                     to: validatedData.maxChangelogEntriesPerProject
+                }
+            }
+
+            if (validatedData.maxRevisionsPerEntry !== existingConfig.maxRevisionsPerEntry) {
+                changes.maxRevisionsPerEntry = {
+                    from: existingConfig.maxRevisionsPerEntry,
+                    to: validatedData.maxRevisionsPerEntry
                 }
             }
 
@@ -344,6 +366,7 @@ export async function PATCH(request: NextRequest) {
             defaultInvitationExpiry: validatedData.defaultInvitationExpiry,
             requireApprovalForChangelogs: validatedData.requireApprovalForChangelogs,
             maxChangelogEntriesPerProject: validatedData.maxChangelogEntriesPerProject,
+            maxRevisionsPerEntry: validatedData.maxRevisionsPerEntry,
             enableAnalytics: validatedData.enableAnalytics,
             enableNotifications: validatedData.enableNotifications,
             allowTelemetry: dbTelemetryState,
@@ -378,6 +401,7 @@ export async function PATCH(request: NextRequest) {
                             defaultInvitationExpiry: config.defaultInvitationExpiry,
                             requireApprovalForChangelogs: config.requireApprovalForChangelogs,
                             maxChangelogEntriesPerProject: config.maxChangelogEntriesPerProject,
+                            maxRevisionsPerEntry: config.maxRevisionsPerEntry,
                             enableAnalytics: config.enableAnalytics,
                             enableNotifications: config.enableNotifications,
                             allowTelemetry: mapTelemetryStateToString(config.allowTelemetry),
@@ -406,6 +430,7 @@ export async function PATCH(request: NextRequest) {
             defaultInvitationExpiry: config.defaultInvitationExpiry,
             requireApprovalForChangelogs: config.requireApprovalForChangelogs,
             maxChangelogEntriesPerProject: config.maxChangelogEntriesPerProject,
+            maxRevisionsPerEntry: config.maxRevisionsPerEntry,
             enableAnalytics: config.enableAnalytics,
             enableNotifications: config.enableNotifications,
             allowTelemetry: mapTelemetryStateToString(config.allowTelemetry),

@@ -1,8 +1,9 @@
-#!/usr/bin/env ts-node
+#!/usr/bin/env -S npx tsx
 
 import * as fs from 'fs';
 import * as path from 'path';
 import { chromium, Page } from 'playwright';
+import { db } from '../../lib/db';
 
 interface PageInfo {
     path: string;
@@ -10,6 +11,8 @@ interface PageInfo {
     type: 'page' | 'layout' | 'loading' | 'error' | 'not-found' | 'route';
     isDynamic: boolean;
     segments: string[];
+    /** Next.js route group names this page falls under, e.g. ['auth'] for app/(auth)/login. */
+    routeGroups: string[];
     screenshotPath?: string;
 }
 
@@ -119,15 +122,33 @@ class NextJSPageScanner {
         }
     }
 
+    // Route params named like this represent one-time/temporary values
+    // (email verification links, invites, password resets, CLI auth codes)
+    // — there's no stable "real" value to screenshot, so these are always
+    // skipped even if a param of this name were ever added to routeParams.
+    private static readonly TEMPORARY_VALUE_PARAMS = new Set(['token', 'code', 'otp', 'secret']);
+
     private filterScreenshotablePages(pages: PageInfo[]): PageInfo[] {
+        // Once we've logged in (auth is configured), the auth-group pages
+        // (login, register, forgot-password, etc.) are pointless to shoot —
+        // most just redirect away from an authenticated session anyway.
+        // "register" is skipped by name too as a defensive backstop, since
+        // it also requires a [token] param we have no real value for.
+        const skipAuthPages = !!this.screenshotConfig?.auth;
+
         return pages.filter(p => {
             // Only screenshot page types
             if (p.type !== 'page') return false;
 
+            if (skipAuthPages && p.routeGroups.includes('auth')) return false;
+            if (p.segments.includes('register')) return false;
+
             // Handle dynamic routes
             if (p.isDynamic) {
-                // Check if we have the required parameters
                 const requiredParams = this.extractRequiredParams(p.segments);
+                if (requiredParams.some(param => NextJSPageScanner.TEMPORARY_VALUE_PARAMS.has(param))) {
+                    return false;
+                }
                 return this.hasRequiredParams(requiredParams);
             }
 
@@ -188,8 +209,36 @@ class NextJSPageScanner {
         await page.fill(selectors.passwordInput, credentials.password);
         await page.click(selectors.submitButton);
 
-        // Wait for navigation after final login
-        await page.waitForNavigation({ waitUntil: 'networkidle' });
+        // If the password has appeared in a known breach (HaveIBeenPwned
+        // check), a security interstitial blocks the normal redirect until
+        // "Continue Anyway" is clicked. Only shows up for breached
+        // passwords, so this is a no-op the rest of the time.
+        // isVisible() checks the current state instantly with no polling —
+        // right after the click, the interstitial (which depends on an async
+        // breach-check API call) usually hasn't rendered yet. waitFor()
+        // actually polls until the timeout instead of checking once.
+        const continueAnyway = page.getByRole('button', { name: /Continue Anyway/i });
+        const breachWarningShown = await continueAnyway
+            .waitFor({ state: 'visible', timeout: 5000 })
+            .then(() => true)
+            .catch(() => false);
+        if (breachWarningShown) {
+            console.log('Password breach warning shown — continuing anyway');
+            await continueAnyway.click();
+        }
+
+        // Wait for navigation after final login. Not 'networkidle' — the
+        // dashboard opens persistent connections (SSE progress streams,
+        // background polling), so the network never actually goes idle and
+        // this would hang until Playwright's timeout every time.
+        try {
+            await page.waitForURL((url) => !url.pathname.includes('login'), { timeout: 15000 });
+        } catch (e) {
+            console.error('[debug] login did not redirect. Current URL:', page.url());
+            console.error('[debug] visible body text:', (await page.locator('body').innerText()).slice(0, 500));
+            await page.screenshot({ path: './_debug_login_failure.png' });
+            throw e;
+        }
         console.log('Login completed');
     }
 
@@ -200,7 +249,9 @@ class NextJSPageScanner {
             const url = this.buildRouteUrl(pageInfo);
             console.log(`Capturing: ${url}`);
 
-            await page.goto(url, { waitUntil: 'networkidle' });
+            // Not 'networkidle' — same reasoning as performLogin above. The
+            // configured `delay` below covers giving the page time to settle.
+            await page.goto(url, { waitUntil: 'load' });
 
             // Wait for specific selector if configured
             if (this.screenshotConfig.waitForSelector) {
@@ -212,8 +263,8 @@ class NextJSPageScanner {
                 await page.waitForTimeout(this.screenshotConfig.delay);
             }
 
-            const screenshotFileName = this.generateScreenshotFilename(pageInfo.path);
-            const screenshotPath = path.join(this.screenshotConfig.outputDir, screenshotFileName);
+            const screenshotPath = path.join(this.screenshotConfig.outputDir, this.generateScreenshotPath(pageInfo.path));
+            this.ensureDirectoryExists(path.dirname(screenshotPath));
 
             await page.screenshot({
                 path: screenshotPath,
@@ -228,15 +279,21 @@ class NextJSPageScanner {
         }
     }
 
-    private generateScreenshotFilename(routePath: string): string {
-        // Convert route path to safe filename
-        const safeName = routePath
-                .replace(/\//g, '_')
-                .replace(/\[|\]/g, '')
-                .replace(/^_/, 'root')
-            || 'root';
+    private generateScreenshotPath(routePath: string): string {
+        // Mirror the route structure as real subfolders instead of one flat
+        // underscore-joined filename per page — e.g. /dashboard/admin/about
+        // becomes dashboard/admin/about.png instead of rootdashboard_admin_about.png.
+        if (routePath === '/') return 'root.png';
 
-        return `${safeName}.png`;
+        const segments = routePath
+            .split('/')
+            .filter(Boolean)
+            .map(segment => segment.replace(/\[|\]/g, ''));
+
+        const fileName = `${segments[segments.length - 1]}.png`;
+        const dirSegments = segments.slice(0, -1);
+
+        return dirSegments.length > 0 ? path.join(...dirSegments, fileName) : fileName;
     }
 
     private scanDirectory(dirPath: string, relativePath: string, pages: PageInfo[]): void {
@@ -313,9 +370,18 @@ class NextJSPageScanner {
         const segments = dirPath === '.' ? [] : dirPath.split(path.sep).filter(Boolean);
         const isDynamic = this.checkIfDynamic(segments);
 
-        let urlPath = segments.length === 0 ? '/' : '/' + segments.join('/');
+        // Route groups — app/(auth)/login — are purely organizational and
+        // never appear in the actual URL; Next.js strips them entirely.
+        // Track their names separately so callers can identify e.g. "this
+        // page is under the auth group" without them polluting the path.
+        const routeGroups = segments
+            .filter(segment => segment.startsWith('(') && segment.endsWith(')'))
+            .map(segment => segment.slice(1, -1));
 
-        urlPath = segments.reduce((acc, segment) => {
+        const urlPath = segments.reduce((acc, segment) => {
+            if (segment.startsWith('(') && segment.endsWith(')')) {
+                return acc; // route group — not part of the URL
+            }
             if (segment.startsWith('[') && segment.endsWith(']')) {
                 const paramName = segment.slice(1, -1);
                 return acc + '/[' + paramName + ']';
@@ -328,15 +394,15 @@ class NextJSPageScanner {
             fullPath,
             type: fileType,
             isDynamic,
-            segments
+            segments,
+            routeGroups
         };
     }
 
     private checkIfDynamic(segments: string[]): boolean {
-        return segments.some(segment =>
-            segment.startsWith('[') && segment.endsWith(']') ||
-            segment.startsWith('(') && segment.endsWith(')')
-        );
+        // Route groups ((auth)) are organizational, not a URL param — only
+        // actual [param] segments make a route "dynamic".
+        return segments.some(segment => segment.startsWith('[') && segment.endsWith(']'));
     }
 
     private buildRouteTree(pages: PageInfo[]): RouteTreeNode[] {
@@ -362,7 +428,7 @@ class NextJSPageScanner {
                         name: segment,
                         path: currentPath,
                         type: i === segments.length - 1 ? page.type : 'page',
-                        isDynamic: segment.startsWith('[') || segment.startsWith('('),
+                        isDynamic: segment.startsWith('['),
                         children: []
                     };
                     currentLevel.push(node);
@@ -407,37 +473,50 @@ class NextJSPageScanner {
     }
 }
 
-// Example configuration
-const exampleConfig: ScreenshotConfig = {
-    baseUrl: 'http://localhost:3000',
-    outputDir: './screenshots',
-    auth: {
-        loginUrl: 'http://localhost:3000',
-        credentials: {
-            email: 'admin@changerawr.com', // admin seeder account email
-            password: 'password123' // admin seeder account password
-        },
-        selectors: {
-            emailInput: 'input[type="email"]',
-            passwordInput: 'input[type="password"]',
-            submitButton: 'button[type="submit"]'
-        }
-    },
-    viewport: {
-        width: 1920,
-        height: 1080
-    },
-    // waitForSelector: '[data-testid="page-loaded"]', // disabled until eventually implemented
-    delay: 1000, // Optional: additional delay in ms
-    routeParams: {
-        projectId: 'cmhy3qagr000dvt7kd5hoicrk', // Uses project ID from current testing database
+// `npm run dev` serves on 3001 (see package.json), not Next's default 3000.
+const BASE_URL = process.env.SCAN_BASE_URL || 'http://localhost:3001';
+
+async function buildConfig(): Promise<ScreenshotConfig> {
+    // The previous hardcoded projectId ('cmhy3qagr000dvt7kd5hoicrk') didn't
+    // exist in the current database — look up a real one each run instead
+    // of relying on an ID that goes stale the moment the seed data changes.
+    const project = await db.project.findFirst({ select: { id: true, name: true } });
+    if (!project) {
+        throw new Error('No projects found in the database — create one before running this script.');
     }
-};
+    console.log(`Using project "${project.name}" (${project.id}) for dynamic routes`);
+
+    return {
+        baseUrl: BASE_URL,
+        outputDir: './screenshots',
+        auth: {
+            loginUrl: BASE_URL,
+            credentials: {
+                email: 'admin@changerawr.com', // admin seeder account email
+                password: 'password123' // admin seeder account password
+            },
+            selectors: {
+                emailInput: 'input[type="email"]',
+                passwordInput: 'input[type="password"]',
+                submitButton: 'button[type="submit"]'
+            }
+        },
+        viewport: {
+            width: 1920,
+            height: 1080
+        },
+        // waitForSelector: '[data-testid="page-loaded"]', // disabled until eventually implemented
+        delay: 1000, // Optional: additional delay in ms
+        routeParams: {
+            projectId: project.id,
+        }
+    };
+}
 
 async function main(): Promise<void> {
     try {
-        // Example with screenshots
-        const scanner = new NextJSPageScanner('./app', exampleConfig);
+        const config = await buildConfig();
+        const scanner = new NextJSPageScanner('./app', config);
         const routeTree = await scanner.scanPages();
 
         if (routeTree.length === 0) {
@@ -450,6 +529,8 @@ async function main(): Promise<void> {
     } catch (error) {
         console.error('Error scanning pages:', error);
         process.exit(1);
+    } finally {
+        await db.$disconnect();
     }
 }
 

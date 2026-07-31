@@ -1,12 +1,14 @@
 import {db} from '@/lib/db';
-import type {RequestStatus} from '@prisma/client';
 import {sendNotificationEmail} from "@/lib/services/email/notification";
+
+type RequestStatus = 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED';
 
 // Types
 interface ProcessRequestOptions {
     requestId: string;
     status: RequestStatus;
     adminId: string;
+    feedback?: string;
     metadata?: {
         timestamp: string;
         processedBy: string;
@@ -194,6 +196,30 @@ class DeleteEntryProcessor implements RequestProcessor {
     }
 }
 
+class DeleteAllEntriesProcessor implements RequestProcessor {
+    async processRequest({tx, request}: RequestContext): Promise<void> {
+        if (!request.project.changelog?.id) {
+            throw new Error('Changelog not found for this project');
+        }
+
+        await tx.changelogEntry.deleteMany({
+            where: {changelogId: request.project.changelog.id}
+        });
+    }
+}
+
+class DeleteAllHistoryProcessor implements RequestProcessor {
+    async processRequest({tx, request}: RequestContext): Promise<void> {
+        if (!request.project.changelog?.id) {
+            throw new Error('Changelog not found for this project');
+        }
+
+        await tx.changelogEntryRevision.deleteMany({
+            where: {entry: {changelogId: request.project.changelog.id}}
+        });
+    }
+}
+
 class AllowPublishProcessor implements RequestProcessor {
     async processRequest({tx, request}: RequestContext): Promise<void> {
         if (!request.ChangelogEntry?.id) {
@@ -269,6 +295,8 @@ class RequestProcessorRegistry {
         'DELETE_PROJECT': new DeleteProjectProcessor(),
         'DELETE_TAG': new DeleteTagProcessor(),
         'DELETE_ENTRY': new DeleteEntryProcessor(),
+        'DELETE_ALL_ENTRIES': new DeleteAllEntriesProcessor(),
+        'DELETE_ALL_HISTORY': new DeleteAllHistoryProcessor(),
         'ALLOW_PUBLISH': new AllowPublishProcessor(),
         'ALLOW_SCHEDULE': new AllowScheduleProcessor()
     };
@@ -298,6 +326,7 @@ class ChangelogRequestService {
             if (safeOptions.status === 'APPROVED') {
                 await this.processApprovedRequest(tx as PrismaTransaction, existingRequest);
             }
+            // CHANGES_REQUESTED and REJECTED: no action, just status update
 
             await this.createAuditLog(tx as PrismaTransaction, updatedRequest, safeOptions);
 
@@ -338,7 +367,10 @@ class ChangelogRequestService {
                             type: result.data.type,
                             projectName: result.data.project?.name || 'Unknown Project',
                             entryTitle: result.data.ChangelogEntry?.title,
-                            adminName: admin?.name || 'an administrator'
+                            adminName: admin?.name || 'an administrator',
+                            feedback: safeOptions.feedback,
+                            entryId: result.data.ChangelogEntry?.id,
+                            projectId: result.data.projectId,
                         },
                         dashboardUrl
                     });
@@ -405,12 +437,22 @@ class ChangelogRequestService {
         request: DatabaseChangelogRequest,
         options: ProcessRequestOptions
     ): Promise<DatabaseChangelogRequest> {
+        // Build metadata — preserve existing, layer in new fields
+        const existingMeta = (request as unknown as { metadata?: Record<string, unknown> }).metadata || {};
+        const newMeta: Record<string, unknown> = {
+            ...existingMeta,
+            lastUpdatedAt: new Date().toISOString(),
+            lastUpdatedBy: options.adminId,
+        };
+        if (options.feedback !== undefined) newMeta.feedback = options.feedback;
+
         const updatedRequest = await tx.changelogRequest.update({
             where: {id: options.requestId},
             data: {
                 status: options.status,
                 adminId: options.adminId,
-                reviewedAt: new Date(options.metadata?.timestamp ?? Date.now())
+                reviewedAt: new Date(options.metadata?.timestamp ?? Date.now()),
+                metadata: newMeta,
             },
             include: {
                 staff: {
@@ -476,6 +518,76 @@ class ChangelogRequestService {
 
 // Export singleton instance
 export const changelogRequestService = new ChangelogRequestService();
+
+// ─── createOrReopenRequest ────────────────────────────────────────────────────
+// When staff resubmits after CHANGES_REQUESTED, we reopen the existing request
+// rather than creating a new orphan. The old feedback is archived in metadata so
+// the admin can see the full history.
+
+interface CreateOrReopenParams {
+    type: string;
+    staffId: string;
+    projectId: string;
+    changelogEntryId?: string | null;
+    changelogTagId?: string | null;
+    targetId?: string | null;
+    metadata?: Record<string, unknown>;
+}
+
+export async function createOrReopenRequest(params: CreateOrReopenParams) {
+    const { type, staffId, projectId, changelogEntryId, changelogTagId, targetId, metadata } = params;
+
+    // Look for a CHANGES_REQUESTED request of the same type targeting the same resource
+    const existing = await db.changelogRequest.findFirst({
+        where: {
+            type,
+            status: 'CHANGES_REQUESTED',
+            projectId,
+            ...(changelogEntryId ? { changelogEntryId } : {}),
+            ...(changelogTagId ? { changelogTagId } : {}),
+        },
+        orderBy: { createdAt: 'desc' },
+    });
+
+    if (existing) {
+        // Reopen with a distinct status so admins can see this was previously reviewed
+        const prev = (existing.metadata ?? {}) as Record<string, unknown>;
+        const updatedMeta: Record<string, unknown> = {
+            ...prev,
+            resubmittedAt: new Date().toISOString(),
+            previousFeedback: prev.feedback ?? null,
+            feedback: null,
+            changesAddressed: true,
+        };
+        if (metadata) Object.assign(updatedMeta, metadata);
+
+        return db.changelogRequest.update({
+            where: { id: existing.id },
+            data: {
+                status: 'CHANGES_REQUESTED_PENDING',
+                staffId,
+                adminId: null,
+                reviewedAt: null,
+                targetId: targetId ?? existing.targetId,
+                metadata: updatedMeta,
+            },
+        });
+    }
+
+    // No existing CHANGES_REQUESTED — create a fresh request
+    return db.changelogRequest.create({
+        data: {
+            type,
+            staffId,
+            projectId,
+            changelogEntryId: changelogEntryId ?? undefined,
+            changelogTagId: changelogTagId ?? undefined,
+            targetId: targetId ?? undefined,
+            status: 'PENDING',
+            ...(metadata ? { metadata } : {}),
+        },
+    });
+}
 
 // Also export types and registry for extensibility
 export type {

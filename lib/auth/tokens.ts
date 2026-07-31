@@ -8,7 +8,7 @@ const ACCESS_SECRET = new TextEncoder().encode(
 );
 
 export async function generateTokens(userId: string) {
-    console.log(`Generating tokens for user: ${userId}`);
+    // console.log(`Generating tokens for user: ${userId}`);
 
     try {
         // Generate access token (short-lived - 15 minutes)
@@ -18,7 +18,7 @@ export async function generateTokens(userId: string) {
             .setIssuedAt()
             .sign(ACCESS_SECRET);
 
-        console.log('Access token generated successfully');
+        // console.log('Access token generated successfully');
 
         // Generate refresh token (long-lived - 7 days)
         const refreshToken = nanoid(64);
@@ -34,20 +34,20 @@ export async function generateTokens(userId: string) {
             },
         });
 
-        console.log('Refresh token created and stored in database');
+        // console.log('Refresh token created and stored in database');
 
         return {
             accessToken,
             refreshToken
         };
     } catch (error) {
-        console.error('Token generation error:', error);
+        // console.error('Token generation error:', error);
         throw error;
     }
 }
 
 export async function generateCLITokens(userId: string) {
-    console.log(`Generating CLI tokens for user: ${userId}`);
+    // console.log(`Generating CLI tokens for user: ${userId}`);
 
     try {
         // Generate access token (30 days for CLI usage)
@@ -57,7 +57,7 @@ export async function generateCLITokens(userId: string) {
             .setIssuedAt()
             .sign(ACCESS_SECRET);
 
-        console.log('CLI access token generated successfully');
+        // console.log('CLI access token generated successfully');
 
         // Generate refresh token (90 days for CLI usage)
         const refreshToken = nanoid(64);
@@ -73,14 +73,14 @@ export async function generateCLITokens(userId: string) {
             },
         });
 
-        console.log('CLI refresh token created and stored in database');
+        // console.log('CLI refresh token created and stored in database');
 
         return {
             accessToken,
             refreshToken
         };
     } catch (error) {
-        console.error('CLI token generation error:', error);
+        // console.error('CLI token generation error:', error);
         throw error;
     }
 }
@@ -157,7 +157,7 @@ export async function refreshAccessToken(currentRefreshToken: string): Promise<T
             user: existingToken.user
         };
     } catch (error) {
-        console.error('Error refreshing token:', error);
+        // console.error('Error refreshing token:', error);
         return null;
     }
 }
@@ -219,7 +219,7 @@ export async function refreshCLIAccessToken(currentRefreshToken: string): Promis
             user: existingToken.user
         };
     } catch (error) {
-        console.error('Error refreshing CLI token:', error);
+        // console.error('Error refreshing CLI token:', error);
         return null;
     }
 }
