@@ -23,23 +23,25 @@ If you don't know what a changelog is, check out [betterauth](https://www.better
 
 **For everyone.** Whether you're a solo developer, small business, or enterprise team - Changerawr scales with you. ( yes, this means you can use it for commercial usage! just please do reach out if you do, I would love to know how your using Changerawr! )
 
-## 🚀 Features
+## 🚀 A few of Changerawr's many features 👇
 
-- **🛠️ Fully Extendable Software** - Powerful extension system to improve your changelogging experience
-- **📝 Beautiful Content Editor** - Write changelogs that look professional
-- **🤖 AI-Powered** - Let AI help you write better changelog entries
-- **📡 Headless API** - Beautifully documented REST API for full control
+- **📝 Beautiful Content Editor** - Write professional changelogs that look polished, with the tooling to make them perfect
+- **🕰️ Full Revision History** - Blame view, pinned revisions, and one-click restores — flexible enough to satisfy authors and administrators alike
+- **🤖 AI-Powered** - Let AI help you write better changelog entries and more
+- **📡 Headless API**: Fully documented REST API mirrors core functionality, enabling complete application control without extra setup
 - **🧩 SDKs** - Pre-built libraries for popular languages
-- **🎨 Embeddable Widget** - Drop a changelog widget anywhere on your site
+- **🎨 Embeddable Widgets** - Drop a changelog widget anywhere on your site in four different flavors
 - **📧 Email Notifications** - Keep users informed of updates
-- **🏷️ Tags & Versioning** - Organize entries exactly how you want
-- **🔗 Multiple Integrations** - Connect with your existing tools
-- **🔐 Modern Authentication** - Custom-built auth with passkey support
+- **🏷️ Tags & Versioning** - Organize entries exactly how you want and color tags to match the mood
+- **🔗 Multiple Integrations** - Connect with your existing tools, e.g., Slack
+- **🔐 Modern Authentication** - Custom-built authentication with passkey, OAuth2, and SAML support out of the box
 - **🖥️ Desktop-First Design** - Built for desktop use (mobile works, but it's quirky)
 - **🔍 Full-Text Search** - Search everything, instantly
-- -**🌐 Custom Domains** - Link a custom domain to your changelog ( you can give it an SSL certificate, too!* )
+- **🔌 Fully Extendable** - Add your own [Changerawr Universal Markdown](https://github.com/changerawr/markdown) extensions to the content editor, and share your own with everyone!*
+- **🌐 Custom Domains** - Link a custom domain to your changelog ( you can give it an SSL certificate, too!** )
 
-<sup><sub>* SSL Certificates require having the [nginx-sidecar](https://github.com/Changerawr/nginx-agent) setup and configured correctly.</sub></sup>
+<sup><sub>* Sharing extensions is really easy! Just follow our [example repository](https://github.com/changerawr/extension-store) to get started! If you have any questions, send us an e-mail! We're more than happy to help you!</sub></sup> \
+<sup><sub>** SSL Certificates require having the [nginx-sidecar](https://github.com/Changerawr/nginx-agent) setup and configured correctly. - We reccomend following our [setup guide](https://github.com/Changerawr/nginx-agent/blob/master/chragent.conf.example) for the best possible results.</sub></sup>
 
 ## 🚀 Quick Start
 
@@ -100,39 +102,6 @@ GITHUB_ENCRYPTION_KEY="your-github-encryption-key"
 ANALYTICS_SALT="your-secure-random-salt-here"
 ```
 <sup><sub>This is not a full list, refer to the .env.example for a full list.</sub></sup>
-
-## 📦 Widget Integration
-
-The easiest way to add changelogs to your site - perfect for non-technical users:
-
-```html
-<!-- Basic widget -->
-<script 
-  src="https://your-changerawr.com/api/widget/your-project-id" 
-  data-theme="light"
-  async
-></script>
-
-<!-- Popup widget -->
-<button id="updates-btn">What's New?</button>
-<script 
-  src="https://your-changerawr.com/api/widget/your-project-id" 
-  data-popup="true"
-  data-trigger="updates-btn"
-  async
-></script>
-```
-
-### Widget Options
-
-| Option | Type    |     Default     | Description |
-|--------|---------|:---------------:|-------------|
-| `data-theme` | string  |     "light"     | Theme: "light" or "dark" |
-| `data-position` | string  | "bottom-right"  | Popup position |
-| `data-max-height` | string  |     "400px"     | Maximum height |
-| `data-popup` | boolean |      false      | Enable popup mode |
-| `data-trigger` | string  |      null       | Button ID or "immediate" |
- | `data-max-entries` | number  |        3        | Amount of entries to display, min 3 max 10
 
 ## 🛠️ Tech Stack
 
@@ -212,8 +181,9 @@ docker network create changerawr-net
 
 # Start the tagger (own image — separate from the app, ~1GB of model weights)
 docker run -d --name changerawr-tagger --network changerawr-net \
+  --memory=4g --memory-swap=4g \
   -e PORT=31672 \
-  -v tagger_models:/app/models -v tagger_data:/app/data \
+  -v tagger_models:/app/models -v tagger_data:/app/runtime \
   ghcr.io/changerawr/tag-ai:latest
 
 # Point the app at it (add to the `docker run` above, plus --network changerawr-net)
@@ -231,23 +201,6 @@ npm run build:widget
 npm run generate-swagger
 npm start:with-maintenance
 ```
-
-## 🎯 Features in Detail
-
-### AI-Powered Writing
-Let AI help you craft professional changelog entries that your users will actually want to read.
-
-### Custom Authentication
-Built from scratch with modern features like passkeys. No third-party restrictions, full control.
-
-### Developer-First API
-Clean, well-documented REST API with SDKs for popular languages. Build exactly what you need.
-
-### Email Notifications
-Keep your users in the loop with beautiful email updates when you ship new features.
-
-### Full Customization
-Tags, versioning - organize your changelogs exactly how your team works.
 
 ## 🤝 Contributing
 
