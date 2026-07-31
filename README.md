@@ -37,7 +37,7 @@ If you don't know what a changelog is, check out [betterauth](https://www.better
 - **🔐 Modern Authentication** - Custom-built authentication with passkey, OAuth2, and SAML support out of the box
 - **🖥️ Desktop-First Design** - Built for desktop use (mobile works, but it's quirky)
 - **🔍 Full-Text Search** - Search everything, instantly
-- **🔌 Fully Extendable** - Add your own [Changerawr Universal Markdown](https://github.com/changerawr/markdown) extensions to the content editor, and share your own with everyone!*
+- **🔌 Fully Extendable** - Add your own [Changerawr Universal Markdown](https://github.com/changerawr/markdown) extensions to the content editor, and share them with everyone!*
 - **🌐 Custom Domains** - Link a custom domain to your changelog ( you can give it an SSL certificate, too!** )
 
 <sup><sub>* Sharing extensions is really easy! Just follow our [example repository](https://github.com/changerawr/extension-store) to get started! If you have any questions, send us an e-mail! We're more than happy to help you!</sub></sup> \
