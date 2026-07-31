@@ -43,6 +43,25 @@ If you don't know what a changelog is, check out [betterauth](https://www.better
 <sup><sub>* Sharing extensions is really easy! Just follow our [example repository](https://github.com/changerawr/extension-store) to get started! If you have any questions, send us an e-mail! We're more than happy to help you!</sub></sup> \
 <sup><sub>** SSL Certificates require having the [nginx-sidecar](https://github.com/Changerawr/nginx-agent) setup and configured correctly. - We reccomend following our [setup guide](https://github.com/Changerawr/nginx-agent/blob/master/chragent.conf.example) for the best possible results.</sub></sup>
 
+## 📸 A peek inside
+
+<!-- GALLERY:START -->
+<table align="center">
+  <tr>
+    <td width="25%"><img src="screenshots/gallery/screenshots_dashboard.png" width="100%" alt="Dashboard overview" /></td>
+    <td width="25%"><img src="screenshots/gallery/screenshots_dashboard_projects.png" width="100%" alt="Projects list" /></td>
+    <td width="25%"><img src="screenshots/gallery/screenshots_dashboard_projects_projectId_changelog.png" width="100%" alt="Changelog view" /></td>
+    <td width="25%"><img src="screenshots/gallery/screenshots_dashboard_projects_projectId_changelog_new.png" width="100%" alt="New changelog entry editor" /></td>
+  </tr>
+  <tr>
+    <td width="25%"><img src="screenshots/gallery/screenshots_dashboard_admin_users.png" width="100%" alt="Admin user management" /></td>
+    <td width="25%"><img src="screenshots/gallery/screenshots_dashboard_admin_audit-logs.png" width="100%" alt="Admin audit logs" /></td>
+    <td width="25%"><img src="screenshots/gallery/screenshots_dashboard_admin_ai-settings.png" width="100%" alt="AI settings" /></td>
+    <td width="25%"><img src="screenshots/gallery/screenshots_dashboard_projects_projectId_settings_tags.png" width="100%" alt="Tag management" /></td>
+  </tr>
+</table>
+<!-- GALLERY:END -->
+
 ## 🚀 Quick Start
 
 ### Prerequisites
