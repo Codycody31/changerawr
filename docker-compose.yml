@@ -78,6 +78,10 @@ services:
       # across image upgrades instead of getting stuck with whatever this
       # volume happened to contain the first time it was created.
       - tagger_data:/app/runtime
+    # Hard cap — the OOM killer takes the container down cleanly at this
+    # limit rather than it (or the host) running unbounded.
+    mem_limit: 4g
+    memswap_limit: 4g
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:31672/health')\" || exit 1"]
       interval: 30s

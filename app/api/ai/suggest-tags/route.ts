@@ -51,16 +51,20 @@ export async function POST(request: NextRequest) {
         headers['Authorization'] = `Bearer ${tagger.apiKey}`;
       }
 
-      // Training runs in the tagger's own background thread against the old
-      // model, which keeps serving — but shares the same CPU, so inference
-      // gets noticeably slower while it's going. Check first so a slow
-      // response reads as "tagger is training" instead of a bare timeout.
-      let isTraining = false;
+      // The tagger frees its model to fit training in memory, so while
+      // training is running /api/v1/tag will always 503 — check first and
+      // return immediately instead of making the caller wait out a request
+      // that's guaranteed to fail.
       try {
         const healthRes = await fetch(`${base}/health`, { signal: AbortSignal.timeout(3_000) });
         if (healthRes.ok) {
           const health = await healthRes.json();
-          isTraining = !!health.training;
+          if (health.training) {
+            return NextResponse.json(
+              { error: 'Tagger is currently training and temporarily unavailable — try again in a moment.', training: true },
+              { status: 503 }
+            );
+          }
         }
       } catch { /* health check itself failing isn't fatal — fall through to the real request */ }
 
@@ -69,24 +73,20 @@ export async function POST(request: NextRequest) {
       const body: Record<string, unknown> = { content: content.trim(), threshold: 0.025, include_evidence: true };
       if (availableTagNames.length > 0) body.tags = availableTagNames;
 
-      let res: Response;
-      try {
-        res = await fetch(`${base}/api/v1/tag`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(body),
-          signal: AbortSignal.timeout(isTraining ? 30_000 : 10_000),
-        });
-      } catch (err) {
-        if (isTraining) {
-          return NextResponse.json(
-            { error: 'Tagger is currently training and running slower than usual — try again in a moment.' },
-            { status: 503 }
-          );
-        }
-        throw err;
-      }
+      const res = await fetch(`${base}/api/v1/tag`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(10_000),
+      });
 
+      if (res.status === 503) {
+        const errBody = await res.json().catch(() => ({}));
+        return NextResponse.json(
+          { error: errBody.detail || 'Tagger is temporarily unavailable — try again in a moment.', training: true },
+          { status: 503 }
+        );
+      }
       if (!res.ok) throw new Error(`changelog-tagger returned ${res.status}`);
 
       const data = await res.json();

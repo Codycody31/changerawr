@@ -1,5 +1,5 @@
 // components/changelog/editor/TagSelector.tsx
-import React, {useState, useCallback} from 'react';
+import React, {useState, useCallback, useRef, useEffect} from 'react';
 import {Button} from '@/components/ui/button';
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover';
 import {
@@ -10,7 +10,7 @@ import {
     CommandItem,
     CommandList,
 } from "@/components/ui/command";
-import {Tags, Check, Plus, Sparkles, Loader2, X, AlertCircle, CheckCircle, Palette, Lightbulb, ThumbsUp, ThumbsDown, Info} from 'lucide-react';
+import {Tags, Check, Plus, Sparkles, Loader2, X, AlertCircle, CheckCircle, Palette, Lightbulb, ThumbsUp, ThumbsDown, Info, BrainCircuit, CheckCircle2} from 'lucide-react';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { renderToTailwind } from '@changerawr/markdown';
 import {Separator} from '@/components/ui/separator';
@@ -31,6 +31,18 @@ interface Tag {
     id: string;
     name: string;
     color?: string | null;
+}
+
+interface TrainingProgress {
+    status: 'idle' | 'running' | 'done' | 'error';
+    progress_pct: number;
+    current_step: number;
+    total_steps: number;
+    current_epoch: number;
+    total_epochs: number;
+    loss: number | null;
+    is_full: boolean;
+    error: string;
 }
 
 interface TagSelectorProps {
@@ -80,6 +92,16 @@ export default function TagSelector({
     const [tagFeedback, setTagFeedback] = useState<Record<string, 'up' | 'down'>>({});
     const [suggestionError, setSuggestionError] = useState<string | null>(null);
     const [showSuggestions, setShowSuggestions] = useState(false);
+    const [training, setTraining] = useState<TrainingProgress | null>(null);
+    const [justFinished, setJustFinished] = useState(false);
+    const eventSourceRef = useRef<EventSource | null>(null);
+
+    const closeStream = useCallback(() => {
+        eventSourceRef.current?.close();
+        eventSourceRef.current = null;
+    }, []);
+
+    useEffect(() => () => closeStream(), [closeStream]);
     // Filter tags based on search
     const filteredTags = search
         ? availableTags.filter(tag =>
@@ -177,6 +199,12 @@ export default function TagSelector({
 
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
+                if (res.status === 503 && err.training) {
+                    setIsGenerating(false);
+                    // eslint-disable-next-line @typescript-eslint/no-use-before-define
+                    watchTraining();
+                    return;
+                }
                 throw new Error(err.error || 'Failed to get tag suggestions');
             }
 
@@ -203,7 +231,41 @@ export default function TagSelector({
         } finally {
             setIsGenerating(false);
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [content, availableTags, canSuggest]);
+
+    const watchTraining = useCallback(() => {
+        if (eventSourceRef.current) return; // already watching
+        setSuggestionError(null);
+        setShowSuggestions(false);
+        setTraining({ status: 'running', progress_pct: 0, current_step: 0, total_steps: 0, current_epoch: 0, total_epochs: 0, loss: null, is_full: false, error: '' });
+
+        const es = new EventSource('/api/ai/tagger-progress');
+        eventSourceRef.current = es;
+
+        es.onmessage = (e) => {
+            const data: TrainingProgress = JSON.parse(e.data);
+            if (data.status !== 'running') {
+                closeStream();
+                setTraining(null);
+                if (data.status === 'done') {
+                    setJustFinished(true);
+                    setTimeout(() => setJustFinished(false), 2000);
+                    generateTagSuggestions(); // model's back — retry automatically
+                } else if (data.status === 'error') {
+                    setSuggestionError(data.error || 'Training failed.');
+                }
+                return;
+            }
+            setTraining(data);
+        };
+        es.onerror = () => {
+            closeStream();
+            setTraining(null);
+            setSuggestionError('Lost connection to the tagger — try again in a moment.');
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [closeStream]);
 
     // Toggle tag selection
     const toggleTag = useCallback((tag: Tag) => {
@@ -289,7 +351,7 @@ export default function TagSelector({
                                             variant="ghost"
                                             size="icon"
                                             className="h-8 w-8 flex-shrink-0"
-                                            disabled={isGenerating}
+                                            disabled={isGenerating || !!training}
                                             onClick={generateTagSuggestions}
                                         >
                                             {isGenerating
@@ -303,6 +365,54 @@ export default function TagSelector({
                         </div>
 
                         <CommandList className="scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                            {/* Tagger training progress */}
+                            <AnimatePresence>
+                                {training && (
+                                    <motion.div
+                                        initial={{opacity: 0, height: 0}}
+                                        animate={{opacity: 1, height: 'auto'}}
+                                        exit={{opacity: 0, height: 0}}
+                                        transition={{duration: 0.15}}
+                                        className="overflow-hidden border-b border-border/60"
+                                    >
+                                        <div className="px-3 py-2.5 space-y-2">
+                                            <p className="text-xs text-muted-foreground">
+                                                Hey — the tagger&apos;s mid-update right now, so suggestions are paused for a moment.
+                                            </p>
+                                            <div className="flex items-center gap-2 text-xs font-medium">
+                                                <BrainCircuit className="h-3.5 w-3.5 text-primary animate-pulse"/>
+                                                {training.is_full ? 'Full retrain…' : 'Quick update…'}
+                                                <span className="ml-auto text-muted-foreground font-normal">
+                                                    {training.total_steps > 0 ? `${training.progress_pct}%` : 'starting…'}
+                                                </span>
+                                            </div>
+                                            <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                                                <div
+                                                    className="h-full bg-primary transition-all duration-300"
+                                                    style={{width: `${Math.max(training.progress_pct, 3)}%`}}
+                                                />
+                                            </div>
+                                            {(training.total_epochs > 0 || training.loss !== null) && (
+                                                <p className="text-[11px] text-muted-foreground">
+                                                    {training.total_epochs > 0 && `Epoch ${training.current_epoch}/${training.total_epochs}`}
+                                                    {training.loss !== null && ` · loss ${training.loss.toFixed(4)}`}
+                                                </p>
+                                            )}
+                                            <p className="text-xs text-muted-foreground">
+                                                Suggestions resume automatically when it&apos;s done — leave this open to watch, or close and come back later.
+                                            </p>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+
+                            {!training && justFinished && (
+                                <p className="px-3 py-2 text-xs text-green-600 dark:text-green-500 flex items-center gap-1.5 border-b border-border/60">
+                                    <CheckCircle2 className="h-3.5 w-3.5"/>
+                                    All good — fetching suggestions…
+                                </p>
+                            )}
+
                             {/* AI Suggestions */}
                             <AnimatePresence>
                                 {showSuggestions && suggestedTags.length > 0 && (
