@@ -356,7 +356,9 @@ export default function AISettingsPage() {
                                                 Epoch {trainingStatus.current_epoch}/{trainingStatus.total_epochs || '—'}
                                                 {trainingStatus.loss !== null && ` · loss ${trainingStatus.loss.toFixed(4)}`}
                                                 {' · '}{trainingStatus.is_full ? 'reprocessing the full seed dataset' : 'training on new feedback only'}
-                                                {' · '}the current model keeps serving requests until this finishes
+                                            </p>
+                                            <p className="text-xs text-amber-600 dark:text-amber-500">
+                                                Tag suggestions are unavailable until this finishes — the model is freed during training to fit in memory.
                                             </p>
                                         </div>
                                     )}
