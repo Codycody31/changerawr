@@ -26,7 +26,7 @@ If you don't know what a changelog is, check out [betterauth](https://www.better
 ## 🚀 A few of Changerawr's many features 👇
 
 - **📝 Beautiful Content Editor** - Write professional changelogs that look polished, with the tooling to make them perfect
-- **🕰️ Full Revision History** - Blame view, pinned revisions, and one-click restores — flexible enough to satisfy authors and administrators alike
+- **🕰️ Full Revision History** - Git-like experience flexible enough to satisfy authors and administrators alike
 - **🤖 AI-Powered** - Let AI help you write better changelog entries and more
 - **📡 Headless API**: Fully documented REST API mirrors core functionality, enabling complete application control without extra setup
 - **🧩 SDKs** - Pre-built libraries for popular languages
