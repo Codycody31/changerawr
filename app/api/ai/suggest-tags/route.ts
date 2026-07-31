@@ -54,9 +54,10 @@ export async function POST(request: NextRequest) {
       // The tagger frees its model to fit training in memory, so while
       // training is running /api/v1/tag will always 503 — check first and
       // return immediately instead of making the caller wait out a request
-      // that's guaranteed to fail.
+      // that's guaranteed to fail. 5s, not 3s — a container mid-training can
+      // be slow to answer even its own lightweight health check.
       try {
-        const healthRes = await fetch(`${base}/health`, { signal: AbortSignal.timeout(3_000) });
+        const healthRes = await fetch(`${base}/health`, { signal: AbortSignal.timeout(5_000) });
         if (healthRes.ok) {
           const health = await healthRes.json();
           if (health.training) {
@@ -73,12 +74,31 @@ export async function POST(request: NextRequest) {
       const body: Record<string, unknown> = { content: content.trim(), threshold: 0.025, include_evidence: true };
       if (availableTagNames.length > 0) body.tags = availableTagNames;
 
-      const res = await fetch(`${base}/api/v1/tag`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(10_000),
-      });
+      let res: Response;
+      try {
+        // Generous — this is a background request from the user's
+        // perspective (the UI shows a "generating…" state and just waits),
+        // so there's little upside to failing fast here. A slow-but-working
+        // response should get the chance to actually finish.
+        res = await fetch(`${base}/api/v1/tag`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(45_000),
+        });
+      } catch (err) {
+        // The health check above missed it (itself timed out, or training
+        // started in the gap between the two calls) — treat any abort/
+        // network failure on the real call the same way: a clear, specific
+        // message instead of a raw AbortError/DOMException bubbling up.
+        if (err instanceof Error && (err.name === 'AbortError' || err.name === 'TimeoutError')) {
+          return NextResponse.json(
+            { error: 'Tagger took too long to respond — it may be training or under heavy load. Try again in a moment.', training: true },
+            { status: 503 }
+          );
+        }
+        return NextResponse.json({ error: 'Tagger service unreachable' }, { status: 502 });
+      }
 
       if (res.status === 503) {
         const errBody = await res.json().catch(() => ({}));
@@ -146,9 +166,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ tags: suggested, source: 'ai' });
   } catch (error) {
     console.error('[suggest-tags]', error);
+    // AbortError/TimeoutError from an AbortSignal.timeout() print as a raw
+    // DOMException with no useful .message — give a clean message instead.
+    const isAbort = error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError');
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to suggest tags' },
-      { status: 500 }
+      { error: isAbort ? 'Request to the tag suggestion service timed out. Try again in a moment.' : (error instanceof Error ? error.message : 'Failed to suggest tags') },
+      { status: isAbort ? 503 : 500 }
     );
   }
 }

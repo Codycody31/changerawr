@@ -4,21 +4,33 @@ import { decryptToken } from '@/lib/utils/encryption';
 // Only used as a fallback when no explicit changelogTaggerUrl is configured.
 const LOCAL_TAGGER_URL = process.env.CHANGELOG_TAGGER_URL || 'http://127.0.0.1:31672';
 
-let cachedLocalDetection: { url: string; checkedAt: number } | null = null;
-const DETECTION_TTL_MS = 60_000;
+let cachedLocalDetection: { reachable: boolean; checkedAt: number } | null = null;
+// Cache a positive result longer than a negative one — a container that's
+// briefly slow (e.g. mid-training, or just starting up) shouldn't get
+// written off for a full minute after one bad probe.
+const POSITIVE_TTL_MS = 60_000;
+const NEGATIVE_TTL_MS = 5_000;
 
 async function isLocalTaggerReachable(): Promise<boolean> {
-    if (cachedLocalDetection && Date.now() - cachedLocalDetection.checkedAt < DETECTION_TTL_MS) {
-        return true;
+    if (cachedLocalDetection) {
+        const ttl = cachedLocalDetection.reachable ? POSITIVE_TTL_MS : NEGATIVE_TTL_MS;
+        if (Date.now() - cachedLocalDetection.checkedAt < ttl) {
+            return cachedLocalDetection.reachable;
+        }
     }
     try {
+        // 500ms was too tight for a real production container (network
+        // latency, a busy event loop mid-training, cold start) — false
+        // negatives here silently disable the tagger instead of just being
+        // slow to detect it.
         const res = await fetch(`${LOCAL_TAGGER_URL}/health`, {
-            signal: AbortSignal.timeout(500),
+            signal: AbortSignal.timeout(2_000),
         });
-        if (!res.ok) return false;
-        cachedLocalDetection = { url: LOCAL_TAGGER_URL, checkedAt: Date.now() };
-        return true;
+        const reachable = res.ok;
+        cachedLocalDetection = { reachable, checkedAt: Date.now() };
+        return reachable;
     } catch {
+        cachedLocalDetection = { reachable: false, checkedAt: Date.now() };
         return false;
     }
 }

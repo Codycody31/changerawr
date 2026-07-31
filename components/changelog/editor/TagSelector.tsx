@@ -365,6 +365,14 @@ export default function TagSelector({
                         </div>
 
                         <CommandList className="scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                            {/* Generating — shown immediately on click, swaps to results/training/error when the request settles */}
+                            {isGenerating && !training && (
+                                <p className="px-3 py-2.5 text-xs text-muted-foreground flex items-center gap-2 border-b border-border/60">
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin flex-shrink-0"/>
+                                    Generating suggestions, please wait…
+                                </p>
+                            )}
+
                             {/* Tagger training progress */}
                             <AnimatePresence>
                                 {training && (
