@@ -10,7 +10,7 @@
     "debug:maintenance": "concurrently \"npm run dev:builder\" \"npm run maintenance\"",
     "test:progress": "node scripts/test-progress.js",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 3001",
     "start:builder": "node scripts/extension-builder/server.js",
     "start:all": "concurrently \"npm start\" \"npm run start:builder\"",
     "lint": "next lint",

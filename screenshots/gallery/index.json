@@ -1,0 +1,50 @@
+[
+  {
+    "src": "screenshots/gallery/screenshots_dashboard.png",
+    "alt": "Dashboard overview"
+  },
+  {
+    "src": "screenshots/gallery/screenshots_dashboard_projects.png",
+    "alt": "Projects list"
+  },
+  {
+    "src": "screenshots/gallery/screenshots_dashboard_projects_projectId_changelog.png",
+    "alt": "Changelog view"
+  },
+  {
+    "src": "screenshots/gallery/screenshots_dashboard_projects_projectId_changelog_new.png",
+    "alt": "New changelog entry editor"
+  },
+  {
+    "src": "screenshots/gallery/screenshots_dashboard_admin_users.png",
+    "alt": "Admin user management"
+  },
+  {
+    "src": "screenshots/gallery/screenshots_dashboard_admin_audit-logs.png",
+    "alt": "Admin audit logs"
+  },
+  {
+    "src": "screenshots/gallery/screenshots_dashboard_admin_ai-settings.png",
+    "alt": "AI settings"
+  },
+  {
+    "src": "screenshots/gallery/screenshots_dashboard_projects_projectId_settings_tags.png",
+    "alt": "Tag management"
+  },
+  {
+    "src": "screenshots/gallery/screenshots_dashboard_admin_about.png",
+    "alt": "About / system information"
+  },
+  {
+    "src": "screenshots/gallery/screenshots_dashboard_projects_projectId_catch-up.png",
+    "alt": "Catch-up view"
+  },
+  {
+    "src": "screenshots/gallery/screenshots_dashboard_projects_projectId_import.png",
+    "alt": "Changelog import"
+  },
+  {
+    "src": "screenshots/gallery/screenshots_changelog_projectId.png",
+    "alt": "Public changelog page"
+  }
+]
