@@ -7,6 +7,7 @@
 [![Version](https://img.shields.io/badge/version-1.0.7-blue.svg)](https://github.com/supernova3339/changerawr)
 [![Status](https://img.shields.io/badge/status-Production%20Ready-green.svg)](https://github.com/supernova3339/changerawr)
 [![License](https://img.shields.io/badge/license-CNC%20OSL-purple.svg)](LICENSE)
+[![AI-DECLARATION: assist](https://img.shields.io/badge/%E4%B7%BC%20AI--DECLARATION-assist-fef9c3?labelColor=fef9c3)](AI-DECLARATION.md)
 
 # What is Changerawr?
 
