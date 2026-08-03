@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { validateAuthAndGetUser } from '@/lib/utils/changelog';
 
 const DEFAULT_STORES = [
   {
@@ -16,6 +17,11 @@ const DEFAULT_STORES = [
  */
 export async function GET(request: NextRequest) {
   try {
+    const user = await validateAuthAndGetUser();
+    if (user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+    }
+
     // Get all extension stores from database
     const stores = await db.extensionStore.findMany({
       where: { isEnabled: true },
@@ -163,6 +169,11 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const user = await validateAuthAndGetUser();
+    if (user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+    }
+
     const body = await request.json();
     const { name, displayName, url } = body;
 

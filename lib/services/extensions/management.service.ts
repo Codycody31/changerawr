@@ -16,6 +16,28 @@ const JOBS_DIR = path.join(process.cwd(), '.next/cache/extension-jobs');
 const isDocker = process.env.DOCKER_BUILD === '1' || !!process.env.DOCKER_CONTAINER;
 const isWindows = process.platform === 'win32';
 
+// Extension author/name come from an attacker-controllable extension.json fetched
+// from an arbitrary GitHub repo — strip anything that isn't a safe path segment
+// so they can't be used to escape EXTENSIONS_DIR (e.g. author: "../../..").
+function sanitizePathSegment(segment: string): string {
+  const cleaned = segment.replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!cleaned) {
+    throw new Error(`Invalid extension manifest path segment: "${segment}"`);
+  }
+  return cleaned;
+}
+
+// Resolves `relativePath` under `baseDir` and throws if the result would land
+// outside baseDir (zip-slip guard for archive entries with "../" in their name).
+function resolveWithinDir(baseDir: string, relativePath: string): string {
+  const resolvedBase = path.resolve(baseDir);
+  const target = path.resolve(resolvedBase, relativePath);
+  if (target !== resolvedBase && !target.startsWith(resolvedBase + path.sep)) {
+    throw new Error(`Refusing to write outside extension directory: "${relativePath}"`);
+  }
+  return target;
+}
+
 // Ensure jobs directory exists
 fs.mkdir(JOBS_DIR, { recursive: true }).catch(() => {});
 
@@ -354,8 +376,10 @@ export async function installExtension(githubUrl: string, jobId: string): Promis
     addJobLog(jobId, `Found extension: ${manifest.displayName} v${manifest.version}`, 'success');
 
     // Create extension directory with author namespace
-    const authorDir = path.join(EXTENSIONS_DIR, manifest.author);
-    const extDir = path.join(authorDir, manifest.name);
+    const safeAuthor = sanitizePathSegment(manifest.author);
+    const safeName = sanitizePathSegment(manifest.name);
+    const authorDir = path.join(EXTENSIONS_DIR, safeAuthor);
+    const extDir = path.join(authorDir, safeName);
 
     // Delete existing extension directory if it exists (for updates)
     try {
@@ -450,7 +474,7 @@ export async function installExtension(githubUrl: string, jobId: string): Promis
 
             // Rewrite relative imports to absolute paths for TypeScript/TSX files
             if (file.endsWith('.ts') || file.endsWith('.tsx')) {
-              textContent = rewriteRelativeImports(textContent, manifest.author, manifest.name);
+              textContent = rewriteRelativeImports(textContent, safeAuthor, safeName);
             }
 
             await fs.writeFile(path.join(extDir, file), textContent);
@@ -473,7 +497,8 @@ export async function installExtension(githubUrl: string, jobId: string): Promis
         for (const entry of dirEntries) {
           // Calculate relative path within the extension directory
           const relativePath = entry.entryName.substring(extensionPrefix.length);
-          const targetPath = path.join(extDir, relativePath);
+          // Zip-slip guard: reject entries whose name resolves outside extDir
+          const targetPath = resolveWithinDir(extDir, relativePath);
 
           // Ensure parent directory exists
           await fs.mkdir(path.dirname(targetPath), { recursive: true });
@@ -483,7 +508,7 @@ export async function installExtension(githubUrl: string, jobId: string): Promis
           // Rewrite relative imports for TypeScript/TSX files
           if (relativePath.endsWith('.ts') || relativePath.endsWith('.tsx')) {
             content = Buffer.from(
-              rewriteRelativeImports(content.toString('utf-8'), manifest.author, manifest.name)
+              rewriteRelativeImports(content.toString('utf-8'), safeAuthor, safeName)
             );
           }
 
@@ -516,11 +541,11 @@ export async function installExtension(githubUrl: string, jobId: string): Promis
     });
 
     await db.editorExtension.upsert({
-      where: { name: manifest.name },
+      where: { name: safeName },
       update: {
         displayName: manifest.displayName,
         version: manifest.version,
-        author: manifest.author,
+        author: safeAuthor,
         description: manifest.description,
         category: manifest.category,
         sourceType: 'STORE',
@@ -528,10 +553,10 @@ export async function installExtension(githubUrl: string, jobId: string): Promis
         isEnabled: true,
       },
       create: {
-        name: manifest.name,
+        name: safeName,
         displayName: manifest.displayName,
         version: manifest.version,
-        author: manifest.author,
+        author: safeAuthor,
         description: manifest.description,
         category: manifest.category,
         sourceType: 'STORE',

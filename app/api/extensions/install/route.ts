@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { startInstallation } from '@/lib/services/extensions/management.service';
+import { validateAuthAndGetUser } from '@/lib/utils/changelog';
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await validateAuthAndGetUser();
+    if (user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+    }
+
     const body = await request.json();
     const { url } = body;
 

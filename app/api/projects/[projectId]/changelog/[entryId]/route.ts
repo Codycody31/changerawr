@@ -284,6 +284,14 @@ export async function PUT(
     try {
         const user = await validateAuthAndGetUser();
         const {projectId, entryId} = await (async () => context.params)();
+
+        if (user.role === Role.VIEWER) {
+            return NextResponse.json(
+                {error: 'Insufficient permissions'},
+                {status: 403}
+            );
+        }
+
         const requestBody = await request.json();
         const {title, content, version, tags, isManual} = requestBody;
 

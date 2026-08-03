@@ -113,7 +113,7 @@ function ChangelogEntry({ entry, projectId, timezone }: { entry: ChangelogEntry;
                             </h2>
                             {entry.version && (
                                 <Badge variant="secondary" className="font-mono text-xs">
-                                    v{entry.version}
+                                    {entry.version}
                                 </Badge>
                             )}
                         </div>

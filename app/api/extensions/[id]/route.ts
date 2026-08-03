@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { uninstallExtension, getJobProgress } from '@/lib/services/extensions/management.service';
 import { db } from '@/lib/db';
+import { validateAuthAndGetUser } from '@/lib/utils/changelog';
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const user = await validateAuthAndGetUser();
+    if (user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+    }
+
     const { id } = await params;
     const body = await request.json();
     const { isEnabled } = body;
@@ -50,6 +56,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const user = await validateAuthAndGetUser();
+    if (user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+    }
+
     const { id } = await params;
 
     if (!id) {
@@ -94,6 +105,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const user = await validateAuthAndGetUser();
+    if (user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+    }
+
     const { id } = await params;
 
     // Check if this is a job ID for progress tracking

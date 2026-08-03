@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { triggerGracefulRestart } from '@/lib/services/restart-manager';
+import { validateAuthAndGetUser } from '@/lib/utils/changelog';
 
 /**
  * Trigger a graceful restart with maintenance mode
@@ -7,6 +8,11 @@ import { triggerGracefulRestart } from '@/lib/services/restart-manager';
  */
 export async function POST(request: NextRequest) {
   try {
+    const user = await validateAuthAndGetUser();
+    if (user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+    }
+
     const body = await request.json().catch(() => ({}));
     const reason = body.reason || 'extension-update';
 

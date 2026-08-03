@@ -5,10 +5,12 @@ import Link from 'next/link';
 import { RenderMarkdown } from '@/components/markdown-editor/RenderMarkdown';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { formatDistanceToNow, format } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import ShareButton from '@/components/changelog/ShareButton';
 import { useEntryViewTracking } from '@/app/changelog/[projectId]/changelog-view';
 import ButtonGroup from '@/components/changelog/ButtonGroup';
+import { formatDateLong } from '@/lib/utils/format-date';
+import { useTimezone } from '@/hooks/use-timezone';
 
 interface ChangelogEntry {
     id: string;
@@ -35,6 +37,7 @@ interface EntryContentProps {
 
 export function EntryContent({ domain, projectId, projectName, entry }: EntryContentProps) {
     const entryRef = useEntryViewTracking(entry.id, projectId);
+    const timeZone = useTimezone();
 
     return (
         <>
@@ -91,7 +94,7 @@ export function EntryContent({ domain, projectId, projectName, entry }: EntryCon
                             <div className="flex items-center gap-1.5">
                                 <Calendar className="w-4 h-4" />
                                 <time dateTime={entry.publishedAt}>
-                                    {format(new Date(entry.publishedAt), 'MMMM d, yyyy')}
+                                    {formatDateLong(entry.publishedAt, timeZone)}
                                 </time>
                             </div>
 
@@ -121,7 +124,7 @@ export function EntryContent({ domain, projectId, projectName, entry }: EntryCon
                     <footer className="pt-8 border-t border-border">
                         <div className="flex items-center justify-between">
                             <div className="text-sm text-muted-foreground">
-                                Last updated: {format(new Date(entry.updatedAt), 'MMMM d, yyyy')}
+                                Last updated: {formatDateLong(entry.updatedAt, timeZone)}
                             </div>
 
                             <Link href="/">
