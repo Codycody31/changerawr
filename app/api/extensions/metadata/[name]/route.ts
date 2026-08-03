@@ -3,6 +3,7 @@ import { getAvailableExtensions } from '@/lib/services/core/markdown/extensionLo
 import { db } from '@/lib/db';
 import * as fs from 'fs';
 import * as path from 'path';
+import { validateAuthAndGetUser } from '@/lib/utils/changelog';
 
 const EXTENSIONS_DIR = path.join(process.cwd(), 'extensions');
 
@@ -18,6 +19,11 @@ export async function GET(
     { params }: { params: Promise<{ name: string }> }
 ) {
     try {
+        const user = await validateAuthAndGetUser();
+        if (user.role !== 'ADMIN') {
+            return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+        }
+
         const { name: rawParam } = await params;
 
         if (!rawParam) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { validateAuthAndGetUser } from '@/lib/utils/changelog';
 
 /**
  * Update all extensions that have updates available
@@ -7,6 +8,11 @@ import { db } from '@/lib/db';
  */
 export async function POST(request: NextRequest) {
   try {
+    const user = await validateAuthAndGetUser();
+    if (user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+    }
+
     // Get all extensions that need updates
     const extensions = await db.editorExtension.findMany({
       where: {

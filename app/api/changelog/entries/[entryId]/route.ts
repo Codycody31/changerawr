@@ -10,7 +10,6 @@ import {
 import {z} from "zod";
 import {NextResponse} from 'next/server';
 import {createOrReopenRequest} from '@/lib/services/request/changelog-request';
-import {useEntryViewTracking} from '@/app/changelog/[projectId]/changelog-view'
 import {maybeCreateRevision} from '@/lib/services/core/changelog/revisions'
 
 // Helper to get project ID from changelog entry
@@ -99,6 +98,8 @@ export async function GET(
                                 id: true,
                                 name: true,
                                 isPublic: true,
+                                maintenanceMode: true,
+                                maintenanceMessage: true,
                             }
                         }
                     }
@@ -121,10 +122,23 @@ export async function GET(
             );
         }
 
+        // Same maintenance-mode gate the changelog list enforces
+        if (entry.changelog.project.maintenanceMode) {
+            return NextResponse.json({
+                project: {
+                    id: entry.changelog.project.id,
+                    name: entry.changelog.project.name,
+                    maintenanceMode: true,
+                    maintenanceMessage: entry.changelog.project.maintenanceMessage,
+                },
+            });
+        }
+
         return NextResponse.json({
             project: {
                 id: entry.changelog.project.id,
                 name: entry.changelog.project.name,
+                maintenanceMode: false,
             },
             entry: {
                 id: entry.id,

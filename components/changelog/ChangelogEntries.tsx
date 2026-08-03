@@ -3,7 +3,8 @@
 
 import {useEffect, useRef, useState, useCallback} from 'react'
 import {motion, useInView, useScroll, useSpring, AnimatePresence} from 'framer-motion'
-import {format} from 'date-fns'
+import {formatDateLong} from '@/lib/utils/format-date'
+import {useTimezone} from '@/hooks/use-timezone'
 import {Badge} from '@/components/ui/badge'
 import {Card, CardContent} from '@/components/ui/card'
 import {Skeleton} from '@/components/ui/skeleton'
@@ -138,6 +139,7 @@ export default function ChangelogEntries({projectId}: ChangelogEntriesProps) {
     const containerRef = useRef<HTMLDivElement>(null)
     const [activeEntry, setActiveEntry] = useState<string | null>(null)
     const pathname = usePathname()
+    const timeZone = useTimezone()
 
     // Determine if we're on a custom domain
     // On custom domains, pathname will be like "/" or "/entryId", NOT "/changelog/custom-domain/..."
@@ -549,12 +551,7 @@ export default function ChangelogEntries({projectId}: ChangelogEntriesProps) {
                                                                                 : entry.publishedAt.toISOString()}
                                                                             className="text-sm tabular-nums"
                                                                         >
-                                                                            {format(
-                                                                                typeof entry.publishedAt === 'string'
-                                                                                    ? new Date(entry.publishedAt)
-                                                                                    : entry.publishedAt,
-                                                                                'MMMM d, yyyy'
-                                                                            )}
+                                                                            {formatDateLong(entry.publishedAt, timeZone)}
                                                                         </time>
                                                                     </div>
                                                                 )}

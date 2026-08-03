@@ -2,6 +2,7 @@ import {notFound} from 'next/navigation';
 import {Metadata} from 'next';
 import {db} from '@/lib/db';
 import {EntryContent} from './EntryContent';
+import MaintenancePage from '@/components/changelog/MaintenancePage';
 
 interface ChangelogEntry {
     id: string;
@@ -57,6 +58,8 @@ async function getProjectFromDomain(domain: string) {
         select: {
             id: true,
             name: true,
+            maintenanceMode: true,
+            maintenanceMessage: true,
             changelog: {
                 select: {
                     id: true,
@@ -146,6 +149,15 @@ export default async function CustomDomainEntryPage({params}: EntryPageProps) {
 
     if (!project?.changelog) {
         notFound();
+    }
+
+    if (project.maintenanceMode) {
+        return (
+            <MaintenancePage
+                projectName={project.name}
+                message={project.maintenanceMessage}
+            />
+        );
     }
 
     const entry = await getEntry(project.changelog.id, entryId);

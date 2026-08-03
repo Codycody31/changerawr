@@ -22,7 +22,11 @@ export async function PATCH(
 ): Promise<Response> {
     try {
         // Authentication check
-        await validateAuthAndGetUser();
+        const user = await validateAuthAndGetUser();
+
+        if (user.role === 'VIEWER') {
+            return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+        }
 
         const { subscriberId } = await context.params;
         const { searchParams } = new URL(request.url);
@@ -121,7 +125,11 @@ export async function DELETE(
 ): Promise<Response> {
     try {
         // Authentication check
-        await validateAuthAndGetUser();
+        const user = await validateAuthAndGetUser();
+
+        if (user.role === 'VIEWER') {
+            return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+        }
 
         const { subscriberId } = await context.params;
         const { searchParams } = new URL(request.url);

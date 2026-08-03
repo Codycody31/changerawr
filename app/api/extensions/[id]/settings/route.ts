@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { validateAuthAndGetUser } from '@/lib/utils/changelog';
 
 /**
  * GET /api/extensions/[id]/settings
@@ -10,6 +11,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Intentionally public: installed extensions fetch their own settings at
+    // render time (including from public, unauthenticated changelog pages).
+    // Only the write path (PATCH, below) is admin-gated.
     const { id } = await params;
 
     console.log('[Settings API] GET request for extension ID:', id);
@@ -55,6 +59,11 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const user = await validateAuthAndGetUser();
+    if (user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+    }
+
     const { id } = await params;
     const body = await request.json();
     const { settings } = body;

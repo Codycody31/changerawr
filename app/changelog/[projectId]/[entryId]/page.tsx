@@ -8,9 +8,12 @@ import {RenderMarkdown} from '@/components/markdown-editor/RenderMarkdown';
 import {Badge} from '@/components/ui/badge';
 import {Button} from '@/components/ui/button';
 import {Skeleton} from '@/components/ui/skeleton';
-import {formatDistanceToNow, format} from 'date-fns';
+import {formatDistanceToNow} from 'date-fns';
 import ShareButton from '@/components/changelog/ShareButton';
 import {useEntryViewTracking} from '@/app/changelog/[projectId]/changelog-view';
+import MaintenancePage from '@/components/changelog/MaintenancePage';
+import {formatDateLong} from '@/lib/utils/format-date';
+import {useTimezone} from '@/hooks/use-timezone';
 
 interface ChangelogEntry {
     id: string;
@@ -34,8 +37,10 @@ interface EntryResponse {
         id: string;
         name: string;
         description?: string;
+        maintenanceMode?: boolean;
+        maintenanceMessage?: string | null;
     };
-    entry: ChangelogEntry;
+    entry?: ChangelogEntry;
 }
 
 type EntryPageProps = {
@@ -49,6 +54,7 @@ export default function EntryPage({params}: EntryPageProps) {
     const [error, setError] = useState(false);
     const [projectId, setProjectId] = useState<string>('');
     const [entryId, setEntryId] = useState<string>('');
+    const timeZone = useTimezone();
 
     // Call the tracking hook at the top level with safe defaults
     // It will only track once data is loaded
@@ -125,6 +131,15 @@ export default function EntryPage({params}: EntryPageProps) {
         );
     }
 
+    if (data.project.maintenanceMode || !data.entry) {
+        return (
+            <MaintenancePage
+                projectName={data.project.name}
+                message={data.project.maintenanceMessage}
+            />
+        );
+    }
+
     const {project, entry} = data;
 
     return (
@@ -172,7 +187,7 @@ export default function EntryPage({params}: EntryPageProps) {
                             {entry.version && (
                                 <div className="flex items-center gap-1.5">
                                     <Badge variant="outline" className="font-mono">
-                                        v{entry.version}
+                                        {entry.version}
                                     </Badge>
                                 </div>
                             )}
@@ -180,7 +195,7 @@ export default function EntryPage({params}: EntryPageProps) {
                             <div className="flex items-center gap-1.5">
                                 <Calendar className="w-4 h-4"/>
                                 <time dateTime={entry.publishedAt}>
-                                    {format(new Date(entry.publishedAt), 'MMMM d, yyyy')}
+                                    {formatDateLong(entry.publishedAt, timeZone)}
                                 </time>
                             </div>
 
@@ -210,7 +225,7 @@ export default function EntryPage({params}: EntryPageProps) {
                     <footer className="pt-8 border-t border-border">
                         <div className="flex items-center justify-between">
                             <div className="text-sm text-muted-foreground">
-                                Last updated: {format(new Date(entry.updatedAt), 'MMMM d, yyyy')}
+                                Last updated: {formatDateLong(entry.updatedAt, timeZone)}
                             </div>
 
                             <Link href={`/changelog/${projectId}`}>

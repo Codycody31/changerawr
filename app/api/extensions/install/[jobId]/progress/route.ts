@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getJobProgress } from '@/lib/services/extensions/management.service';
+import { validateAuthAndGetUser } from '@/lib/utils/changelog';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ jobId: string }> }
 ) {
   try {
+    const user = await validateAuthAndGetUser();
+    if (user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+    }
+
     const { jobId } = await params;
 
     const progress = await getJobProgress(jobId);

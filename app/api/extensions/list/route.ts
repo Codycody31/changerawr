@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { getAvailableExtensions } from '@/lib/services/core/markdown/extensionLoader';
+import { validateAuthAndGetUser } from '@/lib/utils/changelog';
 
 const EXTENSIONS_DIR = path.join(process.cwd(), 'extensions');
 
@@ -24,6 +25,8 @@ function compareVersions(v1: string, v2: string): number {
 
 export async function GET(request: NextRequest) {
   try {
+    await validateAuthAndGetUser();
+
     // Fetch all extensions from database
     const extensions = await db.editorExtension.findMany({
       orderBy: [
